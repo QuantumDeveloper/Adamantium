@@ -50,11 +50,13 @@ internal sealed class RegularPolygonCollector : ShapeSdfCollector<PolygonItem>
     internal static Vector4F ShapeNumbers(RegularPolygonPayload p, float scale) =>
         new(p.Corners, (float)MathHelper.DegreesToRadians(p.StartAngle), (float)(p.RingThickness * scale), 0);
 
-    public bool TryAdd(RegularPolygonPayload p, Matrix4x4F world, double opacity, Rect2D scissor, Rect logicalBounds, int transformSlot = 0)
+    public bool TryAdd(RegularPolygonPayload p, Matrix4x4F world, double opacity, Rect2D scissor, Rect logicalBounds, int transformSlot = 0,
+        int clipSlot = -1, int fadeSlot = -1)
     {
         EnsureCpuCapacity(Count + 1);
         if (Count + 1 > GpuCapacity) return false;
         if (!BakeItem(p, world, opacity, transformSlot, out var item)) return false;   // rotation/shear -> per-unit
+        item.Clip = new Vector4F(clipSlot, fadeSlot, 0, 0);
         Items[Count++] = item;
         MarkPending(scissor, logicalBounds);
         return true;
@@ -86,7 +88,11 @@ internal sealed class RegularPolygonCollector : ShapeSdfCollector<PolygonItem>
             StrokeColor = strokeColor,
             Stroke0 = stroke0,
             Stroke1 = stroke1,
-            Dash = dash
+            Dash = dash,
+            // -1, never 0, for BOTH slots (.x clip, .y opacity): zero is a valid slot belonging to somebody else, so a
+            // record that forgot to stamp its own would be cut by a stranger's shape or faded by a stranger's alpha.
+            // The stampers are TryAdd, TryStage and the patch.
+            Clip = new Vector4F(-1, -1, 0, 0)
         };
         return true;
     }

@@ -109,7 +109,7 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
         public ITexture PendingTexture;   // what the instances appended since the last run all sample
 
         // Parallel MATERIAL instance state for this key's shared mesh. The record is the PATTERN one deliberately: both
-        // feed PatGeomData, so a second identical struct would only be a second thing to keep in step.
+        // feed PatternGeomData, so a second identical struct would only be a second thing to keep in step.
         public PatternGeometryInstance[] MatItems = new PatternGeometryInstance[16];
         public int MatCount;
         public int MatFlushed;
@@ -406,7 +406,8 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
     /// <summary>Collect one instanceable fill: append its per-instance world+colour to its key's buffer and register the
     /// unit for a deferred fringe/stroke draw. False only if it can't be batched (no drawable mesh, or the instance buffer
     /// overflowed this frame) - the caller then draws that unit per-unit (fill included).</summary>
-    public bool TryAdd(GeometryRenderUnit unit, Matrix4x4F local, Rect2D scissor, Rect logicalBounds, int transformSlot)
+    public bool TryAdd(GeometryRenderUnit unit, Matrix4x4F local, Rect2D scissor, Rect logicalBounds, int transformSlot,
+        int clipSlot = -1)
     {
         if (!unit.TryGetInstancedFill(out var key, out var meshObj, out var color)) return false;
         // The unit's OWN placement on top of the caller's bake (a Drawing's shape sitting at its own spot and scale
@@ -438,7 +439,7 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
 
         LastArena = _arenas.TryGetValue(key, out var known) ? known : _arenas[key] = new InstancedKeyArena(this, seg);
         LastSlot = seg.Count;   // ...and which slot of that arena it is, so the walk can note the group run
-        seg.Items[seg.Count++] = GeometryInstance.FromLocal(local, color, transformSlot, FadeSlotFor(unit));
+        seg.Items[seg.Count++] = GeometryInstance.FromLocal(local, color, transformSlot, FadeSlotFor(unit), clipSlot);
 
         _scissor = scissor;
         if (!seg.InPending) { seg.InPending = true; _pendingKeys.Add(seg); }
@@ -461,7 +462,7 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
     /// <summary>Collect one instanceable GRADIENT fill: append its per-instance world + gradient to its key's gradient
     /// buffer, and register the unit for a deferred fringe/stroke draw. False if it can't be batched (no drawable mesh or
     /// buffer overflow) - the caller draws it per-unit.</summary>
-    public bool TryAddGradient(GeometryRenderUnit unit, Matrix4x4F local, Rect2D scissor, Rect logicalBounds, int transformSlot)
+    public bool TryAddGradient(GeometryRenderUnit unit, Matrix4x4F local, Rect2D scissor, Rect logicalBounds, int transformSlot, int clipSlot = -1)
     {
         if (!unit.TryGetInstancedGradientFill(out var key, out var meshObj, out var brush, out var localBounds, out var opacity)) return false;
         local = unit.Place(local);
@@ -486,7 +487,7 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
         }
         if (seg.GradCount + 1 > seg.GradGpuCapacity) return false;
 
-        seg.GradItems[seg.GradCount++] = BuildGradientInstance(brush, local, localBounds, opacity, transformSlot, FadeSlotFor(unit));
+        seg.GradItems[seg.GradCount++] = BuildGradientInstance(brush, local, localBounds, opacity, transformSlot, FadeSlotFor(unit), clipSlot);
 
         _scissor = scissor;
         if (!seg.InPending) { seg.InPending = true; _pendingKeys.Add(seg); }
@@ -506,9 +507,9 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
     // Pack a gradient brush + world + local bounds into one gradient instance record (stops/geometry via the shared
     // GradientBake; Params = (type, spread, stopCount, _) to match the gradient-fill vertex shader).
     private static GradientGeometryInstance BuildGradientInstance(GradientBrush g, Matrix4x4F local, Rect localBounds,
-        double opacity, int transformSlot, int fadeSlot)
+        double opacity, int transformSlot, int fadeSlot, int clipSlot)
     {
-        var inst = new GradientGeometryInstance { Local = local };
+        var inst = new GradientGeometryInstance { Local = local, Clip = new Vector4F(clipSlot, 0, 0, 0) };
         var alpha = (float)(g.Opacity * opacity);
         Span<Vector4F> cols = stackalloc Vector4F[GradientBake.MaxStops];
         Span<float> offs = stackalloc float[GradientBake.MaxStops];
@@ -534,7 +535,7 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
     /// <summary>Collect one instanceable TEXTURED fill. The texture is bound per DRAW, so a change of texture inside one
     /// mesh ends the current run rather than the segment - the instances stay contiguous and each run remembers what to
     /// bind. False if it can't be batched (no frozen mesh, or the source is still decoding).</summary>
-    public bool TryAddTextured(GeometryRenderUnit unit, Matrix4x4F local, Rect2D scissor, Rect logicalBounds, int transformSlot)
+    public bool TryAddTextured(GeometryRenderUnit unit, Matrix4x4F local, Rect2D scissor, Rect logicalBounds, int transformSlot, int clipSlot = -1)
     {
         if (!unit.TryGetInstancedTexturedFill(out var key, out var meshObj, out var brush, out var localBounds, out var opacity, out var texture)) return false;
         local = unit.Place(local);
@@ -562,7 +563,7 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
         }
         if (seg.TexCount + 1 > seg.TexGpuCapacity) return false;
 
-        seg.TexItems[seg.TexCount++] = BuildTexturedInstance(brush, local, localBounds, opacity, transformSlot, FadeSlotFor(unit));
+        seg.TexItems[seg.TexCount++] = BuildTexturedInstance(brush, local, localBounds, opacity, transformSlot, FadeSlotFor(unit), clipSlot);
         seg.PendingTexture = texture;
 
         _scissor = scissor;
@@ -584,7 +585,7 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
     // SDF textured batch uses (ImageTiling), fed the shape's LOCAL box - the geometry PS works in local mesh coords, so
     // the drawn rect is expressed as a fraction of that box rather than in device pixels.
     private static TexGeometryInstance BuildTexturedInstance(TileBrush brush, Matrix4x4F local, Rect localBounds,
-        double opacity, int transformSlot, int fadeSlot)
+        double opacity, int transformSlot, int fadeSlot, int clipSlot)
     {
         var box = localBounds.Width > 0 && localBounds.Height > 0 ? localBounds : new Rect(0, 0, 1, 1);
         var layout = ImageTiling.Layout(brush, box, local.M11, local.M22);
@@ -601,7 +602,8 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
             Rotation = layout.Rotation,
             Drawn = layout.Drawn,
             UvRect = layout.UvRect,
-            Tint = tint
+            Tint = tint,
+            Clip = new Vector4F(clipSlot, 0, 0, 0)   // the rounded ancestor clip, -1 = none
         };
     }
 
@@ -609,7 +611,7 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
 
     /// <summary>Collect one instanceable PATTERN/NOISE fill: append its per-instance world + pattern to its key's pattern
     /// buffer, and register the unit for a deferred fringe/stroke draw. False if it can't be batched.</summary>
-    public bool TryAddPattern(GeometryRenderUnit unit, Matrix4x4F local, Rect2D scissor, Rect logicalBounds, int transformSlot)
+    public bool TryAddPattern(GeometryRenderUnit unit, Matrix4x4F local, Rect2D scissor, Rect logicalBounds, int transformSlot, int clipSlot = -1)
     {
         if (!unit.TryGetInstancedPatternFill(out var key, out var meshObj, out var brush, out var localBounds, out var opacity)) return false;
         local = unit.Place(local);
@@ -634,7 +636,7 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
         }
         if (seg.PatCount + 1 > seg.PatGpuCapacity) return false;
 
-        seg.PatItems[seg.PatCount++] = BuildPatternInstance(brush, local, localBounds, opacity, transformSlot, FadeSlotFor(unit));
+        seg.PatItems[seg.PatCount++] = BuildPatternInstance(brush, local, localBounds, opacity, transformSlot, FadeSlotFor(unit), clipSlot);
 
         _scissor = scissor;
         if (!seg.InPending) { seg.InPending = true; _pendingKeys.Add(seg); }
@@ -654,7 +656,7 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
     // Pack a PatternBrush/NoiseBrush + world + local bounds into one pattern instance record. Cell stays in LOCAL units (the
     // geometry PS works in local mesh coords) - no device-scale, unlike the SDF rect bake. Mirrors PatternRectCollector.BakeItem.
     private static PatternGeometryInstance BuildPatternInstance(Brush brush, Matrix4x4F local, Rect localBounds,
-        double opacity, int transformSlot, int fadeSlot)
+        double opacity, int transformSlot, int fadeSlot, int clipSlot)
     {
         var inst = new PatternGeometryInstance { Local = local };
         PatternBrushRecord.TryDescribe(brush, out var record);   // the caller already refused anything else
@@ -671,7 +673,8 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
         inst.Color2 = c2;
         inst.Color3 = c3;
         inst.Noise = noise;
-        inst.Anim = new Vector4F((float)record.PhaseOffset, (float)record.FrozenPhase, 0, 0);
+        // .w = the rounded ancestor clip's slot (-1 = none), read in the vertex stage; .z is unused by either carrier.
+        inst.Anim = new Vector4F((float)record.PhaseOffset, (float)record.FrozenPhase, 0, clipSlot);
         return inst;
     }
 
@@ -683,7 +686,7 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
     /// <para>A run must agree about the image and the pass that reads it (a disagreement is refused, so the caller
     /// flushes); the captured region merely GROWS to cover every instance in it.</para></summary>
     public bool TryAddMaterial(GeometryRenderUnit unit, Matrix4x4F local, Rect2D scissor, Rect logicalBounds,
-        int transformSlot, Rect2D captureRegion)
+        int transformSlot, Rect2D captureRegion, int clipSlot = -1)
     {
         if (!unit.TryGetInstancedMaterialFill(out var key, out var meshObj, out var brush, out var localBounds, out var opacity)) return false;
         local = unit.Place(local);
@@ -717,7 +720,7 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
         if (seg.MatCount + 1 > seg.MatGpuCapacity) return false;
 
         seg.MatItems[seg.MatCount++] = BuildMaterialInstance(brush, local, localBounds, opacity, transformSlot,
-            FadeSlotFor(unit), source != null && anchor == MaterialAnchor.Element);
+            FadeSlotFor(unit), source != null && anchor == MaterialAnchor.Element, clipSlot);
         seg.MatRegion = seg.MatPending ? Union(seg.MatRegion, captureRegion) : captureRegion;
         seg.MatWallpaper = wallpaper;
         seg.MatGlass = glass;
@@ -755,10 +758,10 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
         };
     }
 
-    // The same PatGeomData slots the pattern bake fills, carrying the material's numbers: tint in Color1 (alpha = its
+    // The same PatternGeomData slots the pattern bake fills, carrying the material's numbers: tint in Color1 (alpha = its
     // strength), blur / grain / refraction in Color3 - as MaterialRectCollector bakes them for the analytic shapes.
     private static PatternGeometryInstance BuildMaterialInstance(MaterialBrush brush, Matrix4x4F local, Rect localBounds,
-        double opacity, int transformSlot, int fadeSlot, bool pinnedToElement)
+        double opacity, int transformSlot, int fadeSlot, bool pinnedToElement, int clipSlot)
     {
         var tint = brush.TintColor;
 
@@ -776,7 +779,9 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
             Color3 = new Vector4F((float)brush.BlurAmount, (float)brush.NoiseAmount, (float)brush.Refraction,
                 (float)Math.Clamp(opacity * brush.Opacity, 0.0, 1.0)),
             Noise = Vector4F.Zero,
-            Anim = Vector4F.Zero
+            // .w = the rounded ancestor clip's slot (-1 = none): this carrier shares PatternGeomData with the pattern
+            // fill, so it reads the clip from the same place - see BuildPatternInstance.
+            Anim = new Vector4F(0, 0, 0, clipSlot)
         };
     }
 
@@ -1415,14 +1420,15 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
 
     /// <summary>Bake one unit's SOLID instance into the patch stage, for THIS key only - a unit whose shape hashes to a
     /// different mesh belongs to another arena and must not be written into this one's array.</summary>
-    internal bool TryStageSolid(object key, IRenderUnit unit, Matrix4x4F world, int transformSlot, List<GeometryInstance> stage)
+    internal bool TryStageSolid(object key, IRenderUnit unit, Matrix4x4F world, int transformSlot, List<GeometryInstance> stage,
+        int clipSlot = -1)
     {
         if (key is not KeySegment seg) return false;
         if (unit is not GeometryRenderUnit gru) return false;
         if (!gru.TryGetInstancedFill(out var unitKey, out var meshObj, out var color)) return false;
         if (meshObj is not FrozenMesh mesh || !ReferenceEquals(GetOrCreate(unitKey, mesh), seg)) return false;
 
-        stage.Add(GeometryInstance.FromLocal(gru.Place(world), color, transformSlot, FadeSlotFor(gru)));
+        stage.Add(GeometryInstance.FromLocal(gru.Place(world), color, transformSlot, FadeSlotFor(gru), clipSlot));
         return true;
     }
 

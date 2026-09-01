@@ -35,7 +35,8 @@ public struct GeometryInstance
     /// their colour, as before.</para></summary>
     public Vector4F Params;
 
-    public static GeometryInstance FromLocal(Matrix4x4F local, Vector4F color, int transformSlot, int fadeSlot) => new()
+    public static GeometryInstance FromLocal(Matrix4x4F local, Vector4F color, int transformSlot, int fadeSlot,
+        int clipSlot = -1) => new()
     {
         // Store the world matrix RAW (row-major, as C# lays out Matrix4x4F). Uniform matrices go through
         // EffectParameter.CopyMatrixColumnMajor (transpose) because cbuffers read column-major, but a matrix in a BDA
@@ -44,6 +45,8 @@ public struct GeometryInstance
         // dumps it into .w and every triangle collapses toward clip origin (the diagonal-streak-from-corner artifact).
         Local = local,
         Color = color,
-        Params = new Vector4F(transformSlot, fadeSlot, 0, 0)
+        // .z is the ROUNDED CLIP slot: a mesh cannot get an ancestor's rounded corners from its own geometry, and a
+        // scissor cannot express them, so the shape comes from the table (-1 = no rounded clip).
+        Params = new Vector4F(transformSlot, fadeSlot, clipSlot, 0)
     };
 }

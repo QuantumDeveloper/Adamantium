@@ -141,13 +141,19 @@ public partial class RenderCache
     // Same slot map for the other SDF batches, kept separate from the rect map (which the SPLICE path renumbers) - these
     // only serve the paint fast-path. Without them a paint-only change to a non-rect (spinning ring, pulsing ellipse)
     // fell through to a full tree walk every tick.
-    private enum SdfSlotKind { Ellipse, GradientRect, GradientEllipse }
+    private enum SdfSlotKind { Ellipse, GradientRect, GradientEllipse, Polygon, Pattern, Texture, Fractal, Material }
     private readonly Dictionary<IRenderUnit, (SdfSlotKind Kind, int Slot)> _sdfSlotByUnit = new();
 
     // A text block owns a RUN of glyph slots, not one - the same map widened to a range, plus the atlas its recorded
     // segment binds. Lets a block whose glyph COUNT and atlas are unchanged (a counter ticking over, an FPS readout) be
     // re-baked in place. Without it ANY dirty text refused the frame's patch and cost a full walk of the scene.
     private readonly Dictionary<IRenderUnit, (int First, int Count, Graphics.Fonts.FontAtlas Atlas)> _textRunByUnit = new();
+
+    // ...and for a TEXTURED fill, which owns a run for the same reason: a NineSliceBrush bakes NINE records (four
+    // corners, four edges, the middle) out of one element. The slot map holds one number per unit, so without this a
+    // nine-slice could not be patched in place and a dragged one waited for a full walk. A plain picture is a run of 1
+    // and takes the same path.
+    private readonly Dictionary<IRenderUnit, (int First, int Count)> _texRunByUnit = new();
 
     // ...and the same for a GEOMETRY unit whose fill rides the instanced collector: which key-arena holds it and at
     // which slot. The arena could already re-bake one record in place (TryStage + UpdateSlotFromStage - the splice uses

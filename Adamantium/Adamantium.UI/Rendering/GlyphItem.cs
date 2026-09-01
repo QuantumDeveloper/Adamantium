@@ -20,12 +20,19 @@ public struct GlyphItem
     public Vector4F Source;
 
     /// <summary>.x = transform-table slot; .y = atlas layer; .z = depth; .w = OPACITY SLOT, sent but NOT YET READ.
-    /// <para>The glyph VS already reads the transform table for its matrix, and this driver AVs in
-    /// <c>vkCreateShadersEXT</c> on a SECOND read of it from that shader - the same compiler bug the layer-index note
-    /// in FontEffect.fx describes, and it crashed the sandbox on start in every form tried (a select, and a bare
-    /// multiply). So text still folds the opacity CHAIN into its colour, and this field waits: when the driver is
-    /// fixed, read it in FontBatchInstancedVS and text joins the rest of the families.</para></summary>
+    /// <para>The reason it went unread is gone. A SECOND read of the transform table from this shader used to AV
+    /// <c>vkCreateShadersEXT</c> in every form tried - but that was the effect sitting at the limit of what that
+    /// compiler would take, and it lost two unreachable passes since (see the note in FontEffect.fx). The clip now
+    /// makes exactly that second read, so this field can be read too and text can stop folding the opacity CHAIN into
+    /// its colour like the odd one out. Not done here only because nothing asked for it yet.</para></summary>
     public Vector4F Params;
+
+    /// <summary>.x = the CLIP SLOT this glyph is cut by, or -1; .yzw spare. Its own field because every number in
+    /// <see cref="Params"/> is spoken for, and -1 rather than 0 because 0 is a valid slot owned by somebody else.
+    /// <para>Carrying the SLOT, like every other family, is only possible since the effect lost its two dead passes: the
+    /// glyph vertex shader already reads the transform table for its matrix, and a SECOND read from it AVd
+    /// <c>vkCreateShadersEXT</c> 4 starts of 4 while they were there.</para></summary>
+    public Vector4F Clip;
 
     /// <summary>Straight (non-premultiplied) RGBA, element/brush opacity already folded into .w.</summary>
     public Vector4F Color;

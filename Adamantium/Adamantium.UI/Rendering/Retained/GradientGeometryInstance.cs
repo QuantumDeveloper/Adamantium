@@ -41,4 +41,8 @@ public struct GradientGeometryInstance
 
     /// <summary>Stop offsets 4..7.</summary>
     public Vector4F Offsets1;
+
+    /// <summary>.x = the ROUNDED CLIP's slot, or -1; .yzw spare. Its own field: this record already packs the opacity
+    /// slot INTO Params.w for want of room, and there is no second spare component to pack into.</summary>
+    public Vector4F Clip;
 }

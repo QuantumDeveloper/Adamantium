@@ -1228,9 +1228,23 @@ internal class Win32WindowWorker : AdamantiumComponent, IWindowWorkerService
 
     private IntPtr HandleCaptureChanged(WindowMessages windowMessage, IntPtr wParam, IntPtr lParam, out bool handled)
     {
-        // The OS revoked our capture (another window/app grabbed it, alt-tab, etc.). Drop the internal capture too so a
-        // captured control doesn't stay stuck believing the drag is still live. Capture() re-routes input against the
-        // visual tree, so marshal it onto the loop thread (the check runs there too - no cross-thread read of Captured).
+        // WM_CAPTURECHANGED also arrives when WE take the capture ourselves - lParam names the window that GAINED it,
+        // and on a button press that is this very window (see HandleMouseLeftButtonDown, which calls SetCapture). Taking
+        // our own capture is not losing it, so only a capture that went ELSEWHERE (another window, another app, alt-tab)
+        // is worth reacting to.
+        //
+        // DEFENSIVE, not a fix for anything seen: it was written for a drag that stopped following the mouse, and the
+        // probe then showed this branch never fired - that defect was elsewhere entirely (Canvas.Left marked the wrong
+        // element). Kept because the rule stands on its own; delete it if it ever gets in the way.
+        if (lParam == window.Handle)
+        {
+            handled = true;
+            return IntPtr.Zero;
+        }
+
+        // The OS revoked our capture. Drop the internal capture too so a captured control doesn't stay stuck believing
+        // the drag is still live. Capture() re-routes input against the visual tree, so marshal it onto the loop thread
+        // (the check runs there too - no cross-thread read of Captured).
         osMouseCaptured = false;
         DispatchInput(() => { if (MouseDevice.CurrentDevice.Captured != null) MouseDevice.CurrentDevice.Capture(null); });
         handled = true;

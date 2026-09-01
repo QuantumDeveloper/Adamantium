@@ -87,7 +87,10 @@ internal abstract class BatchArena
     /// and that is a real hole rather than an omission of tidiness: anything a PATCH put on screen was invisible to the
     /// orphan sweep, so when it stopped drawing its instances kept being issued inside a live segment's range. That is
     /// the phantom scrollbar track - the track arrives and leaves by patch, which is why it reproduced every time.</para></summary>
-    public abstract bool TryStage(IRenderUnit unit, Matrix4x4F world, int transformSlot, int ownerTag);
+    /// <para><paramref name="clipSlot"/> is the ROUNDED CLIP the record is cut by, and it is here for exactly the reason
+    /// ownerTag is: a staged record has to come out identical to the one the walk writes, and anything the walk stamps
+    /// that staging does not is a hole. Families that do not carry a clip yet ignore it.</para>
+    public abstract bool TryStage(IRenderUnit unit, Matrix4x4F world, int transformSlot, int ownerTag, int clipSlot = -1);
 
     /// <summary>Replace [at, at+replaced) inside a segment with a staged range, shifting only what follows. False when the
     /// result outgrows the room that segment owns; the caller then re-points it whole.</summary>

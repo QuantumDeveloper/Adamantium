@@ -70,11 +70,13 @@ internal sealed class EllipseBatchCollector : ShapeSdfCollector<EllipseItem>
     // Bake one solid ellipse fill (bounds -> world, colour straight with opacity folded in) into the pending segment.
     // False only if it can't be baked (rotated/sheared world or a GPU-buffer overflow this frame) - the caller then draws
     // that ellipse via the per-unit path.
-    public bool TryAdd(EllipsePayload p, Matrix4x4F world, double opacity, Rect2D scissor, Rect logicalBounds, int transformSlot = 0, int fadeSlot = -1)
+    public bool TryAdd(EllipsePayload p, Matrix4x4F world, double opacity, Rect2D scissor, Rect logicalBounds, int transformSlot = 0,
+        int fadeSlot = -1, int clipSlot = -1)
     {
         EnsureCpuCapacity(Count + 1);
         if (Count + 1 > GpuCapacity) return false;
         if (!BakeItem(p, world, opacity, transformSlot, fadeSlot, out var item)) return false;   // rotation/shear -> per-unit
+        item.Params.Z = clipSlot;
         Items[Count++] = item;
         MarkPending(scissor, logicalBounds);
         return true;
@@ -108,7 +110,9 @@ internal sealed class EllipseBatchCollector : ShapeSdfCollector<EllipseItem>
             // NODE-local when transformSlot != 0 (world is then the transform RELATIVE to the motion node; the vertex
             // shader applies the node's table matrix on top - the O(1)-scroll path). Slot 0 = identity = world bake.
             Bounds = new Vector4F((float)(r.X * sx + tx), (float)(r.Y * sy + ty), (float)(r.Width * sx), (float)(r.Height * sy)),
-            Params = new Vector4F(transformSlot, fadeSlot, 0, 0),
+            // .z = the rounded CLIP slot, and it starts at -1, never 0: zero is a perfectly valid slot belonging to
+            // somebody else, so a record that forgot to set it would be cut by a stranger's shape.
+            Params = new Vector4F(transformSlot, fadeSlot, -1, 0),
             Color = color,
             StrokeColor = strokeColor,
             Stroke0 = stroke0,
@@ -153,11 +157,12 @@ internal sealed class EllipseBatchCollector : ShapeSdfCollector<EllipseItem>
 
     /// <summary>Bake one unit into the patch stage - see BatchArena. Same bake TryAdd uses; it just lands in the stage
     /// instead of the arena, because a patch has to know the whole frame is repairable before it changes any of it.</summary>
-    public override bool TryStage(IRenderUnit unit, Matrix4x4F world, int transformSlot, int ownerTag)
+    public override bool TryStage(IRenderUnit unit, Matrix4x4F world, int transformSlot, int ownerTag, int clipSlot = -1)
     {
         if (unit is not RenderUnits.EllipseRenderUnit u || !CanBatch(u.EllipsePayload)) return false;
         if (!BakeItem(u.EllipsePayload, world, u.FillOpacity, transformSlot, unit.FadeSlot, out var item)) return false;
 
+        item.Params.Z = clipSlot;   // the same stamp TryAdd makes - see BatchArena.TryStage
         Stage.Add(item);
         return true;
     }

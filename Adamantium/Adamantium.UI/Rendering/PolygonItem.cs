@@ -39,4 +39,12 @@ public struct PolygonItem
 
     /// <summary>Dash runs 2..5 in device px - runs 0 and 1 ride in <see cref="Stroke0"/>.zw.</summary>
     public Vector4F Dash;
+
+    /// <summary>.x = the CLIP SLOT this instance is cut by, or -1; .y = the OPACITY SLOT its alpha is read from (-1 =
+    /// opaque); .zw spare. Its own field because every number in <see cref="Params"/> is already spoken for - this shape
+    /// is described by four of them.
+    /// <para>The opacity slot moved here after the polygon spent a while as the one family that could not read one: it
+    /// carried the whole opacity CHAIN baked into its colour instead, so a fading ancestor had to find and re-bake it
+    /// (RenderCache's slot-blind list), and when that missed, the shape simply did not fade with its neighbours.</para></summary>
+    public Vector4F Clip;
 }

@@ -54,4 +54,8 @@ public struct GradientRectItem
 
     /// <summary>Stop offsets (0..1) for stops 4..7.</summary>
     public Vector4F Offsets1;
+
+    /// <summary>.x = the CLIP SLOT this instance is cut by, or -1; .yzw spare. Its own field: every number in
+    /// <see cref="Params"/> and <see cref="Geom1"/> is already carrying something.</summary>
+    public Vector4F Clip;
 }

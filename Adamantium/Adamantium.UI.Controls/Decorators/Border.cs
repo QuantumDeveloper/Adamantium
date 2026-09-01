@@ -14,7 +14,8 @@ public class Border : Decorator
 
    public static readonly AdamantiumProperty CornerRadiusProperty = AdamantiumProperty.Register(nameof(CornerRadius),
       typeof (CornerRadius), typeof (Border),
-      new PropertyMetadata(default(CornerRadius), PropertyMetadataOptions.AffectsMeasure));
+      new PropertyMetadata(default(CornerRadius), PropertyMetadataOptions.AffectsMeasure,
+         (d, _) => NotifyOwnCornersChanged(d)));   // these corners are also the CLIP's, when it clips - see the note there
 
    public static readonly AdamantiumProperty BorderThicknessProperty =
       AdamantiumProperty.Register(nameof(BorderThickness),
@@ -41,6 +42,13 @@ public class Border : Decorator
    {
       get => GetValue<CornerRadius>(CornerRadiusProperty);
       set => SetValue(CornerRadiusProperty, value);
+   }
+
+   /// <inheritdoc />
+   protected override Vector4F OwnCornerRadii()
+   {
+      var r = CornerRadius;
+      return new Vector4F((float)r.TopLeft, (float)r.TopRight, (float)r.BottomRight, (float)r.BottomLeft);
    }
 
    public Thickness BorderThickness

@@ -47,4 +47,9 @@ public struct TextureItem
     /// <summary>Multiplied into the sampled colour, straight RGBA, opacity folded into .w. White = the image as it is;
     /// a colour tints it, which is how one greyscale skin serves several themes.</summary>
     public Vector4F Tint;
+
+    /// <summary>.x = the ROUNDED CLIP's slot this instance is cut by, .y = the OPACITY slot its alpha is read from
+    /// (-1 for either = none); .zw spare. A field of its own because every component of every other field is spoken
+    /// for - the picture, its tiling and its pen use them all.</summary>
+    public Vector4F Clip;
 }

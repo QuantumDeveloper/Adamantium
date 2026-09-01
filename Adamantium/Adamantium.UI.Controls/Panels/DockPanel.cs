@@ -6,12 +6,18 @@ namespace Adamantium.UI.Controls.Panels;
 
 public class DockPanel:Panel
 {
+   // Both are read by THIS panel's measure and arrange: an edge decides how much of the remaining band a child eats and
+   // therefore what is left for its siblings, so a change has to re-run the panel, not the child. Registered with no
+   // metadata at all, they announced nothing - a Dock written at runtime (from code, a binding, a restored layout) left
+   // the panel laid out by the previous edge until something unrelated invalidated it.
    public static readonly AdamantiumProperty DockProperty =
-      AdamantiumProperty.RegisterAttached("Dock", typeof(Dock), typeof(UIComponent));
+      AdamantiumProperty.RegisterAttached("Dock", typeof(Dock), typeof(UIComponent),
+         new PropertyMetadata(default(Dock),
+            PropertyMetadataOptions.AffectsParentMeasure | PropertyMetadataOptions.AffectsParentArrange));
 
    public static readonly AdamantiumProperty LastChildFillProperty = AdamantiumProperty.Register(nameof(LastChildFill),
       typeof(Boolean), typeof(DockPanel),
-      new PropertyMetadata(true));
+      new PropertyMetadata(true, PropertyMetadataOptions.AffectsMeasure | PropertyMetadataOptions.AffectsArrange));
 
    public Boolean LastChildFill
    {

@@ -28,6 +28,7 @@ internal sealed class TextBatchCollector : BatchCollector<GlyphItem>
     /// from it by the instance's slot (set by RenderCache every frame; slot 0 is identity for world-baked glyphs).</summary>
     public ulong TransformsAddress { get; set; }
 
+
     // Per-segment atlas + renderer, parallel to the base segment list, so the clean-frame op replay can re-bind each
     // recorded segment's atlas (DrawSegment reads _atlas/_fontRenderer, which otherwise hold only the LAST segment's).
     private readonly List<(FontAtlas Atlas, FontRenderer Renderer)> _segState = new();
@@ -44,7 +45,7 @@ internal sealed class TextBatchCollector : BatchCollector<GlyphItem>
     /// <summary>Bake a block's glyphs into the patch stage - the text answer to BatchArena.TryStage. This is the half a
     /// changed glyph COUNT needs: the in-place re-bake (UpdateRun) only ever covered a count that held steady, and
     /// anything that grew or shrank - a counter, a clock, an fps plate - fell through to a walk of the whole scene.</summary>
-    public override bool TryStage(IRenderUnit unit, Matrix4x4F world, int transformSlot, int ownerTag)
+    public override bool TryStage(IRenderUnit unit, Matrix4x4F world, int transformSlot, int ownerTag, int clipSlot = -1)
     {
         if (unit is not TextRenderUnit tru || tru.TextComponent is not { } tc) return false;
         if (!CanBatch(tc, out var atlas)) return false;
@@ -56,7 +57,8 @@ internal sealed class TextBatchCollector : BatchCollector<GlyphItem>
 
         var first = Stage.Count;
         for (var i = 0; i < tc.GlyphRun.Count; i++) Stage.Add(default);
-        if (!PackInto(tc, placed, transformSlot, unit.FadeSlot, CollectionsMarshal.AsSpan(Stage).Slice(first, tc.GlyphRun.Count)))
+        if (!PackInto(tc, placed, transformSlot, unit.FadeSlot, clipSlot,
+                CollectionsMarshal.AsSpan(Stage).Slice(first, tc.GlyphRun.Count)))
         {
             Stage.RemoveRange(first, Stage.Count - first);
             return false;
@@ -121,8 +123,7 @@ internal sealed class TextBatchCollector : BatchCollector<GlyphItem>
         if (!FontRenderer.UseTextBatch) return false;   // off -> every block falls back to the per-block direct draw
         var run = tc.GlyphRun;                            // the FROZEN glyph snapshot (not the live, reshaped-in-place layout)
         if (run == null || run.Count == 0 || run.Atlas == null) return false;
-        var fr = tc.FontRenderer;
-        if (fr == null || !fr.UseCanonicalMsdf || fr.UseOutline) return false;
+        if (tc.FontRenderer == null) return false;
         if (tc.Foreground is not SolidColorBrush) return false;
         atlas = run.Atlas;
         return true;
@@ -136,13 +137,14 @@ internal sealed class TextBatchCollector : BatchCollector<GlyphItem>
     // colour. NO world matrix is applied here - the glyph VS applies the node matrix (from the transform table at the slot)
     // on the GPU. False (no write) for a rotated/sheared RELATIVE transform (the axis-aligned rect can't hold it) or a
     // buffer overflow this frame -> the caller renders that block via the per-block direct draw. Mirrors RectBatchCollector.
-    public bool TryAdd(TextRenderComponent tc, Matrix4x4F relWorld, int transformSlot, int fadeSlot, Rect2D scissor, FontAtlas atlas, Rect logicalBounds)
+    public bool TryAdd(TextRenderComponent tc, Matrix4x4F relWorld, int transformSlot, int fadeSlot, Rect2D scissor, FontAtlas atlas,
+        Rect logicalBounds, int clipSlot = -1)
     {
         var n = tc.GlyphRun.Count;
 
         EnsureCpuCapacity(Count + n);
         if (Count + n > GpuCapacity) return false;   // won't fit this frame's GPU buffer -> direct
-        if (!Pack(tc, relWorld, transformSlot, fadeSlot, Count)) return false;
+        if (!Pack(tc, relWorld, transformSlot, fadeSlot, clipSlot, Count)) return false;
 
         Count += n;
         _atlas = atlas;
@@ -186,10 +188,11 @@ internal sealed class TextBatchCollector : BatchCollector<GlyphItem>
         return true;
     }
 
-    public bool UpdateRun(IGraphicsDevice device, int first, TextRenderComponent tc, Matrix4x4F relWorld, int transformSlot, int fadeSlot)
+    public bool UpdateRun(IGraphicsDevice device, int first, TextRenderComponent tc, Matrix4x4F relWorld, int transformSlot, int fadeSlot,
+        int clipSlot = -1)
     {
         PrepareRetainedWrite(device);
-        if (!Pack(tc, relWorld, transformSlot, fadeSlot, first)) return false;
+        if (!Pack(tc, relWorld, transformSlot, fadeSlot, clipSlot, first)) return false;
         UploadRange(first, tc.GlyphRun.Count);
         return true;
     }
@@ -198,12 +201,13 @@ internal sealed class TextBatchCollector : BatchCollector<GlyphItem>
     // (the axis-aligned rect can hold that), its transform SLOT, its atlas UV, and the block's foreground as a per-instance
     // colour. NO world matrix is applied here - the glyph VS applies the node matrix (from the transform table at the slot)
     // on the GPU. False (no write) for a rotated/sheared RELATIVE transform. Mirrors RectBatchCollector's bake.
-    private bool Pack(TextRenderComponent tc, Matrix4x4F relWorld, int transformSlot, int fadeSlot, int at)
-        => PackInto(tc, relWorld, transformSlot, fadeSlot, Items.AsSpan(at, tc.GlyphRun.Count));
+    private bool Pack(TextRenderComponent tc, Matrix4x4F relWorld, int transformSlot, int fadeSlot, int clipSlot, int at)
+        => PackInto(tc, relWorld, transformSlot, fadeSlot, clipSlot, Items.AsSpan(at, tc.GlyphRun.Count));
 
     /// <summary>Bake one block's glyphs into <paramref name="dst"/>. Where they land is the caller's business - the
     /// retained arena during a walk, the patch stage during a repair - and the bake is the same either way.</summary>
-    private static bool PackInto(TextRenderComponent tc, Matrix4x4F relWorld, int transformSlot, int fadeSlot, Span<GlyphItem> dst)
+    private static bool PackInto(TextRenderComponent tc, Matrix4x4F relWorld, int transformSlot, int fadeSlot, int clipSlot,
+        Span<GlyphItem> dst)
     {
         const float eps = 1e-4f;
         if (Math.Abs(relWorld.M12) > eps || Math.Abs(relWorld.M21) > eps) return false;
@@ -224,6 +228,7 @@ internal sealed class TextBatchCollector : BatchCollector<GlyphItem>
                 LocalRect = new Vector4F((d.X + ax) * sx + tx, (d.Y + ay) * sy + ty, d.Z * sx, d.W * sy),
                 Source = glyphs[i].Source,
                 Params = new Vector4F(transformSlot, glyphs[i].Layer, glyphs[i].Depth, fadeSlot),
+                Clip = new Vector4F(clipSlot, 0, 0, 0),
                 Color = color
             };
         }

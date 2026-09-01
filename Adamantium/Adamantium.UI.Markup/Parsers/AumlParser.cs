@@ -67,6 +67,11 @@ public class ParserContext
         NamespaceMappings = [];
     }
 
+    /// <summary>The document's default xmlns - the one declared without a prefix, which is where an unqualified name
+    /// resolves. Null before the root's declarations have been read, and the caller then falls back.</summary>
+    private string DefaultNamespace()
+        => NamespaceMappings.FirstOrDefault(m => string.IsNullOrEmpty(m.Prefix))?.Namespace;
+
     public AumlAstObjectNode Parse()
     {
         return ParseAumlNode(rootElement, true);
@@ -122,9 +127,14 @@ public class ParserContext
                     // The owner is named by the ATTRIBUTE's prefix, not the element's: nav:RegionManager.RegionName on a
                     // docking:DockingArea means the RegionManager of the nav namespace. Taking the element's namespace
                     // made an attached property resolvable only on elements that happened to live in the same namespace
-                    // as its owner. An unprefixed attribute (Grid.Row="0") carries no namespace of its own in XML, so
-                    // there the element's still stands in.
-                    var ownerNamespace = string.IsNullOrEmpty(ns) ? targetType.Namespace : ns;
+                    // as its owner.
+                    //
+                    // UNPREFIXED (Canvas.Left="40") resolves in the DEFAULT xmlns, not in the element's. In XML an
+                    // unqualified attribute carries no namespace at all and certainly does not inherit its element's, and
+                    // standing the element's in only appeared to work because elements usually come from the same default
+                    // xmlns as the owner. It breaks the moment they do not: Canvas.Left on a control declared with its own
+                    // prefix went looking for a Canvas in THAT assembly, which has none.
+                    var ownerNamespace = string.IsNullOrEmpty(ns) ? DefaultNamespace() ?? targetType.Namespace : ns;
                     ownerType = new AumlAstXmlTypeReference(element.ToLineInfo(), ownerNamespace, names[0]);
                 }
 

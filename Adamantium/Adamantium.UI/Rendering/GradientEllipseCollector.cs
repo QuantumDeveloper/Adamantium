@@ -32,11 +32,13 @@ internal sealed class GradientEllipseCollector : BrushSdfCollector<GradientRectI
 
     public bool CanBatch(EllipsePayload p) => WantsBatch(p);
 
-    public bool TryAdd(EllipsePayload p, Matrix4x4F world, double opacity, Rect2D scissor, Rect logicalBounds, int transformSlot = 0, int fadeSlot = -1)
+    public bool TryAdd(EllipsePayload p, Matrix4x4F world, double opacity, Rect2D scissor, Rect logicalBounds, int transformSlot = 0,
+        int fadeSlot = -1, int clipSlot = -1)
     {
         EnsureCpuCapacity(Count + 1);
         if (Count + 1 > GpuCapacity) return false;
         if (!BakeItem(p, world, opacity, transformSlot, fadeSlot, out var item)) return false;
+        item.Clip = new Vector4F(clipSlot, 0, 0, 0);
         Items[Count++] = item;
         MarkPending(scissor, logicalBounds);
         return true;
@@ -53,11 +55,12 @@ internal sealed class GradientEllipseCollector : BrushSdfCollector<GradientRectI
 
     /// <summary>Bake one unit into the patch stage - see BatchArena. Same bake TryAdd uses; it just lands in the stage
     /// instead of the arena, because a patch has to know the whole frame is repairable before it changes any of it.</summary>
-    public override bool TryStage(IRenderUnit unit, Matrix4x4F world, int transformSlot, int ownerTag)
+    public override bool TryStage(IRenderUnit unit, Matrix4x4F world, int transformSlot, int ownerTag, int clipSlot = -1)
     {
         if (unit is not RenderUnits.EllipseRenderUnit u || !CanBatch(u.EllipsePayload)) return false;
         if (!BakeItem(u.EllipsePayload, world, u.FillOpacity, transformSlot, unit.FadeSlot, out var item)) return false;
 
+        item.Clip = new Vector4F(clipSlot, 0, 0, 0);   // the same stamp TryAdd makes - see BatchArena.TryStage
         Stage.Add(item);
         return true;
     }

@@ -108,7 +108,7 @@ internal sealed class HaloRectCollector : ShapeSdfCollector<HaloRectItem>
     /// the shape and the caller falls back to drawing nothing rather than something wrong.</summary>
     public bool TryAdd(HaloBand[] bands, bool inner, Rect destinationRect, ProceduralGeometry.CornerRadius corners, HaloShape shape,
         Matrix4x4F world, double opacity, Rect2D scissor, Rect logicalBounds, int transformSlot = 0,
-        ITexture field = null, double fieldRange = 0)
+        ITexture field = null, double fieldRange = 0, int clipSlot = -1, int fadeSlot = -1)
     {
         if (bands == null || bands.Length == 0) return false;
 
@@ -123,7 +123,7 @@ internal sealed class HaloRectCollector : ShapeSdfCollector<HaloRectItem>
 
         LastFirst = Count;
         var added = BakeInto(Items.AsSpan(Count, bands.Length), bands, inner, destinationRect, corners, shape, world,
-            opacity, transformSlot, fieldRange);
+            opacity, transformSlot, fieldRange, clipSlot, fadeSlot);
         if (added == 0) return false;
 
         Count += added;
@@ -145,7 +145,7 @@ internal sealed class HaloRectCollector : ShapeSdfCollector<HaloRectItem>
     /// </summary>
     public static int BakeInto(Span<HaloRectItem> dst, HaloBand[] bands, bool inner, Rect destinationRect,
         ProceduralGeometry.CornerRadius corners, HaloShape shape, Matrix4x4F world, double opacity,
-        int transformSlot, double fieldRange)
+        int transformSlot, double fieldRange, int clipSlot = -1, int fadeSlot = -1)
     {
         // The bake goes INTO the instance and the slot is applied on top - the same two-part address every fill family
         // uses. It used to be dropped here, and the band's ONLY address was its slot: correct while that slot held the
@@ -173,7 +173,9 @@ internal sealed class HaloRectCollector : ShapeSdfCollector<HaloRectItem>
                 Radii = radii,
                 Band = new Vector4F(band.Offset.X * iso, band.Offset.Y * iso, band.Spread * iso, band.Softness * iso),
                 Color = color,
-                Field = new Vector4F((float)fieldRange * iso, 0, 0, 0)
+                // .y = the rounded clip's slot, .z = the opacity slot (-1 = none for either): a band is cut - and
+                // faded - by an ancestor exactly like the fill it sits under.
+                Field = new Vector4F((float)fieldRange * iso, clipSlot, fadeSlot, 0)
             };
         }
 

@@ -130,7 +130,7 @@ internal sealed class TextureBatchCollector : BrushSdfCollector<TextureItem>
     /// <see cref="NineSliceBrush"/> is NINE - the corners at their own size, the edges and centre stretched or tiled -
     /// which is the whole trick: one batch, one texture, nine records.</summary>
     public bool TryAdd(RectanglePayload p, Matrix4x4F world, double opacity, Rect2D scissor, Rect logicalBounds,
-        ITexture texture, int transformSlot = 0, int fadeSlot = -1)
+        ITexture texture, int transformSlot = 0, int fadeSlot = -1, int clipSlot = -1)
     {
         var slices = NineSlice.Count(p.Brush);
         EnsureCpuCapacity(Count + slices);
@@ -138,12 +138,14 @@ internal sealed class TextureBatchCollector : BrushSdfCollector<TextureItem>
         {
             return false;
         }
-        if (!Bake(p.Brush, p.DestinationRect, p.CornerRadius, BrushShape.Rect, world, opacity, transformSlot, fadeSlot, out var baked))
+        if (!Bake(p.Brush, p.DestinationRect, p.CornerRadius, BrushShape.Rect, world, opacity, transformSlot, fadeSlot, clipSlot, out var baked))
         {
             return false;
         }
 
         _texture = texture;
+        LastFirst = Count;
+        LastCount = baked.Length;
         foreach (var item in baked)
         {
             Items[Count++] = item;
@@ -151,6 +153,50 @@ internal sealed class TextureBatchCollector : BrushSdfCollector<TextureItem>
         MarkPending(scissor, logicalBounds);
         return true;
     }
+
+    /// <summary>Bake ONE textured fill into a record without appending it - what the MOVE path needs to rewrite the
+    /// record a unit already occupies. Refuses a brush that bakes more than one record (a nine-slice): a run of nine
+    /// cannot be rewritten through a single slot, and the caller falls back to the walk.</summary>
+    public static bool BakeRun(RectanglePayload p, Matrix4x4F world, double opacity, int transformSlot, int fadeSlot,
+        int clipSlot, out TextureItem[] items)
+        => Bake(p.Brush, p.DestinationRect, p.CornerRadius, BrushShape.Rect, world, opacity, transformSlot, fadeSlot,
+            clipSlot, out items);
+
+    /// <summary>How many records this brush bakes: ONE for a picture, NINE for a nine-slice. The move path asks before
+    /// patching - a run whose length changed is not something a rewrite in place can express, and that one takes the
+    /// walk.</summary>
+    public static int RecordCount(Brush brush) => NineSlice.Count(brush);
+
+    /// <inheritdoc cref="BakeSingle"/>
+    public static bool BakeSingleEllipse(EllipsePayload p, Matrix4x4F world, double opacity, int transformSlot, int fadeSlot,
+        int clipSlot, out TextureItem item)
+        => BakeOne(p.Brush, p.DestinationRect, ProceduralGeometry.CornerRadius.Empty, BrushShape.Ellipse, world, opacity, transformSlot, fadeSlot, clipSlot, out item);
+
+    /// <inheritdoc cref="BakeSingle"/>
+    public static bool BakeSinglePolygon(RegularPolygonPayload p, Matrix4x4F world, double opacity, int transformSlot, int fadeSlot,
+        int clipSlot, out TextureItem item)
+        => BakeOne(p.Brush, p.DestinationRect, ProceduralGeometry.CornerRadius.Empty, BrushShape.Polygon(p, (float)world.M11), world, opacity, transformSlot, fadeSlot, clipSlot, out item);
+
+    private static bool BakeOne(Brush brush, Rect destination, ProceduralGeometry.CornerRadius corners, BrushShape shape,
+        Matrix4x4F world, double opacity, int transformSlot, int fadeSlot, int clipSlot, out TextureItem item)
+    {
+        item = default;
+        if (!Bake(brush, destination, corners, shape, world, opacity, transformSlot, fadeSlot, clipSlot, out var baked)
+            || baked.Length != 1)
+        {
+            return false;
+        }
+        item = baked[0];
+        return true;
+    }
+
+    /// <summary>Where the LAST accepted fill landed and how many records it took - one for a plain picture, nine for a
+    /// nine-slice. The move path needs both: patching a unit in place means rewriting ITS run, and a run of nine cannot
+    /// be addressed by one slot number.</summary>
+    public int LastFirst { get; private set; }
+
+    /// <inheritdoc cref="LastFirst"/>
+    public int LastCount { get; private set; }
 
     /// <summary>Ellipse variant: a full ellipse with a textured fill batches into the SAME textured pass, the shape told
     /// apart by a NEGATIVE baked corner radius (TexRectPS branches SdEllipse for it) - the trick PatternRectCollector
@@ -167,19 +213,24 @@ internal sealed class TextureBatchCollector : BrushSdfCollector<TextureItem>
     public bool CanBatchEllipse(EllipsePayload p) => WantsBatchEllipse(p);
 
     public bool TryAddEllipse(EllipsePayload p, Matrix4x4F world, double opacity, Rect2D scissor, Rect logicalBounds,
-        ITexture texture, int transformSlot = 0, int fadeSlot = -1)
+        ITexture texture, int transformSlot = 0, int fadeSlot = -1, int clipSlot = -1)
     {
         EnsureCpuCapacity(Count + 1);
         if (Count + 1 > GpuCapacity)
         {
             return false;
         }
-        if (!Bake(p.Brush, p.DestinationRect, ProceduralGeometry.CornerRadius.Empty, BrushShape.Ellipse, world, opacity, transformSlot, fadeSlot, out var baked))
+        if (!Bake(p.Brush, p.DestinationRect, ProceduralGeometry.CornerRadius.Empty, BrushShape.Ellipse, world, opacity, transformSlot, fadeSlot, clipSlot, out var baked))
         {
             return false;
         }
 
         _texture = texture;
+        // Where THIS fill landed. Set on every accepting path, not just the rect one: the move path reads it to learn
+        // which record belongs to this unit, and a stale value from the previous fill points it at somebody else's -
+        // dragging a textured polygon by one pixel then rewrote the textured RECTANGLE's record and the rectangle vanished.
+        LastFirst = Count;
+        LastCount = 1;
         Items[Count++] = baked[0];
         MarkPending(scissor, logicalBounds);
         return true;
@@ -201,17 +252,22 @@ internal sealed class TextureBatchCollector : BrushSdfCollector<TextureItem>
     public bool CanBatchPolygon(RegularPolygonPayload p) => WantsBatchPolygon(p);
 
     public bool TryAddPolygon(RegularPolygonPayload p, Matrix4x4F world, double opacity, Rect2D scissor, Rect logicalBounds,
-        ITexture texture, int transformSlot = 0, int fadeSlot = -1)
+        ITexture texture, int transformSlot = 0, int fadeSlot = -1, int clipSlot = -1)
     {
         EnsureCpuCapacity(Count + 1);
         if (Count + 1 > GpuCapacity) return false;
         if (!Bake(p.Brush, p.DestinationRect, ProceduralGeometry.CornerRadius.Empty, BrushShape.Polygon(p, (float)world.M11),
-                world, opacity, transformSlot, fadeSlot, out var baked))
+                world, opacity, transformSlot, fadeSlot, clipSlot, out var baked))
         {
             return false;
         }
 
         _texture = texture;
+        // Where THIS fill landed. Set on every accepting path, not just the rect one: the move path reads it to learn
+        // which record belongs to this unit, and a stale value from the previous fill points it at somebody else's -
+        // dragging a textured polygon by one pixel then rewrote the textured RECTANGLE's record and the rectangle vanished.
+        LastFirst = Count;
+        LastCount = 1;
         Items[Count++] = baked[0];
         MarkPending(scissor, logicalBounds);
         return true;
@@ -221,7 +277,7 @@ internal sealed class TextureBatchCollector : BrushSdfCollector<TextureItem>
     // axis-aligned instance cannot hold it) so the caller falls back to the per-unit path. The four corner radii ride in
     // Radii, scaled with the world; Params.x carries the LARGEST of them, or -1 as the ELLIPSE shape flag.
     private static bool Bake(Brush brush, Rect destinationRect, ProceduralGeometry.CornerRadius corners, BrushShape shape, Matrix4x4F world, double opacity,
-        int transformSlot, int fadeSlot, out TextureItem[] items)
+        int transformSlot, int fadeSlot, int clipSlot, out TextureItem[] items)
     {
         items = null;
         const float eps = 1e-4f;
@@ -246,7 +302,16 @@ internal sealed class TextureBatchCollector : BrushSdfCollector<TextureItem>
             TileBrush tile => [Single(tile, bounds, radius, radii, opacity, transformSlot, fadeSlot, sx, sy)],
             _ => null
         };
-        return items != null;
+        if (items == null) return false;
+
+        // Stamped HERE rather than inside each producer: a nine-slice makes nine records and a tile one, and every one
+        // of them is cut - and faded - by the same ancestor. -1 = none, for either.
+        // The FADE slot reached this collector as a parameter and was dropped on the floor for a long time, while the
+        // bake had already taken the opacity CHAIN out of the tint (RenderCache calls FadeBySlot for this family): a
+        // faded ancestor left the picture nearly at full strength. Measured on the Opacity stand at 0.86 of its
+        // reference where every well-behaved family sat at 0.58.
+        for (var i = 0; i < items.Length; i++) items[i].Clip = new Vector4F(clipSlot, fadeSlot, 0, 0);
+        return true;
     }
 
     // One record for the plain textured fill. WHERE it is drawn and WHAT it samples come from the brush's tiling and

@@ -11,6 +11,12 @@ public interface IUIComponent : IFundamentalUIComponent
     
     Guid RenderId { get; }
     Boolean ClipToBounds { get; set; }
+
+    /// <summary>How this clip's corners are rounded (TL, TR, BR, BL). A scissor is square, so rounding is applied by the
+    /// shaders; zero means the plain rectangular clip. Unset falls back to the container's own CornerRadius, where it
+    /// has one - see UIComponent.ClipCornerRadius.</summary>
+    Vector4F ClipRadii { get; }
+
     Double Opacity { get; set; }
     Double SelfOpacity { get; set; }
     bool IsEnabled { get; set; }

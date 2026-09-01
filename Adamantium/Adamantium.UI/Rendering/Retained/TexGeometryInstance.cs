@@ -38,4 +38,8 @@ public struct TexGeometryInstance
     public Vector4F UvRect;
 
     public Vector4F Tint;
+
+    /// <summary>.x = the ROUNDED CLIP's slot, or -1; .yzw spare. Its own field: Params is full (repeat, mirror,
+    /// opacity slot, transform slot) and the rest describe the picture.</summary>
+    public Vector4F Clip;
 }
