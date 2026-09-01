@@ -99,6 +99,8 @@
                             <Shadow Color="#FFF0ABFC" OffsetX="6" OffsetY="6" BlurRadius="12" Spread="2"/>
                         </Rectangle.Shadow>
                     </Rectangle>
+                    <Polygon Points="{Binding Star}" Fill="#FF485061" Stroke="#FF67E8F9" StrokeThickness="6"
+                             Width="84" Height="56" MarginRight="10" Opacity="{Binding ElementOpacity}"/>
                 </StackPanel>
             </Border>
 
@@ -155,6 +157,11 @@
                             <Shadow Color="#FFF0ABFC" OffsetX="6" OffsetY="6" BlurRadius="12" Spread="2"/>
                         </Rectangle.Shadow>
                     </Rectangle>
+                    <!-- A PER-UNIT OVERLAY: a tessellated shape's stroke is expanded into real geometry and drawn by
+                         itself, outside every batch. It is the one thing that never read the opacity slot - it is handed
+                         the current alpha instead, on the frame it draws. Thick and light so the ribbon is measurable. -->
+                    <Polygon Points="{Binding Star}" Fill="#FF485061" Stroke="#FF67E8F9" StrokeThickness="6"
+                             Width="84" Height="56" MarginRight="10"/>
                 </StackPanel>
             </Border>
 
@@ -171,6 +178,7 @@
                 <TextBlock Text="material" Width="94" Foreground="{ResourceReference TextFillColorSecondary}"/>
                 <TextBlock Text="aura" Width="94" Foreground="{ResourceReference TextFillColorSecondary}"/>
                 <TextBlock Text="shadow" Width="94" Foreground="{ResourceReference TextFillColorSecondary}"/>
+                <TextBlock Text="stroke" Width="94" Foreground="{ResourceReference TextFillColorSecondary}"/>
             </StackPanel>
         </StackPanel>
     </ScrollViewer>

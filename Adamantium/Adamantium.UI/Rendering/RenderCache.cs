@@ -175,12 +175,6 @@ public partial class RenderCache
 
     private readonly Dictionary<IRenderUnit, HaloRuns> _haloRunsByUnit = new();
 
-    // The units whose shader CANNOT read the opacity slot (text above all, plus the instanced fills and the procedural
-    // families - see GlyphItem). Element Opacity is composed at draw time for everyone else, so a fade touches nothing;
-    // these still carry the chain in their baked colour and have to be re-baked when an ANCESTOR's Opacity moves.
-    // Kept as a list so that a fade costs "walk the handful of units that need it", not "walk the subtree": marking the
-    // subtree dirty instead is what cost a 22k-node fade 42 ms a frame, with 3 text blocks the only real work in it.
-    private readonly HashSet<IRenderUnit> _slotBlindUnits = new();
 
     // The units each LIVE brush paints, built on the recording walk; the render thread re-bakes them all when a
     // composited PAINT animation changes the brush snapshot. Keyed by live brush by REFERENCE; one brush is shared by
