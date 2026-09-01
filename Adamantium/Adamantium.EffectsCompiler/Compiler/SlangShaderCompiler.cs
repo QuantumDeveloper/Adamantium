@@ -14,7 +14,7 @@ namespace Adamantium.EffectsCompiler.Compiler
     /// </summary>
     internal sealed class SlangShaderCompiler : IDisposable
     {
-        // Matches the DXC path's target (SPIR-V 1.6) so both backends emit for the same Vulkan environment.
+        // The Vulkan environment the engine's pipelines are created for.
         private const string SpirvProfile = "spirv_1_6";
 
         private readonly SlangCompiler compiler;
@@ -34,8 +34,8 @@ namespace Adamantium.EffectsCompiler.Compiler
                         IntValue0 = 1
                     }
                 ],
-                // Legacy HLSL spellings the engine's .fx files use but Slang's stricter front-end doesn't define
-                // (DXC tolerated these as-is); applied as session-wide preprocessor macros.
+                // Legacy HLSL spellings the engine's .fx files still use but Slang's stricter front end does not define;
+                // applied as session-wide preprocessor macros.
                 defines: new Dictionary<string, string> { ["sampler"] = "SamplerState" });
         }
 

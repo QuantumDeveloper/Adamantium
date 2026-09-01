@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.IO;
 using Adamantium.EffectsCompiler;
 using MessagePack;
@@ -113,6 +114,61 @@ namespace Adamantium.Engine.CompilerTests
                 result.EffectData.Save("BasicEffect1");
                 var restored = EffectData.Load("BasicEffect1");
             }
+        }
+
+        // Two headers. Tint.fxh is what the effect calls; it pulls in Bee.fxh, and THAT is what makes the compiler parse
+        // Tint.fxh at all - an include's content is only handed to the include parser when it literally contains
+        // "#include" (EffectCompilerInternal), and unlike the main source its comments are never stripped. So a header
+        // that includes anything is exactly where a directive hiding in a comment gets read as code.
+        private static ImmutableArray<ShaderFileInfo> TintInclude(string commentedLine = "") => ImmutableArray.Create(
+            new ShaderFileInfo
+            {
+                FileName = "Tint.fxh",
+                Path = Path.Combine("Includes", "Tint.fxh"),
+                Content = "#include \"Includes/Bee.fxh\"\n" + commentedLine + "float4 Tint(float4 c) { return c * Bee(); }\n"
+            },
+            new ShaderFileInfo
+            {
+                FileName = "Bee.fxh",
+                Path = Path.Combine("Includes", "Bee.fxh"),
+                Content = "float Bee() { return 1; }\n"
+            });
+
+        private static string EffectCalling(string includeLine) =>
+            includeLine + @"
+float4 VS(float4 p : POSITION) : SV_Position { return p; }
+float4 PS(float4 p : SV_Position) : SV_Target0 { return Tint(float4(1, 1, 1, 1)); }
+technique T { pass P { Profile = 6.6; VertexShader = VS; PixelShader = PS; } }
+";
+
+        /// <summary>The baseline for the test below: a REAL #include is expanded, so the function it defines resolves.</summary>
+        [Test]
+        public void IncludeIsExpanded()
+        {
+            var result = EffectCompiler.Compile(EffectCalling("#include \"Includes/Tint.fxh\"\n"), "Probe.fx", TintInclude());
+
+            var messages = string.Join(Environment.NewLine, result.Logger.Messages);
+            Assert.That(result.HasErrors, Is.False, $"a real include did not resolve:{Environment.NewLine}{messages}");
+        }
+
+        /// <summary>A preprocessor directive written inside a COMMENT is not a directive. The tokenizer handed `/` to the
+        /// divide rule before the comment rule could claim `//`, so comments were tokenised as ordinary code and every
+        /// `#` in one was obeyed - this shape reports "Unsupported preprocessor token".
+        /// <para>It guards more than it used to: the source reaching the parser was stripped of comments by regex first,
+        /// which hid this everywhere except inside a header. That stripping was there for the DXC backend and went with
+        /// it, so comments now reach the parser exactly as written.</para></summary>
+        [Test]
+        public void DirectiveInsideACommentIsNotObeyed()
+        {
+            var source = "// #banana - a directive that only a parser reading comments as code would ever see\n"
+                       + EffectCalling("#include \"Includes/Tint.fxh\"\n");
+
+            var result = EffectCompiler.Compile(source, "Probe.fx", TintInclude());
+
+            var messages = string.Join(Environment.NewLine, result.Logger.Messages);
+            Assert.That(messages, Does.Not.Contain("Unsupported preprocessor token"),
+                $"a `#` inside a comment was taken for a directive:{Environment.NewLine}{messages}");
+            Assert.That(result.HasErrors, Is.False, $"the effect did not compile:{Environment.NewLine}{messages}");
         }
     }
 }

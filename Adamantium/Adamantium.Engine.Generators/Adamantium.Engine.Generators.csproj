@@ -39,10 +39,9 @@
 	<ItemGroup>
          <!--Generator dependencies-->
 		
-		<PackageReference Include="Adamantium.DXC" Version="1.0.9" GeneratePathProperty="true" PrivateAssets="all" />
-		<PackageReference Include="Adamantium.Vulkan.Spirv" Version="1.0.6" GeneratePathProperty="true" PrivateAssets="all" />
-		<PackageReference Include="Adamantium.Vulkan.Slang" Version="1.0.3" GeneratePathProperty="true" PrivateAssets="all" />
-        <PackageReference Include="QuantumBinding.Utils" Version="2.0.0" GeneratePathProperty="true" PrivateAssets="all" />
+		<PackageReference Include="Adamantium.Vulkan.Spirv" Version="1.0.7" GeneratePathProperty="true" PrivateAssets="all" />
+		<PackageReference Include="Adamantium.Vulkan.Slang" Version="1.0.4" GeneratePathProperty="true" PrivateAssets="all" />
+        <PackageReference Include="QuantumBinding.Utils" Version="2.0.1" GeneratePathProperty="true" PrivateAssets="all" />
         <PackageReference Include="MessagePack" Version="3.1.7" GeneratePathProperty="true" PrivateAssets="all" />
         <PackageReference Include="MessagePack.Annotations" Version="3.1.7" GeneratePathProperty="true" PrivateAssets="all" />
 		<PackageReference Include="System.Runtime.CompilerServices.Unsafe" Version="6.1.2" GeneratePathProperty="true" PrivateAssets="all" />
@@ -51,7 +50,6 @@
     </ItemGroup>
     
     <ItemGroup>
-        <EmbeddedResource Include="dxcompiler.dll"/>
         <EmbeddedResource Include="spirv-cross-c-shared.dll"/>
         <EmbeddedResource Include="slang.dll"/>
         <EmbeddedResource Include="slang-c-shared.dll"/>
@@ -77,7 +75,6 @@
 
     <Target Name="GetDependencyTargetPaths">
         <ItemGroup>
-			<TargetPathWithTargetPlatformMoniker Include="$(PKGAdamantium_DXC)\lib\netstandard2.0\Adamantium.DXC.dll" IncludeRuntimeDependency="false" />
             <TargetPathWithTargetPlatformMoniker Include="$(PKGAdamantium_Vulkan_Spirv)\lib\netstandard2.0\Adamantium.Vulkan.Spirv.dll" IncludeRuntimeDependency="false" />
             <TargetPathWithTargetPlatformMoniker Include="$(PKGAdamantium_Vulkan_Slang)\lib\netstandard2.0\Adamantium.Vulkan.Slang.dll" IncludeRuntimeDependency="false" />
             <TargetPathWithTargetPlatformMoniker Include="$(PKGQuantumBinding_Utils)\lib\netstandard2.0\QuantumBinding.Utils.dll" IncludeRuntimeDependency="false" />

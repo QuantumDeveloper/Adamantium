@@ -1,9 +1,9 @@
 namespace Adamantium.EffectsCompiler.Compiler
 {
     /// <summary>
-    /// Backend-neutral result of compiling a single shader stage to SPIR-V.
-    /// Produced by either the Slang or the DXC backend so the rest of the pipeline
-    /// (reflection, parameter building) does not care who emitted the bytecode.
+    /// The result of compiling a single shader stage to SPIR-V. It stays a type of its own, rather than the backend's
+    /// own result, so reflection and parameter building keep not caring who emitted the bytecode - which is what let the
+    /// second backend be removed without touching either of them.
     /// </summary>
     internal sealed class ShaderCompilationResult
     {

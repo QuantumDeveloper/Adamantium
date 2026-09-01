@@ -31,8 +31,15 @@ namespace Adamantium.EffectsCompiler
             @"(?<plus>\+)|" +
             @"(?<minus>\-)|" +
             @"(?<multiply>\*)|" +
-            @"(?<divide>\/)|" +
-            @"(?<comment>\//)|" +
+            // NOT a bare slash: it must not swallow the first character of a comment, or the comment rule below never
+            // gets a turn and a comment is tokenised as ordinary code. That is not cosmetic - the parser acts on a `#`
+            // wherever it finds one, so an #include written inside a COMMENT was obeyed. A file whose comment quoted its
+            // own include line therefore included itself, forever, and the build died with a stack overflow in the
+            // include parser rather than anything that names the file.
+            @"(?<divide>\/(?![\/\*]))|" +
+            // A whole comment, line or block, as ONE token the parser skips (see EffectParser.InternalNextToken). Block
+            // comments are lazy so `/* a */ b /* c */` is two comments and not one that eats `b`.
+            @"(?<comment>\/\/[^\r\n]*|\/\*[\s\S]*?\*\/)|" +
             // ONE character, not a run. The operators this grammar has no rule for - ! % & | ^ ~ ? : and every
             // non-ASCII character a comment may contain - land here, and a greedy run swallowed everything up to the
             // next space along with them: `!isEnd)` ate its own closing parenthesis, so the bracket counter never

@@ -58,7 +58,6 @@ namespace Adamantium.EffectsCompiler
         /// <value>The include directory list.</value>
         public List<string> IncludeDirectoryList => includeDirectoryList;
 
-        public ImmutableArray<ShaderFileInfo> Includes { get; set; }
 
         /// <summary>
         /// Gets or sets the logger.
@@ -249,18 +248,11 @@ namespace Adamantium.EffectsCompiler
                 InternalNextToken();
                 if (Expect("include") || Expect("define"))
                 {
-                    var prevToken = token.Value + currentToken.Value;
+                    // Consumed and left alone. This parser is here for the .fx grammar - techniques and passes - and the
+                    // BACKEND resolves includes itself. Splicing each header's text in here produced one flat source,
+                    // which is what DXC needed and nothing needs now; it also had to be done with a blind
+                    // String.Replace over the whole buffer, so a path that appeared twice was rewritten twice.
                     token = InternalNextToken();
-                    var includePath = token.Value.Replace("\"", "").Replace('/', '\\');
-
-                    foreach (var include in Includes)
-                    {
-                        if (include.Path.EndsWith(includePath))
-                        {
-                            newPreprocessedSource =
-                                newPreprocessedSource.Replace(prevToken, "").Replace(token.Value, include.Content);
-                        }
-                    }
                 }
                 else if (Expect("line"))
                 {
@@ -331,6 +323,20 @@ namespace Adamantium.EffectsCompiler
                 {
                     currentLine++;
                     currentLineAbsolutePos = currentToken.Span.StartIndex + currentToken.Span.Length;
+                }
+                else if (currentToken.Type == TokenType.Comment)
+                {
+                    // Skipped like a newline, never handed to the grammar: a comment is not code, and the preprocessor
+                    // rules above act on a `#` wherever they see one - which is how an #include quoted inside a comment
+                    // used to be obeyed (a file that mentioned its own include line included itself until the stack ran
+                    // out). A BLOCK comment can span lines, so its newlines are counted here or every diagnostic after
+                    // one points at the wrong line.
+                    for (var i = 0; i < currentToken.Value.Length; i++)
+                    {
+                        if (currentToken.Value[i] != '\n') continue;
+                        currentLine++;
+                        currentLineAbsolutePos = currentToken.Span.StartIndex + i + 1;
+                    }
                 }
                 else
                 {

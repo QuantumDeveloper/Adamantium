@@ -9,7 +9,6 @@ using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
 using Adamantium.Core;
-using Adamantium.DXC;
 using Adamantium.EffectsCompiler.Compiler;
 using Adamantium.Mathematics;
 using Adamantium.Vulkan.Spirv.Cross;
@@ -23,11 +22,7 @@ namespace Adamantium.EffectsCompiler
         private static readonly Regex splitSODeclartionRegex = new Regex(@"\s*;\s*");
         private static readonly Regex soDeclarationItemRegex = new Regex(@"^\s*(\d+)?\s*:?\s*([A-Za-z][A-Za-z0-9_]*)(\.[xyzw]+|\.[rgba]+)?$");
         private static readonly Regex soSemanticIndex = new Regex(@"^([A-Za-z][A-Za-z0-9_]*?)([0-9]*)?$");
-        private static readonly Regex replaceBackSlash = new Regex(@"\\+");
         private static readonly List<char> xyzwrgbaComponents = new List<char>() { 'x', 'y', 'z', 'w', 'r', 'g', 'b', 'a' };
-
-        readonly string commentPattern = @"//.*?$\n";
-        readonly string multiLineCommentPattern = @"/\*.*?\*/";
 
         private static readonly Dictionary<string, ValueConverter> ValueConverters =
             new Dictionary<string, ValueConverter>()
@@ -60,12 +55,10 @@ namespace Adamantium.EffectsCompiler
         //private StreamOutputElement[] currentStreamOutputElements;
 
         private FileDependencyList dependencyList;
-        private IDxcCompilerPlatform dxcCompiler;
         private SlangShaderCompiler slangCompiler;
 
         public EffectCompilerInternal()
         {
-            dxcCompiler = DxcCompiler.Create();
             slangCompiler = new SlangShaderCompiler();
         }
 
@@ -182,41 +175,6 @@ namespace Adamantium.EffectsCompiler
             return new SpirvReflection(shader.Bytecode).Disassemble(resourceKeys);
         }
 
-        public EffectData Build(params DxcCompilationResult[] bytecodes)
-        {
-            if (bytecodes == null || bytecodes.Length == 0)
-                throw new ArgumentException("Expected at least one bytecode", "bytecodes");
-
-            SetupEffectData(Guid.NewGuid().ToString("N"));
-
-            effectData.Description.ShareConstantBuffers = true;
-
-            SetupTechnique("Technique0", new SourceSpan());
-            SetupPass("Pass0", new SourceSpan());
-
-            for (var i = 0; i < bytecodes.Length; i++)
-                ProcessShader(bytecodes[i]);
-
-            CheckPassConsistency(new SourceSpan());
-
-            return effectData;
-        }
-
-        private void ProcessShader(DxcCompilationResult shaderBytecode)
-        {
-            var shaderType = TargetProfileToShaderStage(shaderBytecode.TargetProfile);
-
-            var result = new ShaderCompilationResult
-            {
-                Bytecode = shaderBytecode.Bytecode,
-                HasErrors = shaderBytecode.HasErrors,
-                Errors = shaderBytecode.Errors
-            };
-
-            var shader = CreateEffectShader(shaderType, shaderBytecode.Name, shaderBytecode.EntryPoint, result);
-            ProcessShaderData(shaderType, result, shader);
-        }
-
         private void InternalCompile(string sourceCode, string fileName)
         {
             effectData = null;
@@ -225,43 +183,26 @@ namespace Adamantium.EffectsCompiler
 
             logger = new EffectCompilerLogger();
 
+            // The include SET, for Slang to resolve against (ResolveSlangInclude). Nothing here expands anything: Slang
+            // pulls each header itself through its VFS callback, which is why the sources below go to it untouched -
+            // #include directives intact, comments intact, line numbers therefore honest in its diagnostics.
+            //
+            // It used to be otherwise. Every header was pre-parsed and spliced into one flat string, and both it and the
+            // main source were stripped of comments by regex first - all of it to feed DXC, which needed the whole
+            // effect as one blob. DXC is gone; so is the flattening, the pre-parse and the stripping.
             if (includes == null)
             {
                 var directory = Path.GetDirectoryName(fileName);
                 var includeFiles = Directory.GetFiles(directory, "*.hlsl").Concat(Directory.GetFiles(directory, "*.fxh"));
                 includes = includeFiles.Select(x => new ShaderFileInfo()
                 { Content = File.ReadAllText(x), Path = x, FileName = Path.GetFileName(x) }).ToImmutableArray();
-
-                foreach (var include in includes)
-                {
-                    include.Content = Regex.Replace(include.Content, commentPattern, String.Empty, RegexOptions.Multiline);
-                    include.Content = Regex.Replace(include.Content, multiLineCommentPattern, String.Empty, RegexOptions.Singleline);
-                }
             }
 
-            var includeParser = new IncludeParser() { Logger = logger };
-            
-            includeParser.Includes = includes;
-            foreach (var include in includes)
-            {
-                if (include.Content.Contains("#include"))
-                {
-                    var result = includeParser.Parse(include.Content, include.Path);
-                    include.Content = result.PreprocessedSource;
-                }
-            }
-            
-            sourceCode = Regex.Replace(sourceCode, commentPattern, String.Empty, RegexOptions.Multiline);
-            sourceCode = Regex.Replace(sourceCode, multiLineCommentPattern, String.Empty, RegexOptions.Singleline);
-
-            // Keep the source with #include directives intact for the Slang backend, which resolves them
-            // itself via its VFS callback (the engine still flattens parserResult.PreprocessedSource for DXC).
             slangRawSource = sourceCode;
 
             var parser = new EffectParser { Logger = logger };
             parser.Macros.AddRange(macros);
             parser.IncludeDirectoryList.AddRange(includeDirectoryList);
-            parser.Includes = includes;
             parserResult = parser.Parse(sourceCode, fileName);
             
             dependencyList = parserResult.DependencyList;
@@ -1001,16 +942,9 @@ namespace Adamantium.EffectsCompiler
                 return;
             }
 
-            // If the level is not setup, return an error
-            if (profile == 0)
-            {
-                logger.Error("Expecting setup of [Profile = 5_0/5_1/6_0...etc.] before compiling a shader.", span);
-                return;
-            }
-
             try
             {
-                var result = CompileParsedShader(type, entryPoint, profile);
+                var result = CompileParsedShader(type, entryPoint);
 
                 if (result.HasErrors || result.Bytecode == null)
                 {
@@ -1038,21 +972,12 @@ namespace Adamantium.EffectsCompiler
             }
         }
 
-        private ShaderCompilationResult CompileParsedShader(EffectShaderType shaderKind, string entryPoint, float profile)
+        /// <summary>Compiles ONE stage. Slang is the only backend - there is no second one to fall back to, and the
+        /// difference shows in what this hands it: the source with its `#include` directives INTACT, resolved by Slang
+        /// itself through <see cref="ResolveSlangInclude"/>. Only the `technique { pass { ... } }` blocks are blanked,
+        /// because that grammar is the effect file's own and Slang's HLSL front end has never seen it.</summary>
+        private ShaderCompilationResult CompileParsedShader(EffectShaderType shaderKind, string entryPoint)
         {
-            var sourcecodeBuilder = new StringBuilder();
-            if (!string.IsNullOrEmpty(preprocessorText))
-                sourcecodeBuilder.Append(preprocessorText);
-            sourcecodeBuilder.Append(parserResult.PreprocessedSource);
-
-            var sourcecode = sourcecodeBuilder.ToString().TrimEnd('\r', '\n', ' ');
-
-            var filePath = replaceBackSlash.Replace(parserResult.SourceFileName, @"\");
-
-            // Slang is the primary backend; DXC stays as a fallback for HLSL Slang can't digest.
-            // Slang gets the non-flattened source (its #include directives intact, resolved via the VFS
-            // callback) with the .fx `technique { pass { ... } }` blocks blanked out (Slang's HLSL front-end
-            // doesn't understand them). DXC keeps the flattened `sourcecode`.
             var slangSourceBuilder = new StringBuilder();
             if (!string.IsNullOrEmpty(preprocessorText))
                 slangSourceBuilder.Append(preprocessorText);
@@ -1061,35 +986,16 @@ namespace Adamantium.EffectsCompiler
 
             try
             {
-                var slangResult = slangCompiler.Compile(slangSource, entryPoint, shaderKind, ResolveSlangInclude);
-                if (!slangResult.HasErrors && slangResult.Bytecode != null)
-                    return slangResult;
-
-                if (!string.IsNullOrWhiteSpace(slangResult.Errors))
-                    logger.Warnings($"Slang could not compile {shaderKind} '{entryPoint}', falling back to DXC: {slangResult.Errors}");
+                return slangCompiler.Compile(slangSource, entryPoint, shaderKind, ResolveSlangInclude);
             }
             catch (Exception ex)
             {
-                logger.Warnings($"Slang backend threw for {shaderKind} '{entryPoint}', falling back to DXC: {ex.Message}");
+                return new ShaderCompilationResult
+                {
+                    HasErrors = true,
+                    Errors = $"Slang backend threw for {shaderKind} '{entryPoint}': {ex.Message}"
+                };
             }
-
-            var compilerOptions = new CompilerOptions();
-            compilerOptions.Add(CompilerArguments.AllResourcesBound);
-            compilerOptions.Add(CompilerArguments.SpvUseDxLayout);
-            compilerOptions.Add(CompilerArguments.SpvTargetEnvVulkan1_3);
-            compilerOptions.Add(CompilerArguments.SpvcExtensionGoogleHlslFunctionality1);
-            compilerOptions.Add(CompilerArguments.SpvcExtensionGoogleUserType);
-            compilerOptions.Add(CompilerArguments.SpvReflect);
-
-            var targetProfile = $"{StageTypeToString(shaderKind)}_{GetShaderModelFromProfile(profile)}";
-
-            var dxcResult = dxcCompiler.CompileIntoSpirvFromText(sourcecode, filePath, entryPoint, targetProfile, compilerOptions);
-            return new ShaderCompilationResult
-            {
-                Bytecode = dxcResult.Bytecode,
-                HasErrors = dxcResult.HasErrors,
-                Errors = dxcResult.Errors
-            };
         }
 
         // Resolves a Slang #include request against the engine's include collection (same matching as
@@ -1283,55 +1189,6 @@ namespace Adamantium.EffectsCompiler
             else
             {
                 logger.Warning("Unhandled method [{0}]", expression.Span, expression.Name);
-            }
-        }
-
-        private static string StageTypeToString(EffectShaderType type)
-        {
-            string profile = null;
-            switch (type)
-            {
-                case EffectShaderType.Vertex:
-                    profile = "vs";
-                    break;
-                case EffectShaderType.Domain:
-                    profile = "ds";
-                    break;
-                case EffectShaderType.Hull:
-                    profile = "hs";
-                    break;
-                case EffectShaderType.Geometry:
-                    profile = "gs";
-                    break;
-                case EffectShaderType.Fragment:
-                    profile = "ps";
-                    break;
-                case EffectShaderType.Compute:
-                    profile = "cs";
-                    break;
-            }
-            return profile;
-        }
-
-        private static EffectShaderType TargetProfileToShaderStage(string targetProfile)
-        {
-            var shader = targetProfile.Substring(0, targetProfile.IndexOf('_'));
-            switch (shader)
-            {
-                case "vs":
-                    return EffectShaderType.Vertex;
-                case "ds":
-                    return EffectShaderType.Domain;
-                case "hs":
-                    return EffectShaderType.Hull;
-                case "gs":
-                    return EffectShaderType.Geometry;
-                case "ps":
-                    return EffectShaderType.Fragment;
-                case "cs":
-                    return EffectShaderType.Compute;
-                default:
-                    throw new InvalidEnumArgumentException($"Unknown shader type: {shader}");
             }
         }
 
