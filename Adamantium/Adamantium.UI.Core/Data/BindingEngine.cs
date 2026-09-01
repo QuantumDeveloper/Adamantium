@@ -61,7 +61,12 @@ public static class BindingEngine
     public static bool HasBindings(IAdamantiumComponent target)
         => _bindings.TryGetValue(target, out var map) && map.Count > 0;
 
-    /// <summary>Re-resolves and re-applies every binding on an element - e.g. after its DataContext changed.</summary>
+    /// <summary>Re-resolves and re-applies every binding on an element - e.g. after its DataContext changed.
+    /// <para>Measured 2026-09-01 while building the heaviest tab: 1111 calls, of which 498 found bindings, over 490
+    /// elements - one refresh per element, not several, and ~100 ms of establishing inside a 6 s window. The "context
+    /// reaches an element several times" entry this used to carry was already answered by NeedsInheritedCallback (only
+    /// elements that HAVE bindings or a handler get the callback) and by resolving inheritance on READ rather than
+    /// pushing it down the tree.</para></summary>
     public static void RefreshBindings(IAdamantiumComponent target)
     {
         if (_bindings.TryGetValue(target, out var map))
