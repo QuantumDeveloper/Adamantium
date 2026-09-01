@@ -73,7 +73,7 @@ SamplerState SourceSampler : register(s2);
 // pattern from it) while its FRINGE is not: a one-pixel ring does not evaluate a pattern, it just takes the brush's low
 // colour, so the ring is the same flat pass the solid fills use and lives with them in BatchEffect. Both read this
 // record, so it belongs to neither.
-struct PatGeomData
+struct PatternGeomData
 {
     float4x4 Local;      // element local -> SLOT space (the slot's matrix is applied on top, from the transform table)
     float4 Params;       // .y pattern type, .z cell (LOCAL units), .w transform-table slot. .x = opacity slot
@@ -82,7 +82,8 @@ struct PatGeomData
     float4 Color2;
     float4 Color3;
     float4 Noise;        // x octaves (sign=animate), y seed, z lacunarity, w gain (or combustible fire-palette flag)
-    float4 Anim;         // .x = offset subtracted from the clock while animating, .y = the phase held while paused
+    float4 Anim;         // .x = offset subtracted from the clock while animating, .y = the phase held while paused,
+                         // .w = the ROUNDED CLIP's slot (-1 = none)
 };
 
 // ---- InstancedFringe pass: the analytic-AA fringe of the SAME instances, as one instanced draw --------------------
@@ -103,5 +104,8 @@ struct FringePSInput
     float4 Position : SV_Position;
     float4 Color    : COLOR0;
     float  Coverage : TEXCOORD0;
+    // The rounded ancestor clip's SHAPE, fetched in the vertex stage (see ClipShapeBox): rect in device px + radii.
+    nointerpolation float4 ClipBox   : TEXCOORD1;
+    nointerpolation float4 ClipRadii : TEXCOORD2;
 };
 

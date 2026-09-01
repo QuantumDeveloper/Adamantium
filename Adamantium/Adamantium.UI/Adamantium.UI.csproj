@@ -28,6 +28,10 @@
 		<ProjectReference Include="..\Adamantium.MacOS\Adamantium.MacOS.csproj" />
 		<ProjectReference Include="..\Adamantium.UI.Controls\Adamantium.UI.Controls.csproj" />
 		<ProjectReference Include="..\Adamantium.UI.Core\Adamantium.UI.Core.csproj" />
+		<!-- The UI's SHADERS, in their own project (the same shape Adamantium.FX has): the .fx/.fxh files and the effect
+		     classes the generator makes from them. Split out so they can be referenced on their own, and so a shader
+		     edit rebuilds this one project rather than the whole of Adamantium.UI. -->
+		<ProjectReference Include="..\Adamantium.UI.FX\Adamantium.UI.FX.csproj" />
 		<ProjectReference Include="..\Adamantium.UI.Markup\Adamantium.UI.Markup.csproj" />
 		<ProjectReference Include="..\Adamantium.UI.Themes\Adamantium.UI.Themes.csproj" />
 		<ProjectReference Include="..\Adamantium.Win32\Adamantium.Win32.csproj" />
@@ -58,8 +62,8 @@
 	</ItemGroup>
 
 	<ItemGroup>
-		<AdditionalFiles Include="$(ProjectDir)**\*.fx" />
-		<AdditionalFiles Include="$(ProjectDir)**\*.fxh" />
+		<!-- No .fx/.fxh here any more - they live in Adamantium.UI.FX, which generates the effect classes this project
+		     draws through. The generator options stay because other generators in this project read them. -->
 		<CompilerVisibleProperty Include="RootNamespace" />
 		<AdditionalFiles Remove="obj\**" />
 		<!-- IDE up-to-date check: rebuild when generator inputs (AdditionalFiles) change. -->
