@@ -1,0 +1,176 @@
+<View xmlns="http://adamantium/ui"
+      xmlns:x="http://adamantium/ui/xaml/extensions"
+      xmlns:conv="clr-namespace:Adamantium.Game.Sandbox.Converters"
+      xmlns:ctl="clr-namespace:Adamantium.Game.Sandbox.Controls">
+    <!-- DataContext is the ClippingViewModel. A scissor is a RECTANGLE, so a rounded container used to cut its content
+         off with square corners.
+
+         ONE container, and the pieces are DRAGGABLE. Every family is represented once - an analytic rectangle, an
+         ellipse, a regular polygon, a mesh (the star), text - and each is pushed into whichever corner is of interest by
+         hand. A stand per family shows only the corners its author aimed at; this one shows any of them in seconds, and
+         side by side, which is the only way to see a family behaving differently from its neighbours. -->
+    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+        <StackPanel Orientation="Vertical" Margin="24">
+            <TextBlock Text="Rounded clipping — drag the pieces into the corners" FontSize="18" Margin="0,0,0,6"/>
+            <TextBlock Text="The container clips by its own corners. Drag any piece so it crosses a corner: its edge must follow the rounding, not the square scissor. Turn the clip off and everything spills out whole."
+                       Foreground="{ResourceReference TextFillColorSecondary}" TextWrapping="WrapByWords" MarginBottom="10"/>
+
+            <StackPanel Orientation="Horizontal" MarginBottom="12">
+                <TextBlock Text="Corner radius" VerticalAlignment="Center" Width="110"
+                           Foreground="{ResourceReference TextFillColorSecondary}"/>
+                <Slider Minimum="0" Maximum="120" Value="{Binding ClipRadius, Mode=TwoWay}" Width="240"/>
+                <TextBlock Text="{Binding ClipRadius}" MarginLeft="8" Width="48" VerticalAlignment="Center"/>
+                <CheckBox Content="ClipToBounds" IsChecked="{Binding ClipOn, Mode=TwoWay}" MarginLeft="24" VerticalAlignment="Center"/>
+            </StackPanel>
+
+            <!-- The container. Its OWN corners drive the clip (ClipCornerRadius unset), which is the common case: a card
+                 clips the way it is drawn. -->
+            <Border Width="620" Height="520" Background="#22FFFFFF"
+                    BorderBrush="#88FFFFFF" BorderThickness="1"
+                    CornerRadius="{Binding ClipRadius, Converter={conv:DoubleToCornerRadiusConverter}}"
+                    ClipToBounds="{Binding ClipOn}"
+                    HorizontalAlignment="Left" MarginBottom="24">
+                <Canvas>
+                    <!-- ANALYTIC RECTANGLE: the shape is a formula in the shader, corners included. -->
+                    <ctl:DragPiece Canvas.Left="40" Canvas.Top="30" Width="150" Height="90">
+                        <Rectangle Fill="#FF7DD3FC" CornerRadius="6"/>
+                    </ctl:DragPiece>
+
+                    <!-- ELLIPSE: its own analytic family. -->
+                    <ctl:DragPiece Canvas.Left="240" Canvas.Top="30" Width="150" Height="90">
+                        <Ellipse Fill="#FFF0ABFC"/>
+                    </ctl:DragPiece>
+
+                    <!-- REGULAR POLYGON: analytic too, but reconstructed from corner count + start angle. -->
+                    <ctl:DragPiece Canvas.Left="440" Canvas.Top="20" Width="120" Height="120">
+                        <RegularPolygon Corners="6" Fill="#FF86EFAC"/>
+                    </ctl:DragPiece>
+
+                    <!-- MESH: a star arrives as TRIANGLES. It has no closed form to clip against, so its rounding can
+                         only come from the clip slot - the case worth watching. -->
+                    <ctl:DragPiece Canvas.Left="60" Canvas.Top="180" Width="170" Height="150">
+                        <Polygon Points="{Binding BigStar}" Fill="#FFFDE68A"/>
+                    </ctl:DragPiece>
+
+                    <!-- TEXT: its own pass entirely (a glyph atlas), and the one most likely to be forgotten. -->
+                    <ctl:DragPiece Canvas.Left="280" Canvas.Top="200" Width="230" Height="60">
+                        <TextBlock Text="Text in the corner" FontSize="26" Foreground="#FFFFFFFF"
+                                   VerticalAlignment="Center"/>
+                    </ctl:DragPiece>
+
+                    <!-- A GRADIENT fill: another family again, its own pass. -->
+                    <ctl:DragPiece Canvas.Left="300" Canvas.Top="290" Width="200" Height="90">
+                        <Rectangle CornerRadius="10">
+                            <Rectangle.Fill>
+                                <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                                    <GradientStop Offset="0" Color="#FFFB7185"/>
+                                    <GradientStop Offset="1" Color="#FF60A5FA"/>
+                                </LinearGradientBrush>
+                            </Rectangle.Fill>
+                        </Rectangle>
+                    </ctl:DragPiece>
+
+                    <!-- The COMPUTED and SAMPLED fills, each its own pass in BrushEffect. They START on the four
+                         CORNERS rather than in the middle: these families reached the clip last, and a piece already
+                         straddling a corner says whether they still obey it without anyone touching the mouse. -->
+                    <ctl:DragPiece Canvas.Left="-34" Canvas.Top="-18" Width="130" Height="70">
+                        <Rectangle CornerRadius="8">
+                            <Rectangle.Fill>
+                                <PatternBrush Pattern="Checkerboard" CellSize="14" Color1="#FF0F172A" Color2="#FF38BDF8"/>
+                            </Rectangle.Fill>
+                        </Rectangle>
+                    </ctl:DragPiece>
+
+                    <ctl:DragPiece Canvas.Left="524" Canvas.Top="-18" Width="130" Height="70">
+                        <Rectangle CornerRadius="8">
+                            <Rectangle.Fill>
+                                <ImageBrush Source="Textures/nine-slice-frame.png"/>
+                            </Rectangle.Fill>
+                        </Rectangle>
+                    </ctl:DragPiece>
+
+                    <ctl:DragPiece Canvas.Left="-34" Canvas.Top="468" Width="130" Height="70">
+                        <Rectangle CornerRadius="8">
+                            <Rectangle.Fill>
+                                <FractalBrush Fractal="Julia" C="-0.8,0.156" Zoom="1.1" Iterations="120"
+                                              Color1="#FF0B122B" Color2="#FF22D3EE"/>
+                            </Rectangle.Fill>
+                        </Rectangle>
+                    </ctl:DragPiece>
+
+                    <ctl:DragPiece Canvas.Left="330" Canvas.Top="470" Width="130" Height="70">
+                        <Rectangle CornerRadius="8">
+                            <Rectangle.Fill>
+                                <MaterialBrush Material="Acrylic" TintColor="#FF7DD3FC" TintOpacity="0.4" BlurAmount="18"/>
+                            </Rectangle.Fill>
+                        </Rectangle>
+                    </ctl:DragPiece>
+
+                    <!-- The SAME brushes on the other two carriers. They are here for the MOVE as much as for the clip:
+                         a brush on an ellipse or a polygon owns a record in the very same batch, and until it was noted
+                         in the slot map dragging one waited for a full walk. -->
+                    <ctl:DragPiece Canvas.Left="150" Canvas.Top="130" Width="110" Height="70">
+                        <Ellipse>
+                            <Ellipse.Fill>
+                                <PatternBrush Pattern="Stripes" CellSize="12" Color1="#FF1E1B4B" Color2="#FFF472B6"/>
+                            </Ellipse.Fill>
+                        </Ellipse>
+                    </ctl:DragPiece>
+
+                    <ctl:DragPiece Canvas.Left="300" Canvas.Top="120" Width="90" Height="90">
+                        <RegularPolygon Corners="5">
+                            <RegularPolygon.Fill>
+                                <ImageBrush Source="Textures/nine-slice-frame.png"/>
+                            </RegularPolygon.Fill>
+                        </RegularPolygon>
+                    </ctl:DragPiece>
+
+                    <!-- A NINE-SLICE: one element that bakes NINE records. It is here for the MOVE - the slot map holds
+                         one number per unit, so until it remembered a RUN this was the last fill that could not be
+                         patched in place and a drag waited for a full walk. -->
+                    <ctl:DragPiece Canvas.Left="60" Canvas.Top="350" Width="120" Height="80">
+                        <Rectangle>
+                            <Rectangle.Fill>
+                                <NineSliceBrush Source="Textures/nine-slice-frame.png" Slice="0.25"/>
+                            </Rectangle.Fill>
+                        </Rectangle>
+                    </ctl:DragPiece>
+
+                    <!-- An AURA: its band is drawn OUTSIDE the shape, so the corner has to cut the GLOW - the one
+                         family whose clip shows in the margin around the piece rather than on its own edge. -->
+                    <ctl:DragPiece Canvas.Left="524" Canvas.Top="452" Width="110" Height="110">
+                        <Ellipse Width="60" Height="60" Fill="#FFFDE68A"
+                                 HorizontalAlignment="Center" VerticalAlignment="Center">
+                            <Ellipse.Aura>
+                                <Aura Color="#FFFDE68A" Radius="22" Spread="6"/>
+                            </Ellipse.Aura>
+                        </Ellipse>
+                    </ctl:DragPiece>
+                </Canvas>
+            </Border>
+
+            <!-- The SECOND question, and the reason ClipCornerRadius exists rather than the renderer quietly reading
+                 CornerRadius: cut by something OTHER than how the container is drawn. The border below keeps radius 10
+                 and stays visible, so the gap between the frame and the cut is the whole point. -->
+            <TextBlock Text="An explicit clip radius — cut differently from how the container looks" FontSize="18" Margin="0,0,0,6"/>
+            <TextBlock Text="The border keeps radius 10. Drag this slider and the CUT follows ClipCornerRadius instead — frame and cut come apart."
+                       Foreground="{ResourceReference TextFillColorSecondary}" TextWrapping="WrapByWords" MarginBottom="10"/>
+
+            <StackPanel Orientation="Horizontal" MarginBottom="12">
+                <TextBlock Text="ClipCornerRadius" VerticalAlignment="Center" Width="110"
+                           Foreground="{ResourceReference TextFillColorSecondary}"/>
+                <Slider Minimum="0" Maximum="120" Value="{Binding ExplicitRadius, Mode=TwoWay}" Width="240"/>
+                <TextBlock Text="{Binding ExplicitRadius}" MarginLeft="8" Width="48" VerticalAlignment="Center"/>
+            </StackPanel>
+
+            <Border Width="420" Height="200" Background="#22FFFFFF"
+                    BorderBrush="#88FFFFFF" BorderThickness="1" CornerRadius="10"
+                    ClipToBounds="True"
+                    ClipCornerRadius="{Binding ExplicitRadius, Converter={conv:DoubleToCornerRadiusConverter}}"
+                    HorizontalAlignment="Left">
+                <Rectangle Width="560" Height="320" Fill="#FFF0ABFC"
+                           HorizontalAlignment="Center" VerticalAlignment="Center"/>
+            </Border>
+        </StackPanel>
+    </ScrollViewer>
+</View>

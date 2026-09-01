@@ -36,6 +36,8 @@ public partial class GalleryViewModel
         new ImageViewModel(),
         new VectorIconsViewModel(),
         new LayoutViewModel(),
+        new ClippingViewModel(),
+        new OpacityViewModel(),
         new ViewboxViewModel(),
         new ZoomBoxViewModel(),
         new TilesViewModel(),

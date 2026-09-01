@@ -1,0 +1,177 @@
+<View xmlns="http://adamantium/ui"
+      xmlns:x="http://adamantium/ui/xaml/extensions"
+      xmlns:conv="clr-namespace:Adamantium.Game.Sandbox.Converters">
+    <!-- DataContext is the OpacityViewModel.
+
+         The engine fades a subtree by writing ONE number into a transform-table slot; each shader reads it. A family
+         whose pass cannot read it carries the opacity CHAIN in its baked colour instead - and the two mistakes look
+         nothing like each other on one shape: both applied and it fades twice, neither and it does not fade at all.
+         What makes either visible is a NEIGHBOUR that got it right.
+
+         So the strip is duplicated: the top one lives inside a container this slider fades, the bottom one sits outside
+         it, untouched. Every pair must drift apart together. A swatch that stays brighter than its own reference is
+         reading a different alpha from the rest, and it is named right under it. -->
+    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto">
+        <StackPanel Orientation="Vertical" Margin="24">
+            <TextBlock Text="Opacity — every family must fade by the same amount" FontSize="18" Margin="0,0,0,6"/>
+            <!-- MaxWidth, not just TextWrapping: this page scrolls HORIZONTALLY (the strips are wider than the window),
+                 so the panel measures at unlimited width and a wrapping line has nothing to wrap against. The cap gives
+                 it one. -->
+            <TextBlock Text="The top strip is inside a container the slider fades; the bottom one is the same strip at full opacity. Compare each swatch with the one below it: they must part in step. A swatch that lags behind reads its alpha differently from its neighbours."
+                       Foreground="{ResourceReference TextFillColorSecondary}" TextWrapping="WrapByWords"
+                       MaxWidth="900" HorizontalAlignment="Left" MarginBottom="12"/>
+
+            <StackPanel Orientation="Horizontal" MarginBottom="8">
+                <TextBlock Text="Container opacity" VerticalAlignment="Center" Width="140"
+                           Foreground="{ResourceReference TextFillColorSecondary}"/>
+                <Slider Minimum="0" Maximum="1" Value="{Binding ContainerOpacity, Mode=TwoWay}" Width="260"/>
+                <TextBlock Text="{Binding ContainerOpacity}" MarginLeft="8" Width="56" VerticalAlignment="Center"/>
+            </StackPanel>
+
+            <!-- The SECOND question: an element's own Opacity ON TOP of its container's. The product is what should
+                 reach the screen, so a family that reads the slot AND keeps the chain in its colour goes too dark. -->
+            <StackPanel Orientation="Horizontal" MarginBottom="14">
+                <TextBlock Text="Element opacity" VerticalAlignment="Center" Width="140"
+                           Foreground="{ResourceReference TextFillColorSecondary}"/>
+                <Slider Minimum="0" Maximum="1" Value="{Binding ElementOpacity, Mode=TwoWay}" Width="260"/>
+                <TextBlock Text="{Binding ElementOpacity}" MarginLeft="8" Width="56" VerticalAlignment="Center"/>
+                <TextBlock Text="(every swatch in the faded strip, so the PRODUCT is what you compare)" MarginLeft="12"
+                           VerticalAlignment="Center" Foreground="{ResourceReference TextFillColorSecondary}"/>
+            </StackPanel>
+
+            <!-- FADED strip. A mid-tone ground on purpose: on near-black a fading swatch just goes dark and every
+                 family looks alike, which is exactly the comparison this stand exists to make. -->
+            <Border Background="#FF485061" CornerRadius="8" Padding="10" MarginBottom="10"
+                    Opacity="{Binding ContainerOpacity}" HorizontalAlignment="Left">
+                <StackPanel Orientation="Horizontal">
+                    <Rectangle Width="84" Height="56" Fill="#FF7DD3FC" CornerRadius="6" MarginRight="10"
+                               Opacity="{Binding ElementOpacity}"/>
+                    <Ellipse Width="84" Height="56" Fill="#FFF0ABFC" MarginRight="10" Opacity="{Binding ElementOpacity}"/>
+                    <RegularPolygon Corners="6" Width="84" Height="56" Fill="#FF86EFAC" MarginRight="10" Opacity="{Binding ElementOpacity}"/>
+                    <Polygon Points="{Binding Star}" Fill="#FFFDE68A" Width="84" Height="56" MarginRight="10" Opacity="{Binding ElementOpacity}"/>
+                    <TextBlock Text="Text" FontSize="30" Foreground="#FFFFFFFF" Width="84" Height="56"
+                               VerticalAlignment="Center" MarginRight="10" Opacity="{Binding ElementOpacity}"/>
+                    <Rectangle Width="84" Height="56" CornerRadius="6" MarginRight="10" Opacity="{Binding ElementOpacity}">
+                        <Rectangle.Fill>
+                            <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                                <GradientStop Offset="0" Color="#FFFB7185"/>
+                                <GradientStop Offset="1" Color="#FF60A5FA"/>
+                            </LinearGradientBrush>
+                        </Rectangle.Fill>
+                    </Rectangle>
+                    <Rectangle Width="84" Height="56" CornerRadius="6" MarginRight="10" Opacity="{Binding ElementOpacity}">
+                        <Rectangle.Fill>
+                            <PatternBrush Pattern="Checkerboard" CellSize="14" Color1="#FF0F172A" Color2="#FF38BDF8"/>
+                        </Rectangle.Fill>
+                    </Rectangle>
+                    <Rectangle Width="84" Height="56" CornerRadius="6" MarginRight="10" Opacity="{Binding ElementOpacity}">
+                        <Rectangle.Fill>
+                            <ImageBrush Source="Textures/nine-slice-frame.png"/>
+                        </Rectangle.Fill>
+                    </Rectangle>
+                    <Rectangle Width="84" Height="56" CornerRadius="6" MarginRight="10" Opacity="{Binding ElementOpacity}">
+                        <Rectangle.Fill>
+                            <!-- Deliberately LIGHT on both stops. A dark fill reads as "faded" against this mid-tone
+                                 strip whatever its alpha does, and its thin bright filaments are all anti-aliased
+                                 edges - neither the eye nor a pixel measurement can tell a wrong alpha from a dark
+                                 colour there. -->
+                            <FractalBrush Fractal="Julia" C="-0.8,0.156" Zoom="1.1" Iterations="120"
+                                          Color1="#FF67E8F9" Color2="#FFFDE68A"/>
+                        </Rectangle.Fill>
+                    </Rectangle>
+                    <Rectangle Width="84" Height="56" CornerRadius="6" MarginRight="10" Opacity="{Binding ElementOpacity}">
+                        <Rectangle.Fill>
+                            <MaterialBrush Material="Acrylic" TintColor="#FF7DD3FC" TintOpacity="0.4" BlurAmount="18"/>
+                        </Rectangle.Fill>
+                    </Rectangle>
+                    <!-- The AURA's band is drawn OUTSIDE the shape, so it needs the room its margin leaves. -->
+                    <Ellipse Width="44" Height="44" Fill="#FFFDE68A" Margin="20,6,20,6" VerticalAlignment="Center"
+                             Opacity="{Binding ElementOpacity}">
+                        <Ellipse.Aura>
+                            <Aura Color="#FFFDE68A" Radius="18" Spread="4"/>
+                        </Ellipse.Aura>
+                    </Ellipse>
+                    <!-- SHADOW: the same band with an OFFSET, and the other half of the halo pass. A light colour on
+                         purpose - a dark shadow on this mid-tone strip is invisible whatever its alpha does. -->
+                    <Rectangle Width="48" Height="44" Fill="#FF485061" CornerRadius="6" Margin="18,6,22,6"
+                               VerticalAlignment="Center" Opacity="{Binding ElementOpacity}">
+                        <Rectangle.Shadow>
+                            <Shadow Color="#FFF0ABFC" OffsetX="6" OffsetY="6" BlurRadius="12" Spread="2"/>
+                        </Rectangle.Shadow>
+                    </Rectangle>
+                </StackPanel>
+            </Border>
+
+            <!-- REFERENCE strip: the same swatches, never faded. -->
+            <Border Background="#FF485061" CornerRadius="8" Padding="10" HorizontalAlignment="Left">
+                <StackPanel Orientation="Horizontal">
+                    <Rectangle Width="84" Height="56" Fill="#FF7DD3FC" CornerRadius="6" MarginRight="10"/>
+                    <Ellipse Width="84" Height="56" Fill="#FFF0ABFC" MarginRight="10"/>
+                    <RegularPolygon Corners="6" Width="84" Height="56" Fill="#FF86EFAC" MarginRight="10"/>
+                    <Polygon Points="{Binding Star}" Fill="#FFFDE68A" Width="84" Height="56" MarginRight="10"/>
+                    <TextBlock Text="Text" FontSize="30" Foreground="#FFFFFFFF" Width="84" Height="56"
+                               VerticalAlignment="Center" MarginRight="10"/>
+                    <Rectangle Width="84" Height="56" CornerRadius="6" MarginRight="10">
+                        <Rectangle.Fill>
+                            <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                                <GradientStop Offset="0" Color="#FFFB7185"/>
+                                <GradientStop Offset="1" Color="#FF60A5FA"/>
+                            </LinearGradientBrush>
+                        </Rectangle.Fill>
+                    </Rectangle>
+                    <Rectangle Width="84" Height="56" CornerRadius="6" MarginRight="10">
+                        <Rectangle.Fill>
+                            <PatternBrush Pattern="Checkerboard" CellSize="14" Color1="#FF0F172A" Color2="#FF38BDF8"/>
+                        </Rectangle.Fill>
+                    </Rectangle>
+                    <Rectangle Width="84" Height="56" CornerRadius="6" MarginRight="10">
+                        <Rectangle.Fill>
+                            <ImageBrush Source="Textures/nine-slice-frame.png"/>
+                        </Rectangle.Fill>
+                    </Rectangle>
+                    <Rectangle Width="84" Height="56" CornerRadius="6" MarginRight="10">
+                        <Rectangle.Fill>
+                            <!-- Deliberately LIGHT on both stops. A dark fill reads as "faded" against this mid-tone
+                                 strip whatever its alpha does, and its thin bright filaments are all anti-aliased
+                                 edges - neither the eye nor a pixel measurement can tell a wrong alpha from a dark
+                                 colour there. -->
+                            <FractalBrush Fractal="Julia" C="-0.8,0.156" Zoom="1.1" Iterations="120"
+                                          Color1="#FF67E8F9" Color2="#FFFDE68A"/>
+                        </Rectangle.Fill>
+                    </Rectangle>
+                    <Rectangle Width="84" Height="56" CornerRadius="6" MarginRight="10">
+                        <Rectangle.Fill>
+                            <MaterialBrush Material="Acrylic" TintColor="#FF7DD3FC" TintOpacity="0.4" BlurAmount="18"/>
+                        </Rectangle.Fill>
+                    </Rectangle>
+                    <Ellipse Width="44" Height="44" Fill="#FFFDE68A" Margin="20,6,20,6" VerticalAlignment="Center">
+                        <Ellipse.Aura>
+                            <Aura Color="#FFFDE68A" Radius="18" Spread="4"/>
+                        </Ellipse.Aura>
+                    </Ellipse>
+                    <Rectangle Width="48" Height="44" Fill="#FF485061" CornerRadius="6" Margin="18,6,22,6"
+                               VerticalAlignment="Center">
+                        <Rectangle.Shadow>
+                            <Shadow Color="#FFF0ABFC" OffsetX="6" OffsetY="6" BlurRadius="12" Spread="2"/>
+                        </Rectangle.Shadow>
+                    </Rectangle>
+                </StackPanel>
+            </Border>
+
+            <StackPanel Orientation="Horizontal" MarginTop="6">
+                <TextBlock Text="rect" Width="94" Foreground="{ResourceReference TextFillColorSecondary}"/>
+                <TextBlock Text="ellipse" Width="94" Foreground="{ResourceReference TextFillColorSecondary}"/>
+                <TextBlock Text="polygon" Width="94" Foreground="{ResourceReference TextFillColorSecondary}"/>
+                <TextBlock Text="mesh" Width="94" Foreground="{ResourceReference TextFillColorSecondary}"/>
+                <TextBlock Text="text" Width="94" Foreground="{ResourceReference TextFillColorSecondary}"/>
+                <TextBlock Text="gradient" Width="94" Foreground="{ResourceReference TextFillColorSecondary}"/>
+                <TextBlock Text="pattern" Width="94" Foreground="{ResourceReference TextFillColorSecondary}"/>
+                <TextBlock Text="texture" Width="94" Foreground="{ResourceReference TextFillColorSecondary}"/>
+                <TextBlock Text="fractal" Width="94" Foreground="{ResourceReference TextFillColorSecondary}"/>
+                <TextBlock Text="material" Width="94" Foreground="{ResourceReference TextFillColorSecondary}"/>
+                <TextBlock Text="aura" Width="94" Foreground="{ResourceReference TextFillColorSecondary}"/>
+                <TextBlock Text="shadow" Width="94" Foreground="{ResourceReference TextFillColorSecondary}"/>
+            </StackPanel>
+        </StackPanel>
+    </ScrollViewer>
+</View>
