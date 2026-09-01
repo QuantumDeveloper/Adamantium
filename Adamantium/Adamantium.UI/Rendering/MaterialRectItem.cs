@@ -43,4 +43,8 @@ public struct MaterialRectItem
     public Vector4F StrokeColor;
     public Vector4F Stroke0;
     public Vector4F Stroke1;
+
+    /// <summary>.x = the ROUNDED CLIP's slot, or -1; .yzw spare. Its own field rather than one of Stroke1's unused
+    /// components: those are the pen's dash/trim/flags, unused only because this batch bakes solid pens today.</summary>
+    public Vector4F Clip;
 }

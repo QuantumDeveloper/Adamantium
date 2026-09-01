@@ -35,16 +35,10 @@ public class FontRenderer : GraphicsResource
     // per-block DrawLayoutDirect (Stage 1). Requires UseDirectTextDraw too; the aggregator/fallback live in RenderCache.
     public static bool UseTextBatch = true;
 
-    // Selects the glyph pixel shader: true = canonical MSDF (Chlumsky screenPxRange, RenderMsdf pass),
-    // false = the gradient-derivative AA (Render pass). See FontEffect.fx.
-    public bool UseCanonicalMsdf { get; set; } = true;
-
-    // Outline test pass (RenderMsdfOutline). When on, draws OutlineColor as a ring OutlineWidth (normalized
-    // field units) outside each glyph - a functional check that the distance field is valid beyond the
-    // contour (only works because PxRange was widened; a thin field would have no data out there).
-    public bool UseOutline { get; set; } = false;
-    public Color OutlineColor { get; set; } = Colors.Black;
-    public float OutlineWidth { get; set; } = 0.15f;
+    // The glyph pixel shader used to be selectable - canonical MSDF against a gradient-derivative variant, plus an
+    // outline pass that existed to PROVE the widened distance field carried data beyond the contour. Both switches were
+    // fixed at their defaults everywhere and nothing ever flipped them, so the two passes they chose were dead code in
+    // an effect whose shader compiler is unusually easy to upset; they and their parameters are gone.
 
     // True-SDF blend band, in atlas texels per screen pixel. Below Lo the glyph is magnified -> MSDF median
     // (sharp corners); above Hi it is minified -> single-channel true SDF (crisp small text where the median
@@ -63,10 +57,10 @@ public class FontRenderer : GraphicsResource
     private EffectParameter effectFontWeight;
     private EffectParameter effectPixelRange;
     private EffectParameter effectAtlasSize;
-    private EffectParameter effectOutlineColor;
-    private EffectParameter effectOutlineWidth;
     private EffectParameter effectSdfBlendLo;
     private EffectParameter effectSdfBlendHi;
+    private EffectParameter effectDirectClipBox;
+    private EffectParameter effectDirectClipRadii;
     private EffectParameter effectGlyphInstances;   // BDA address of the per-instance GlyphItem storage buffer (instanced batch)
     private EffectParameter effectTransforms;       // BDA address of the transform table the glyph VS indexes by slot
 
@@ -96,17 +90,17 @@ public class FontRenderer : GraphicsResource
         effectFontWeight = fontEffect.FontWeight;
         effectPixelRange = fontEffect.PxRange;
         effectAtlasSize = fontEffect.MSDFAtlasSize;
-        effectOutlineColor = fontEffect.OutlineColor;
-        effectOutlineWidth = fontEffect.OutlineWidth;
         effectSdfBlendLo = fontEffect.SdfBlendLo;
         effectSdfBlendHi = fontEffect.SdfBlendHi;
+        effectDirectClipBox = fontEffect.DirectClipBox;
+        effectDirectClipRadii = fontEffect.DirectClipRadii;
         effectGlyphInstances = fontEffect.GlyphInstancesAddress;
         effectTransforms = fontEffect.TransformsAddress;
     }
 
-    public void DrawLayout(Buffer<FontItem> glyphs, uint count, FontAtlas atlas, float fontSize, Color foreground, Color stroke)
+    public void DrawLayout(Buffer<FontItem> glyphs, uint count, FontAtlas atlas, float fontSize, Color foreground)
     {
-        DrawInternal(glyphs, count, atlas, fontSize, foreground, stroke);
+        DrawInternal(glyphs, count, atlas, fontSize, foreground);
     }
 
     public void SetState(
@@ -151,7 +145,7 @@ public class FontRenderer : GraphicsResource
         beginCalled = true;
     }
 
-    private void DrawInternal(Buffer<FontItem> glyphs, uint count, FontAtlas atlas, float fontSize, Color foreground, Color stroke)
+    private void DrawInternal(Buffer<FontItem> glyphs, uint count, FontAtlas atlas, float fontSize, Color foreground)
     {
         if (count == 0) return;
 
@@ -194,28 +188,18 @@ public class FontRenderer : GraphicsResource
         effectFontWeight.SetValue(FontWeight);
         effectPixelRange.SetValue(atlas.PixelRange);
         effectAtlasSize.SetValue(new Vector2F(atlas.Atlas.Width, atlas.Atlas.Height));
-        effectOutlineColor.SetValue(OutlineColor.ToVector4());
-        effectOutlineWidth.SetValue(OutlineWidth);
         effectSdfBlendLo.SetValue(SdfBlendLo);
         effectSdfBlendHi.SetValue(SdfBlendHi);
+        // NO clip on this path, and it has to be SAID: the glyphs go into a private target, so their SV_Position is
+        // target-local while the clip box is in screen device pixels - the two do not describe the same space. Left
+        // unset, the pass would keep whatever the last per-block draw put there and cut the target by a stranger's rect.
+        effectDirectClipBox.SetValue(Vector4F.Zero);
+        effectDirectClipRadii.SetValue(Vector4F.Zero);
         GraphicsDevice.VertexType = vertexType;
         GraphicsDevice.SetVertexBuffer(glyphs);   // the component's own buffer, uploaded from the FROZEN glyph run (no live layout)
         // Instanced quad: 4-vertex triangle strip per glyph (corners from SV_VertexID), one instance per glyph.
         GraphicsDevice.PrimitiveTopology = PrimitiveTopology.TriangleStrip;
-        if (stroke == Colors.Transparent)
-        {
-            IEffectPass pass;
-            if (UseOutline)
-                pass = fontEffect.FontBatchRenderMsdfOutlinePass;
-            else
-                pass = UseCanonicalMsdf ? fontEffect.FontBatchRenderMsdfPass : fontEffect.FontBatchRenderPass;
-            pass.Apply();
-        }
-        else
-        {
-            fontEffect.StrokeColor.SetValue(stroke.ToVector4());
-            fontEffect.FontBatchStrokedTextPass.Apply();
-        }
+        fontEffect.FontBatchRenderMsdfPass.Apply();
 
         GraphicsDevice.Draw(4, count);   // 4 strip verts x glyph instances (composite path)
     }
@@ -227,7 +211,8 @@ public class FontRenderer : GraphicsResource
     // units (CompareOp.Always, test+write on) - NOT the RT path's depth-off (that target had no depth buffer).
     // Behind FontRenderer.UseDirectTextDraw. The MVP is built on the CPU (Translation(TextArea) x World x Projection)
     // because an indirect/indexed matrix in a graphics shader AVs vkCreateShadersEXT on this Turing - see the plan.
-    public void DrawLayoutDirect(SamplerState samplerState, Buffer<FontItem> glyphs, uint count, FontAtlas atlas, float fontSize, Color foreground, Matrix4x4F mvp, float opacity)
+    public void DrawLayoutDirect(SamplerState samplerState, Buffer<FontItem> glyphs, uint count, FontAtlas atlas, float fontSize, Color foreground, Matrix4x4F mvp, float opacity,
+        Vector4F clipBox = default, Vector4F clipRadii = default)
     {
         if (count == 0) return;
 
@@ -240,7 +225,12 @@ public class FontRenderer : GraphicsResource
         GraphicsDevice.DepthCompareFunction = CompareOp.Always;
 
         var fg = foreground.ToVector4();
-        fg.W *= opacity;   // fold the element's Opacity (fade animation, dimmed container) into the glyph alpha
+        // Fold the element's Opacity (fade animation, dimmed container) into the glyph alpha, RAISED TO 2.2 first: the
+        // pixel shader gamma-boosts what it gets (pow(alpha * coverage, 1/2.2)), and a fade that went in raw came back
+        // boosted - a block at Opacity 0.5 kept 0.755 of its ink while the shapes beside it were at 0.501. The colour's
+        // OWN alpha still goes in raw and stays under the boost; taking it out from there washes text out (see
+        // FontPixelShaderMsdf). Same correction as the batch path makes in its vertex stage.
+        fg.W *= MathF.Pow(opacity, 2.2f);
 
         effectSampler.SetResource(samplerState);
         effectTexture.SetResource(atlas.Atlas);
@@ -252,18 +242,14 @@ public class FontRenderer : GraphicsResource
         effectFontWeight.SetValue(FontWeight);
         effectPixelRange.SetValue(atlas.PixelRange);
         effectAtlasSize.SetValue(new Vector2F(atlas.Atlas.Width, atlas.Atlas.Height));
-        effectOutlineColor.SetValue(OutlineColor.ToVector4());
-        effectOutlineWidth.SetValue(OutlineWidth);
         effectSdfBlendLo.SetValue(SdfBlendLo);
         effectSdfBlendHi.SetValue(SdfBlendHi);
+        effectDirectClipBox.SetValue(clipBox);       // zero size = no rounded clip
+        effectDirectClipRadii.SetValue(clipRadii);
         GraphicsDevice.VertexType = vertexType;
         GraphicsDevice.SetVertexBuffer(glyphs);   // the component's own buffer, uploaded from the FROZEN glyph run (no live layout)
         GraphicsDevice.PrimitiveTopology = PrimitiveTopology.TriangleStrip;
-        // Direct text is never stroked (both text paths pass no stroke) - pick outline, else canonical / gradient MSDF.
-        var pass = UseOutline
-            ? fontEffect.FontBatchRenderMsdfOutlinePass
-            : (UseCanonicalMsdf ? fontEffect.FontBatchRenderMsdfPass : fontEffect.FontBatchRenderPass);
-        pass.Apply();
+        fontEffect.FontBatchRenderMsdfPass.Apply();   // direct text is never stroked - both text paths pass no stroke
 
         GraphicsDevice.Draw(4, count);   // 4 strip verts x glyph instances
     }

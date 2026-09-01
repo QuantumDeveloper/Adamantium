@@ -39,7 +39,8 @@ public class Control : TemplatedUIComponent, IControl
 
    public static readonly AdamantiumProperty CornerRadiusProperty = AdamantiumProperty.Register(nameof(CornerRadius),
       typeof(CornerRadius), typeof(Control),
-      new PropertyMetadata(default(CornerRadius), PropertyMetadataOptions.AffectsRender));
+      new PropertyMetadata(default(CornerRadius), PropertyMetadataOptions.AffectsRender,
+         (d, _) => NotifyOwnCornersChanged(d)));   // these corners are also the CLIP's, when it clips - see the note there
 
    public static readonly AdamantiumProperty PaddingProperty = AdamantiumProperty.Register(nameof(Padding),
       typeof(Thickness), typeof(Control),
@@ -68,6 +69,13 @@ public class Control : TemplatedUIComponent, IControl
    {
       get => GetValue<CornerRadius>(CornerRadiusProperty);
       set => SetValue(CornerRadiusProperty, value);
+   }
+
+   /// <inheritdoc />
+   protected override Vector4F OwnCornerRadii()
+   {
+      var r = CornerRadius;
+      return new Vector4F((float)r.TopLeft, (float)r.TopRight, (float)r.BottomRight, (float)r.BottomLeft);
    }
 
    public Thickness Padding

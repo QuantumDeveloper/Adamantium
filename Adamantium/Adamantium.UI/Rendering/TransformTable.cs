@@ -327,6 +327,57 @@ internal sealed class TransformTable
     }
 
 
+    // ---- CLIP SLOTS ---------------------------------------------------------------------------------------------
+    // A ROUNDED clip cannot be a scissor - scissors are rectangles - so the shape travels to the shaders the same way a
+    // transform and an opacity chain do: in a slot, named by index in the instance record. That also means a clip
+    // survives a replayed frame and follows a scrolling subtree without re-recording anything.
+    //
+    // The slot's matrix is used as STORAGE, not as a transform: row 0 holds the clip rectangle in device pixels, row 1
+    // its four radii. Params.X marks the slot as carrying a clip at all.
+    private readonly System.Collections.Generic.Dictionary<Guid, int> _clipSlotByOwner = new();
+
+    public int AcquireClipSlot(Guid ownerId)
+    {
+        if (_clipSlotByOwner.TryGetValue(ownerId, out var slot)) return slot;
+
+        slot = AcquireFreeSlot();
+        _cpu[slot].Params.X = 0f;   // a recycled slot carries a stranger's clip until the first SetClip
+        _version[slot]++;
+        _clipSlotByOwner[ownerId] = slot;
+        return slot;
+    }
+
+    public void ReleaseClipSlot(Guid ownerId)
+    {
+        if (!_clipSlotByOwner.Remove(ownerId, out var slot)) return;
+
+        _cpu[slot].Params.X = 0f;
+        _version[slot]++;
+        _free.Push(slot);
+    }
+
+    /// <summary>The clip's rectangle and corner radii, both in DEVICE pixels - the space a fragment's own position is
+    /// already in, so the shader needs no matrix to compare them.</summary>
+    public void SetClip(IGraphicsDevice device, int slot, Vector4F rect, Vector4F radii)
+    {
+        ref var s = ref _cpu[slot];
+        if (s.World.M11 == rect.X && s.World.M12 == rect.Y && s.World.M13 == rect.Z && s.World.M14 == rect.W
+            && s.World.M21 == radii.X && s.World.M22 == radii.Y && s.World.M23 == radii.Z && s.World.M24 == radii.W
+            && s.Params.X == 1f)
+        {
+            if (_gpu != null && slot < _gpuCapacity && _uploaded[_current][slot] != _version[slot]) Upload(slot);
+            return;
+        }
+
+        s.World.M11 = rect.X; s.World.M12 = rect.Y; s.World.M13 = rect.Z; s.World.M14 = rect.W;
+        s.World.M21 = radii.X; s.World.M22 = radii.Y; s.World.M23 = radii.Z; s.World.M24 = radii.W;
+        s.Params.X = 1f;
+        _version[slot]++;
+
+        if (_gpu == null || slot >= _gpuCapacity) return;
+        if (_uploaded[_current][slot] != _version[slot]) Upload(slot);
+    }
+
     private int AcquireFreeSlot()
     {
         if (_free.Count > 0) return _free.Pop();

@@ -40,11 +40,13 @@ internal sealed class GradientRectCollector : BrushSdfCollector<GradientRectItem
 
     // Bake one gradient rounded-rect fill. False only if it can't be baked (rotated/sheared world or a GPU-buffer
     // overflow this frame) - the caller draws it per-unit.
-    public bool TryAdd(RectanglePayload p, Matrix4x4F world, double opacity, Rect2D scissor, Rect logicalBounds, int transformSlot = 0, int fadeSlot = -1)
+    public bool TryAdd(RectanglePayload p, Matrix4x4F world, double opacity, Rect2D scissor, Rect logicalBounds, int transformSlot = 0,
+        int fadeSlot = -1, int clipSlot = -1)
     {
         EnsureCpuCapacity(Count + 1);
         if (Count + 1 > GpuCapacity) return false;
         if (!BakeItem(p, world, opacity, transformSlot, fadeSlot, out var item)) return false;
+        item.Clip = new Vector4F(clipSlot, 0, 0, 0);
         Items[Count++] = item;
         MarkPending(scissor, logicalBounds);
         return true;
@@ -73,11 +75,13 @@ internal sealed class GradientRectCollector : BrushSdfCollector<GradientRectItem
 
     public bool CanBatchPolygon(RegularPolygonPayload p) => WantsBatchPolygon(p);
 
-    public bool TryAddPolygon(RegularPolygonPayload p, Matrix4x4F world, double opacity, Rect2D scissor, Rect logicalBounds, int transformSlot = 0, int fadeSlot = -1)
+    public bool TryAddPolygon(RegularPolygonPayload p, Matrix4x4F world, double opacity, Rect2D scissor, Rect logicalBounds, int transformSlot = 0,
+        int fadeSlot = -1, int clipSlot = -1)
     {
         EnsureCpuCapacity(Count + 1);
         if (Count + 1 > GpuCapacity) return false;
         if (!BakePolygonItem(p, world, opacity, transformSlot, fadeSlot, out var item)) return false;
+        item.Clip = new Vector4F(clipSlot, 0, 0, 0);
         Items[Count++] = item;
         MarkPending(scissor, logicalBounds);
         return true;
@@ -130,20 +134,25 @@ internal sealed class GradientRectCollector : BrushSdfCollector<GradientRectItem
         var rectRadii = RectBatchCollector.BakeRadii(corners, dest, sx);
         item.Radii = shape.RadiiFor(rectRadii);
         // ...and the OPACITY SLOT rides above them (biased by 1, so 0 means nothing above this element fades). Packed
-        // rather than given a field of its own: growing this record aborts shader creation on this driver, measured
-        // seven starts out of seven. The vertex stage unpacks it and hands the alpha to the pixel stage.
+        // rather than given a field of its own, which at the time was because growing this record aborted shader creation
+        // on this driver (measured, seven starts of seven). That is no longer true: the Clip field below was added and
+        // measured at seven starts of seven with no failure. Left packed because unpacking it now would change nothing.
+        // The vertex stage unpacks it and hands the alpha to the pixel stage.
         item.Params = new Vector4F(shape.RadiusFlag(rectRadii), type, count,
             (float)g.SpreadMethod + 8f * (float)g.ColorInterpolationMode + 16f * (fadeSlot + 1));
+        // -1, never 0: zero is a valid clip slot belonging to somebody else. Stamped by TryAdd/TryStage/the patch.
+        item.Clip = new Vector4F(-1, 0, 0, 0);
         return true;
     }
 
     /// <summary>Bake one unit into the patch stage - see BatchArena. Same bake TryAdd uses; it just lands in the stage
     /// instead of the arena, because a patch has to know the whole frame is repairable before it changes any of it.</summary>
-    public override bool TryStage(IRenderUnit unit, Matrix4x4F world, int transformSlot, int ownerTag)
+    public override bool TryStage(IRenderUnit unit, Matrix4x4F world, int transformSlot, int ownerTag, int clipSlot = -1)
     {
         if (unit is not RenderUnits.RectangleRenderUnit u || !CanBatch(u.RectPayload)) return false;
         if (!BakeItem(u.RectPayload, world, u.FillOpacity, transformSlot, unit.FadeSlot, out var item)) return false;
 
+        item.Clip = new Vector4F(clipSlot, 0, 0, 0);   // the same stamp TryAdd makes - see BatchArena.TryStage
         Stage.Add(item);
         return true;
     }

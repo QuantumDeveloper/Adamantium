@@ -210,6 +210,8 @@ public partial class RenderCache
         {
             _worldCache.Clear();
             _clipCache.Clear();
+            _clipSlotCache.Clear();
+            _clipShapeCache.Clear();
             _relWorldCache.Clear();
             _nodeCache.Clear();
         }

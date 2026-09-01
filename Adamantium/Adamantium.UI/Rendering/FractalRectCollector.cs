@@ -97,14 +97,14 @@ internal sealed class FractalRectCollector : BrushSdfCollector<FractalRectItem>
 
     // Bake one fractal rounded-rect fill. False only if it can't be baked (rotated/sheared world or a GPU-buffer overflow) -
     // the caller draws it per-unit (the demo stays axis-aligned).
-    public bool TryAdd(RectanglePayload p, Matrix4x4F world, double opacity, Rect2D scissor, Rect logicalBounds, int transformSlot = 0)
+    public bool TryAdd(RectanglePayload p, Matrix4x4F world, double opacity, Rect2D scissor, Rect logicalBounds, int transformSlot = 0, int clipSlot = -1, int fadeSlot = -1)
     {
         EnsureCpuCapacity(Count + 1);
         if (Count + 1 > GpuCapacity)
         {
             return false;
         }
-        if (!BakeItem(p, world, opacity, transformSlot, out var item))
+        if (!BakeItem(p, world, opacity, transformSlot, clipSlot, fadeSlot, out var item))
         {
             return false;
         }
@@ -167,7 +167,7 @@ internal sealed class FractalRectCollector : BrushSdfCollector<FractalRectItem>
 
     // Bake a fractal fill into an instance record. Position -> world; the fractal maps the fragment to the complex plane
     // (centre/zoom are complex-plane values, NOT scaled by the device scale - only the corner radius + stroke are px).
-    public static bool BakeItem(RectanglePayload p, Matrix4x4F world, double opacity, int transformSlot, out FractalRectItem item)
+    public static bool BakeItem(RectanglePayload p, Matrix4x4F world, double opacity, int transformSlot, int clipSlot, int fadeSlot, out FractalRectItem item)
     {
         item = default;
         const float eps = 1e-4f;
@@ -204,7 +204,11 @@ internal sealed class FractalRectCollector : BrushSdfCollector<FractalRectItem>
             StrokeColor = strokeColor,
             Stroke0 = stroke0,
             Stroke1 = stroke1,
-            Dash = dash
+            Dash = dash,
+            // .x the rounded ancestor clip, .y the opacity slot its alpha comes from (-1 = none for either). Until the
+            // slot was read here a faded ancestor reached a fractal only through a full re-bake, so it lagged behind
+            // every neighbour on the Opacity stand until something forced a walk.
+            Clip = new Vector4F(clipSlot, fadeSlot, 0, 0)
         };
         return true;
     }

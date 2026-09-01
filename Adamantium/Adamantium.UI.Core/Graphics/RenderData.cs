@@ -25,6 +25,16 @@ public class RenderData
     
     public Matrix4x4F ProjectionMatrix { get; set; }
 
+    /// <summary>The nearest ROUNDED ancestor clip, in DEVICE pixels: <c>xy</c> = the clip rect's origin, <c>zw</c> = its
+    /// size, and the four corner radii beside it. Zero size = nothing rounded cuts this command.
+    /// <para>Here rather than only in the transform table because a PER-UNIT draw cannot read that table: the batched
+    /// families fetch the same two values by slot, and these carry them to the passes that take them as uniforms. Set at
+    /// bake, beside <see cref="Opacity"/>, since both follow the ancestor chain and neither survives a re-record.</para></summary>
+    public Vector4F RoundedClipBox { get; set; }
+
+    /// <inheritdoc cref="RoundedClipBox"/>
+    public Vector4F RoundedClipRadii { get; set; }
+
     /// <summary>The soft bands drawn UNDER this command's shape (an aura, a shadow, or both), baked from the element's
     /// live <see cref="Media.Aura"/>/<see cref="Media.Shadow"/> at RECORD time. Null when it wears none - which is the
     /// overwhelmingly common case, so nothing is allocated for it.</summary>

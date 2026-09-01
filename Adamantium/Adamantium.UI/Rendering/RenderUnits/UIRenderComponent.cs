@@ -511,12 +511,11 @@ public class TextRenderComponent : ImageRenderComponent
         var pad = GlyphRun.EffectPadding;
         var location = new Vector3F(RenderingParameters.TextArea.X + pad, RenderingParameters.TextArea.Y + pad, 5);
         var foreground = ((SolidColorBrush)Foreground).Color;
-        var stroke = Colors.Transparent;
         var previousColor = GraphicsDevice.ClearColor;
         // Rasterize the (logical-size) layout RenderScale x larger into the target; the composite minifies it = SSAA.
         FontRenderer.RenderScale = TextSupersample;
         FontRenderer.SetState(GraphicsDevice.SamplerStates.LinearFont, location, EnsureRenderTarget(), outerPassActive: false);
-        FontRenderer.DrawLayout(EnsureGlyphVtx(), (uint)GlyphRun.Count, GlyphRun.Atlas, GlyphRun.FontSize, foreground, stroke);
+        FontRenderer.DrawLayout(EnsureGlyphVtx(), (uint)GlyphRun.Count, GlyphRun.Atlas, GlyphRun.FontSize, foreground);
         FontRenderer.RestoreState(outerPassActive: false);
         GraphicsDevice.ClearColor = previousColor;
         _textRendered = true;
@@ -562,6 +561,8 @@ public class TextRenderComponent : ImageRenderComponent
             GlyphRun.FontSize,
             foreground,
             mvp,
-            RenderData.Opacity);
+            RenderData.Opacity,
+            RenderData.RoundedClipBox,      // the rounded ancestor clip the batched path gets from the table by slot
+            RenderData.RoundedClipRadii);
     }
 }

@@ -488,7 +488,7 @@ public partial class RenderCache
         if (_haloOver != null) _haloOver.TransformsAddress = address;
         if (_haloLivingUnder != null) _haloLivingUnder.TransformsAddress = address;
         if (_haloLivingOver != null) _haloLivingOver.TransformsAddress = address;
-        if (_textBatch != null) _textBatch.TransformsAddress = address;   // glyph VS fetches the block's node matrix by slot
+        if (_textBatch != null) _textBatch.TransformsAddress = address;   // glyph VS fetches the node matrix AND the clip by slot
         if (_instancedFill != null) _instancedFill.TransformsAddress = address;
     }
 
@@ -609,6 +609,12 @@ public partial class RenderCache
         var setupBytes0 = System.GC.GetAllocatedBytesForCurrentThread();
         BeginTransformFrame(device);
 
+        // Rounded clips, refreshed from their owners BEFORE the clean-frame early-out - for the same reason the
+        // composited animations below run there: a replayed frame re-records nothing, so a clip that changed shape
+        // reaches the screen only through its slot.
+        _frameScissor = fullScissor;   // the frame's own, for anything that has to ask RoundedClipSlot outside the walk
+        RefreshClipSlots(fullScissor);
+
         // The animations this thread plays by itself. BEFORE the clean-frame early-out on purpose: a composited animation
         // changes what the retained op stream draws (a matrix, a re-baked colour slot), so an otherwise CLEAN frame is
         // exactly when it must still apply - the loop can be stalled in a theme cascade and the spinner keeps turning.
@@ -680,6 +686,7 @@ public partial class RenderCache
             _rectSlotByUnit.Clear();
             _sdfSlotByUnit.Clear();
             _textRunByUnit.Clear();
+            _texRunByUnit.Clear();
             _fillSlotByUnit.Clear();
             _haloRunsByUnit.Clear();
             _slotBlindUnits.Clear();
@@ -842,6 +849,14 @@ public partial class RenderCache
             // frozen snapshot first, so batches (rru.FillOpacity) and per-unit renderers bake with the current opacity.
             unit.SetEffectiveOpacity(EffectiveOpacity(unit.Component));
             unit.SetFadeSlot(OpacitySlotOf(device, unit.Component));
+            // The rounded clip as a SHAPE, for the per-unit draws that take it as a uniform (the batched families read
+            // the same numbers from the table by slot). Written before Update so the draw sees this frame's clip.
+            if (unit.RenderData != null)
+            {
+                var (clipBox, clipRadii) = RoundedClipShape(unit.Component, fullScissor);
+                unit.RenderData.RoundedClipBox = clipBox;
+                unit.RenderData.RoundedClipRadii = clipRadii;
+            }
             unit.Update(wt, _projectionMatrix, _renderScale);
 
             // The unit's soft bands (aura / shadow), if it wears any. NOT an alternative to its fill - an addition, so it
@@ -880,7 +895,8 @@ public partial class RenderCache
                     FlushBatches(device, fullScissor, ref scissorNarrowed);
                 var bakeWorld = ResolveBake(device, unit.Component, wt, out var slot4Rect);
                 FadeBySlot(unit);   // this pass reads the alpha from the slot - keep it out of the colour
-                if (_rectBatch.TryAdd(rru.RectPayload, bakeWorld, rru.FillOpacity, scissor, rectBounds, slot4Rect, rru.FadeSlot, TagOf(group)))
+                if (_rectBatch.TryAdd(rru.RectPayload, bakeWorld, rru.FillOpacity, scissor, rectBounds, slot4Rect,
+                        rru.FadeSlot, TagOf(group), RoundedClipSlot(unit.Component, fullScissor)))
                 {
                     if (_recording)
                     {
@@ -908,7 +924,8 @@ public partial class RenderCache
                     FlushBatches(device, fullScissor, ref scissorNarrowed);
                 var gradBakeWorld = ResolveBake(device, unit.Component, wt, out var slot4Grad);
                 FadeBySlot(unit);
-                if (_gradientRectBatch.TryAdd(grru.RectPayload, gradBakeWorld, grru.FillOpacity, scissor, gradRectBounds, slot4Grad, grru.FadeSlot))
+                if (_gradientRectBatch.TryAdd(grru.RectPayload, gradBakeWorld, grru.FillOpacity, scissor, gradRectBounds, slot4Grad, grru.FadeSlot,
+                        RoundedClipSlot(unit.Component, fullScissor)))
                 {
                     if (_recording)
                     {
@@ -931,7 +948,8 @@ public partial class RenderCache
                     FlushBatches(device, fullScissor, ref scissorNarrowed);
                 var bakeWorld = ResolveBake(device, unit.Component, wt, out var slot4El);
                 FadeBySlot(unit);
-                if (_ellipseBatch.TryAdd(eru.EllipsePayload, bakeWorld, eru.FillOpacity, scissor, ellipseBounds, slot4El, eru.FadeSlot))
+                if (_ellipseBatch.TryAdd(eru.EllipsePayload, bakeWorld, eru.FillOpacity, scissor, ellipseBounds, slot4El, eru.FadeSlot,
+                        RoundedClipSlot(unit.Component, fullScissor)))
                 {
                     if (_recording)
                     {
@@ -954,14 +972,18 @@ public partial class RenderCache
                 if ((_batchOpen && !ScissorEquals(_batchScissor, scissor)) || OverlapsHigherLayer(1, polyBounds, unit.Component))
                     FlushBatches(device, fullScissor, ref scissorNarrowed);
                 var bakeWorldPoly = ResolveBake(device, unit.Component, wt, out var slot4Poly);
-                if (_polygonBatch.TryAdd(pru2.PolygonPayload, bakeWorldPoly, pru2.FillOpacity, scissor, polyBounds, slot4Poly))
+                FadeBySlot(unit);   // this pass reads the alpha from the slot - keep the chain out of the colour
+                if (_polygonBatch.TryAdd(pru2.PolygonPayload, bakeWorldPoly, pru2.FillOpacity, scissor, polyBounds, slot4Poly,
+                        RoundedClipSlot(unit.Component, fullScissor), pru2.FadeSlot))
                 {
-                    // A solid polygon holds the opacity CHAIN in its colour (its record has no room for a slot - see
-                    // the Polygon pass), so an ancestor's fade has to find it here, exactly as it finds text.
-                    _slotBlindUnits.Add(unit);
-
                     if (_recording)
                     {
+                        // WHERE its record sits. Without this the unit answered HoldsInstances = false, which the move
+                        // path reads as "a per-unit draw - the replay re-points it" (RefreshMovedComponents) - but this
+                        // is a BATCHED segment, and RepointIfItMoved only ever sees per-unit ops. Neither half carried
+                        // it: a dragged polygon stayed where it was until an unrelated full walk (alt-tabbing away from
+                        // the window was enough) moved it in one jump.
+                        _sdfSlotByUnit[unit] = (SdfSlotKind.Polygon, _polygonBatch.LastSlot);
                         group.NotBatchable("polygonBatch");   // non-rect-batch draw -> not rect-splice-patchable
                         IndexUnitBrush(unit.Component, unit, pru2.PolygonPayload.LiveBrush);
                     }
@@ -983,10 +1005,12 @@ public partial class RenderCache
                     FlushBatches(device, fullScissor, ref scissorNarrowed);
                 var gradPolyBake = ResolveBake(device, unit.Component, wt, out var slot4GradPoly);
                 FadeBySlot(unit);
-                if (_gradientRectBatch.TryAddPolygon(gpru.PolygonPayload, gradPolyBake, gpru.FillOpacity, scissor, gradPolyBounds, slot4GradPoly, gpru.FadeSlot))
+                if (_gradientRectBatch.TryAddPolygon(gpru.PolygonPayload, gradPolyBake, gpru.FillOpacity, scissor, gradPolyBounds, slot4GradPoly,
+                        gpru.FadeSlot, RoundedClipSlot(unit.Component, fullScissor)))
                 {
                     if (_recording)
                     {
+                        _sdfSlotByUnit[unit] = (SdfSlotKind.GradientRect, _gradientRectBatch.LastSlot);   // so a MOVE re-points it
                         group.NotBatchable("gradientPolygon");
                         IndexUnitBrush(unit.Component, unit, gpru.PolygonPayload.LiveBrush);
                     }
@@ -1007,9 +1031,15 @@ public partial class RenderCache
                     || OverlapsHigherLayer(4, patPolyBounds, unit.Component))   // 4 = pattern layer
                     FlushBatches(device, fullScissor, ref scissorNarrowed);
                 var patPolyBake = ResolveBake(device, unit.Component, wt, out var slot4PatPoly);
-                if (_patternBatch.TryAddPolygon(ppru.PolygonPayload, patPolyBake, ppru.FillOpacity, scissor, patPolyBounds, slot4PatPoly, ppru.FadeSlot))
+                FadeBySlot(unit);   // the pattern passes read the chain from the slot now - keep it out of the colours
+                if (_patternBatch.TryAddPolygon(ppru.PolygonPayload, patPolyBake, ppru.FillOpacity, scissor, patPolyBounds, slot4PatPoly, ppru.FadeSlot,
+                        RoundedClipSlot(unit.Component, fullScissor)))
                 {
-                    if (_recording) group.NotBatchable("patternPolygon");
+                    if (_recording)
+                    {
+                        _sdfSlotByUnit[unit] = (SdfSlotKind.Pattern, _patternBatch.LastSlot);   // so a MOVE re-points it
+                        group.NotBatchable("patternPolygon");
+                    }
                     _batchScissor = scissor;
                     _batchClip = unit.Component;
                     _batchOpen = true;
@@ -1036,9 +1066,15 @@ public partial class RenderCache
                     FlushBatches(device, fullScissor, ref scissorNarrowed);
                 }
                 var texPolyBake = ResolveBake(device, unit.Component, wt, out var slot4TexPoly);
-                if (_texRectBatch.TryAddPolygon(tpru.PolygonPayload, texPolyBake, tpru.FillOpacity, scissor, texPolyBounds, texPolyTexture, slot4TexPoly, tpru.FadeSlot))
+                FadeBySlot(unit);   // this pass reads the chain from the slot now - keep it out of the tint
+                if (_texRectBatch.TryAddPolygon(tpru.PolygonPayload, texPolyBake, tpru.FillOpacity, scissor, texPolyBounds, texPolyTexture, slot4TexPoly, tpru.FadeSlot,
+                        RoundedClipSlot(unit.Component, fullScissor)))
                 {
-                    if (_recording) group.NotBatchable("texturedPolygon");
+                    if (_recording)
+                    {
+                        if (_texRectBatch.LastCount == 1) _sdfSlotByUnit[unit] = (SdfSlotKind.Texture, _texRectBatch.LastFirst);
+                        group.NotBatchable("texturedPolygon");
+                    }
                     _batchScissor = scissor;
                     _batchClip = unit.Component;
                     _batchOpen = true;
@@ -1055,7 +1091,8 @@ public partial class RenderCache
                     FlushBatches(device, fullScissor, ref scissorNarrowed);
                 var gradElBakeWorld = ResolveBake(device, unit.Component, wt, out var slot4GradEl);
                 FadeBySlot(unit);
-                if (_gradientEllipseBatch.TryAdd(geru.EllipsePayload, gradElBakeWorld, geru.FillOpacity, scissor, gradElBounds, slot4GradEl, geru.FadeSlot))
+                if (_gradientEllipseBatch.TryAdd(geru.EllipsePayload, gradElBakeWorld, geru.FillOpacity, scissor, gradElBounds, slot4GradEl,
+                        geru.FadeSlot, RoundedClipSlot(unit.Component, fullScissor)))
                 {
                     if (_recording)
                     {
@@ -1083,11 +1120,14 @@ public partial class RenderCache
                     FlushBatches(device, fullScissor, ref scissorNarrowed);
                 }
                 var patElBakeWorld = ResolveBake(device, unit.Component, wt, out var slot4PatEl);
-                if (_patternBatch.TryAddEllipse(peru.EllipsePayload, patElBakeWorld, peru.FillOpacity, scissor, patElBounds, slot4PatEl, peru.FadeSlot))
+                FadeBySlot(unit);   // see the pattern rect branch
+                if (_patternBatch.TryAddEllipse(peru.EllipsePayload, patElBakeWorld, peru.FillOpacity, scissor, patElBounds, slot4PatEl, peru.FadeSlot,
+                        RoundedClipSlot(unit.Component, fullScissor)))
                 {
                     if (_recording)
                     {
-                        group.NotBatchable("patternEllipse");   // node-aware, not paint/splice-patchable in v1
+                        _sdfSlotByUnit[unit] = (SdfSlotKind.Pattern, _patternBatch.LastSlot);   // so a MOVE re-points it
+                        group.NotBatchable("patternEllipse");
                     }
                     _batchScissor = scissor;
                     _batchClip = unit.Component;
@@ -1107,8 +1147,9 @@ public partial class RenderCache
                     var matBakeWorld = ResolveBake(device, unit.Component, wt, out var slot4Mat);
                     FadeBySlot(unit);   // the material pass reads the chain from the slot; keep it out of the colour
                     if (_materialBatch.TryAdd(mru.RectPayload, matBakeWorld, mru.FillOpacity, scissor, materialBounds,
-                            slot4Mat, mru.FadeSlot, matSource))
+                            slot4Mat, mru.FadeSlot, matSource, RoundedClipSlot(unit.Component, fullScissor)))
                     {
+                        if (_recording) _sdfSlotByUnit[unit] = (SdfSlotKind.Material, _materialBatch.LastSlot);   // see the pattern branch
                         CloseMaterialSegment(group, unit.Component, scissor);
                         continue;
                     }
@@ -1131,8 +1172,9 @@ public partial class RenderCache
                     var bake = ResolveBake(device, unit.Component, wt, out var slot);
                     FadeBySlot(unit);
                     if (_materialBatch.TryAddEllipse(meru.EllipsePayload, bake, meru.FillOpacity, scissor, bounds,
-                            slot, meru.FadeSlot, elSource))
+                            slot, meru.FadeSlot, elSource, RoundedClipSlot(unit.Component, fullScissor)))
                     {
+                        if (_recording) _sdfSlotByUnit[unit] = (SdfSlotKind.Material, _materialBatch.LastSlot);
                         CloseMaterialSegment(group, unit.Component, scissor);
                         continue;
                     }
@@ -1152,8 +1194,9 @@ public partial class RenderCache
                     var bake = ResolveBake(device, unit.Component, wt, out var slot);
                     FadeBySlot(unit);
                     if (_materialBatch.TryAddPolygon(mpru.PolygonPayload, bake, mpru.FillOpacity, scissor, bounds,
-                            slot, mpru.FadeSlot, polySource))
+                            slot, mpru.FadeSlot, polySource, RoundedClipSlot(unit.Component, fullScissor)))
                     {
+                        if (_recording) _sdfSlotByUnit[unit] = (SdfSlotKind.Material, _materialBatch.LastSlot);
                         CloseMaterialSegment(group, unit.Component, scissor);
                         continue;
                     }
@@ -1173,12 +1216,19 @@ public partial class RenderCache
                     FlushBatches(device, fullScissor, ref scissorNarrowed);
                 }
                 var patBakeWorld = ResolveBake(device, unit.Component, wt, out var slot4Pat);
-                if (_patternBatch.TryAdd(pru.RectPayload, patBakeWorld, pru.FillOpacity, scissor, patternBounds, slot4Pat, pru.FadeSlot))
+                // The SDF pattern reads its alpha from the slot now (Anim.z), so the bake must not fold the chain into
+                // c1/c2 as well - that was the doubling this stand caught: 0.34 where every neighbour sat at 0.55.
+                FadeBySlot(unit);
+                if (_patternBatch.TryAdd(pru.RectPayload, patBakeWorld, pru.FillOpacity, scissor, patternBounds, slot4Pat, pru.FadeSlot,
+                        RoundedClipSlot(unit.Component, fullScissor)))
                 {
-                    // Pattern is node-aware (rides the transform table), but NOT paint/splice-patchable in v1: no
-                    // _sdfSlotByUnit entry, so a dirty pattern falls to a full walk (patterns are static backdrops).
                     if (_recording)
                     {
+                        // WHERE its record sits, so a MOVE can re-point it in place. Without this the unit answered
+                        // HoldsInstances = false and the move path read that as "a per-unit draw the replay re-points",
+                        // which it is not: a dragged pattern stayed put until an unrelated full walk caught up. The
+                        // same defect the polygon had, and the same cure.
+                        _sdfSlotByUnit[unit] = (SdfSlotKind.Pattern, _patternBatch.LastSlot);
                         group.NotBatchable("patternRect");
                     }
                     _batchScissor = scissor;
@@ -1200,10 +1250,13 @@ public partial class RenderCache
                     FlushBatches(device, fullScissor, ref scissorNarrowed);
                 }
                 var fracBakeWorld = ResolveBake(device, unit.Component, wt, out var slot4Frac);
-                if (_fractalBatch.TryAdd(fru.RectPayload, fracBakeWorld, fru.FillOpacity, scissor, fractalBounds, slot4Frac))
+                FadeBySlot(unit);   // this pass reads the chain from the slot now - keep it out of the colours
+                if (_fractalBatch.TryAdd(fru.RectPayload, fracBakeWorld, fru.FillOpacity, scissor, fractalBounds, slot4Frac,
+                        RoundedClipSlot(unit.Component, fullScissor), fru.FadeSlot))
                 {
                     if (_recording)
                     {
+                        _sdfSlotByUnit[unit] = (SdfSlotKind.Fractal, _fractalBatch.LastSlot);   // see the pattern branch
                         group.NotBatchable("fractal");
                     }
                     _batchScissor = scissor;
@@ -1239,10 +1292,17 @@ public partial class RenderCache
                     FlushBatches(device, fullScissor, ref scissorNarrowed);
                 }
                 var texBakeWorld = ResolveBake(device, unit.Component, wt, out var slot4Tex);
-                if (_texRectBatch.TryAdd(xru.RectPayload, texBakeWorld, xru.FillOpacity, scissor, texBounds, texture, slot4Tex, xru.FadeSlot))
+                FadeBySlot(unit);   // this pass reads the chain from the slot now - keep it out of the tint
+                if (_texRectBatch.TryAdd(xru.RectPayload, texBakeWorld, xru.FillOpacity, scissor, texBounds, texture, slot4Tex, xru.FadeSlot,
+                        RoundedClipSlot(unit.Component, fullScissor)))
                 {
                     if (_recording)
                     {
+                        // Where its records sit, so a MOVE re-points them instead of waiting for a walk (see the
+                        // pattern branch). A picture is one record and a NINE-SLICE is nine, so what is remembered is
+                        // the RUN, exactly as a text block remembers its glyph run.
+                        _sdfSlotByUnit[unit] = (SdfSlotKind.Texture, _texRectBatch.LastFirst);
+                        _texRunByUnit[unit] = (_texRectBatch.LastFirst, _texRectBatch.LastCount);
                         group.NotBatchable("texturedRect");
                     }
                     _batchScissor = scissor;
@@ -1274,10 +1334,13 @@ public partial class RenderCache
                     FlushBatches(device, fullScissor, ref scissorNarrowed);
                 }
                 var texEllBakeWorld = ResolveBake(device, unit.Component, wt, out var slot4TexEll);
-                if (_texRectBatch.TryAddEllipse(xeru.EllipsePayload, texEllBakeWorld, xeru.FillOpacity, scissor, texEllBounds, texEllTexture, slot4TexEll, xeru.FadeSlot))
+                FadeBySlot(unit);   // this pass reads the chain from the slot now - keep it out of the tint
+                if (_texRectBatch.TryAddEllipse(xeru.EllipsePayload, texEllBakeWorld, xeru.FillOpacity, scissor, texEllBounds, texEllTexture, slot4TexEll, xeru.FadeSlot,
+                        RoundedClipSlot(unit.Component, fullScissor)))
                 {
                     if (_recording)
                     {
+                        if (_texRectBatch.LastCount == 1) _sdfSlotByUnit[unit] = (SdfSlotKind.Texture, _texRectBatch.LastFirst);
                         group.NotBatchable("texturedEllipse");
                     }
                     _batchScissor = scissor;
@@ -1300,12 +1363,14 @@ public partial class RenderCache
                 // per-unit path composes the same value through Update.
                 var textBake = tru.Place(ResolveBake(device, unit.Component, wt, out var slot4Text));
                 var textFirst = _textBatch.RetainedCount;
-                if (_textBatch.TryAdd(tc, textBake, slot4Text, unit.FadeSlot, scissor, atlas, LogicalBounds(unit.Component, wt)))
+                FadeBySlot(unit);   // this pass reads the alpha from the slot now - keep the chain out of the colour
+                if (_textBatch.TryAdd(tc, textBake, slot4Text, unit.FadeSlot, scissor, atlas, LogicalBounds(unit.Component, wt),
+                        RoundedClipSlot(unit.Component, fullScissor)))
                 {
-                    // Text bakes the opacity CHAIN into its glyph colours (its shader cannot read the slot), so an
-                    // ancestor's fade has to find it - noted on every walk, like the slot maps.
-                    _slotBlindUnits.Add(unit);
-
+                    // NOT slot-blind any more. Text used to bake the opacity CHAIN into its glyph colours because its
+                    // shader could not read the table twice, so a fading ancestor had to re-bake every glyph under it;
+                    // now the glyph VS reads the fade slot like everyone else. Leaving it in that list would apply the
+                    // fade TWICE - once in the colour it re-bakes, once in the slot the shader reads.
                     if (_recording)
                     {
                         // SLOT-patchable while the glyph count holds; and when it does NOT, the run is what the splice
@@ -1339,7 +1404,8 @@ public partial class RenderCache
                 }
                 var fillBake = ResolveBake(device, unit.Component, wt, out var slot4Fill);
                 FadeBySlot(unit);
-                if (_instancedFill.TryAdd(gru, fillBake, scissor, LogicalBounds(unit.Component, wt), slot4Fill))
+                if (_instancedFill.TryAdd(gru, fillBake, scissor, LogicalBounds(unit.Component, wt), slot4Fill,
+                        RoundedClipSlot(unit.Component, fullScissor)))
                 {
                     gru.FillInstanced = true;
                     // WHERE this fill sits is a fact about the arena as it stands, so it is remembered on EVERY walk -
@@ -1378,7 +1444,8 @@ public partial class RenderCache
                     FlushBatches(device, fullScissor, ref scissorNarrowed);
                 var gradBake = ResolveBake(device, unit.Component, wt, out var slot4GradFill);
                 FadeBySlot(unit);
-                if (_instancedFill.TryAddGradient(ggru, gradBake, scissor, LogicalBounds(unit.Component, wt), slot4GradFill))
+                if (_instancedFill.TryAddGradient(ggru, gradBake, scissor, LogicalBounds(unit.Component, wt), slot4GradFill,
+                        RoundedClipSlot(unit.Component, fullScissor)))
                 {
                     ggru.FillInstanced = true;
                     if (!RidesFadeSlot(unit)) _slotBlindUnits.Add(unit);
@@ -1405,7 +1472,7 @@ public partial class RenderCache
                 var matMeshBake = ResolveBake(device, unit.Component, wt, out var slot4MatMesh);
                 FadeBySlot(unit);
                 if (_instancedFill.TryAddMaterial(mgru, matMeshBake, scissor, matBounds, slot4MatMesh,
-                        MaterialCaptureRegion(matBounds, scissor, fullScissor)))
+                        MaterialCaptureRegion(matBounds, scissor, fullScissor), RoundedClipSlot(unit.Component, fullScissor)))
                 {
                     mgru.FillInstanced = true;
                     if (!RidesFadeSlot(unit)) _slotBlindUnits.Add(unit);
@@ -1425,7 +1492,8 @@ public partial class RenderCache
                     FlushBatches(device, fullScissor, ref scissorNarrowed);
                 var patBake = ResolveBake(device, unit.Component, wt, out var slot4PatFill);
                 FadeBySlot(unit);
-                if (_instancedFill.TryAddPattern(pgru, patBake, scissor, LogicalBounds(unit.Component, wt), slot4PatFill))
+                if (_instancedFill.TryAddPattern(pgru, patBake, scissor, LogicalBounds(unit.Component, wt), slot4PatFill,
+                        RoundedClipSlot(unit.Component, fullScissor)))
                 {
                     pgru.FillInstanced = true;
                     if (!RidesFadeSlot(unit)) _slotBlindUnits.Add(unit);
@@ -1446,7 +1514,8 @@ public partial class RenderCache
                     FlushBatches(device, fullScissor, ref scissorNarrowed);
                 var texBake = ResolveBake(device, unit.Component, wt, out var slot4TexFill);
                 FadeBySlot(unit);
-                if (_instancedFill.TryAddTextured(tgru, texBake, scissor, LogicalBounds(unit.Component, wt), slot4TexFill))
+                if (_instancedFill.TryAddTextured(tgru, texBake, scissor, LogicalBounds(unit.Component, wt), slot4TexFill,
+                        RoundedClipSlot(unit.Component, fullScissor)))
                 {
                     tgru.FillInstanced = true;
                     if (!RidesFadeSlot(unit)) _slotBlindUnits.Add(unit);
@@ -1652,7 +1721,7 @@ public partial class RenderCache
         // reads the alpha the compositor just applied.
         if (_applySnap.TryGetValue(owner, out var snap))
             _applySnap[owner] = new LayoutSnapshot(snap.LocalTransform, snap.RenderSize, snap.ClipToBounds,
-                snap.IsMotionNode, snap.RenderParent, entry.Alpha, snap.SelfOpacity);
+                snap.IsMotionNode, snap.RenderParent, entry.Alpha, snap.SelfOpacity, snap.ClipRadii);
     }
 
     // TRANSFORM: one 64-byte matrix write moves the whole node, and it lands in TWO places. The transform table is what the
@@ -1980,10 +2049,17 @@ public partial class RenderCache
         _rectSlotByUnit.ContainsKey(u) || _sdfSlotByUnit.ContainsKey(u)
         || _textRunByUnit.ContainsKey(u) || _fillSlotByUnit.ContainsKey(u);
 
-    // Does THIS unit draw from a pass that reads the element's alpha from the opacity slot? The slot maps answer it:
-    // a rect holds a rect-batch slot, and the SDF map holds only the three families whose shaders read it too.
+    /// <summary>How many records the last walk gave this textured unit - 1 for a picture, 9 for a nine-slice. Units
+    /// that predate the run map (or never took one) answer 1, which is what a single-slot entry means.</summary>
+    private int TexRunLength(IRenderUnit u) => _texRunByUnit.TryGetValue(u, out var run) ? run.Count : 1;
+
+    // Does THIS unit draw from a pass that reads the element's alpha from the opacity slot? The slot maps answer it: a
+    // rect holds a rect-batch slot, a glyph run holds a text run, and the SDF map holds the rest - the polygon included,
+    // since its record found room for the slot in the clip field.
     private bool ReadsSlotAlpha(IRenderUnit u) =>
-        _rectSlotByUnit.ContainsKey(u) || _sdfSlotByUnit.ContainsKey(u);
+        _rectSlotByUnit.ContainsKey(u)
+        || _textRunByUnit.ContainsKey(u)
+        || _sdfSlotByUnit.ContainsKey(u);
 
     // Does this arena's shader pass read the element's alpha from the opacity slot? Only these four do; the rest could
     // not take the extra work on this driver and still fold the opacity CHAIN into their colour (see GlyphItem).
@@ -2024,9 +2100,22 @@ public partial class RenderCache
         if (u is RectangleRenderUnit rru)
         {
             if (_rectSlotByUnit.ContainsKey(u)) return _rectBatch.CanBatch(rru.RectPayload);
-            if (_sdfSlotByUnit.TryGetValue(u, out var gr) && gr.Kind == SdfSlotKind.GradientRect)
-                return _gradientRectBatch.CanBatch(rru.RectPayload);
-            return false;
+            if (!_sdfSlotByUnit.TryGetValue(u, out var gr)) return false;
+            // Each brush family owns a record in its own batch, and each answers for itself: a fill that stopped being
+            // batchable this frame (a rotated world, an overflowed buffer) has no record to patch and its slot number
+            // belongs to whoever took it.
+            return gr.Kind switch
+            {
+                SdfSlotKind.GradientRect => _gradientRectBatch.CanBatch(rru.RectPayload),
+                SdfSlotKind.Pattern => _patternBatch != null && _patternBatch.CanBatch(rru.RectPayload),
+                // ...and, for a picture, the RUN must still be the same length: a nine-slice that became a plain fill
+                // (or the other way round) is a change of record COUNT, which only the walk can express.
+                SdfSlotKind.Texture => _texRectBatch != null && _texRectBatch.CanBatch(rru.RectPayload)
+                                       && TextureBatchCollector.RecordCount(rru.RectPayload.Brush) == TexRunLength(u),
+                SdfSlotKind.Fractal => _fractalBatch != null && _fractalBatch.CanBatch(rru.RectPayload),
+                SdfSlotKind.Material => _materialBatch != null && _materialBatch.CanBatch(rru.RectPayload),
+                _ => false
+            };
         }
 
         // A text block holds a RUN of glyph slots. Patchable only while the run still DESCRIBES it: the same number of
@@ -2047,10 +2136,29 @@ public partial class RenderCache
                    && _instancedFill != null
                    && _instancedFill.CanBatch(fgru);
 
+        // An ellipse or a polygon carries the SAME brush families a rectangle does - each in its own batch, each
+        // answering for itself, exactly as the rect branch above.
         if (u is EllipseRenderUnit eru && _sdfSlotByUnit.TryGetValue(u, out var e))
-            return e.Kind == SdfSlotKind.Ellipse
-                ? _ellipseBatch.CanBatch(eru.EllipsePayload)
-                : _gradientEllipseBatch.CanBatch(eru.EllipsePayload);
+            return e.Kind switch
+            {
+                SdfSlotKind.Ellipse => _ellipseBatch.CanBatch(eru.EllipsePayload),
+                SdfSlotKind.GradientEllipse => _gradientEllipseBatch.CanBatch(eru.EllipsePayload),
+                SdfSlotKind.Pattern => _patternBatch != null && _patternBatch.CanBatchEllipse(eru.EllipsePayload),
+                SdfSlotKind.Texture => _texRectBatch != null && _texRectBatch.CanBatchEllipse(eru.EllipsePayload),
+                SdfSlotKind.Material => _materialBatch != null && MaterialRectCollector.WantsBatch(eru.EllipsePayload.Brush, eru.EllipsePayload.Pen),
+                _ => false
+            };
+
+        if (u is RegularPolygonRenderUnit pru && _sdfSlotByUnit.TryGetValue(u, out var p))
+            return p.Kind switch
+            {
+                SdfSlotKind.Polygon => _polygonBatch.CanBatch(pru.PolygonPayload),
+                SdfSlotKind.GradientRect => _gradientRectBatch.CanBatchPolygon(pru.PolygonPayload),
+                SdfSlotKind.Pattern => _patternBatch != null && _patternBatch.CanBatchPolygon(pru.PolygonPayload),
+                SdfSlotKind.Texture => _texRectBatch != null && _texRectBatch.CanBatchPolygon(pru.PolygonPayload),
+                SdfSlotKind.Material => _materialBatch != null && MaterialRectCollector.WantsBatch(pru.PolygonPayload.Brush, pru.PolygonPayload.Pen),
+                _ => false
+            };
 
         return false;
     }
@@ -2082,12 +2190,60 @@ public partial class RenderCache
             if (_rectSlotByUnit.TryGetValue(u, out var rectSlot))
             {
                 if (!RectBatchCollector.BakeItem(rru.RectPayload, bakeWorld, rru.FillOpacity, transformSlot, rru.FadeSlot, out var item)) return false;
+                // The record the WALK writes carries its rounded clip (TryAdd, same line after the same bake). A patch
+                // that leaves it out writes a record the walk would never have written: dragging a shape across a rounded
+                // corner un-rounded the cut under it, and it came back only when something forced a walk.
+                item.Clip = new Vector4F(RoundedClipSlot(u.Component, _frameScissor), 0, 0, 0);
                 _rectBatch.UpdateSlot(device, rectSlot, item);
                 return true;
             }
 
+            var rectEntry = _sdfSlotByUnit[u];
+            var rectClip = RoundedClipSlot(u.Component, _frameScissor);   // every family stamps the same clip the walk does
+
+            // The BRUSH families, each re-baked into the record it already occupies. They reached this path late: until
+            // they were noted in the slot map a moved pattern/picture/fractal/material stayed where it was until an
+            // unrelated full walk caught up - the defect the polygon had before it was given a slot of its own.
+            if (rectEntry.Kind == SdfSlotKind.Pattern)
+            {
+                if (!PatternRectCollector.BakeItem(rru.RectPayload, bakeWorld, rru.FillOpacity, transformSlot, rru.FadeSlot, rectClip, out var patItem)) return false;
+                _patternBatch.UpdateSlot(device, rectEntry.Slot, patItem);
+                return true;
+            }
+
+            if (rectEntry.Kind == SdfSlotKind.Texture)
+            {
+                // The whole RUN, in place: one record for a picture, nine for a nine-slice. Rewriting a PREFIX would
+                // leave the rest of the frame painting the old place, so a length that no longer matches refuses and
+                // the walk owns it.
+                var texRun = _texRunByUnit.TryGetValue(u, out var tr) ? tr : (First: rectEntry.Slot, Count: 1);
+                if (!TextureBatchCollector.BakeRun(rru.RectPayload, bakeWorld, rru.FillOpacity, transformSlot, rru.FadeSlot, rectClip, out var texItems)
+                    || texItems.Length != texRun.Count)
+                {
+                    return false;
+                }
+                for (var i = 0; i < texItems.Length; i++) _texRectBatch.UpdateSlot(device, texRun.First + i, texItems[i]);
+                return true;
+            }
+
+            if (rectEntry.Kind == SdfSlotKind.Fractal)
+            {
+                if (!FractalRectCollector.BakeItem(rru.RectPayload, bakeWorld, rru.FillOpacity, transformSlot, rectClip, rru.FadeSlot, out var fracItem)) return false;
+                _fractalBatch.UpdateSlot(device, rectEntry.Slot, fracItem);
+                return true;
+            }
+
+            if (rectEntry.Kind == SdfSlotKind.Material)
+            {
+                if (!MaterialRectCollector.BakeItem(rru.RectPayload, bakeWorld, rru.FillOpacity, transformSlot, rru.FadeSlot,
+                        rru.BrushTexture(), rectClip, out var matItem)) return false;
+                _materialBatch.UpdateSlot(device, rectEntry.Slot, matItem);
+                return true;
+            }
+
             if (!GradientRectCollector.BakeItem(rru.RectPayload, bakeWorld, rru.FillOpacity, transformSlot, rru.FadeSlot, out var gradItem)) return false;
-            _gradientRectBatch.UpdateSlot(device, _sdfSlotByUnit[u].Slot, gradItem);
+            gradItem.Clip = new Vector4F(rectClip, 0, 0, 0);   // as the walk stamps it
+            _gradientRectBatch.UpdateSlot(device, rectEntry.Slot, gradItem);
             return true;
         }
 
@@ -2096,8 +2252,10 @@ public partial class RenderCache
             // A paint patch is where an INHERITED recolour arrives: the block was never re-recorded, so its component
             // still holds the brushes it dereferenced at record time. Re-read them before baking.
             tru.RefreshColors();
+            FadeBySlot(u);   // and bake the colour WITHOUT the chain, exactly as the walk does - see the rect branch
             // The block's own placement rides on top of the bake, exactly as the recording walk composed it.
-            return _textBatch.UpdateRun(device, _textRunByUnit[u].First, tru.TextComponent, tru.Place(bakeWorld), transformSlot, tru.FadeSlot);
+            return _textBatch.UpdateRun(device, _textRunByUnit[u].First, tru.TextComponent, tru.Place(bakeWorld), transformSlot, tru.FadeSlot,
+                RoundedClipSlot(u.Component, _frameScissor));   // as the walk stamps it - see the rect branch
         }
 
         if (u is GeometryRenderUnit)
@@ -2107,26 +2265,86 @@ public partial class RenderCache
             // frames. The colour keeps the opacity CHAIN here: this family's shader does not read the slot.
             var (fillArena, fillSlot) = _fillSlotByUnit[u];
             fillArena.ClearStage();
-            if (!fillArena.TryStage(u, bakeWorld, transformSlot, 0)) return false;
+            if (!fillArena.TryStage(u, bakeWorld, transformSlot, 0, RoundedClipSlot(u.Component, _frameScissor))) return false;
 
             fillArena.UpdateSlotFromStage(device, fillSlot, 0);
             fillArena.ClearStage();
             return true;
         }
 
-        var eru = (EllipseRenderUnit)u;
-        var entry = _sdfSlotByUnit[u];
-        FadeBySlot(u);   // both ellipse families read the alpha from the slot - see the rectangle above
-        if (entry.Kind == SdfSlotKind.Ellipse)
+        if (u is RegularPolygonRenderUnit pru && _sdfSlotByUnit.TryGetValue(u, out var poly))
         {
-            if (!EllipseBatchCollector.BakeItem(eru.EllipsePayload, bakeWorld, eru.FillOpacity, transformSlot, eru.FadeSlot, out var item)) return false;
-            _ellipseBatch.UpdateSlot(device, entry.Slot, item);
-            return true;
+            FadeBySlot(u);   // every family under this unit reads the alpha from the slot - bake without the chain
+            var polyClip = RoundedClipSlot(u.Component, _frameScissor);
+            switch (poly.Kind)
+            {
+                case SdfSlotKind.Polygon:
+                    if (!RegularPolygonCollector.BakeItem(pru.PolygonPayload, bakeWorld, pru.FillOpacity, transformSlot, out var polyItem)) return false;
+                    polyItem.Clip = new Vector4F(polyClip, pru.FadeSlot, 0, 0);   // both slots, as the walk stamps them
+                    _polygonBatch.UpdateSlot(device, poly.Slot, polyItem);
+                    return true;
+
+                case SdfSlotKind.GradientRect:
+                    if (!GradientRectCollector.BakePolygonItem(pru.PolygonPayload, bakeWorld, pru.FillOpacity, transformSlot, pru.FadeSlot, out var gPoly)) return false;
+                    gPoly.Clip = new Vector4F(polyClip, 0, 0, 0);
+                    _gradientRectBatch.UpdateSlot(device, poly.Slot, gPoly);
+                    return true;
+
+                case SdfSlotKind.Pattern:
+                    if (!PatternRectCollector.BakePolygonItem(pru.PolygonPayload, bakeWorld, pru.FillOpacity, transformSlot, pru.FadeSlot, polyClip, out var patPoly)) return false;
+                    _patternBatch.UpdateSlot(device, poly.Slot, patPoly);
+                    return true;
+
+                case SdfSlotKind.Texture:
+                    if (!TextureBatchCollector.BakeSinglePolygon(pru.PolygonPayload, bakeWorld, pru.FillOpacity, transformSlot, pru.FadeSlot, polyClip, out var texPoly)) return false;
+                    _texRectBatch.UpdateSlot(device, poly.Slot, texPoly);
+                    return true;
+
+                case SdfSlotKind.Material:
+                    if (!MaterialRectCollector.BakePolygonItem(pru.PolygonPayload, bakeWorld, pru.FillOpacity, transformSlot, pru.FadeSlot,
+                            pru.BrushTexture(), polyClip, out var matPoly)) return false;
+                    _materialBatch.UpdateSlot(device, poly.Slot, matPoly);
+                    return true;
+
+                default:
+                    return false;
+            }
         }
 
-        if (!GradientEllipseCollector.BakeItem(eru.EllipsePayload, bakeWorld, eru.FillOpacity, transformSlot, eru.FadeSlot, out var gradEllipse)) return false;
-        _gradientEllipseBatch.UpdateSlot(device, entry.Slot, gradEllipse);
-        return true;
+        var eru = (EllipseRenderUnit)u;
+        var entry = _sdfSlotByUnit[u];
+        FadeBySlot(u);   // every ellipse family reads the alpha from the slot - see the rectangle above
+        var elClip = RoundedClipSlot(u.Component, _frameScissor);
+        switch (entry.Kind)
+        {
+            case SdfSlotKind.Ellipse:
+                if (!EllipseBatchCollector.BakeItem(eru.EllipsePayload, bakeWorld, eru.FillOpacity, transformSlot, eru.FadeSlot, out var item)) return false;
+                item.Params.Z = elClip;   // as the walk stamps it - see the rect branch
+                _ellipseBatch.UpdateSlot(device, entry.Slot, item);
+                return true;
+
+            case SdfSlotKind.Pattern:
+                if (!PatternRectCollector.BakeEllipseItem(eru.EllipsePayload, bakeWorld, eru.FillOpacity, transformSlot, eru.FadeSlot, elClip, out var patEl)) return false;
+                _patternBatch.UpdateSlot(device, entry.Slot, patEl);
+                return true;
+
+            case SdfSlotKind.Texture:
+                if (!TextureBatchCollector.BakeSingleEllipse(eru.EllipsePayload, bakeWorld, eru.FillOpacity, transformSlot, eru.FadeSlot, elClip, out var texEl)) return false;
+                _texRectBatch.UpdateSlot(device, entry.Slot, texEl);
+                return true;
+
+            case SdfSlotKind.Material:
+                if (!MaterialRectCollector.BakeEllipseItem(eru.EllipsePayload, bakeWorld, eru.FillOpacity, transformSlot, eru.FadeSlot,
+                        eru.BrushTexture(), elClip, out var matEl)) return false;
+                _materialBatch.UpdateSlot(device, entry.Slot, matEl);
+                return true;
+
+            default:
+                if (!GradientEllipseCollector.BakeItem(eru.EllipsePayload, bakeWorld, eru.FillOpacity, transformSlot, eru.FadeSlot, out var gradEllipse)) return false;
+                gradEllipse.Clip = new Vector4F(elClip, 0, 0, 0);   // as the walk stamps it
+                _gradientEllipseBatch.UpdateSlot(device, entry.Slot, gradEllipse);
+                return true;
+        }
     }
 
     // Do the halo records the last walk gave this unit still describe it? Only the COUNT is asked - what the bands look
@@ -2177,29 +2395,32 @@ public partial class RenderCache
         if (_haloRunsByUnit.Count == 0 || !_haloRunsByUnit.TryGetValue(u, out var runs)) return;
         if (!TryHaloShape(u, out var shape, out var corners, out var kind, out _, out var fieldRange)) return;
 
+        FadeBySlot(u);   // as the walk bakes it - the band's chain comes from the slot, not from its colour
         var opacity = u.RenderData.Opacity;
+        var haloClip = RoundedClipSlot(u.Component, _frameScissor);   // the patch writes what the walk writes
+        var haloFade = u.FadeSlot;
         PatchStillHalo(device, _haloUnder, u.RenderData.Halo, inner: false, runs.UnderFirst, runs.UnderCount,
-            shape, corners, kind, bakeWorld, opacity, transformSlot, fieldRange);
+            shape, corners, kind, bakeWorld, opacity, transformSlot, fieldRange, haloClip, haloFade);
         PatchStillHalo(device, _haloOver, u.RenderData.Halo, inner: true, runs.OverFirst, runs.OverCount,
-            shape, corners, kind, bakeWorld, opacity, transformSlot, fieldRange);
+            shape, corners, kind, bakeWorld, opacity, transformSlot, fieldRange, haloClip, haloFade);
 
         PatchLivingHalo(device, _haloLivingUnder, u.RenderData.LivingHalo, inner: false, runs.LivingUnder,
-            shape, corners, kind, bakeWorld, opacity, transformSlot, fieldRange);
+            shape, corners, kind, bakeWorld, opacity, transformSlot, fieldRange, haloClip, haloFade);
         PatchLivingHalo(device, _haloLivingOver, u.RenderData.LivingHalo, inner: true, runs.LivingOver,
-            shape, corners, kind, bakeWorld, opacity, transformSlot, fieldRange);
+            shape, corners, kind, bakeWorld, opacity, transformSlot, fieldRange, haloClip, haloFade);
     }
 
     private readonly HaloRectItem[] _haloPatchStage = new HaloRectItem[8];
 
     private void PatchStillHalo(IGraphicsDevice device, HaloRectCollector batch, Core.Media.HaloBand[] bands, bool inner,
         int first, int count, Rect shape, ProceduralGeometry.CornerRadius corners, HaloShape kind,
-        Matrix4x4F bakeWorld, double opacity, int transformSlot, double fieldRange)
+        Matrix4x4F bakeWorld, double opacity, int transformSlot, double fieldRange, int clipSlot, int fadeSlot)
     {
         if (batch == null || count <= 0 || bands == null) return;
 
         var room = System.Math.Min(count, _haloPatchStage.Length);
         var written = HaloRectCollector.BakeInto(_haloPatchStage.AsSpan(0, room), bands, inner, shape, corners, kind,
-            bakeWorld, opacity, transformSlot, fieldRange);
+            bakeWorld, opacity, transformSlot, fieldRange, clipSlot, fadeSlot);
 
         // Fewer bands than the walk recorded means one went dark; the splice owns that, and rewriting a PREFIX here
         // would leave the rest painting the old colour. Left to the refusal above.
@@ -2210,11 +2431,11 @@ public partial class RenderCache
 
     private void PatchLivingHalo(IGraphicsDevice device, HaloLivingCollector batch, Core.Media.LivingBand? band, bool inner,
         int slot, Rect shape, ProceduralGeometry.CornerRadius corners, HaloShape kind,
-        Matrix4x4F bakeWorld, double opacity, int transformSlot, double fieldRange)
+        Matrix4x4F bakeWorld, double opacity, int transformSlot, double fieldRange, int clipSlot, int fadeSlot)
     {
         if (batch == null || slot < 0 || band is not { } live || live.Inner != inner) return;
         if (!HaloLivingCollector.BakeItem(live, shape, corners, kind, bakeWorld, opacity, live.Color, transformSlot,
-                fieldRange, out var item))
+                fieldRange, clipSlot, fadeSlot, out var item))
         {
             return;
         }
@@ -2345,7 +2566,7 @@ public partial class RenderCache
                 // The families whose shaders read the opacity slot must be re-baked WITHOUT the chain in their colour,
                 // exactly as the walk bakes them; the rest keep it. Which arena repairs this group says which it is.
                 if (ReadsFadeSlot(arena)) FadeBySlot(u);
-                if (!arena.TryStage(u, bakeWorld, slot, TagOf(group)))
+                if (!arena.TryStage(u, bakeWorld, slot, TagOf(group), RoundedClipSlot(u.Component, fullScissor)))
                     return SpliceRefused($"notStageable<{u.GetType().Name} in {comp.GetType().Name}>");
                 // How many INSTANCES it added, which is not how many units were asked: one rectangle is one instance, one
                 // text block is a whole run of glyphs. Counting units here left a repaired block drawing its first glyph

@@ -50,4 +50,9 @@ public struct FractalRectItem
     /// <summary>Perturbation deep-zoom: .x = reference-orbit start index into the shared orbit buffer (OrbitAddress),
     /// .y = orbit length, .z = deep flag (1 = iterate the perturbation path), .w = reserved.</summary>
     public Vector4F Ref;
+
+    /// <summary>.x = the ROUNDED CLIP's slot, .y = the OPACITY slot its alpha is read from (-1 for either = none);
+    /// .zw spare. Its own field rather than a spare component: this record has none left - the pixel shader reads all
+    /// four of <see cref="Ref"/> and of Julia.</summary>
+    public Vector4F Clip;
 }

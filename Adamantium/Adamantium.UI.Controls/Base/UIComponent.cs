@@ -158,6 +158,77 @@ public class UIComponent : FundamentalUIComponent, IUIComponent
         VisualTreeNotifications.RaiseClipChanged(component);
     }
 
+    /// <summary>How the CLIP's own corners are rounded, when <see cref="ClipToBounds"/> is on. Unset (all zero) means
+    /// "take the container's own corners", so a rounded Border or Control clips the way it looks without being told
+    /// twice; set it to clip differently from how the container is drawn.
+    ///
+    /// <para>Lives here rather than on the rounded controls because CLIPPING is a property of any container, while
+    /// CornerRadius belongs to whoever happens to paint corners - Control, Border, Image and Rectangle each declare
+    /// their own, and a Grid or a StackPanel declares none while still being perfectly able to clip.</para></summary>
+    public static readonly AdamantiumProperty ClipCornerRadiusProperty = AdamantiumProperty.Register(
+        nameof(ClipCornerRadius), typeof(ProceduralGeometry.CornerRadius), typeof(UIComponent),
+        new PropertyMetadata(default(ProceduralGeometry.CornerRadius), PropertyMetadataOptions.AffectsRender,
+            OnClipCornerRadiusChanged));
+
+    public ProceduralGeometry.CornerRadius ClipCornerRadius
+    {
+        get => GetValue<ProceduralGeometry.CornerRadius>(ClipCornerRadiusProperty);
+        set => SetValue(ClipCornerRadiusProperty, value);
+    }
+
+    /// <inheritdoc />
+    /// <remarks>The explicit clip radius when set, otherwise the container's OWN corners - so a rounded Border clips the
+    /// way it is drawn without being told twice. Read through a virtual property because CornerRadius is declared
+    /// separately by Control, Border, Image and Rectangle, and a panel declares none at all.</remarks>
+    public virtual Vector4F ClipRadii
+    {
+        get
+        {
+            var explicitRadius = ClipCornerRadius;
+            if (explicitRadius.TopLeft > 0 || explicitRadius.TopRight > 0
+                || explicitRadius.BottomRight > 0 || explicitRadius.BottomLeft > 0)
+            {
+                return new Vector4F((float)explicitRadius.TopLeft, (float)explicitRadius.TopRight,
+                    (float)explicitRadius.BottomRight, (float)explicitRadius.BottomLeft);
+            }
+
+            return OwnCornerRadii();
+        }
+    }
+
+    /// <summary>The corners this container paints for itself, for <see cref="ClipRadii"/> to fall back on. Empty here -
+    /// the types that actually have a CornerRadius override it.</summary>
+    protected virtual Vector4F OwnCornerRadii() => Vector4F.Zero;
+
+    /// <summary>A container that clips BY ITS OWN CORNERS has just been given different ones. The property-changed
+    /// callback of every CornerRadius that feeds <see cref="OwnCornerRadii"/> must call this.
+    ///
+    /// <para>AffectsRender on the CornerRadius itself is not enough, and for the same reason ClipToBounds needed its own
+    /// announcement: the clip belongs to the whole SUBTREE, not to the element that owns the corners, and the frozen
+    /// layout snapshot the renderer clips from is only re-taken for what a mark names. Without this the cut kept the
+    /// radii it was recorded with - a container whose radius was bound or animated went on cutting square until an
+    /// unrelated full walk (a scroll, the window losing focus) re-froze it, and then changed in one jump.</para>
+    ///
+    /// <para>Silent when the clip does not read them: an explicit ClipCornerRadius wins over the painted corners, so
+    /// changing those then means nothing to the cut - and a structural mark is the most expensive kind there is.</para></summary>
+    protected static void NotifyOwnCornersChanged(AdamantiumComponent d)
+    {
+        if (d is not UIComponent { ClipToBounds: true } component) return;
+
+        var explicitRadius = component.ClipCornerRadius;
+        if (explicitRadius.TopLeft > 0 || explicitRadius.TopRight > 0
+            || explicitRadius.BottomRight > 0 || explicitRadius.BottomLeft > 0) return;
+
+        VisualTreeNotifications.RaiseClipChanged(component);
+    }
+
+    // Same reasoning as ClipToBounds: the clip belongs to the whole subtree, so a change is structural, not a repaint of
+    // this element - which draws nothing of its own in the usual case.
+    private static void OnClipCornerRadiusChanged(AdamantiumComponent d, AdamantiumPropertyChangedEventArgs e)
+    {
+        if (d is UIComponent component) VisualTreeNotifications.RaiseClipChanged(component);
+    }
+
     public static readonly AdamantiumProperty IsEnabledProperty = AdamantiumProperty.Register(nameof(IsEnabled),
         typeof(Boolean), typeof(UIComponent),
         new PropertyMetadata(true, PropertyMetadataOptions.BindsTwoWayByDefault));

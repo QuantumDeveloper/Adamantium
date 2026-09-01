@@ -157,8 +157,11 @@ public partial class RenderCache
 
         var bounds = LogicalBounds(unit.Component, wt);
         var bakeWorld = ResolveBake(device, unit.Component, wt, out var slot);
+        // The band reads the ancestor chain from the OPACITY SLOT now, so what goes into its colour is the element's
+        // OWN alpha only - the same split every batched fill makes.
+        FadeBySlot(unit);
         if (!batch.TryAdd(band, shape, corners, kind, bakeWorld, unit.RenderData.Opacity, scissor, bounds,
-                band.Color, slot, field, fieldRange))
+                band.Color, slot, field, fieldRange, RoundedClipSlot(unit.Component, _frameScissor), unit.FadeSlot))
         {
             return false;
         }
@@ -200,8 +203,10 @@ public partial class RenderCache
 
         var haloBounds = LogicalBounds(unit.Component, wt);
         var bakeWorld = ResolveBake(device, unit.Component, wt, out var slot);
+        FadeBySlot(unit);   // the chain comes from the slot now - the colour carries the element's own alpha only
         if (!batch.TryAdd(bands, inner, shape, corners, kind, bakeWorld,
-                unit.RenderData.Opacity, scissor, haloBounds, slot, field, fieldRange))
+                unit.RenderData.Opacity, scissor, haloBounds, slot, field, fieldRange,
+                RoundedClipSlot(unit.Component, _frameScissor), unit.FadeSlot))
         {
             return false;
         }

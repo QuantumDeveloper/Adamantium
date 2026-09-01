@@ -20,7 +20,8 @@ internal readonly struct LayoutSnapshot(
     bool isMotionNode,
     IUIComponent renderParent,
     float opacity = 1f,
-    float selfOpacity = 1f) : System.IEquatable<LayoutSnapshot>
+    float selfOpacity = 1f,
+    Vector4F clipRadii = default) : System.IEquatable<LayoutSnapshot>
 {
     // A FIELD, not a get-only property: 64 bytes that Equals wants to compare by reference, and a property cannot be
     // passed as `in` (it is not addressable, so the compiler copies it first - the very copy this avoids).
@@ -28,6 +29,10 @@ internal readonly struct LayoutSnapshot(
     public Size RenderSize { get; } = renderSize;
     public bool ClipToBounds { get; } = clipToBounds;
     public bool IsMotionNode { get; } = isMotionNode;
+
+    /// <summary>How this clip's own corners are rounded, in the CornerRadius order (TL, TR, BR, BL). Zero = a square
+    /// clip, which is what a scissor already does. Frozen here with the rest, so the draw never reads it live.</summary>
+    public Vector4F ClipRadii { get; } = clipRadii;
 
     /// <summary>The element's OWN opacity - the part that composites DOWN onto descendants. The bake multiplies this up the
     /// <see cref="RenderParent"/> chain (see RenderCache.EffectiveOpacity); frozen here so the draw never reads the live
@@ -53,6 +58,7 @@ internal readonly struct LayoutSnapshot(
                && RenderSize.Width == other.RenderSize.Width
                && RenderSize.Height == other.RenderSize.Height
                && ClipToBounds == other.ClipToBounds
+               && ClipRadii == other.ClipRadii
                && IsMotionNode == other.IsMotionNode
                && Opacity == other.Opacity
                && SelfOpacity == other.SelfOpacity
@@ -71,5 +77,5 @@ internal readonly struct LayoutSnapshot(
 
     public override bool Equals(object obj) => obj is LayoutSnapshot other && Equals(other);
 
-    public override int GetHashCode() => System.HashCode.Combine(RenderSize, ClipToBounds, IsMotionNode, Opacity, SelfOpacity, RenderParent);
+    public override int GetHashCode() => System.HashCode.Combine(RenderSize, ClipToBounds, ClipRadii, IsMotionNode, Opacity, SelfOpacity, RenderParent);
 }

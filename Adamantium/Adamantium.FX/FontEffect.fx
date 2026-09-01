@@ -10,23 +10,24 @@ struct FontItem
     float Rotation : PSIZE1;
     float4 Color: COLOR0;
     int SpriteEffect : BLENDINDICES0;
-    // The C# FontItem sends the atlas array slice here (per glyph), but the shader does NOT read it yet - see the
-    // DRIVER-BUG note below. Kept so the pipeline is ready to go dynamic without a vertex-format change.
+    // The atlas array slice this glyph was packed into - read by the pixel stage, see the note below.
     float Layer : PSIZE2;
 };
 
 // ============================================================================================================
-// DRIVER BUG WORKAROUND (NVIDIA Quadro RTX 4000, VK_EXT_shader_object). This driver's shader-object compiler AVs
-// (vkCreateShadersEXT, 0xC0000005) on ANY non-trivial Texture2DArray use in this shader: a runtime layer index, an
-// extra VS->PS varying, OR a switch of constant-index samples ALL crash it. Bisection proved the ONLY form that
-// compiles is a SINGLE sample with a COMPILE-TIME-CONSTANT layer (validation-clean, so a pure driver compiler bug).
-// So for now we sample layer 0 (constant) and carry NO layer varying. The atlas IS a real Texture2DArray and the C#
-// side packs glyphs across layers, so when the driver is fixed, GO DYNAMIC by:
-//   1) add `nointerpolation float Layer : TEXCOORD2;` to PSInput
-//   2) in ExpandGlyphCorner: `vertex.Layer = item.Layer;`
-//   3) replace each `float3(input.UV, 0)` below with `float3(input.UV, input.Layer)`
-// Until then only layer-0 glyphs render correctly (~one 1024x1024 layer's worth); glyphs the packer spills to layers
-// 1+ will mis-sample (they read layer 0) - NOT a crash. Effective capacity today ~= the old single-layer atlas.
+// THE ATLAS LAYER IS DYNAMIC AGAIN. It was pinned to a compile-time 0 for a long time: this driver's shader-object
+// compiler (NVIDIA Quadro RTX 4000, VK_EXT_shader_object) AVd in vkCreateShadersEXT on ANY non-trivial
+// Texture2DArray use here - a runtime layer index, an extra VS->PS varying, even a switch over constant indices -
+// and bisection at the time left a single sample at a constant layer as the only form that compiled. Text was
+// therefore limited to one 1024x1024 layer; glyphs the packer spilled to layers 1+ silently sampled layer 0.
+//
+// What changed is not the driver. This effect used to carry two passes nothing could reach (a gradient-derivative
+// AA variant and an outline verification pass) and it was sitting at the limit where that compiler gives up - the
+// same limit that made a second read of the transform table fatal. With those gone there is room, and the layer
+// index compiles and runs. Measured: a cold compile still flakes (the AV is a floating one and hits any changed
+// shader), but once through it starts 6 of 6 and the glyphs are the same as before.
+//
+// So if this ever AVs again, the question to ask is what the EFFECT has grown, not what the sampler is doing.
 // ============================================================================================================
 
 struct PSInput
@@ -34,6 +35,13 @@ struct PSInput
     float4 Position : SV_Position;
     float2 UV : TEXCOORD0;
     float4 Color : COLOR;
+    // The rounded ancestor clip's SHAPE, fetched from the transform table in the VERTEX stage like every other family
+    // (see ClipMath.fxh). That fetch is a SECOND read of the table from this shader, which used to kill the shader
+    // compiler outright until the effect lost its two dead passes.
+    nointerpolation float4 ClipBox : TEXCOORD1;
+    nointerpolation float4 ClipRadii : TEXCOORD2;
+    // The atlas array slice, as a runtime value - see the note above for why it was a compile-time 0 for so long.
+    nointerpolation float Layer : TEXCOORD3;
 };
 
 Texture2DArray Texture : register(t1);
@@ -47,20 +55,20 @@ float FontSizeThreshold;
 float FontWeight;
 float PxRange;
 float2 MSDFAtlasSize;
-float4 StrokeColor;
-// Outline effect (RenderMsdfOutline pass). OutlineWidth is the ring thickness in normalized field units
-// (sd is 0..1 with the contour at 0.5 and the field edge at 0, so 0.25 ~= PxRange*0.25 texels outside the
-// glyph). The ring is only visible because the field carries real distance that far out (wide PxRange) -
-// it doubles as a check that the widened field works beyond the contour.
-float OutlineWidth;
-float4 OutlineColor;
-
 // True-SDF blend band, in atlas texels per screen pixel. Below SdfBlendLo the glyph is magnified -> use the
 // MSDF median (keeps sharp corners). Above SdfBlendHi it is minified -> use the single-channel true SDF
 // (alpha), which stays crisp where median(bilinear) softens (its only cost, rounded corners, is sub-pixel
 // at that size). Smoothly blended in between so there is no pop across the size threshold.
 float SdfBlendLo;
 float SdfBlendHi;
+
+// The rounded ancestor clip for the PER-BLOCK (direct) draw, as plain uniforms: xy = the clip rect's origin in device
+// pixels, zw = its size (zw = 0 means no clip), and the four corner radii. The batched pass fetches the same two
+// values from the transform table by slot, which this pass cannot do - it never binds the table, and a first read
+// from it would be a new compile shape on the effect that is tightest on this driver. One draw = one block = one
+// clip, so a uniform says it exactly.
+float4 DirectClipBox;
+float4 DirectClipRadii;
 
 // BDA (buffer device address) storage for the INSTANCED glyph batch (pass RenderMsdfBatchInstanced) - the SAME proven
 // pattern BatchEffect.fx uses for rect/ellipse fills. GlyphInstancesAddress -> the per-instance GlyphData buffer;
@@ -78,6 +86,10 @@ struct NodeSlot
     float4x4 World;
     float4   Params;   // .x = alpha (1 = opaque); .yzw reserved
 };
+
+// The rounded clip, shared with the UI's effects (one physical file, linked in - see Adamantium.FX.csproj). It reads
+// NodeSlot and TransformsAddress, both declared just above, so it has to come AFTER them. NOTHING after the path.
+#include "Includes/ClipMath.fxh"
 
 // Per-glyph quad expansion, now in the VERTEX stage (corner from SV_VertexID), so the geometry shader is gone:
 // plain instanced rendering (4-vertex triangle strip x N glyphs), portable to Metal/MoltenVK and free of the
@@ -111,6 +123,13 @@ PSInput ExpandGlyphCorner(FontItem item, int corner)
     float2 uvCorner = TextureCornerCoords[corner ^ item.SpriteEffect];
     vertex.UV = item.Source.xy + uvCorner * item.Source.zw;
 
+    // The clip comes in as a uniform here (see DirectClipBox) instead of from the table by slot, and it has to be
+    // WRITTEN either way: a varying this vertex shader does not set reaches the pixel shader as whatever was in the
+    // register, and the batch shares this PSInput with it. A zero box is "no clip".
+    vertex.Layer = item.Layer;
+    vertex.ClipBox = DirectClipBox;
+    vertex.ClipRadii = DirectClipRadii;
+
     vertex.Position = mul(vertex.Position, MatrixTransform);
     return vertex;
 }
@@ -139,46 +158,10 @@ float SampleGlyphCoverage(float4 samp, float2 uv)
     return lerp(msdf, samp.a, t);
 }
 
-float2 SafeNormalize(float2 v)
-{
-    float len = length(v);
-    len = (len > 0.0) ? 1.0 / len : 0.0;
-    return v * len;
-}
-
 [shader("vertex")]
 PSInput FontVertexShader(FontItem item, uint vertexId : SV_VertexID)
 {
     return ExpandGlyphCorner(item, (int)vertexId);   // vertexId 0..3 = strip corner
-}
-
-[shader("fragment")]
-float4 FontPixelShader(PSInput input) : SV_Target
-{
-    float2 uv = input.UV * MSDFAtlasSize;
-    float2 Jdx = ddx(uv);
-    float2 Jdy = ddy(uv);
-    float4 samp = Texture.Sample(TextureSampler, float3(input.UV, 0));
-
-    // Signed distance (normalized, contour at 0.5). FontWeight shifts the contour for thinner/thicker
-    // stems. Coverage source switches MSDF -> true-SDF with minification (see SampleGlyphCoverage).
-    float sigDist = SampleGlyphCoverage(samp, input.UV) - 0.5 + FontWeight;
-
-    // Anti-alias over ~1 screen pixel. The MAGNITUDE comes from the geometry derivatives (Jdx/Jdy = how
-    // many atlas texels map to one screen pixel) - smooth and robust, so thin stems don't drop out; the
-    // field derivatives give only the edge DIRECTION (their magnitude aliases on sub-pixel stems). The
-    // 0.5/PxRange factor is half a screen pixel and scales with PxRange - the old code hardcoded it to
-    // ~0.5/6, so at PxRange=16 the edge was ~2.8x too soft and clamped to the max -> permanent blur.
-    float2 gradDir = SafeNormalize(float2(ddx(sigDist), ddy(sigDist)));
-    float2 grad = float2(gradDir.x * Jdx.x + gradDir.y * Jdy.x, gradDir.x * Jdx.y + gradDir.y * Jdy.y);
-    float afWidth = min(0.5 / PxRange * length(grad), 0.5);
-    float opacity = smoothstep(-afWidth, afWidth, sigDist);
-
-    // Pre-multiplied alpha with gamma correction.
-    float4 color;
-    color.a = pow(abs(ForegroundColor.a * opacity), 1.0 / 2.2);
-    color.rgb = ForegroundColor.rgb * color.a;
-    return color;
 }
 
 // Canonical MSDF reconstruction (Chlumsky). ScreenPxRange() gives the field slope in screen pixels.
@@ -188,96 +171,46 @@ float4 FontPixelShader(PSInput input) : SV_Target
 [shader("fragment")]
 float4 FontPixelShaderMsdf(PSInput input) : SV_Target
 {
-    float4 samp = Texture.Sample(TextureSampler, float3(input.UV, 0));
+    float4 samp = Texture.Sample(TextureSampler, float3(input.UV, input.Layer));
     float sd = SampleGlyphCoverage(samp, input.UV);
     float opacity = clamp(ScreenPxRange(input.UV) * (sd - 0.5 + FontWeight) + 0.5, 0.0, 1.0);
     // Gamma-boost the coverage (same as the gradient pass): raises partial opacities so thin stems keep
     // their colour instead of washing out toward the background. The engine blends in sRGB, so this also
     // compensates the perceptual lightening of un-gamma-corrected coverage AA.
+    //
+    // The boost is taken on the PRODUCT, colour alpha included, and that is NOT an oversight to "fix" by reordering:
+    // splitting them (pow(coverage) * alpha) was tried twice and both times made text look washed out. The reason is
+    // that UI text is rarely fully opaque - secondary text in the theme is not - so the boost has been carrying that
+    // alpha too, and taking it out thins every half-covered stem.
+    // The ELEMENT's fade is a different number and does not belong under the boost either. The CPU folds it into
+    // ForegroundColor.a for this pass, so it arrives ALREADY raised to 2.2 and the boost hands it back linear - the
+    // same trick the batch shader plays in its vertex stage (FontRenderer.DrawLayoutDirect).
     float alpha = pow(ForegroundColor.a * opacity, 1.0 / 2.2);
+    // The rounded ancestor clip, as coverage, exactly as the batch pass applies it. Both the premultiplied colour and
+    // the alpha are cut: this pass outputs rgb*alpha, so cutting one without the other leaves colour where the glyph
+    // was cut away. A zero-size box gives 1 and costs nothing.
+    alpha *= ClipCoverage(input.Position.xy, input.ClipBox, input.ClipRadii);
     return float4(ForegroundColor.rgb * alpha, alpha);
 }
 
 // Batch variant of FontPixelShaderMsdf: the foreground comes from the per-instance vertex colour (input.Color,
 // baked per glyph on the CPU) instead of the ForegroundColor uniform, so ONE instanced draw can render glyphs
 // of many text blocks - each its own colour - from the shared atlas. Identical MSDF reconstruction otherwise.
-// Used by the CPU pre-transform text batch (docs/TEXT_GLYPH_BATCH_PLAN.md §9 Stage 2). input.Color is a plain
+// Used by the CPU pre-transform text batch (docs/TEXT_GLYPH_BATCH_PLAN.md sec. 9 Stage 2). input.Color is a plain
 // interpolated attribute (no matrix), so it is driver-safe on this Turing.
 [shader("fragment")]
 float4 FontPixelShaderMsdfBatch(PSInput input) : SV_Target
 {
-    float4 samp = Texture.Sample(TextureSampler, float3(input.UV, 0));
+    float4 samp = Texture.Sample(TextureSampler, float3(input.UV, input.Layer));
     float sd = SampleGlyphCoverage(samp, input.UV);
     float opacity = clamp(ScreenPxRange(input.UV) * (sd - 0.5 + FontWeight) + 0.5, 0.0, 1.0);
+    // Unchanged on purpose - the element's fade is pre-compensated in the vertex stage so that this very boost hands
+    // it back linear. See the FADE line in FontBatchInstancedVS.
     float alpha = pow(input.Color.a * opacity, 1.0 / 2.2);
+    // The rounded ancestor clip, as coverage. Applied to the PREMULTIPLIED colour as well as the alpha - this pass
+    // outputs rgb*alpha, so cutting only the alpha would leave the colour standing where the glyph was cut away.
+    alpha *= ClipCoverage(input.Position.xy, input.ClipBox, input.ClipRadii);
     return float4(input.Color.rgb * alpha, alpha);
-}
-
-// MSDF + outline. Reconstructs two coverages from the SAME field: the glyph body (contour at 0.5) and an
-// outer shape that extends OutlineWidth (normalized) OUTSIDE the contour. The ring between them is drawn in
-// OutlineColor. This is the verification effect: a visible outline at a real offset proves the distance
-// field is valid beyond the contour (only possible with the widened PxRange - a thin field saturates to
-// black a couple texels out and the ring collapses).
-[shader("fragment")]
-float4 FontPixelShaderMsdfOutline(PSInput input) : SV_Target
-{
-    float3 samp = Texture.Sample(TextureSampler, float3(input.UV, 0)).rgb;
-    float sd = Median(samp.r, samp.g, samp.b);
-    float screenPx = ScreenPxRange(input.UV);
-
-    // Body coverage (same as the plain MSDF pass) and the outer (body + outline) coverage.
-    float fill = clamp(screenPx * (sd - 0.5 + FontWeight) + 0.5, 0.0, 1.0);
-    float outer = clamp(screenPx * (sd - 0.5 + OutlineWidth + FontWeight) + 0.5, 0.0, 1.0);
-
-    // Inside -> foreground, the ring (outer but not fill) -> outline colour.
-    float3 rgb = lerp(OutlineColor.rgb, ForegroundColor.rgb, fill);
-    float alpha = pow(ForegroundColor.a * outer, 1.0 / 2.2);
-    return float4(rgb * alpha, alpha);
-}
-
-[shader("fragment")]
-float4 StrokedTextPS(PSInput input) : SV_Target
-{
-    if (FontSize > FontSizeThreshold) // large stroke
-    {
-        float2 msdfUnit = PxRange / MSDFAtlasSize;
-        float3 samp = Texture.Sample(TextureSampler, float3(input.UV, 0)).rgb;
-
-        float sigDist = Median(samp.r, samp.g, samp.b) - 0.5;
-        sigDist = sigDist * dot(msdfUnit, 0.5 / fwidth(input.UV));
-        const float strokeThickness = 0.250 * 0.75;
-        float strokeDist = Median(samp.r, samp.g, samp.b) - 0.25 - strokeThickness;
-        strokeDist = -(abs(strokeDist) - strokeThickness);
-        strokeDist = strokeDist * dot(msdfUnit, 0.5 / fwidth(input.UV));
-
-        float opacity = clamp(sigDist + 0.5, 0.0, 1.0);
-        float strokeOpacity = clamp(strokeDist + 0.5, 0.0, 1.0);
-        return lerp(StrokeColor, ForegroundColor, opacity) * max(opacity, strokeOpacity);
-    }
-    else // small stroked text
-    {
-        float2 uv = input.UV * MSDFAtlasSize;
-        float2 Jdx = ddx(uv);
-        float2 Jdy = ddy(uv);
-        float4 samp = Texture.Sample(TextureSampler, float3(input.UV, 0));
-
-        // Same coverage source as the plain text pass: MSDF when magnified, true-SDF when minified.
-        float coverage = SampleGlyphCoverage(samp, input.UV);
-        float sigDist = coverage - 0.5;
-        const float strokeThickness = 0.250 * 0.75;
-        float strokeDist = -(abs(coverage - 0.25 - strokeThickness) - strokeThickness);
-
-        // Same screen-pixel AA as the plain text pass: magnitude from the geometry derivatives (Jdx/Jdy) so
-        // thin stems survive, scaled by 0.5/PxRange (half a screen pixel, scales with PxRange - no hardcoded
-        // constant). The field derivatives give only the edge direction.
-        float2 gradDir = SafeNormalize(float2(ddx(sigDist), ddy(sigDist)));
-        float2 grad = float2(gradDir.x * Jdx.x + gradDir.y * Jdy.x, gradDir.x * Jdx.y + gradDir.y * Jdy.y);
-        float afWidth = min(0.5 / PxRange * length(grad), 0.5);
-        float opacity = smoothstep(-afWidth, afWidth, sigDist);
-        float strokeOpacity = smoothstep(-afWidth, afWidth, strokeDist);
-
-        return lerp(StrokeColor, ForegroundColor, opacity) * max(opacity, strokeOpacity);
-    }
 }
 
 // ---- Instanced glyph batch: per-instance GlyphData read from a BDA STORAGE buffer by SV_InstanceID (mirrors
@@ -288,7 +221,8 @@ struct GlyphData
 {
     float4 LocalRect;   // node-local x, y, w, h (world for slot-0 legacy bakes)
     float4 Source;      // atlas UV rect
-    float4 Params;      // .x = transform-table slot; .y = atlas layer (PS constant-0 today); .z = depth; .w reserved
+    float4 Params;      // .x = transform-table slot; .y = atlas layer (read by the PS); .z = depth; .w reserved
+    float4 Clip;        // .x = the ROUNDED CLIP's slot, or -1; .yzw spare
     float4 Color;       // straight RGBA, element/brush opacity folded into .w
 };
 
@@ -308,20 +242,30 @@ PSInput FontBatchInstancedVS(uint vertexId : SV_VertexID, uint instanceId : SV_I
     float4 worldPos = mul(float4(localPos, g.Params.z, 1.0), nodeWorld);
     o.Position = mul(worldPos, MatrixTransform);   // MatrixTransform = the (transposed-on-upload) projection
     o.UV = g.Source.xy + corner * g.Source.zw;     // SpriteEffect == 0 for batched glyphs
-    o.Color = g.Color;
+    // The element's alpha from the OPACITY SLOT, exactly as every other family reads it: a fading ancestor then moves
+    // one number in the table instead of re-baking every glyph under it. Params.w is -1 when nothing above fades.
+    float fadeSlot = g.Params.w;
+    float fade = nodes[(uint)max(fadeSlot, 0.0)].Params.x;
+    fade = lerp(1.0, fade, step(0.0, fadeSlot));
+    // FADE, pre-compensated for the pixel shader's gamma boost. That boost is taken on the whole product
+    // (pow(Color.a * coverage, 1/2.2)) and must stay that way - moving the colour's alpha out of it washes text out,
+    // tried twice. But the ELEMENT's fade is not coverage, and inside the boost it came out too strong: a block at
+    // Opacity 0.5 kept 0.755 of its ink while every shape beside it was at 0.501. Raising it to 2.2 here makes the
+    // boost hand back exactly `fade`, and at fade = 1 the expression is the old one unchanged.
+    // Carrying it as a fifth varying instead works too - measured, the effect compiles with one - but it spends an
+    // interpolant on the effect that is tightest on this driver, and makes the pixel shader carry the knowledge.
+    o.Color = float4(g.Color.rgb, g.Color.a * pow(fade, 2.2));
+    // The clip's shape, from the table by the slot the record carries - one fetch per instance, as everywhere else.
+    // Together with the fade this shader now reads that table THREE times; it used to AV the compiler on the second,
+    // and what made the difference is the two dead passes this effect no longer carries.
+    o.Layer = g.Params.y;   // the atlas layer this glyph was packed into
+    o.ClipBox = ClipShapeBox(g.Clip.x);
+    o.ClipRadii = ClipShapeRadii(g.Clip.x);
     return o;
 }
 
 technique FontBatch
 {
-    pass Render
-    {
-        EffectName = "FontEffect";
-        Profile = 5.1;
-        VertexShader = FontVertexShader;
-        PixelShader = FontPixelShader;
-    }
-
     pass RenderMsdf
     {
         EffectName = "FontEffectMsdf";
@@ -336,21 +280,5 @@ technique FontBatch
         Profile = 6.6;
         VertexShader = FontBatchInstancedVS;
         PixelShader = FontPixelShaderMsdfBatch;
-    }
-
-    pass RenderMsdfOutline
-    {
-        EffectName = "FontEffectMsdfOutline";
-        Profile = 5.1;
-        VertexShader = FontVertexShader;
-        PixelShader = FontPixelShaderMsdfOutline;
-    }
-
-    pass StrokedText
-    {
-        EffectName = "StrokedFontEffect";
-        Profile = 5.1;
-        VertexShader = FontVertexShader;
-        PixelShader = StrokedTextPS;
     }
 }

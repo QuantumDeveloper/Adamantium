@@ -269,7 +269,11 @@ internal sealed class RectBatchCollector : ShapeSdfCollector<RectItem>
             Stroke0 = stroke0,
             Stroke1 = stroke1,
             Dash = dash,
-            Inset = inset
+            Inset = inset,
+            // NO CLIP is -1, and it has to be set HERE rather than only where a clip is known: zero is a perfectly
+            // valid slot number belonging to somebody else, so an instance baked through any other path (a patch, the
+            // stage) would be read against a stranger's matrix and vanish.
+            Clip = new Vector4F(-1, 0, 0, 0)
         };
         return true;
     }
@@ -381,11 +385,12 @@ internal sealed class RectBatchCollector : ShapeSdfCollector<RectItem>
     }
 
     public bool TryAdd(RectanglePayload p, Matrix4x4F world, double opacity, Rect2D scissor, Rect logicalBounds, int transformSlot = 0,
-        int fadeSlot = -1, int ownerTag = 0)
+        int fadeSlot = -1, int ownerTag = 0, int clipSlot = -1)
     {
         EnsureCpuCapacity(Count + 1);
         if (Count + 1 > GpuCapacity) return false;
         if (!BakeItem(p, world, opacity, transformSlot, fadeSlot, out var item)) return false;   // rotation/shear -> per-unit
+        item.Clip = new Vector4F(clipSlot, 0, 0, 0);
         item.OwnerTag = ownerTag;   // travels with the bytes through every copy the arena makes - see RectItem.OwnerTag
         Items[Count++] = item;
         MarkPending(scissor, logicalBounds);
@@ -394,7 +399,7 @@ internal sealed class RectBatchCollector : ShapeSdfCollector<RectItem>
 
     /// <summary>Bake one unit into the patch stage - see BatchArena. Same bake TryAdd uses; it just lands in the stage
     /// instead of the arena, because a patch has to know the whole frame is repairable before it changes any of it.</summary>
-    public override bool TryStage(IRenderUnit unit, Matrix4x4F world, int transformSlot, int ownerTag)
+    public override bool TryStage(IRenderUnit unit, Matrix4x4F world, int transformSlot, int ownerTag, int clipSlot = -1)
     {
         if (unit is not RenderUnits.RectangleRenderUnit u || !CanBatch(u.RectPayload)) return false;
         if (!BakeItem(u.RectPayload, world, u.FillOpacity, transformSlot, unit.FadeSlot, out var item)) return false;
@@ -402,6 +407,7 @@ internal sealed class RectBatchCollector : ShapeSdfCollector<RectItem>
         // The same stamp TryAdd makes. Without it a patched-in rectangle had no owner, and the orphan sweep - which asks
         // the INSTANCE whose it is - could never blank it once the control stopped drawing.
         item.OwnerTag = ownerTag;
+        item.Clip = new Vector4F(clipSlot, 0, 0, 0);   // ...and the same clip, for the same reason - see BatchArena.TryStage
         Stage.Add(item);
         return true;
     }

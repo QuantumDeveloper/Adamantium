@@ -49,6 +49,10 @@ public struct RectItem
     /// border with different sides is what every second control in a theme asks for.</para></summary>
     public Vector4F Inset;
 
+    /// <summary>.x = the CLIP SLOT this instance is cut by, or -1. A rounded clip cannot be a scissor, so the shape
+    /// travels in a transform-table slot and the fragment's coverage is multiplied by it; .yzw spare.</summary>
+    public Vector4F Clip;
+
     /// <summary>WHOSE instance this is - the paint group that baked it. CPU bookkeeping: no shader reads it.
     /// <para>It is here, in the instance, rather than in a table beside it, because the arena moves these bytes
     /// constantly - a re-issued layer copies its neighbours over, a patch rebuilds a whole range - and anything kept

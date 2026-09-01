@@ -107,6 +107,8 @@ public partial class RenderCache
         _snap.Clear();         // full rebuild -> drop last frame's frozen layout snapshot (else stale overlay positions + unbounded _snap growth)
         _worldCache.Clear();   // new frame: drop last frame's transform + clip memos
         _clipCache.Clear();
+        _clipSlotCache.Clear();
+        _clipShapeCache.Clear();
         _relWorldCache.Clear();
         _nodeCache.Clear();
 
@@ -248,12 +250,16 @@ public partial class RenderCache
         _packet.SnapDelta.Add(new KeyValuePair<IUIComponent, LayoutSnapshot>(component, snapshot));
     }
 
+    // Only a CLIP has rounded corners worth freezing - everything else paints its own and needs nothing here.
+    private static Vector4F ClipRadiiOf(IUIComponent c) => c.ClipToBounds ? c.ClipRadii : Vector4F.Zero;
+
     // Record one component's frozen layout into the recorder's map AND this frame's delta (the applier's replica is built
     // from nothing else). Memoised: an unchanged component is captured once and never re-sent.
     private LayoutSnapshot Snap(IUIComponent c)
     {
         if (_snap.TryGetValue(c, out var s)) return s;
-        s = new LayoutSnapshot(c.LocalTransform, c.RenderSize, c.ClipToBounds, c.IsRenderMotionNode, c.RenderParent, (float)c.Opacity, (float)c.SelfOpacity);
+        s = new LayoutSnapshot(c.LocalTransform, c.RenderSize, c.ClipToBounds, c.IsRenderMotionNode, c.RenderParent,
+            (float)c.Opacity, (float)c.SelfOpacity, ClipRadiiOf(c));
         _snap[c] = s;
         PublishSnapshot(c, s);
         return s;
@@ -264,7 +270,8 @@ public partial class RenderCache
     private LayoutSnapshot ApplySnap(IUIComponent c)
     {
         if (_applySnap.TryGetValue(c, out var s)) return s;
-        s = new LayoutSnapshot(c.LocalTransform, c.RenderSize, c.ClipToBounds, c.IsRenderMotionNode, c.RenderParent, (float)c.Opacity, (float)c.SelfOpacity);
+        s = new LayoutSnapshot(c.LocalTransform, c.RenderSize, c.ClipToBounds, c.IsRenderMotionNode, c.RenderParent,
+            (float)c.Opacity, (float)c.SelfOpacity, ClipRadiiOf(c));
 
         // ...but a part the teardown DESTROYED is not cached. This miss-fallback is the third way into the map and the
         // one that kept re-adding what the sweep had just removed: 39 dead controls a swap survived both a sweep taking
@@ -365,7 +372,8 @@ public partial class RenderCache
     {
         if (component == null || !_refreshedThisCapture.Add(component)) return;
         var snapshot = new LayoutSnapshot(component.LocalTransform, component.RenderSize, component.ClipToBounds,
-            component.IsRenderMotionNode, component.RenderParent, (float)component.Opacity, (float)component.SelfOpacity);
+            component.IsRenderMotionNode, component.RenderParent, (float)component.Opacity, (float)component.SelfOpacity,
+            ClipRadiiOf(component));
 
         // ...AND publish it: the delta is the ONLY source of the applier's replica, so updating the recorder's map alone
         // leaves the applier composing from the PREVIOUS transform (a tilting tile never moves). Snap() below publishes on
@@ -404,10 +412,13 @@ public partial class RenderCache
     {
         if (element == null) return;
         var s = ApplySnap(element);
-        _applySnap[element] = new LayoutSnapshot(Matrix4x4F.Identity, s.RenderSize, s.ClipToBounds, false, null, s.Opacity, s.SelfOpacity);
+        _applySnap[element] = new LayoutSnapshot(Matrix4x4F.Identity, s.RenderSize, s.ClipToBounds, false, null,
+            s.Opacity, s.SelfOpacity, s.ClipRadii);
         _worldCache.Clear();    // drop any absolute transforms/clips memoised during the build so ProcessCommands recomputes rebased
         _relWorldCache.Clear();
         _clipCache.Clear();
+        _clipSlotCache.Clear();
+        _clipShapeCache.Clear();
         _nodeCache.Clear();
     }
 
@@ -729,6 +740,10 @@ public partial class RenderCache
     // below the paths that hold it.
     private Adamantium.Vulkan.Core.Rect2D _cullScissor;
 
+    // This frame's full scissor. The WALK is handed it as an argument, but a patch is not - and a patch re-bakes records
+    // that carry a clip slot, so it has to be able to ask for one too.
+    private Adamantium.Vulkan.Core.Rect2D _frameScissor;
+
     private bool RefreshMovedComponents(IGraphicsDevice device, Adamantium.Vulkan.Core.Rect2D fullScissor)
     {
         _cullScissor = fullScissor;
@@ -802,6 +817,86 @@ public partial class RenderCache
             if (!CollectMovedSubtree(child)) return false;
 
         return true;
+    }
+
+    // The clip slot a unit under this component must read, or -1. Memoised per frame like CumulativeClip, and for the
+    // same reason: every unit under one clip asks the same question.
+    private readonly Dictionary<IUIComponent, int> _clipSlotCache = new();
+
+    // The same clip as a SHAPE, for the draws that cannot read the table by slot - filled by the walk below, in the one
+    // place that already computes it, so the two can never disagree. See RenderData.RoundedClipBox.
+    private readonly Dictionary<IUIComponent, (Vector4F Box, Vector4F Radii)> _clipShapeCache = new();
+
+    // The clip OWNERS whose slots exist - kept across frames, unlike the cache above. A clip that changes shape (a radius
+    // animating, the container resizing) must reach the screen on a REPLAYED frame too, and a replay re-records nothing:
+    // the slot is the only thing that can carry it, so its contents are refreshed per frame from here.
+    private readonly Dictionary<IUIComponent, int> _clipOwners = new();
+
+    /// <summary>Rewrite every live clip slot from its owner's current shape. One 32-byte write per clip, and it is what
+    /// makes a rounded clip follow a resize or an animated radius without the frame being re-recorded.</summary>
+    private void RefreshClipSlots(Vulkan.Core.Rect2D fullScissor)
+    {
+        if (_clipOwners.Count == 0 || _transformTable == null) return;
+
+        foreach (var (owner, slot) in _clipOwners)
+        {
+            var s = ApplySnap(owner);
+            if (!s.ClipToBounds || s.ClipRadii == Vector4F.Zero) continue;
+
+            var box = ToFramebufferScissor(new Rect(0, 0, s.RenderSize.Width, s.RenderSize.Height)
+                .TransformToAABB(World(owner)), fullScissor);
+            _transformTable.SetClip(null, slot,
+                new Vector4F(box.Offset.X, box.Offset.Y, box.Extent.Width, box.Extent.Height),
+                s.ClipRadii * (float)_renderScale);
+        }
+    }
+
+    /// <summary>
+    /// The NEAREST rounded clip above this component, as a slot index the shaders can read.
+    ///
+    /// <para>One, not all of them. Intersecting two rounded clips is a max() of two distance fields - a second slot and a
+    /// second fetch in every pixel shader - for a case that barely occurs: a rounded box inside another rounded box,
+    /// both clipping, both cutting the same corner. The remaining ancestors keep clipping rectangularly through the
+    /// scissor, which is where the bulk of the cut happens anyway.</para>
+    /// </summary>
+    private int RoundedClipSlot(IUIComponent c, Vulkan.Core.Rect2D fullScissor)
+    {
+        if (c == null || _transformTable == null) return -1;
+        if (_clipSlotCache.TryGetValue(c, out var cached)) return cached;
+
+        var slot = -1;
+        for (var owner = c; owner != null; owner = ApplySnap(owner).RenderParent)
+        {
+            var s = ApplySnap(owner);
+            if (!s.ClipToBounds || s.ClipRadii == Vector4F.Zero) continue;
+
+            var box = ToFramebufferScissor(new Rect(0, 0, s.RenderSize.Width, s.RenderSize.Height)
+                .TransformToAABB(World(owner)), fullScissor);
+
+            var boxVec = new Vector4F(box.Offset.X, box.Offset.Y, box.Extent.Width, box.Extent.Height);
+            var radiiVec = s.ClipRadii * (float)_renderScale;
+            slot = _transformTable.AcquireClipSlot(owner.RenderId);
+            _transformTable.SetClip(null, slot, boxVec, radiiVec);
+            _clipShapeCache[c] = (boxVec, radiiVec);
+            _clipOwners[owner] = slot;   // so a replayed frame can refresh it - see RefreshClipSlots
+            break;
+        }
+
+        // A slot the shader cannot reach yet (the table grew past this frame's buffer) would be indexed out of the
+        // allocation, and this device answers that with a lost device rather than a wrong pixel.
+        if (slot >= 0 && !_transformTable.IsSlotLive(slot)) slot = -1;
+
+        _clipSlotCache[c] = slot;
+        return slot;
+    }
+
+    /// <summary>The rounded clip as a SHAPE (device px), for a per-unit draw that takes it as a uniform instead of
+    /// reading the table by slot. Zero size = no clip. Asks the slot walk above so both answers come from one place.
+    /// A slot the shader could not reach also answers "no clip" here, exactly as it does there.</summary>
+    private (Vector4F Box, Vector4F Radii) RoundedClipShape(IUIComponent c, Vulkan.Core.Rect2D fullScissor)
+    {
+        var slot = RoundedClipSlot(c, fullScissor);
+        return slot >= 0 && _clipShapeCache.TryGetValue(c, out var shape) ? shape : default;
     }
 
     private Rect? CumulativeClip(IUIComponent c)
