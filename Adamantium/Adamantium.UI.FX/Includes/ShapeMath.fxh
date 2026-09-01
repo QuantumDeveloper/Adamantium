@@ -31,35 +31,6 @@ float2 SlotPixelScale(float4x4 nodeWorld)
     return ViewportSize.x < 1.0 ? float2(1.0, 1.0) : scale;   // no viewport supplied: leave the bake untouched
 }
 
-// The corner this fragment belongs to, out of the four (x = TL, y = TR, z = BR, w = BL - the CPU CornerRadius order).
-// SDF space has y DOWN (the quad's corner 0 is the TOP-left), so a negative Local.y is the top half. Every rounded-rect
-// helper below picks its radius through this one function, which is what keeps the four corners INDEPENDENT: the field
-// stays continuous across the axes because the +r/-r of the offset cancels on a straight edge, so neighbouring corners
-// never have to agree.
-float CornerRadiusAt(float2 p, float4 radii)
-{
-    return p.x < 0.0 ? (p.y < 0.0 ? radii.x : radii.w)
-                     : (p.y < 0.0 ? radii.y : radii.z);
-}
-
-// Signed distance (device px) to a rounded rect with a selectable outer-corner JOIN: 0 = miter (sharp, Chebyshev outer
-// corner), 1 = bevel (45-deg chamfer), 2 = round (Euclidean, the natural offset). Straight edges are identical across all
-// three; only the corner (both q>0) differs. This is what gives stroke-join parity with the pen (PenLineJoin).
-float SdRoundRectJoin(float2 p, float2 b, float4 radii, int joinType)
-{
-    float r = CornerRadiusAt(p, radii);
-    float2 q = abs(p) - b + r;
-    float inside = min(max(q.x, q.y), 0.0);
-    float2 qp = max(q, float2(0.0, 0.0));
-    // A ROUNDED geometry (r>0) already curves the corner - the join is moot and applying miter/bevel would (wrongly)
-    // reshape the FILL, so only a (near-)sharp corner honours the join. Round join is always the plain Euclidean offset.
-    float outside = (r > 0.5 || joinType == 2) ? length(qp)
-                  : (joinType == 1) ? (qp.x + qp.y)                   // bevel: L1 - a 45-deg chamfer at the corner, but a
-                                                                     // straight edge (one component 0) stays exact
-                  : max(qp.x, qp.y);                                  // miter (sharp)
-    return inside + outside - r;
-}
-
 // Approximate SIGNED DISTANCE (device px) to an ellipse boundary: the implicit F = length(p/half) - 1 normalised by the
 // length of its gradient (first-order/Taylor distance). Exact for a circle (rx==ry); for rx!=ry it's the correct shape
 // with sub-pixel-accurate distance near the boundary - which is exactly where fill AA and the stroke ring live.

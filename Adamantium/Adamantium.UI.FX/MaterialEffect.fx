@@ -9,11 +9,12 @@
 // split: their source is not a brush's business at all. A gradient computes its colour, a texture samples an asset,
 // and a material reads the FRAME - produced mid-draw, one region per segment (see BackdropCapture).
 
-#include "Effects/CommonData.fxh"
-#include "Effects/ShapeMath.fxh"
-#include "Effects/StrokeMath.fxh"
-#include "Effects/NoiseMath.fxh"
-#include "Effects/BrushData.fxh"
+#include "Includes/CommonData.fxh"
+#include "Includes/ClipMath.fxh"
+#include "Includes/ShapeMath.fxh"
+#include "Includes/StrokeMath.fxh"
+#include "Includes/NoiseMath.fxh"
+#include "Includes/BrushData.fxh"
 
 // ---- BACKDROP MATERIALS: a fill made from what is ALREADY DRAWN behind the element ---------------------------------
 // The capture arrives in SourceTexture (see BackdropCapture): the region behind this element, copied with a downscaling
@@ -41,6 +42,7 @@ struct MaterialRectData
     float4 StrokeColor;  // the pen, in the slots CompositeFillStroke expects
     float4 Stroke0;      // .x width (LOGICAL units - scaled by Scale below), .y alignment
     float4 Stroke1;      // dash offset / trim / flags: this batch bakes only whole solid pens, so they stay at default
+    float4 Clip;         // .x = the ROUNDED CLIP's slot, or -1; .yzw spare
 };
 
 struct MaterialPSInput
@@ -52,6 +54,8 @@ struct MaterialPSInput
     nointerpolation uint InstId : TEXCOORD3;
     nointerpolation float Scale : TEXCOORD4;   // device pixels per logical unit, for the pen's width
     nointerpolation float Fade  : TEXCOORD5;   // the opacity slot's chain, as every other batched fill reads it
+    nointerpolation float4 ClipBox   : TEXCOORD6;   // the ancestor's rounded clip, fetched in the VERTEX stage
+    nointerpolation float4 ClipRadii : TEXCOORD7;
 };
 
 [shader("vertex")]
@@ -82,6 +86,8 @@ MaterialPSInput MaterialRectInstancedVS(uint vertexId : SV_VertexID, uint instan
     o.Scale  = iso;
     int fadeSlot = int(it.Params.w);
     o.Fade = lerp(1.0, nodes[max(fadeSlot, 0)].Params.x, step(0.0, float(fadeSlot)));
+    o.ClipBox   = ClipShapeBox(it.Clip.x);
+    o.ClipRadii = ClipShapeRadii(it.Clip.x);
     return o;
 }
 
@@ -149,7 +155,7 @@ float4 MaterialFrostedPS(MaterialPSInput input) : SV_Target
     // from the bake, so only the chain is applied to the composited result.
     float4 painted = CompositeFillStroke(d, float4(colour, it.Params.z), it.StrokeColor,
                                          it.Stroke0.x * input.Scale, it.Stroke0.y, 1.0, 0.0);
-    return float4(painted.rgb, painted.a * input.Fade);
+    return float4(painted.rgb, painted.a * input.Fade * ClipCoverage(input.Position.xy, input.ClipBox, input.ClipRadii));
 }
 
 
@@ -231,7 +237,7 @@ float4 MaterialGlassPS(MaterialPSInput input) : SV_Target
     // from the bake, so only the chain is applied to the composited result.
     float4 painted = CompositeFillStroke(d, float4(colour, it.Params.z), it.StrokeColor,
                                          it.Stroke0.x * input.Scale, it.Stroke0.y, 1.0, 0.0);
-    return float4(painted.rgb, painted.a * input.Fade);
+    return float4(painted.rgb, painted.a * input.Fade * ClipCoverage(input.Position.xy, input.ClipBox, input.ClipRadii));
 }
 
 
@@ -249,13 +255,15 @@ struct MaterialMeshPSInput
     float2 Local : TEXCOORD0;                   // fragment's local mesh xy, for the lens falloff
     nointerpolation uint InstId : TEXCOORD1;
     nointerpolation float Fade : TEXCOORD2;
+    nointerpolation float4 ClipBox   : TEXCOORD3;   // ...and so is the ancestor's rounded clip
+    nointerpolation float4 ClipRadii : TEXCOORD4;
 };
 
 [shader("vertex")]
 MaterialMeshPSInput MaterialFillVS(UI_VERTEX v, uint instanceId : SV_InstanceID)
 {
-    PatGeomData* items = (PatGeomData*)InstancesAddress;
-    PatGeomData it = items[instanceId];
+    PatternGeomData* items = (PatternGeomData*)InstancesAddress;
+    PatternGeomData it = items[instanceId];
 
     // local -> slot space -> world, as PatternFillVS and the other instanced fills do it.
     NodeSlot* nodes = (NodeSlot*)TransformsAddress;
@@ -267,14 +275,16 @@ MaterialMeshPSInput MaterialFillVS(UI_VERTEX v, uint instanceId : SV_InstanceID)
     o.InstId = instanceId;
     int fadeSlot = int(it.Params.x);
     o.Fade = lerp(1.0, nodes[max(fadeSlot, 0)].Params.x, step(0.0, float(fadeSlot)));
+    o.ClipBox   = ClipShapeBox(it.Anim.w);     // this carrier is PatternGeomData - the clip rides in Anim.w
+    o.ClipRadii = ClipShapeRadii(it.Anim.w);
     return o;
 }
 
 [shader("fragment")]
 float4 MaterialFrostedMeshPS(MaterialMeshPSInput input) : SV_Target
 {
-    PatGeomData* items = (PatGeomData*)InstancesAddress;
-    PatGeomData it = items[input.InstId];
+    PatternGeomData* items = (PatternGeomData*)InstancesAddress;
+    PatternGeomData it = items[input.InstId];
 
     // Params.y pins the picture to the ELEMENT - here, the fragment's place within the mesh's own local bounds.
     float pin = it.Params.y;
@@ -288,14 +298,14 @@ float4 MaterialFrostedMeshPS(MaterialMeshPSInput input) : SV_Target
     float grain = (Hash21(input.Position.xy) - 0.5) * it.Color3.y;
     colour = saturate(colour + grain);
 
-    return float4(colour, input.Fade * it.Color3.w);
+    return float4(colour, input.Fade * it.Color3.w * ClipCoverage(input.Position.xy, input.ClipBox, input.ClipRadii));
 }
 
 [shader("fragment")]
 float4 MaterialGlassMeshPS(MaterialMeshPSInput input) : SV_Target
 {
-    PatGeomData* items = (PatGeomData*)InstancesAddress;
-    PatGeomData it = items[input.InstId];
+    PatternGeomData* items = (PatternGeomData*)InstancesAddress;
+    PatternGeomData it = items[input.InstId];
 
     float strength = it.Color3.z;
 
@@ -330,7 +340,7 @@ float4 MaterialGlassMeshPS(MaterialMeshPSInput input) : SV_Target
     float grain = (Hash21(input.Position.xy) - 0.5) * it.Color3.y;
     colour = saturate(colour + grain);
 
-    return float4(colour, input.Fade * it.Color3.w);
+    return float4(colour, input.Fade * it.Color3.w * ClipCoverage(input.Position.xy, input.ClipBox, input.ClipRadii));
 }
 
 

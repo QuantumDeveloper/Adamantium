@@ -21,11 +21,12 @@
 // In dependency order - each header builds on the ones above it, and BrushData is last because everything in it is
 // built from the other four. NOTHING after the path on these lines: a trailing comment on an #include stops the
 // preprocessor with "unexpected tokens after directive".
-#include "Effects/CommonData.fxh"
-#include "Effects/ShapeMath.fxh"
-#include "Effects/StrokeMath.fxh"
-#include "Effects/NoiseMath.fxh"
-#include "Effects/BrushData.fxh"
+#include "Includes/CommonData.fxh"
+#include "Includes/ClipMath.fxh"
+#include "Includes/ShapeMath.fxh"
+#include "Includes/StrokeMath.fxh"
+#include "Includes/NoiseMath.fxh"
+#include "Includes/BrushData.fxh"
 
 // GPU-resident FRACTAL REFERENCE ORBITS (perturbation deep-zoom): a flat float2[] holding every deep-zoom fractal
 // instance's reference orbit Z_n concatenated. Each FractalRectData.Ref.x is this instance's START INDEX into it and
@@ -52,6 +53,7 @@ struct GradientRectData
     float4 Stop4; float4 Stop5; float4 Stop6; float4 Stop7;
     float4 Offsets0;     // stop offsets 0..3
     float4 Offsets1;     // stop offsets 4..7
+    float4 Clip;         // .x = the ROUNDED CLIP's slot, or -1; .yzw spare
 };
 
 // Apply the spread mode to a raw gradient parameter t: pad = clamp, reflect = mirror-tile, repeat = tile.
@@ -201,6 +203,8 @@ struct GradPSInput
                                                // baked in slot units, and has to match a pixel-space SDF
     nointerpolation float Fade  : TEXCOORD5;   // the element's alpha, fetched in the VERTEX stage: reaching the node
                                                // table from the PIXEL stage blanks the window on this driver
+    nointerpolation float4 ClipBox   : TEXCOORD6;   // the rounded ancestor clip's shape - fetched there for the same reason
+    nointerpolation float4 ClipRadii : TEXCOORD7;
 };
 
 [shader("vertex")]
@@ -233,6 +237,8 @@ GradPSInput GradientRectInstancedVS(uint vertexId : SV_VertexID, uint instanceId
     float fadeSlot = floor(it.Params.w / 16.0) - 1.0;
     float fade = nodes[(uint)max(fadeSlot, 0.0)].Params.x;
     o.Fade = lerp(1.0, fade, step(0.0, fadeSlot));
+    o.ClipBox   = ClipShapeBox(it.Clip.x);
+    o.ClipRadii = ClipShapeRadii(it.Clip.x);
     return o;
 }
 
@@ -283,9 +289,11 @@ float4 GradientPS(GradPSInput input) : SV_Target
         mask = DashTrimMask(s, s, perim, it.Stroke0.z * sc, it.Stroke0.w * sc, it.Stroke1.x * sc, it.Stroke1.y,
                             it.Stroke1.z, dPerp * capScl, halfW * capScl, it.Stroke1.w, it.Dash * sc);
     }
-    // The element's fade came across from the vertex stage - fill and stroke both take it.
-    return CompositeFillStroke(d, float4(fill.rgb, fill.a * input.Fade),
+    // The element's fade came across from the vertex stage - fill and stroke both take it. So did the ancestor clip's
+    // shape, and for the same reason; here it is only arithmetic.
+    float4 outColor = CompositeFillStroke(d, float4(fill.rgb, fill.a * input.Fade),
                                float4(it.StrokeColor.rgb, it.StrokeColor.a * input.Fade), widthPx, it.Stroke0.y, mask, 0.0);
+    return float4(outColor.rgb, outColor.a * ClipCoverage(input.Position.xy, input.ClipBox, input.ClipRadii));
 }
 
 // ---- GradientFill: general instanced geometry (a shared tessellated mesh drawn N times) whose FILL is a LINEAR/RADIAL
@@ -304,6 +312,7 @@ struct GradGeomData
     float4 Stop0; float4 Stop1; float4 Stop2; float4 Stop3;
     float4 Stop4; float4 Stop5; float4 Stop6; float4 Stop7;
     float4 Offsets0; float4 Offsets1;
+    float4 Clip;         // .x = the ROUNDED CLIP's slot, or -1; .yzw spare
 };
 
 // The opacity slot rides PACKED in Params.w next to the interpolation mode (0 sRGB / 1 OKLab): this record has no free
@@ -321,6 +330,8 @@ struct GradFillPSInput
     // The opacity slot's alpha, fetched in the VERTEX stage and carried down: reading the node table from the PIXEL
     // stage is what this driver answers with a device loss, so the fetch happens once per vertex and rides a varying.
     nointerpolation float Fade : TEXCOORD2;
+    nointerpolation float4 ClipBox   : TEXCOORD3;   // the ancestor's rounded clip, fetched the same way
+    nointerpolation float4 ClipRadii : TEXCOORD4;
 };
 
 [shader("vertex")]
@@ -339,6 +350,8 @@ GradFillPSInput GradientFillVS(UI_VERTEX v, uint instanceId : SV_InstanceID)
     o.InstId = instanceId;
     int gradFadeSlot = GradGeomFadeSlot(it);
     o.Fade = lerp(1.0, nodes[max(gradFadeSlot, 0)].Params.x, step(0.0, float(gradFadeSlot)));
+    o.ClipBox   = ClipShapeBox(it.Clip.x);
+    o.ClipRadii = ClipShapeRadii(it.Clip.x);
     return o;
 }
 
@@ -372,7 +385,7 @@ float4 GradientFillPS(GradFillPSInput input) : SV_Target
 {
     GradGeomData* items = (GradGeomData*)InstancesAddress;
     float4 c = GradGeomColor(items[input.InstId], input.Local);
-    return float4(c.rgb, c.a * input.Fade);
+    return float4(c.rgb, c.a * input.Fade * ClipCoverage(input.Position.xy, input.ClipBox, input.ClipRadii));
 }
 
 // The analytic-AA fringe of those gradient instances: same shared ring, same instance buffer, one draw. Unlike the
@@ -385,6 +398,8 @@ struct GradFringePSInput
     float  Coverage : TEXCOORD1;
     nointerpolation uint InstId : TEXCOORD2;
     nointerpolation float Fade : TEXCOORD3;   // fetched in the VERTEX stage - see GradFillPSInput
+    nointerpolation float4 ClipBox   : TEXCOORD4;   // ...and so is the ancestor's rounded clip
+    nointerpolation float4 ClipRadii : TEXCOORD5;
 };
 
 [shader("vertex")]
@@ -403,6 +418,8 @@ GradFringePSInput InstancedGradientFringeVS(FringeVertex v, uint instanceId : SV
     o.InstId = instanceId;
     int gradFadeSlot = GradGeomFadeSlot(it);
     o.Fade = lerp(1.0, nodes[max(gradFadeSlot, 0)].Params.x, step(0.0, float(gradFadeSlot)));
+    o.ClipBox   = ClipShapeBox(it.Clip.x);
+    o.ClipRadii = ClipShapeRadii(it.Clip.x);
     return o;
 }
 
@@ -411,7 +428,8 @@ float4 InstancedGradientFringePS(GradFringePSInput input) : SV_Target
 {
     GradGeomData* items = (GradGeomData*)InstancesAddress;
     float4 c = GradGeomColor(items[input.InstId], input.Local);
-    c.a *= saturate(input.Coverage) * input.Fade;   // 1 at the contour -> 0 at the outer edge
+    c.a *= saturate(input.Coverage) * input.Fade   // 1 at the contour -> 0 at the outer edge
+         * ClipCoverage(input.Position.xy, input.ClipBox, input.ClipRadii);
     return c;
 }
 
@@ -432,7 +450,9 @@ struct PatternRectData
     float4 Dash;         // dash runs 2..5 (device px); runs 0 and 1 ride in Stroke0.zw, the count in Stroke1.w
     float4 Noise;        // FBM noise (type 4 only): x octaves, y seed, z lacunarity, w gain
     float4 Color3;       // optional MID colour for a 3-colour noise gradient-map (Color1->Color3->Color2); .w==0 = off
-    float4 Anim;         // .x = offset subtracted from the clock while animating, .y = the phase held while paused
+    float4 Anim;         // .x = offset subtracted from the clock while animating, .y = the phase held while paused,
+                         // .z = an opacity slot the CPU stamps that NO pass reads (this carrier folds the chain into
+                         // Color1/Color2), .w = the ROUNDED CLIP's slot, -1 = none
 };
 
 struct PatternPSInput
@@ -445,6 +465,13 @@ struct PatternPSInput
     nointerpolation float Scale : TEXCOORD4;   // slot unit -> device px. The PS re-reads the record, whose stroke AND
                                                // cell size (PatternBrush.CellSize / NoiseBrush.Scale, one field) are
                                                // absolute lengths in slot units - they can't ride a ratio like uv.
+    nointerpolation float4 ClipBox   : TEXCOORD5;   // the ancestor's rounded clip, fetched in the VERTEX stage
+    nointerpolation float4 ClipRadii : TEXCOORD6;
+    // The element's alpha from the OPACITY SLOT, fetched in the same stage. The CPU has stamped that slot into the
+    // record all along and nothing read it, while the bake had already taken the opacity CHAIN out of the colour
+    // (RenderCache calls FadeBySlot for this family) - so a faded ancestor left a pattern at full strength. Measured on
+    // the Opacity stand: every other family sat at 0.58 of its reference and the pattern at 1.28.
+    nointerpolation float Fade : TEXCOORD7;
 };
 
 [shader("vertex")]
@@ -471,6 +498,13 @@ PatternPSInput PatternRectInstancedVS(uint vertexId : SV_VertexID, uint instance
     o.Radii = ScaleShapeNumbers(it.Radii, iso, step(it.Params.x, -1.5));   // Params.x: -2 = regular polygon
     o.InstId = instanceId;
     o.Scale  = iso;
+    o.ClipBox   = ClipShapeBox(it.Anim.w);     // the clip slot rides in Anim.w - see PatternRectData
+    o.ClipRadii = ClipShapeRadii(it.Anim.w);
+    // ...and the opacity slot in Anim.z. An INT test and a branch, NOT the `nodes[max(slot, 0)]` + lerp/step the
+    // sibling passes still use: that form takes this driver to device-lost from a freshly changed shader - measured
+    // here and on the polygon VS in BatchEffect, where the same swap cured it.
+    int patFadeSlot = int(it.Anim.z);
+    o.Fade = patFadeSlot < 0 ? 1.0 : nodes[(uint)patFadeSlot].Params.x;
     return o;
 }
 
@@ -927,26 +961,30 @@ float4 PatternSdfShade(PatternPSInput input, int kind)
         mask = DashTrimMask(s, s, perim, it.Stroke0.z * sc, it.Stroke0.w * sc, it.Stroke1.x * sc, it.Stroke1.y,
                             it.Stroke1.z, dPerp * capScl, halfW * capScl, it.Stroke1.w, it.Dash * sc);
     }
-    return CompositeFillStroke(d, fill, it.StrokeColor, widthPx, it.Stroke0.y, mask, 0.0);
+    // The shape's own edge is the SDF above; this is the ANCESTOR's rounding, as coverage - and its FADE beside it.
+    float4 patOut = CompositeFillStroke(d, fill, it.StrokeColor, widthPx, it.Stroke0.y, mask, 0.0);
+    return float4(patOut.rgb, patOut.a * input.Fade * ClipCoverage(input.Position.xy, input.ClipBox, input.ClipRadii));
 }
 
 // ---- PatternFill: general instanced geometry (a shared tessellated mesh drawn N times) whose FILL is a PROCEDURAL
 // pattern/noise brush - the pattern sibling of GradientFill, so pattern/noise work on ANY geometry (Path/Polygon/glyphs),
-// not just the SDF rect. Per-instance PatGeomData from a BDA buffer by SV_InstanceID; the PS reconstructs a PatternRectData
+// not just the SDF rect. Per-instance PatternGeomData from a BDA buffer by SV_InstanceID; the PS reconstructs a PatternRectData
 // and calls the SAME PatternFillColor the SDF rect pattern PS uses (fed the fragment's LOCAL mesh position).
 struct PatFillPSInput
 {
     float4 Position : SV_Position;
     float2 Local : TEXCOORD0;                   // varying: fragment's local mesh xy
-    nointerpolation uint InstId : TEXCOORD1;    // instance -> re-read PatGeomData in the PS (light signature)
+    nointerpolation uint InstId : TEXCOORD1;    // instance -> re-read PatternGeomData in the PS (light signature)
     nointerpolation float Fade : TEXCOORD2;     // fetched in the VERTEX stage - see GradFillPSInput
+    nointerpolation float4 ClipBox   : TEXCOORD3;   // the ancestor's rounded clip, fetched the same way
+    nointerpolation float4 ClipRadii : TEXCOORD4;
 };
 
 [shader("vertex")]
 PatFillPSInput PatternFillVS(UI_VERTEX v, uint instanceId : SV_InstanceID)
 {
-    PatGeomData* items = (PatGeomData*)InstancesAddress;
-    PatGeomData it = items[instanceId];
+    PatternGeomData* items = (PatternGeomData*)InstancesAddress;
+    PatternGeomData it = items[instanceId];
     // local -> slot space -> world, as InstancedFillVS / GradientFillVS.
     NodeSlot* nodes = (NodeSlot*)TransformsAddress;
     float4 world = mul(mul(float4(v.position.xyz, 1.0), it.Local), nodes[(uint)it.Params.w].World);
@@ -957,6 +995,8 @@ PatFillPSInput PatternFillVS(UI_VERTEX v, uint instanceId : SV_InstanceID)
     o.InstId = instanceId;
     int patFadeSlot = int(it.Params.x);
     o.Fade = lerp(1.0, nodes[max(patFadeSlot, 0)].Params.x, step(0.0, float(patFadeSlot)));
+    o.ClipBox   = ClipShapeBox(it.Anim.w);     // the clip slot rides in Anim.w, as in the SDF pattern record
+    o.ClipRadii = ClipShapeRadii(it.Anim.w);
     return o;
 }
 
@@ -966,8 +1006,8 @@ PatFillPSInput PatternFillVS(UI_VERTEX v, uint instanceId : SV_InstanceID)
 
 float4 PatternMeshShade(PatFillPSInput input, int kind)
 {
-    PatGeomData* items = (PatGeomData*)InstancesAddress;
-    PatGeomData it = items[input.InstId];
+    PatternGeomData* items = (PatternGeomData*)InstancesAddress;
+    PatternGeomData it = items[input.InstId];
 
     // Reconstruct a PatternRectData for the shared PatternFillColor (Bounds/stroke fields unused by the fill eval).
     PatternRectData pd;
@@ -985,7 +1025,7 @@ float4 PatternMeshShade(PatFillPSInput input, int kind)
     float2 pTopLeft = input.Local - it.LocalBounds.xy;                                   // fragment from the shape top-left
     float2 centerRel = input.Local - (it.LocalBounds.xy + it.LocalBounds.zw * 0.5);      // fragment from the shape centre
     float4 c = PatternFillColor(pd, kind, pTopLeft, centerRel, max(it.LocalBounds.w * 0.5, 1.0));
-    return float4(c.rgb, c.a * input.Fade);
+    return float4(c.rgb, c.a * input.Fade * ClipCoverage(input.Position.xy, input.ClipBox, input.ClipRadii));
 }
 
 // ---- ONE ENTRY POINT PER KIND ---------------------------------------------------------------------------------------
@@ -1047,6 +1087,7 @@ struct TexRectData
     float4 Drawn;      // the content's rect inside ONE tile: offsetXY, scaleXY, both in 0..1 of the tile
     float4 UvRect;     // sub-rectangle of the source: x, y, w, h (normalised)
     float4 Tint;       // multiplied into the sample, straight RGBA
+    float4 Clip;       // .x = the ROUNDED CLIP's slot, or -1; .yzw spare
 };
 
 struct TexPSInput
@@ -1056,6 +1097,9 @@ struct TexPSInput
     float2 Half     : TEXCOORD1;   // rect half-size
     float4 Radii    : TEXCOORD2;   // corner radii (TL, TR, BR, BL) in device px
     nointerpolation uint InstId : TEXCOORD3;
+    nointerpolation float4 ClipBox   : TEXCOORD4;   // the ancestor's rounded clip, fetched in the VERTEX stage
+    nointerpolation float4 ClipRadii : TEXCOORD5;
+    nointerpolation float Fade : TEXCOORD6;         // ...and the element's alpha from its opacity slot
 };
 
 [shader("vertex")]
@@ -1079,6 +1123,10 @@ TexPSInput TexRectInstancedVS(uint vertexId : SV_VertexID, uint instanceId : SV_
     o.Local  = (corner - 0.5) * it.Bounds.zw * px + (corner * 2.0 - 1.0);
     o.Radii = ScaleShapeNumbers(it.Radii, iso, step(it.Params.x, -1.5));   // Params.x: -2 = regular polygon
     o.InstId = instanceId;
+    o.ClipBox   = ClipShapeBox(it.Clip.x);
+    o.ClipRadii = ClipShapeRadii(it.Clip.x);
+    int texSdfFadeSlot = int(it.Clip.y);   // int test + branch - see the pattern VS above for why, not the lerp/step form
+    o.Fade = texSdfFadeSlot < 0 ? 1.0 : nodes[(uint)texSdfFadeSlot].Params.x;
     return o;
 }
 
@@ -1134,9 +1182,10 @@ float4 TexRectPS(TexPSInput input) : SV_Target
     // Outside the content's rect there is nothing to paint - the gap a Uniform fit leaves around EVERY tile, and the
     // whole of the shape a single copy does not reach.
     float inside = step(0.0, inContent.x) * step(inContent.x, 1.0) * step(0.0, inContent.y) * step(inContent.y, 1.0);
-    // NOT faded through the slot: this pass aborted shader creation in every form tried, so the opacity CHAIN stays
-    // folded into the tint here (see TextureItem).
-    fill.a *= inside;
+    // Both of the ancestor's numbers, fetched in the VERTEX stage and applied here for one multiply each: its FADE and
+    // its rounded CLIP. The fade used to be missing - the record dropped the slot the CPU handed it while the bake had
+    // already taken the chain out of the tint, so a faded ancestor barely dimmed a picture.
+    fill.a *= inside * input.Fade * ClipCoverage(input.Position.xy, input.ClipBox, input.ClipRadii);
     return fill;
 }
 
@@ -1156,6 +1205,7 @@ struct TexGeomData
     float4 Drawn;        // the content's rect inside ONE tile: offsetXY, scaleXY, both in 0..1 of the tile
     float4 UvRect;       // the sub-rectangle of the source one copy samples
     float4 Tint;
+    float4 Clip;         // .x = the ROUNDED CLIP's slot, or -1; .yzw spare
 };
 
 struct TexFillPSInput
@@ -1164,6 +1214,8 @@ struct TexFillPSInput
     float2 Local : TEXCOORD0;                   // varying: fragment's local mesh xy
     nointerpolation uint InstId : TEXCOORD1;    // instance -> re-read TexGeomData in the PS (light signature)
     nointerpolation float Fade : TEXCOORD2;     // fetched in the VERTEX stage - see GradFillPSInput
+    nointerpolation float4 ClipBox   : TEXCOORD3;   // ...and so is the ancestor's rounded clip
+    nointerpolation float4 ClipRadii : TEXCOORD4;
 };
 
 [shader("vertex")]
@@ -1180,6 +1232,8 @@ TexFillPSInput TexFillVS(UI_VERTEX v, uint instanceId : SV_InstanceID)
     o.InstId = instanceId;
     int texFadeSlot = int(it.Params.z);
     o.Fade = lerp(1.0, nodes[max(texFadeSlot, 0)].Params.x, step(0.0, float(texFadeSlot)));
+    o.ClipBox   = ClipShapeBox(it.Clip.x);
+    o.ClipRadii = ClipShapeRadii(it.Clip.x);
     return o;
 }
 
@@ -1207,7 +1261,7 @@ float4 TexFillPS(TexFillPSInput input) : SV_Target
 
     // Outside the content's rect inside its tile there is nothing to paint - the gap a Uniform fit leaves.
     float inside = step(0.0, n.x) * step(n.x, 1.0) * step(0.0, n.y) * step(n.y, 1.0);
-    color.a *= inside * input.Fade;
+    color.a *= inside * input.Fade * ClipCoverage(input.Position.xy, input.ClipBox, input.ClipRadii);
 
     return color;
 }
@@ -1219,6 +1273,8 @@ struct TexFringePSInput
     float Coverage  : TEXCOORD1;
     nointerpolation uint InstId : TEXCOORD2;
     nointerpolation float Fade : TEXCOORD3;   // fetched in the VERTEX stage - see GradFillPSInput
+    nointerpolation float4 ClipBox   : TEXCOORD4;   // ...and so is the ancestor's rounded clip
+    nointerpolation float4 ClipRadii : TEXCOORD5;
 };
 
 // The analytic-AA fringe of those textured instances: the SAME shared ring and the SAME instance buffer as the body, so
@@ -1241,6 +1297,8 @@ TexFringePSInput InstancedTexFringeVS(FringeVertex v, uint instanceId : SV_Insta
     o.InstId = instanceId;
     int texFadeSlot = int(it.Params.z);
     o.Fade = lerp(1.0, nodes[max(texFadeSlot, 0)].Params.x, step(0.0, float(texFadeSlot)));
+    o.ClipBox   = ClipShapeBox(it.Clip.x);
+    o.ClipRadii = ClipShapeRadii(it.Clip.x);
     return o;
 }
 
@@ -1264,14 +1322,14 @@ float4 TexFringePS(TexFringePSInput input) : SV_Target
 
     float4 color = SourceTexture.SampleLevel(SourceSampler, uv, 0.0) * it.Tint;
     float inside = step(0.0, n.x) * step(n.x, 1.0) * step(0.0, n.y) * step(n.y, 1.0);
-    color.a *= inside * input.Coverage * input.Fade;
+    color.a *= inside * input.Coverage * input.Fade * ClipCoverage(input.Position.xy, input.ClipBox, input.ClipRadii);
 
     return color;
 }
 
 // ---- Fractal batch: the SAME SDF rounded-rect (self-AA shape + shared stroke), but the FILL is an escape-time FRACTAL
 // (Julia/Mandelbrot) iterated per fragment - resolution-independent, no texture. Per-instance FractalRectData from a BDA
-// storage buffer by SV_InstanceID; the PS re-reads the record, maps the fragment to the complex plane, iterates z=z²+c and
+// storage buffer by SV_InstanceID; the PS re-reads the record, maps the fragment to the complex plane, iterates z=z^2+c and
 // colours by the smooth escape count. With the animate flag set, a Julia's C drifts on a Lissajous over the global Time.
 struct FractalRectData
 {
@@ -1286,7 +1344,8 @@ struct FractalRectData
     float4 Stroke0;      // width_px, align, dashOn, dashGap
     float4 Stroke1;      // dashOffset, trimStart, trimEnd, flags
     float4 Dash;         // dash runs 2..5 (device px); runs 0 and 1 ride in Stroke0.zw, the count in Stroke1.w
-    float4 Ref;          // perturbation: .x orbit start index (into OrbitAddress), .y orbit length, .z deep flag (1=use), .w reserved
+    float4 Ref;          // perturbation: .x orbit start index (into OrbitAddress), .y orbit length, .zw the delta offset
+    float4 Clip;         // .x = the ROUNDED CLIP's slot, or -1; .yzw spare
 };
 
 struct FractalPSInput
@@ -1297,6 +1356,9 @@ struct FractalPSInput
     float4 Radii    : TEXCOORD2;   // corner radii (TL, TR, BR, BL) in device px
     nointerpolation uint InstId : TEXCOORD3;   // instance -> re-read FractalRectData in the PS
     nointerpolation float Scale : TEXCOORD4;   // slot unit -> device px, for the stroke record the PS re-reads
+    nointerpolation float4 ClipBox   : TEXCOORD5;   // the ancestor's rounded clip, fetched in the VERTEX stage
+    nointerpolation float4 ClipRadii : TEXCOORD6;
+    nointerpolation float Fade : TEXCOORD7;         // ...and the element's alpha from its opacity slot
 };
 
 [shader("vertex")]
@@ -1324,10 +1386,14 @@ FractalPSInput FractalRectInstancedVS(uint vertexId : SV_VertexID, uint instance
     o.Radii = it.Radii * iso;
     o.InstId = instanceId;
     o.Scale  = iso;
+    o.ClipBox   = ClipShapeBox(it.Clip.x);
+    o.ClipRadii = ClipShapeRadii(it.Clip.x);
+    int fracFadeSlot = int(it.Clip.y);   // int test + branch, not lerp/step - see the pattern VS
+    o.Fade = fracFadeSlot < 0 ? 1.0 : nodes[(uint)fracFadeSlot].Params.x;
     return o;
 }
 
-// Newton fractal for z³ - 1: iterate z -= (z³-1)/(3z²) and colour by which of the 3 cube roots of unity it converges to
+// Newton fractal for z^3 - 1: iterate z -= (z^3-1)/(3z^2) and colour by which of the 3 cube roots of unity it converges to
 // (a different look from escape-time: smooth colour basins with a fractal border). The two brush colours take two roots,
 // their blend the third; converging in more steps (near a border) darkens, so the boundary detail shows. Animate flows it.
 float4 NewtonColor(float2 z, int maxIt, bool animate, float4 c1, float4 c2)
@@ -1339,10 +1405,10 @@ float4 NewtonColor(float2 z, int maxIt, bool animate, float4 c1, float4 c2)
     int i = 0;
     for (i = 0; i < maxIt; i++)
     {
-        float2 z2 = float2(z.x * z.x - z.y * z.y, 2.0 * z.x * z.y);              // z²
-        float2 z3 = float2(z2.x * z.x - z2.y * z.y, z2.x * z.y + z2.y * z.x);    // z³
-        float2 num = float2(z3.x - 1.0, z3.y);                                  // z³ - 1
-        float2 den = float2(3.0 * z2.x, 3.0 * z2.y);                            // 3z²
+        float2 z2 = float2(z.x * z.x - z.y * z.y, 2.0 * z.x * z.y);              // z², проверка UTF-8
+        float2 z3 = float2(z2.x * z.x - z2.y * z.y, z2.x * z.y + z2.y * z.x);    // z^3
+        float2 num = float2(z3.x - 1.0, z3.y);                                  // z^3 - 1
+        float2 den = float2(3.0 * z2.x, 3.0 * z2.y);                            // 3z^2
         float dd = dot(den, den);
         if (dd < 1e-12) break;                                                  // derivative ~0: stationary
         z -= float2(num.x * den.x + num.y * den.y, num.y * den.x - num.x * den.y) / dd;   // z -= num/den (complex divide)
@@ -1479,16 +1545,16 @@ float4 FractalPS(FractalPSInput input) : SV_Target
         int i = 0;
         for (i = 0; i < maxIt; i++)
         {
-            if (formula == 1)         // Burning Ship: (|Re z| + i|Im z|)² + c
+            if (formula == 1)         // Burning Ship: (|Re z| + i|Im z|)^2 + c
             {
                 float2 za = float2(abs(z.x), abs(z.y));
                 z = float2(za.x * za.x - za.y * za.y, 2.0 * za.x * za.y) + cc;
             }
-            else if (formula == 2)    // Tricorn / Mandelbar: conj(z)² + c
+            else if (formula == 2)    // Tricorn / Mandelbar: conj(z)^2 + c
             {
                 z = float2(z.x * z.x - z.y * z.y, -2.0 * z.x * z.y) + cc;
             }
-            else if (formula == 3)    // Celtic: |Re(z²)| + i·Im(z²) + c
+            else if (formula == 3)    // Celtic: |Re(z^2)| + i*Im(z^2) + c
             {
                 float2 z2 = float2(z.x * z.x - z.y * z.y, 2.0 * z.x * z.y);
                 z = float2(abs(z2.x), z2.y) + cc;
@@ -1499,7 +1565,7 @@ float4 FractalPS(FractalPSInput input) : SV_Target
                 float th = atan2(z.y, z.x);
                 z = pow(rr, expo) * float2(cos(expo * th), sin(expo * th)) + cc;
             }
-            else                      // Quadratic: z² + c
+            else                      // Quadratic: z^2 + c
             {
                 z = float2(z.x * z.x - z.y * z.y, 2.0 * z.x * z.y) + cc;
             }
@@ -1537,7 +1603,8 @@ float4 FractalPS(FractalPSInput input) : SV_Target
         mask = DashTrimMask(s, s, perim, it.Stroke0.z * sc, it.Stroke0.w * sc, it.Stroke1.x * sc, it.Stroke1.y,
                             it.Stroke1.z, dPerp * capScl, halfW * capScl, it.Stroke1.w, it.Dash * sc);
     }
-    return CompositeFillStroke(d, fill, it.StrokeColor, widthPx, it.Stroke0.y, mask, 0.0);
+    float4 fracOut = CompositeFillStroke(d, fill, it.StrokeColor, widthPx, it.Stroke0.y, mask, 0.0);
+    return float4(fracOut.rgb, fracOut.a * input.Fade * ClipCoverage(input.Position.xy, input.ClipBox, input.ClipRadii));
 }
 
 
@@ -1586,7 +1653,7 @@ technique Gradient
 
 // PROCEDURAL two-colour fills - both the regular patterns (checker, stripes, dots, grid, honeycomb, hatch) and the
 // noise fields (simplex, perlin, value, WorleyNoise, ridged, turbulence, voronoi). They share one pixel stage today, which
-// is the thing Ф7а's step 2 splits into a pass per kind.
+// is the thing the theme work's step 2 splits into a pass per kind.
 // REGULAR PATTERNS. One pass per KIND, and within the name the carrier: Checkerboard on an analytic shape is
 // CheckerboardSdf, the same pattern on tessellated geometry is CheckerboardMesh. The vertex stage is shared - only the
 // pixel stage differs, and only in which field it evaluates.

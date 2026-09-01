@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
         <TargetFramework>net10.0</TargetFramework>
@@ -9,6 +9,10 @@
         <CompilerGeneratedFilesOutputPath>$(BaseIntermediateOutputPath)Generated</CompilerGeneratedFilesOutputPath>
         <LangVersion>latest</LangVersion>
         <OutputType>Library</OutputType>
+        <!-- Adamantium.UI, NOT Adamantium.UI.FX: the effects generator emits into "{RootNamespace}.Effects.Generated",
+             and these effects have always been Adamantium.UI.Effects.Generated.*. Keeping the root namespace is what
+             makes this a MOVE of files rather than a rename of every type that draws through them. -->
+        <RootNamespace>Adamantium.UI</RootNamespace>
     </PropertyGroup>
 
     <ItemGroup>
@@ -27,11 +31,6 @@
     <ItemGroup>
         <AdditionalFiles Include="$(ProjectDir)**\*.fx" />
         <AdditionalFiles Include="$(ProjectDir)**\*.fxh" />
-        <!-- The rounded clip's field, shared with the UI's effects rather than copied: the text batch is cut by the same
-             shape through the same transform-table slot, so there is one implementation and nothing to drift. A LINKED
-             FILE, not a project reference - the shader generator only needs the text. Includes resolve by path SUFFIX,
-             so the link has to keep the Includes\ folder. -->
-        <AdditionalFiles Include="..\Adamantium.UI.FX\Includes\ClipMath.fxh" Link="Includes\ClipMath.fxh" />
         <CompilerVisibleProperty Include="RootNamespace" />
         <AdditionalFiles Remove="obj\**" />
         <!-- IDE up-to-date check: rebuild when generator inputs (AdditionalFiles) change. -->
