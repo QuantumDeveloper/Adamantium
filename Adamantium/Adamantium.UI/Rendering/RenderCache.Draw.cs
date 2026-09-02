@@ -2186,7 +2186,7 @@ public partial class RenderCache
                 // leave the rest of the frame painting the old place, so a length that no longer matches refuses and
                 // the walk owns it.
                 var texRun = _texRunByUnit.TryGetValue(u, out var tr) ? tr : (First: rectEntry.Slot, Count: 1);
-                if (!TextureBatchCollector.BakeRun(rru.RectPayload, bakeWorld, rru.FillOpacity, transformSlot, rru.FadeSlot, rectClip, out var texItems)
+                if (!TextureBatchCollector.BakeRun(rru.RectPayload, bakeWorld, rru.FillOpacity, transformSlot, rru.FadeSlot, rectClip, out var texItems, rru.BrushTexture())
                     || texItems.Length != texRun.Count)
                 {
                     return false;

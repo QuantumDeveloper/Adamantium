@@ -237,4 +237,68 @@ public class NineSliceTests
 
         Assert.That(Bake(brush, new Rect(0, 0, 100, 100)), Is.Null);
     }
+
+    // --- A VECTOR source: the brush stays raster, but the raster it gets has to be an honest one -------------------
+
+    // The inset is half a TEXEL, so it needs the texture's texel count. For a bitmap that is the source's own size and
+    // these are one number; for a drawing the source has no texels at all and the texture is a bake made to fit, so the
+    // two part company. Reading the inset off the SOURCE then either eats a visible sliver of the piece or leaves the
+    // seam line it exists to remove - and the same source pairs with a different bake at every shape size, so it does
+    // both, at different sizes, from the same brush.
+    [Test]
+    public void TheTexelInsetFollowsTheTextureAndNotTheSource()
+    {
+        var bake = NineSlice.Bake(Brush(), new Rect(0, 0, 300, 300), 1.0, 0, -1, texels: new Size(400, 400));
+
+        Assert.That(bake[0].UvRect.X, Is.EqualTo(0.5 / 400).Within(1e-6), "half a texel OF THE BAKE, not of the drawing");
+        Assert.That(bake[0].UvRect.X, Is.Not.EqualTo(Texel / 2).Within(1e-6), "which is not what the 100-unit source would give");
+    }
+
+    // What a FRAME needs from a bake is not what a fill needs. A fill is drawn at the shape's scale, so the shape's size
+    // is the right resolution for it; a corner is drawn at its Border however large the panel grows, so baking at the
+    // shape's size spends everything on the middle and leaves the corners as whatever falls out. Each band is asked what
+    // it needs - a band drawn N long out of a fraction F of the source is 1:1 at N/F - and the largest answer wins.
+    [Test]
+    public void AFrameIsBakedAtTheResolutionItsPiecesNeedNotTheShapes()
+    {
+        var brush = Brush();                       // a 100x100 source cut at 0.25
+        brush.Border = new Thickness(40);          // ...whose corners are drawn at 40, not at 25
+
+        Assert.Multiple(() =>
+        {
+            // 40 out of a quarter of the source: the corner is 1:1 only when the source is 160 across - which is WIDER
+            // than the 120-wide panel it dresses. Baking at the shape is what used to happen, and it is exactly the
+            // 25% the corner was missing.
+            Assert.That(NineSlice.BakeSize(brush, new Size(120, 120)).Width, Is.EqualTo(160).Within(1e-6),
+                "the corner asks for more than the whole shape");
+
+            // A wide panel stretches the CENTRE, and that band then asks for the most - which is the shape's size, give
+            // or take the corners. The old behaviour, and still right when it is the demanding one.
+            Assert.That(NineSlice.BakeSize(brush, new Size(900, 200)).Width, Is.EqualTo((900 - 80) / 0.5).Within(1e-6));
+
+            // A REPEATED edge draws its motif at the motif's own size however long the strip is, so it asks for nothing
+            // beyond the source and the corner's demand is all that is left - however wide the panel.
+            brush.EdgeMode = NineSliceEdgeMode.Repeat;
+            Assert.That(NineSlice.BakeSize(brush, new Size(900, 200)).Width, Is.EqualTo(160).Within(1e-6));
+        });
+    }
+
+    // A thin ornament blown up by a thick border asks for a picture that is mostly never seen at that density: at slice
+    // 0.01 a 40px corner wants 4000 across. The corner softens past the cap instead of the frame costing a render target
+    // of that size - the trade a brush that is raster BY DESIGN is entitled to make.
+    [Test]
+    public void AnAbsurdDemandIsCappedRatherThanHonoured()
+    {
+        var brush = Brush();
+        brush.Slice = new Thickness(0.01);
+        brush.Border = new Thickness(40);
+
+        Assert.That(NineSlice.BakeSize(brush, new Size(200, 200)).Width, Is.EqualTo(2048).Within(1e-6));
+    }
+
+    [Test]
+    public void ABrushWithNoSourceIsBakedAtTheShape()
+    {
+        Assert.That(NineSlice.BakeSize(new NineSliceBrush(), new Size(120, 80)), Is.EqualTo(new Size(120, 80)));
+    }
 }

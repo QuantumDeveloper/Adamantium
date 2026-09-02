@@ -107,18 +107,34 @@ internal sealed class TextureBatchCollector : BrushSdfCollector<TextureItem>
         // aspect Stretch asked for (see ImageTiling.BakeSize). A nine-slice always fills its box.
         if (source is DrawingImage vector)
         {
-            var bakeSize = brush is TileBrush tileBrush ? ImageTiling.BakeSize(tileBrush, size) : size;
-            var baked = DrawingImageRaster.Get(vector, bakeSize, owner);
+            // Baked to the VIEWBOX's slice at the slice's own resolution - see ImageTiling.BakeSize. The layout is told
+            // the same thing (Layout's sourceIsSlice), so what it names in uv is a fraction of the slice, not of the
+            // whole drawing. A FRAME asks a different question and answers it itself (NineSlice.BakeSize): its pieces
+            // are not drawn at the shape's scale, so the shape's size is the wrong thing to bake at.
+            var tileBrush = brush as TileBrush;
+            var bakeSize = brush switch
+            {
+                TileBrush tiled => ImageTiling.BakeSize(tiled, size),
+                NineSliceBrush frame => NineSlice.BakeSize(frame, size),
+                _ => size
+            };
+            var slice = tileBrush != null ? ImageTiling.SliceOf(tileBrush) : default;
+            // Get answers with the exact bake, or a stand-in, or nothing - and queues the exact one itself either way,
+            // so a stand-in cannot swallow the order for the bake it is standing in for.
+            var baked = DrawingImageRaster.Get(vector, bakeSize, owner, slice);
             if (baked != null)
             {
                 return baked.GetOrCreateTexture(factory);
             }
-
-            DrawingImageRaster.Request(vector, bakeSize, owner);
         }
 
         return null;
     }
+
+    /// <summary>Is the texture behind this brush a BAKE OF THE VIEWBOX'S SLICE rather than of the whole source? True
+    /// for a vector source, which is rasterised to exactly what a tile shows (see BrushTexture); false for pixels,
+    /// which exist once at their own resolution. The layout has to be told, because it decides what uv means.</summary>
+    internal static bool SourceIsSlice(TileBrush brush) => brush?.ContentSource is DrawingImage;
 
     /// <summary>Whether this fill belongs to the textured batch at all. STATIC because it is asked before the collector
     /// exists: one is built on the first textured fill a cache meets, and most caches never meet one.</summary>
@@ -138,7 +154,7 @@ internal sealed class TextureBatchCollector : BrushSdfCollector<TextureItem>
         {
             return false;
         }
-        if (!Bake(p.Brush, p.DestinationRect, p.CornerRadius, BrushShape.Rect, world, opacity, transformSlot, fadeSlot, clipSlot, out var baked))
+        if (!Bake(p.Brush, p.DestinationRect, p.CornerRadius, BrushShape.Rect, world, opacity, transformSlot, fadeSlot, clipSlot, out var baked, texture))
         {
             return false;
         }
@@ -158,9 +174,9 @@ internal sealed class TextureBatchCollector : BrushSdfCollector<TextureItem>
     /// record a unit already occupies. Refuses a brush that bakes more than one record (a nine-slice): a run of nine
     /// cannot be rewritten through a single slot, and the caller falls back to the walk.</summary>
     public static bool BakeRun(RectanglePayload p, Matrix4x4F world, double opacity, int transformSlot, int fadeSlot,
-        int clipSlot, out TextureItem[] items)
+        int clipSlot, out TextureItem[] items, ITexture texture = null)
         => Bake(p.Brush, p.DestinationRect, p.CornerRadius, BrushShape.Rect, world, opacity, transformSlot, fadeSlot,
-            clipSlot, out items);
+            clipSlot, out items, texture);
 
     /// <summary>How many records this brush bakes: ONE for a picture, NINE for a nine-slice. The move path asks before
     /// patching - a run whose length changed is not something a rewrite in place can express, and that one takes the
@@ -277,7 +293,7 @@ internal sealed class TextureBatchCollector : BrushSdfCollector<TextureItem>
     // axis-aligned instance cannot hold it) so the caller falls back to the per-unit path. The four corner radii ride in
     // Radii, scaled with the world; Params.x carries the LARGEST of them, or -1 as the ELLIPSE shape flag.
     private static bool Bake(Brush brush, Rect destinationRect, ProceduralGeometry.CornerRadius corners, BrushShape shape, Matrix4x4F world, double opacity,
-        int transformSlot, int fadeSlot, int clipSlot, out TextureItem[] items)
+        int transformSlot, int fadeSlot, int clipSlot, out TextureItem[] items, ITexture texture = null)
     {
         items = null;
         const float eps = 1e-4f;
@@ -298,7 +314,8 @@ internal sealed class TextureBatchCollector : BrushSdfCollector<TextureItem>
 
         items = brush switch
         {
-            NineSliceBrush nine => NineSlice.Bake(nine, bounds, opacity, transformSlot, fadeSlot, sx, sy),
+            NineSliceBrush nine => NineSlice.Bake(nine, bounds, opacity, transformSlot, fadeSlot, sx, sy,
+                texture == null ? default : new Size(texture.Width, texture.Height)),
             TileBrush tile => [Single(tile, bounds, radius, radii, opacity, transformSlot, fadeSlot, sx, sy)],
             _ => null
         };
@@ -322,7 +339,7 @@ internal sealed class TextureBatchCollector : BrushSdfCollector<TextureItem>
         var tint = brush.Tint.ToVector4();
         tint.W *= (float)(opacity * brush.Opacity);
 
-        var layout = ImageTiling.Layout(brush, bounds, scaleX, scaleY);
+        var layout = ImageTiling.Layout(brush, bounds, scaleX, scaleY, SourceIsSlice(brush));
 
         // The SHAPE stays the shape; only the content inside each tile is fitted. Handing the fitted rect over as the
         // bounds shrank the SDF itself, so a Uniform fill turned a circle into an oval.
