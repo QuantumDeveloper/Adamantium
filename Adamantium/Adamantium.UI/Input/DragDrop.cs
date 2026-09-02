@@ -427,12 +427,8 @@ public static partial class DragDrop
         // Anchor to insert BEFORE must SURVIVE the source removal: skip items that are being dragged (they're the ListBox
         // selection - still present during the drag), so a reorder landing INSIDE the moved pack keeps a real anchor instead
         // of losing it and appending to the end. First non-dragged item at/after the caret; null (append) if there is none.
-        _insertBefore = null;
+        _insertBefore = AnchorAt(list, index);
         var items = list.Items;
-        var dragged = (list as ListBox)?.SelectedItems;
-        if (items != null)
-            for (int i = index; i >= 0 && i < items.Count; i++)
-                if (dragged?.Contains(items[i]) != true) { _insertBefore = items[i]; break; }
         // A panel that can open a real hole at the insertion point says so itself, and then the hole IS the cue: a caret
         // as well would mark the same place twice, and the two disagree the moment a line reflows. Everything else keeps
         // the caret.
@@ -456,7 +452,7 @@ public static partial class DragDrop
         {
             ClearIndicatorVisual();
             _insertIndex = slot;
-            _insertBefore = items != null && slot < items.Count ? items[slot] : null;
+            _insertBefore = AnchorAt(list, slot);
             SetDropGap(hostPanel, slot);
             return;
         }
@@ -670,6 +666,27 @@ public static partial class DragDrop
 
     // A gap belongs to ONE panel at a time: moving to another list has to close the first, or a list the cursor left
     // would keep a hole in it for the rest of the gesture.
+    /// <summary>The item a drop should land BEFORE, given the seam it lands at: the first one at or after that seam
+    /// which is NOT being dragged. Said ONCE, because both cues need the same answer and only one of them had it.
+    /// <para>Why the skip: the source removes the dragged items and the target then inserts them before this anchor -
+    /// that order is what turns a drop back into the origin list into a reorder rather than a delete. So the anchor has
+    /// to be something that SURVIVES the removal. The gap path took <c>items[slot]</c> outright, and hovering the gap an
+    /// item left behind makes that item its own anchor: once the source removed it the target had nothing to insert
+    /// before and appended to the end instead - the item read as having vanished from where it was.</para></summary>
+    private static object AnchorAt(ItemsControl list, int index)
+    {
+        var items = list?.Items;
+        if (items == null) return null;
+
+        var dragged = (list as ListBox)?.SelectedItems;
+        for (var i = index; i >= 0 && i < items.Count; i++)
+        {
+            if (dragged?.Contains(items[i]) != true) return items[i];
+        }
+
+        return null;   // nothing but dragged items after the seam - append
+    }
+
     private static void SetDropGap(VirtualizingPanel panel, int index)
     {
         if (!ReferenceEquals(_gapPanel, panel) && _gapPanel != null) _gapPanel.DropGapIndex = -1;
