@@ -62,7 +62,25 @@ public class ItemContainerGenerator
         var container = _recyclePool.Pop();
         _pooledSet.Remove(container);
         (container as Core.FundamentalUIComponent)?.Revive();
+        ReactivateBindings(container);
         return container;
+    }
+
+    /// <summary>Re-opens every binding in a container coming back out of the pool. The panel CLOSED them when it parked
+    /// it (VirtualizingPanel.ParkContainer drops the tile out of any shared source's fan-out), and the only thing that
+    /// used to re-open them was the DataContext change a rebind makes.
+    /// <para>Which is not a change when the container is handed back THE SAME ITEM it already held - a same-value write
+    /// notifies nobody - so the row came back on screen with dead bindings: no text, no brush from a resource, and only
+    /// the parts of the template that depend on neither still drawn. On a list with a drag grip that is a bare handle
+    /// floating in an empty row, which is what it looked like. A window that shrinks and regrows by one is all it takes,
+    /// and opening a drop gap does exactly that.</para>
+    /// <para>Unconditional, and cheap where it is not needed: a pool pop happens when the window GROWS, not on the
+    /// steady-scroll path (which reuses donors in place, never parked), and re-establishing a connection that is already
+    /// established is what every DataContext change already does.</para></summary>
+    private static void ReactivateBindings(IUIComponent node)
+    {
+        Core.Data.BindingEngine.RefreshBindings(node);
+        foreach (var child in node.VisualChildren) ReactivateBindings(child);
     }
 
     private void PoolClear()
