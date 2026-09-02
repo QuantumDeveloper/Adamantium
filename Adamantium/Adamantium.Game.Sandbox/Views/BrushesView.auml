@@ -963,6 +963,8 @@
                                 <VisualBrush Visual="{Binding ElementName=ReflectionSource}"
                                              TileMode="{Binding VisualTileMode}"
                                              Stretch="{Binding VisualStretch}"
+                                             AlignmentX="{Binding VisualAlignmentX}"
+                                             AlignmentY="{Binding VisualAlignmentY}"
                                              ViewportUnits="Absolute"
                                              Viewport="{Binding VisualViewportSize, Converter={conv:DoubleToSquareViewportConverter}}"
                                              RotationAngle="{Binding VisualRotation}"
@@ -977,6 +979,8 @@
                                 <VisualBrush Visual="{Binding ElementName=ReflectionSource}"
                                              TileMode="{Binding VisualTileMode}"
                                              Stretch="{Binding VisualStretch}"
+                                             AlignmentX="{Binding VisualAlignmentX}"
+                                             AlignmentY="{Binding VisualAlignmentY}"
                                              ViewportUnits="Absolute"
                                              Viewport="{Binding VisualViewportSize, Converter={conv:DoubleToSquareViewportConverter}}"
                                              RotationAngle="{Binding VisualRotation}"
@@ -1014,6 +1018,10 @@
                     <DropDown ItemsSource="{Binding TileModes}" SelectedItem="{Binding VisualTileMode, Mode=TwoWay}" Width="270" MarginBottom="10"/>
                     <TextBlock Text="Stretch — fits the source inside ONE tile" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
                     <DropDown ItemsSource="{Binding Stretches}" SelectedItem="{Binding VisualStretch, Mode=TwoWay}" Width="270" MarginBottom="10"/>
+                    <!-- Without this the alignments read as broken: one of the two axes is inert at any given Stretch,
+                         which is correct and completely invisible from the two dropdowns alone. -->
+                    <TextBlock Text="Alignment moves the source only where the fit LEFT ROOM, and Uniform leaves room on exactly ONE axis. The source is 240×150 in a square tile: Uniform fills the width, so only Y can move; UniformToFill crops the width instead, so only X can; Fill leaves no room at all."
+                               Foreground="{ResourceReference TextFillColorSecondary}" TextWrapping="WrapByWords" Width="270" MarginBottom="6"/>
                     <TextBlock Text="Alignment X" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
                     <DropDown ItemsSource="{Binding AlignmentsX}" SelectedItem="{Binding VisualAlignmentX, Mode=TwoWay}" Width="270" MarginBottom="10"/>
                     <TextBlock Text="Alignment Y" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
