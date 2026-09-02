@@ -463,7 +463,7 @@ public class TabItem : ContentControl, ISelectable, ISpringLoadable
 
         if (!_dragging && Owner is { AllowTabDrag: false }) return;
 
-        if (!_dragging && PlatformSettings.ExceedsDragThreshold(e.GetPosition(this) - _pressPos))
+        if (!_dragging && PlatformSettings.ExceedsDragThreshold(e.GetPosition(this) - _pressPos, this))
         {
             _dragging = true;
             CaptureMouse();   // now the drag must keep tracking even as the pointer leaves this tab

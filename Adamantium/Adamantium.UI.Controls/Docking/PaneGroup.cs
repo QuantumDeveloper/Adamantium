@@ -170,7 +170,7 @@ public class PaneGroup : TabControl, Panels.IPaneMinimum
             return;
         }
 
-        if (!PlatformSettings.ExceedsDragThreshold(e.GetPosition(this) - _captionPress)) return;
+        if (!PlatformSettings.ExceedsDragThreshold(e.GetPosition(this) - _captionPress, this)) return;
 
         // Crossing the threshold IS the tear-off, as for a tab: the platform's move loop carries it from here.
         _captionPressed = false;
