@@ -16,7 +16,8 @@ public class MaterialKnobVisibilityConverter : IValueConverter
         var glass = value is MaterialType.LiquidGlass;
         var velvet = value is MaterialType.Velvet;
         var metal = value is MaterialType.Metal;
-        var surface = velvet || metal;
+        var wood = value is MaterialType.Wood;
+        var surface = velvet || metal || wood;
         var visible = parameter as string switch
         {
             // A SURFACE has no capture to scatter, bend or tint: every knob about the thing BEHIND the element is
@@ -31,6 +32,7 @@ public class MaterialKnobVisibilityConverter : IValueConverter
             "Surface" => surface,
             "Nap" => velvet,
             "Metal" => metal,
+            "Wood" => wood,
             // Only mica takes a picture of its own; the other two ARE what is beneath them.
             "Source" => value is MaterialType.Mica,
             _ => true

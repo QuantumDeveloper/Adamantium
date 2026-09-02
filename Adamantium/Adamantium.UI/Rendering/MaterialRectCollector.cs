@@ -66,6 +66,7 @@ internal sealed class MaterialRectCollector : SdfBatchCollector<MaterialRectItem
         MaterialTreatment.Glass => Effect.MaterialGlassSdfPass,
         MaterialTreatment.Sheen => Effect.MaterialSheenSdfPass,
         MaterialTreatment.Metal => Effect.MaterialMetalSdfPass,
+        MaterialTreatment.Wood => Effect.MaterialWoodSdfPass,
         _ => Effect.MaterialFrostedSdfPass
     };
 
@@ -199,14 +200,21 @@ internal sealed class MaterialRectCollector : SdfBatchCollector<MaterialRectItem
         MaterialType.LiquidGlass => MaterialTreatment.Glass,
         MaterialType.Velvet => MaterialTreatment.Sheen,
         MaterialType.Metal => MaterialTreatment.Metal,
+        MaterialType.Wood => MaterialTreatment.Wood,
         _ => MaterialTreatment.Frosted
     };
 
     /// <summary>Does this material look BEHIND the element at all? The SURFACES do not - they depict what a thing is
     /// made of, not what shows through it - so a frame holding nothing but velvet or metal must not pay for a capture.
     /// </summary>
-    public static bool NeedsBackdrop(MaterialType material)
-        => TreatmentOf(material) is not (MaterialTreatment.Sheen or MaterialTreatment.Metal);
+    public static bool NeedsBackdrop(MaterialType material) => NeedsBackdrop(TreatmentOf(material));
+
+    /// <summary>The same question asked where only the treatment is still known - by the mesh carrier, which refuses to
+    /// draw a segment whose backdrop would not bind. Stated ONCE, here: written out a second time it becomes a list of
+    /// surfaces that somebody has to remember to extend, and a surface left off it is asked for a capture it never
+    /// wanted and silently stops drawing.</summary>
+    public static bool NeedsBackdrop(MaterialTreatment treatment)
+        => treatment is not (MaterialTreatment.Sheen or MaterialTreatment.Metal or MaterialTreatment.Wood);
 
     // The surface's three records, packed once here so BOTH carriers bake the same numbers - a velvet rectangle and a
     // velvet path must not be able to drift apart in appearance, and two copies of this arithmetic is exactly how they
@@ -214,15 +222,30 @@ internal sealed class MaterialRectCollector : SdfBatchCollector<MaterialRectItem
     // a lit surface, which is why the whole branch shares them.
     internal static Vector4F SurfaceOf(MaterialBrush m)
     {
-        var c = TreatmentOf(m.Material) == MaterialTreatment.Metal ? m.MetalColor : m.NapColor;
+        var c = TreatmentOf(m.Material) switch
+        {
+            MaterialTreatment.Metal => m.MetalColor,
+            MaterialTreatment.Wood => m.EarlyWoodColor,
+            _ => m.NapColor
+        };
         return new Vector4F(c.R / 255f, c.G / 255f, c.B / 255f, (float)Math.Max(m.GrainScale, 0.5));
     }
 
     internal static Vector4F ResponseOf(MaterialBrush m)
     {
-        var c = TreatmentOf(m.Material) == MaterialTreatment.Metal ? m.EnvironmentColor : m.SheenColor;
+        var c = TreatmentOf(m.Material) switch
+        {
+            MaterialTreatment.Metal => m.EnvironmentColor,
+            MaterialTreatment.Wood => m.LateWoodColor,
+            _ => m.SheenColor
+        };
         return new Vector4F(c.R / 255f, c.G / 255f, c.B / 255f, (float)Math.Clamp(m.Roughness, 0.0, 1.0));
     }
+
+    /// <summary>The wood's two discriminators as ONE number: the cut, plus 4 when the board is varnished. One field
+    /// because there is one free component and two things to say - and they ARE one question, "what kind of wooden face
+    /// is this", decoded once at the top of the pass.</summary>
+    internal static float FigureCodeOf(MaterialBrush m) => (float)m.Cut + (m.Varnished ? 4f : 0f);
 
     // Degrees on the brush, RADIANS in the record: the shader takes a direction, and turning it there would be a
     // conversion per fragment for a number that is the same across the whole instance.
@@ -230,7 +253,7 @@ internal sealed class MaterialRectCollector : SdfBatchCollector<MaterialRectItem
         (float)(m.GrainDirection * Math.PI / 180.0),
         (float)(m.LightAngle * Math.PI / 180.0),
         (float)Math.Clamp(m.LightElevation, 0.0, 1.0),
-        (float)Math.Clamp(m.Anisotropy, 0.0, 1.0));
+        TreatmentOf(m.Material) == MaterialTreatment.Wood ? FigureCodeOf(m) : 0f);
 
     protected override void DrawSegment(IGraphicsDevice device, Buffer<MaterialRectItem> buffer, uint count, uint firstInstance, Matrix4x4F projection)
     {

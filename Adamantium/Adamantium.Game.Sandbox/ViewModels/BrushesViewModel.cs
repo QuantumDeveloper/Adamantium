@@ -400,6 +400,8 @@ public partial class BrushesViewModel : TabPageViewModel
     [Bindable] private Color _materialNapColor = new Color(38, 20, 54, 255);
     [Bindable] private Color _materialSheenColor = new Color(228, 214, 255, 255);
     [Bindable] private Color _materialMetalColor = new Color(196, 199, 202, 255);
+    [Bindable] private Color _materialEarlyWoodColor = new Color(198, 158, 106, 255);
+    [Bindable] private Color _materialLateWoodColor = new Color(120, 78, 42, 255);
     [Bindable] private Color _materialEnvironmentColor = new Color(226, 228, 231, 255);
     [Bindable] private double _materialGrainScale = 6;
     [Bindable] private double _materialGrainDirection = 0;
@@ -452,6 +454,11 @@ public partial class BrushesViewModel : TabPageViewModel
                 MetalPreset ??= MetalPresets[0];
                 ApplyMetal(MetalPreset);
                 break;
+
+            case MaterialType.Wood:
+                WoodPreset ??= WoodPresets[0];
+                ApplyWood(WoodPreset);
+                break;
         }
     }
 
@@ -491,7 +498,35 @@ public partial class BrushesViewModel : TabPageViewModel
         MaterialGrainScale = metal.Grain;
     }
 
+    /// <summary>The four cuts, as one list. Not four patterns but one seen from four planes - which is why they are a
+    /// choice on the material rather than four materials.</summary>
+    public WoodCut[] WoodCuts { get; } = Enum.GetValues<WoodCut>();
+
+    [Bindable] private WoodCut _materialWoodCut = WoodCut.Flat;
+    [Bindable] private bool _materialVarnished = true;
+
+    partial void OnMaterialWoodCutChanged(WoodCut value) => LiveMaterial.Cut = value;
+    partial void OnMaterialVarnishedChanged(bool value) => LiveMaterial.Varnished = value;
+
+    public WoodPreset[] WoodPresets { get; } = WoodPreset.All;
+
+    [Bindable] private WoodPreset _woodPreset;
+
+    partial void OnWoodPresetChanged(WoodPreset value) => ApplyWood(value);
+
+    private void ApplyWood(WoodPreset wood)
+    {
+        if (wood == null) return;
+
+        MaterialEarlyWoodColor = wood.Early;
+        MaterialLateWoodColor = wood.Late;
+        MaterialGrainScale = wood.RingScale;
+        MaterialRoughness = wood.Gloss;
+    }
+
     partial void OnMaterialMetalColorChanged(Color value) => LiveMaterial.MetalColor = value;
+    partial void OnMaterialEarlyWoodColorChanged(Color value) => LiveMaterial.EarlyWoodColor = value;
+    partial void OnMaterialLateWoodColorChanged(Color value) => LiveMaterial.LateWoodColor = value;
     partial void OnMaterialEnvironmentColorChanged(Color value) => LiveMaterial.EnvironmentColor = value;
     partial void OnMaterialGrainScaleChanged(double value) => LiveMaterial.GrainScale = value;
     partial void OnMaterialGrainDirectionChanged(double value) => LiveMaterial.GrainDirection = value;

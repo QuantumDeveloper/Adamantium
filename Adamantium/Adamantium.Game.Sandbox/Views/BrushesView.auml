@@ -175,21 +175,21 @@
                          is not really there, turning the light changes nothing. -->
                     <StackPanel Orientation="Vertical"
                                 Visibility="{Binding MaterialKind, Converter={conv:MaterialKnobVisibilityConverter}, ConverterParameter=Surface}">
-                        <TextBlock Text="Grain scale — px per fibre clump, or per scratch of the grinding"
+                        <TextBlock Text="Grain scale — px per fibre clump, per scratch of the grinding, or per annual ring"
                                    Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2" TextWrapping="WrapByWords"/>
                         <StackPanel Orientation="Horizontal" MarginBottom="10">
                             <Slider Minimum="1" Maximum="40" Value="{Binding MaterialGrainScale, Mode=TwoWay}" Width="240"/>
                             <TextBlock Text="{Binding MaterialGrainScale}" MarginLeft="8" Width="48"/>
                         </StackPanel>
 
-                        <TextBlock Text="Grain direction — which way the pile is combed, or the grinding runs"
+                        <TextBlock Text="Grain direction — which way the pile is combed, the grinding runs, or the trunk lay"
                                    Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2" TextWrapping="WrapByWords"/>
                         <StackPanel Orientation="Horizontal" MarginBottom="10">
                             <Slider Minimum="0" Maximum="360" Value="{Binding MaterialGrainDirection, Mode=TwoWay}" Width="240"/>
                             <TextBlock Text="{Binding MaterialGrainDirection}" MarginLeft="8" Width="48"/>
                         </StackPanel>
 
-                        <TextBlock Text="Roughness — 0 is a mirror; on cloth it is how far the sheen spreads"
+                        <TextBlock Text="Roughness — 0 is a mirror; on cloth how far the sheen spreads, on wood the varnish"
                                    Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2" TextWrapping="WrapByWords"/>
                         <StackPanel Orientation="Horizontal" MarginBottom="10">
                             <Slider Minimum="0" Maximum="1" Value="{Binding MaterialRoughness, Mode=TwoWay}" Width="240"/>
@@ -238,6 +238,32 @@
                         <TextBlock Text="Environment — what it reflects. Procedural: behind a UI there is no room"
                                    Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2" TextWrapping="WrapByWords"/>
                         <ColorPickerButton Width="48" Height="32" SelectedColor="{Binding MaterialEnvironmentColor, Mode=TwoWay}" MarginBottom="10"/>
+                    </StackPanel>
+
+                    <!-- WOOD. Two colours rather than one: a ring is a broad pale band closed by a narrow dark one, and
+                         the contrast between them is what tells oak from walnut. -->
+                    <StackPanel Orientation="Vertical"
+                                Visibility="{Binding MaterialKind, Converter={conv:MaterialKnobVisibilityConverter}, ConverterParameter=Wood}">
+                        <TextBlock Text="Timber — a starting point; every knob above stays free"
+                                   Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2" TextWrapping="WrapByWords"/>
+                        <DropDown ItemsSource="{Binding WoodPresets}" SelectedItem="{Binding WoodPreset, Mode=TwoWay}"
+                                  Width="270" MarginBottom="10"/>
+
+                        <TextBlock Text="Cut — where the saw crossed the rings. Same tree, four figures"
+                                   Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2" TextWrapping="WrapByWords"/>
+                        <DropDown ItemsSource="{Binding WoodCuts}" SelectedItem="{Binding MaterialWoodCut, Mode=TwoWay}"
+                                  Width="270" MarginBottom="10"/>
+
+                        <CheckBox Content="Varnished — a clear coat that shows the room and glares along the edge"
+                                  IsChecked="{Binding MaterialVarnished, Mode=TwoWay}" MarginBottom="10"/>
+
+                        <TextBlock Text="Early wood — the broad pale band grown in spring"
+                                   Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2" TextWrapping="WrapByWords"/>
+                        <ColorPickerButton Width="48" Height="32" SelectedColor="{Binding MaterialEarlyWoodColor, Mode=TwoWay}" MarginBottom="10"/>
+
+                        <TextBlock Text="Late wood — the narrow dark band that closes each ring"
+                                   Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2" TextWrapping="WrapByWords"/>
+                        <ColorPickerButton Width="48" Height="32" SelectedColor="{Binding MaterialLateWoodColor, Mode=TwoWay}" MarginBottom="10"/>
                     </StackPanel>
 
                     <StackPanel Orientation="Vertical"

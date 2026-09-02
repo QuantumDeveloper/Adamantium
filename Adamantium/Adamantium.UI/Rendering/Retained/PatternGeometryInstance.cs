@@ -41,6 +41,8 @@ public struct PatternGeometryInstance
     public Vector4F Noise;
 
     /// <summary>.x = the offset subtracted from the live clock while animating (the brush's own phase); .y = the phase to hold
-    /// while NOT animating. .zw spare.</summary>
+    /// while NOT animating. .z spare; .w carries the ROUNDED CLIP's slot when this record holds a MATERIAL - so a
+    /// material on a mesh has NO free component here, which is why the wood pass cannot be told which cut to draw.
+    /// </summary>
     public Vector4F Anim;
 }

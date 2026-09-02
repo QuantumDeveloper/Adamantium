@@ -45,7 +45,10 @@ struct MaterialRectData
     float4 Clip;         // .x = the ROUNDED CLIP's slot, or -1; .yzw spare
     float4 Surface;      // SURFACES: .rgb what it is made of (cloth colour / metal F0), .a grain scale in device px
     float4 Response;     // SURFACES: .rgb what it answers light with (sheen colour / environment), .a roughness
-    float4 Light;        // SURFACES: .x grain direction (rad), .y light angle (rad), .z elevation, .w anisotropy
+    float4 Light;        // SURFACES: .x grain direction (rad), .y light angle (rad), .z elevation, .w the WOOD's figure
+                         // code - the cut, plus 4 when varnished. Spare here because the anisotropy that used to sit in
+                         // it is read by nobody; the mesh carrier keeps its clip slot in the same component, which is
+                         // why the mesh wood pass cannot be told either thing
 };
 
 // ---------------------------------------------------------------------------------------------------------------
@@ -363,6 +366,169 @@ float4 MetalSurface(float2 p, float2 halfExtent, float2 bevelTilt, float4 surfac
     return float4(ToneRollOff(env + spec), 1.0);
 }
 
+// ---- WOOD ------------------------------------------------------------------------------------------------------
+// The odd one of the branch. Velvet and metal are lighting models over a plain colour; wood is a PATTERN that happens
+// to be lit, and getting the pattern right matters far more here than getting the lobe right.
+//
+// What the pattern IS: a tree lays down one ring a year - a broad pale band while it grows fast in spring, closed by a
+// narrow dense dark one in summer - and those rings are concentric cylinders about the trunk's core. A board is a
+// SLICE through that stack, so its face shows where the cut plane crossed the cylinders. That is the whole reason
+// timber shows arches rather than stripes, and it is why this is built from a distance to an axis rather than from a
+// stripe function: stripes are what a plane parallel to the rings would give, and nobody saws boards that way.
+//
+// THREE noise evaluations, and that is a budget rather than a taste: this file already lost launches to
+// vkCreateShadersEXT once, and the fix was to spend fewer taps (see NoiseD). One tap wanders the core, one roughens the
+// rings, one draws the fibre.
+float4 WoodSurface(float2 p, float2 halfExtent, float2 bevelTilt, float4 surface, float4 response, float4 light)
+{
+    // The figure code, unpacked: the cut, and 4 added on top when the board carries a finish.
+    float varnished = step(3.5, light.w);
+    float cut = light.w - varnished * 4.0;
+
+    float s = max(surface.a, 0.5);
+    float dir = light.x;
+
+    float2 axis = float2(cos(dir), sin(dir));     // along the grain: the trunk's length
+    float2 across = float2(-axis.y, axis.x);
+
+    float u = dot(p, axis) / s;
+    float v = dot(p, across) / s;
+
+    // TWO TAPS, TAKEN ONCE, before the cut is chosen. Branching to take extra samples is how this file lost launches
+    // before, so the budget stays fixed no matter which way the plank was sawn.
+    float3 wander = NoiseD(float2(u * 0.11, 0.0));
+    float3 rough = NoiseD(float2(u * 0.45, v * 0.45));
+
+    // THE RING'S FOOTPRINT, MEASURED HERE - before any branch, and from the COORDINATES rather than from the distance
+    // built out of them. Two things depend on that order. Screen derivatives taken inside divergent control flow are
+    // undefined by the rules and, on this driver, produce a shader that will not create at all; and computing every
+    // cut just to keep the flow straight makes the shader heavy enough that the driver dies creating it anyway - which
+    // is exactly the pair of failures this function has already caused. Measured at the source, the branch below is
+    // free to be a branch. It is an ANTI-ALIASING width, so a footprint within a factor of the true one is enough.
+    float w = max(length(fwidth(float2(u, v))), 0.0015);
+
+    // WHERE THE CORE IS, WHICH IS THE WHOLE OF THE CUT. The rings never change: they are cylinders about the trunk's
+    // axis, and every one of these four figures is that same distance-to-the-axis seen from a different plane - which
+    // is why they share one formula and differ only in where the axis is put.
+    float r;
+
+    if (cut < 0.5)
+    {
+        // PLAIN SAWN: the plane runs BESIDE the core without meeting it. A trunk leans, tapers and bends, so its axis
+        // wanders relative to the face - and the arches everybody pictures as wood are the places where that wandering
+        // axis comes closest to the board and the rings close into a nest. A straight axis gives dead parallel bands.
+        float centre = wander.x * 7.0 - 3.5;
+        float depth = 1.2 + wander.x * 3.0;
+        r = length(float2(v - centre, depth)) + rough.x * 0.75;
+    }
+    else if (cut < 1.5)
+    {
+        // QUARTER SAWN: the plane passes THROUGH the core, so it meets every ring square on and they land as narrow,
+        // evenly spaced lines running the length of the board. No arch is possible here - that is the point of the cut -
+        // and the small wander is all that keeps them from looking ruled.
+        r = v + wander.x * 0.9 + rough.x * 0.2;
+    }
+    else if (cut < 2.5)
+    {
+        // END GRAIN: the plane is ACROSS the trunk, so the cylinders show as what they are - rings about the core.
+        r = length(float2(u, v)) + rough.x * 0.5;
+    }
+    else
+    {
+        // BURL: a knot of dormant buds where the grain has no direction left. Not a clean cut through an orderly log,
+        // so the distance itself is dragged about before the rings are taken from it.
+        r = length(float2(u, v) + float2(wander.x - 0.5, rough.x - 0.5) * 9.0) + rough.x * 2.5;
+    }
+
+    // EACH YEAR, and the sharp edge is real. The step from summer's dense wood back to the next spring's open growth is
+    // abrupt in the timber, which is why a ring reads as a LINE; the soft edge is the other side of the same band.
+    // Widened by the footprint above so that a plate seen small washes to the average colour instead of shimmering -
+    // the same discipline as the metal lobe, and needed for the same reason.
+    float ring = frac(r);
+    float late = smoothstep(0.72 - w, 0.86, ring) * (1.0 - smoothstep(1.0 - w, 1.0, ring));
+
+    // Past the point where a whole ring falls inside one pixel there is nothing left to resolve, so stop pretending and
+    // settle on the proportion of late wood a ring actually has. Without this the rings alias into moire.
+    late = lerp(late, 0.28, saturate(w * 2.0 - 0.35));
+
+    // THE FIBRE: cells run ALONG the trunk, so the streaks must be long that way and fine across it. Same field as the
+    // rings, read with the axes swapped in scale - which is all "grain" means here.
+    float3 fibre = NoiseD(float2(u * 0.30, v * 8.0));
+
+    float3 colour = lerp(surface.rgb, response.rgb, saturate(late));
+    colour *= 0.88 + fibre.x * 0.24;
+
+    // The relief is the FIBRE and not the rings: on a planed board the rings are colour, while the open pores of spring
+    // growth are what a fingernail catches. Shallow, and shallower still where the fibre is finer than the pixel.
+    float2 g = axis * (fibre.y * 0.30) + across * (fibre.z * 8.0);
+    float damp = saturate(1.0 / (1.0 + length(fwidth(float2(u * 0.30, v * 8.0))) * 3.0));
+    float3 n = normalize(float3(-g * 0.035 * damp, 1.0));
+
+    // The chamfer, folded into that same normal - and on wood it does more work than on metal, because a clear coat
+    // reflects almost nothing head-on and almost everything at a grazing angle. The rim is therefore where a finish
+    // ANNOUNCES itself, and a plank without one is where a raw board is easiest to tell from a lacquered one.
+    n = normalize(float3(n.xy + bevelTilt, n.z));
+
+    float3 l = BranchLight(light);
+    float3 vdir = float3(0.0, 0.0, 1.0);
+    float3 h = normalize(l + vdir);
+
+    float wrap = saturate((dot(n, l) + 0.35) / 1.35);
+    float3 body = colour * (0.55 + 0.45 * wrap);
+
+    // How much the normal varies within this pixel, taken HERE - outside the finish branch below, for the same reason
+    // the ring's footprint is taken before the cut is chosen.
+    float nVariance = length(fwidth(n));
+
+    // RAW TIMBER STOPS HERE, and stops for real: bare wood has no film on it to reflect anything, however smoothly it
+    // is planed, so the finish is a separate answer from the roughness rather than a value of it. A branch and not a
+    // blend, because everything below - a full specular lobe and a room reflection - is worth skipping outright, and
+    // that weight is what once made this shader too much for the driver to create.
+    if (varnished < 0.5) return float4(ToneRollOff(body), 1.0);
+
+    float NoV = abs(dot(n, vdir)) + 1e-5;
+    float NoL = saturate(dot(n, l));
+    float NoH = saturate(dot(n, h));
+    float VoH = saturate(dot(vdir, h));
+
+    float perceptual = clamp(response.a, 0.06, 1.0);
+    float a = saturate(perceptual * perceptual + nVariance * 0.5);
+    float at = max(a, 0.002);
+
+    // Wood is a DIELECTRIC, so unlike metal it keeps BOTH lobes: the colour above is what its body scatters back, and
+    // the clear coat sits on top with an F0 of 0.04 - the same for every finish, because gloss and satin differ in
+    // roughness, not in reflectance.
+    const float3 coatF0 = float3(0.04, 0.04, 0.04);
+
+    float3 varnish = MetalDistribution(at, at, dot(axis, h.xy), dot(across, h.xy), NoH)
+                   * MetalVisibility(at, at, dot(axis, vdir.xy), dot(across, vdir.xy), NoV,
+                                     dot(axis, l.xy), dot(across, l.xy), NoL)
+                   * MetalFresnel(coatF0, VoH) * NoL;
+
+    varnish = varnish / (1.0 + max(varnish.r, max(varnish.g, varnish.b)));
+
+    // AND THE ROOM IN IT, which is what was missing. A single light over a nearly flat board gives a highlight that is
+    // the SAME everywhere - an even wash, not a highlight at all, and the reason the varnish could not be seen. What
+    // makes a polished surface read as polished is that you can see the room in it, and the room's reflection VARIES
+    // across the board because the room is at a finite distance. The same near-field argument metal needed.
+    float2 uv = p / max(halfExtent, float2(1.0, 1.0));
+    float3 rdir = reflect(-vdir, n);
+
+    const float roomDistance = 1.7;
+    float upness = clamp((uv.y + rdir.y * roomDistance) / (1.0 + roomDistance) * 2.0, -1.0, 1.0);
+
+    float3 sharp = StudioEnvironment(upness, float3(0.86, 0.87, 0.9));
+    float3 blurred = StudioEnvironment(0.0, float3(0.86, 0.87, 0.9));
+    float3 room = lerp(sharp, blurred, saturate(perceptual * 1.6));
+
+    // Schlick over the coat, and the grazing rise is the whole point: about four per cent head-on, nearly everything
+    // edge-on. That is why a polished table looks like wood from above and like a mirror from across the room, and it
+    // is what lights the chamfer up.
+    float3 fres = MetalFresnel(coatF0, NoV);
+
+    return float4(ToneRollOff(lerp(body, room, fres) + varnish), 1.0);
+}
+
 struct MaterialPSInput
 {
     float4 Position : SV_Position;
@@ -609,6 +775,37 @@ float4 MaterialMetalPS(MaterialPSInput input) : SV_Target
 }
 
 
+[shader("fragment")]
+float4 MaterialWoodPS(MaterialPSInput input) : SV_Target
+{
+    MaterialRectData* items = (MaterialRectData*)InstancesAddress;
+    MaterialRectData it = items[input.InstId];
+
+    float isPolygon = step(it.Params.x, -1.5);
+    float isEllipse = step(it.Params.x, -0.0001) * (1.0 - isPolygon);
+    float lim = min(input.Half.x, input.Half.y);
+    float4 r4 = lerp(min(input.Radii, float4(lim, lim, lim, lim)), input.Radii, isPolygon);
+    float d = BrushShapeDistance(input.Local, input.Half, r4, 2, isEllipse + isPolygon * 2.0);
+
+    // The chamfer, from the shape's own distance field - the same one the metal takes. It matters more here: a clear
+    // coat reflects almost nothing head-on and almost everything at a grazing angle, so the turned rim is where a
+    // finish shows itself at all.
+    // The chamfer, from the shape's own distance field - the same one the metal takes. It matters more here: a clear
+    // coat reflects almost nothing head-on and almost everything at a grazing angle, so the turned rim is where a
+    // finish shows itself at all.
+    const float bevelWidth = 9.0;   // device px of eased edge
+    float2 outward = GlassSlope(d, input.Local);
+    float rise = GlassCurve(d, bevelWidth);
+    float4 surface = WoodSurface(input.Local, input.Half, outward * rise * 0.9,
+                                 it.Surface, it.Response, it.Light);
+
+    // No film grain - see the metal pass: a surface has no capture whose banding would need hiding.
+    float4 painted = CompositeFillStroke(d, float4(saturate(surface.rgb), it.Params.z), it.StrokeColor,
+                                         it.Stroke0.x * input.Scale, it.Stroke0.y, 1.0, 0.0);
+    return float4(painted.rgb, painted.a * input.Fade * ClipCoverage(input.Position.xy, input.ClipBox, input.ClipRadii));
+}
+
+
 // ---- THE SAME MATERIALS ON ARBITRARY GEOMETRY -----------------------------------------------------------------
 // An authored outline arrives as triangles, so these passes do LESS than the analytic ones above: no distance field, no
 // radii, no edge to anti-alias - coverage IS the geometry. What remains is the material itself: read the capture, tint,
@@ -752,6 +949,38 @@ float4 MaterialMetalMeshPS(MaterialMeshPSInput input) : SV_Target
 }
 
 
+[shader("fragment")]
+float4 MaterialWoodMeshPS(MaterialMeshPSInput input) : SV_Target
+{
+    PatternGeomData* items = (PatternGeomData*)InstancesAddress;
+    PatternGeomData it = items[input.InstId];
+
+    float2 halfSize = max(it.LocalBounds.zw * 0.5, float2(1.0, 1.0));
+    float2 centred = input.Local - (it.LocalBounds.xy + halfSize);
+
+    // The chamfer from the bounding box, as the metal and glass mesh passes take it: an authored outline has no
+    // distance field here, so the turn follows the box rather than the true edge.
+    float2 fromCentre = centred / halfSize;
+    float edge = saturate(max(abs(fromCentre.x), abs(fromCentre.y)));
+    float rise = saturate((edge - 0.82) / 0.18);
+    float len = length(fromCentre);
+    float2 outward = len > 1e-5 ? fromCentre / len : float2(0.0, 0.0);
+
+    // ONE FIGURE ONLY on this carrier, and pinned here on purpose. The figure code rides the light's fourth component,
+    // and on THIS record that component is the rounded clip's slot - a number that would decode into a nonsense cut and
+    // a nonsense finish. So a wooden path or star is plain sawn and varnished, whatever the brush says. It is a real
+    // limitation, written up in the tech debt rather than hidden: the record has nothing spare, and giving it a field
+    // of its own is what loses the device.
+    float4 pinnedLight = float4(it.Anim.xyz, 4.0);   // Flat + varnished
+
+    float4 surface = WoodSurface(centred, halfSize, outward * rise * rise * 0.9,
+                                 it.Color2, it.Noise, pinnedLight);
+
+    // No film grain - see the SDF pass.
+    return float4(saturate(surface.rgb), input.Fade * it.Color3.w * ClipCoverage(input.Position.xy, input.ClipBox, input.ClipRadii));
+}
+
+
 // =====================================================================================================================
 // TECHNIQUE - one pass per TREATMENT and CARRIER. Frosted serves both Acrylic and Mica: they differ in what is CAPTURED,
 // not in what is done with it. Glass bends the same capture instead of scattering it. Sheen reads no capture at all - it
@@ -814,6 +1043,20 @@ technique Material
         Profile = 6.6;
         VertexShader = MaterialFillVS;
         PixelShader = MaterialMetalMeshPS;
+    }
+
+    pass WoodSdf
+    {
+        Profile = 6.6;
+        VertexShader = MaterialRectInstancedVS;
+        PixelShader = MaterialWoodPS;
+    }
+
+    pass WoodMesh
+    {
+        Profile = 6.6;
+        VertexShader = MaterialFillVS;
+        PixelShader = MaterialWoodMeshPS;
     }
 
 }

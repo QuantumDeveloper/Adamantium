@@ -1130,9 +1130,9 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
             foreach (var (seg, first, count, wallpaper, treatment, region, source, anchor) in rec.MatKeys)
             {
                 // NO backdrop, NO draw - the same refusal the textured runs make, and for the same reason: a pass that
-                // samples an unbound descriptor paints whatever was left there. A SHEEN reads no backdrop at all, so
-                // the refusal does not apply to it: asking would refuse every velvet surface there is.
-                if (treatment is not (Core.Media.MaterialTreatment.Sheen or Core.Media.MaterialTreatment.Metal)
+                // samples an unbound descriptor paints whatever was left there. The SURFACES read no backdrop at all,
+                // so the refusal does not apply to them: asking would refuse every velvet surface there is.
+                if (MaterialRectCollector.NeedsBackdrop(treatment)
                     && !Backdrop.BindSource(_device, wallpaper, region, source, anchor,
                         material.SourceTexture, material.SourceSampler, material.SourceUv)) continue;
                 material.InstancesAddress.SetValue(seg.MatGpu.GetDeviceAddress() + (ulong)(first * PatInstanceStride));
@@ -1143,6 +1143,7 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
                     Core.Media.MaterialTreatment.Glass => material.MaterialGlassMeshPass,
                     Core.Media.MaterialTreatment.Sheen => material.MaterialSheenMeshPass,
                     Core.Media.MaterialTreatment.Metal => material.MaterialMetalMeshPass,
+                    Core.Media.MaterialTreatment.Wood => material.MaterialWoodMeshPass,
                     _ => material.MaterialFrostedMeshPass
                 }).Apply();
                 if (seg.Indexed)
