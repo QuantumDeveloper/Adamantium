@@ -588,7 +588,7 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
         double opacity, int transformSlot, int fadeSlot, int clipSlot)
     {
         var box = localBounds.Width > 0 && localBounds.Height > 0 ? localBounds : new Rect(0, 0, 1, 1);
-        var layout = ImageTiling.Layout(brush, box, local.M11, local.M22);
+        var layout = ImageTiling.Layout(brush, box, local.M11, local.M22, TextureBatchCollector.SourceIsSlice(brush));
 
         var tint = brush.Tint.ToVector4();
         tint.W *= (float)(opacity * brush.Opacity);

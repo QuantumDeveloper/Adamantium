@@ -315,7 +315,10 @@ public partial class BrushesViewModel : TabPageViewModel
         new NineSliceSkin("Studded panel", "nine-slice-frame.png"),
         new NineSliceSkin("Stone blocks", "nine-slice-stone.png"),
         new NineSliceSkin("Sci-fi plating", "nine-slice-scifi.png"),
-        new NineSliceSkin("Gilded parchment", "nine-slice-parchment.png")
+        new NineSliceSkin("Gilded parchment", "nine-slice-parchment.png"),
+        // ...and one that is NOT a picture: a drawing, rasterised to order before it is cut. The brush stays raster, so
+        // what this one is for is checking that the raster it gets is made at the resolution the FRAME needs.
+        NineSliceSkin.Vector()
     ];
 
     [Bindable] private NineSliceSkin _skin;

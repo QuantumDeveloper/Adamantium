@@ -19,7 +19,12 @@ internal static class ImageTiling
 {
     private static readonly Vector4F WholeTile = new(0, 0, 1, 1);
 
-    public static TileLayout Layout(TileBrush brush, Rect bounds, double scaleX, double scaleY)
+    /// <param name="sourceIsSlice">The texture this layout will sample holds ONLY the viewbox's slice of the source,
+    /// baked at that slice's own resolution (a vector source - see <see cref="SliceOf"/>). Everything about the fit is
+    /// unchanged; only the final uv is re-expressed, because the sub-rectangle it names has become the whole picture.
+    /// A raster source is never sliced - its pixels exist once, at their own resolution, and cropping them costs
+    /// nothing to sample.</param>
+    public static TileLayout Layout(TileBrush brush, Rect bounds, double scaleX, double scaleY, bool sourceIsSlice = false)
     {
         var content = brush.ContentSize;
         var repeats = brush.TileMode != TileMode.None;
@@ -66,8 +71,25 @@ internal static class ImageTiling
             }
         }
 
+        // The picture the shader will sample IS the slice, so the uv computed above - a sub-rectangle of the whole
+        // drawing - has to be restated as a fraction OF THE SLICE. Usually that is the whole texture; it stays a
+        // sub-rectangle when UniformToFill cropped the slice further to the tile's aspect.
+        if (sourceIsSlice)
+        {
+            var slice = Viewbox(brush, content);
+            if (slice is { Z: > 0, W: > 0 })
+            {
+                uv = new Vector4F((uv.X - slice.X) / slice.Z, (uv.Y - slice.Y) / slice.W, uv.Z / slice.Z, uv.W / slice.W);
+            }
+        }
+
         return new TileLayout(uv, tile, drawn, rotation, Mirror(brush.TileMode), repeats);
     }
+
+    /// <summary>The viewbox as a 0..1 rectangle of the source - what a tile actually shows. Public because a VECTOR
+    /// source is baked to exactly this slice: baking the whole drawing and then sampling a tenth of it is a tenth of
+    /// the resolution, which is the blur a small viewbox used to bring with it.</summary>
+    public static Vector4F SliceOf(TileBrush brush) => Viewbox(brush, brush.ContentSize);
 
     private static readonly Vector4F NoRotation = new(1, 0, 0, 1);
 
@@ -118,7 +140,13 @@ internal static class ImageTiling
     /// twice - which is why Stretch did nothing at all on a drawing.</summary>
     public static Size BakeSize(TileBrush brush, Size box)
     {
-        var content = brush.ContentSize;
+        // The unit being fitted is the VIEWBOX's slice, not the whole drawing: a tile shows the slice, so the slice is
+        // what has to arrive at the tile's resolution. Sizing the whole picture instead meant a viewbox of 0.3 baked
+        // its visible part at a third of the pixels the tile draws - measured on the stand as an edge that took 2 px
+        // to cross where a full viewbox took 1.
+        var slice = SliceOf(brush);
+        var whole = brush.ContentSize;
+        var content = new Size(whole.Width * slice.Z, whole.Height * slice.W);
         if (content.Width <= 0 || content.Height <= 0 || box.Width <= 0 || box.Height <= 0)
         {
             return box;

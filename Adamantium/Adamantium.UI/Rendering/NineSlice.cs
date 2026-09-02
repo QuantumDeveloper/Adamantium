@@ -20,13 +20,74 @@ internal static class NineSlice
         _ => 1
     };
 
+    // A vector source cannot be baked bigger than this on either axis. The rule below asks what each BAND needs, and a
+    // thin ornament magnified by a thick Border asks for a lot: a corner drawn at 40px from 2% of the source wants a
+    // 2000px picture, of which only the four corners are ever seen at that density. Past this the corner softens instead
+    // of the frame costing 16MB of render target, which is the trade a raster brush is entitled to make.
+    private const double MaxBakeLength = 2048;
+
+    /// <summary>The size a VECTOR source has to be baked at to dress this shape - in LOGICAL units, the device scale
+    /// being the raster cache's business. The sibling of <see cref="ImageTiling.BakeSize"/>, and needed for the same
+    /// reason: the picture a fill samples is made to order, so somebody has to say how big to make it.
+    /// <para>What makes a FRAME different from a fill is that its pieces are not drawn at the shape's scale. A corner is
+    /// drawn at <see cref="NineSliceBrush.Border"/> however large the panel is, so baking at the shape's size - which is
+    /// what a fill wants, and what this used to do - spends the resolution on the middle and leaves the corners as
+    /// whatever is left over. So each band is asked what it needs and the largest answer wins: a band drawn N units long
+    /// out of a fraction F of the source needs N/F of source to be 1:1.</para></summary>
+    public static Size BakeSize(NineSliceBrush brush, Size shape)
+    {
+        var source = brush?.Source;
+        if (source == null) return shape;
+
+        var (sourceWidth, sourceHeight) = PixelSize(source);
+        if (sourceWidth <= 0 || sourceHeight <= 0) return shape;
+
+        var slice = Clamp(brush.Slice);
+        var border = brush.Border;
+
+        // A REPEATED edge draws its motif at the motif's own size however long the strip is, so it never asks for more
+        // than the source already has; only a STRETCHED one grows with the shape.
+        var repeat = brush.EdgeMode != NineSliceEdgeMode.Stretch;
+
+        return new Size(
+            Axis(border.Left > 0 ? border.Left : slice.Left * sourceWidth,
+                border.Right > 0 ? border.Right : slice.Right * sourceWidth,
+                slice.Left, slice.Right, shape.Width, sourceWidth, repeat),
+            Axis(border.Top > 0 ? border.Top : slice.Top * sourceHeight,
+                border.Bottom > 0 ? border.Bottom : slice.Bottom * sourceHeight,
+                slice.Top, slice.Bottom, shape.Height, sourceHeight, repeat));
+    }
+
+    // The most demanding band on one axis, in source units. A band drawn `length` long out of a `fraction` of the source
+    // is 1:1 when the source is length/fraction across.
+    private static double Axis(double near, double far, double nearFraction, double farFraction, double shapeLength,
+        double sourceLength, bool repeat)
+    {
+        var middleFraction = Math.Max(0, 1 - nearFraction - farFraction);
+        var middle = repeat ? middleFraction * sourceLength : Math.Max(0, shapeLength - near - far);
+
+        var needed = 0.0;
+        if (nearFraction > 0) needed = Math.Max(needed, near / nearFraction);
+        if (farFraction > 0) needed = Math.Max(needed, far / farFraction);
+        if (middleFraction > 0) needed = Math.Max(needed, middle / middleFraction);
+
+        // No band asked for anything (every fraction zero, or the shape has no room): the source's own size is the only
+        // honest answer left.
+        return needed <= 0 ? sourceLength : Math.Min(needed, MaxBakeLength);
+    }
+
     /// <summary>Cut <paramref name="bounds"/> (already in WORLD/device space) into the nine pieces.
     /// <para>The corners are drawn at <see cref="NineSliceBrush.Border"/>, or - unset - at the size the slice fractions
     /// give against the source's own pixels, which is the 1:1 case. When the shape is too small for its own corners the
     /// border is scaled DOWN proportionally rather than letting opposite corners overlap and draw each other's pixels;
     /// this is what CSS border-image does too, and it is the difference between a skin that degrades and one that
     /// smears.</para></summary>
-    public static TextureItem[] Bake(NineSliceBrush brush, Rect bounds, double opacity, int transformSlot, int fadeSlot, double scaleX = 1.0, double scaleY = 1.0)
+    /// <param name="texels">The size of the texture actually bound for this fill, for the half-texel inset below; unset
+    /// means the source states its own. For a BITMAP the two are the same number; for a VECTOR the source has no texels
+    /// at all and the texture is a bake, so they part company - one count used to answer both "how big is a corner"
+    /// (source units) and "how wide is a texel" (texture), and only the first of those is the source's to answer.</param>
+    public static TextureItem[] Bake(NineSliceBrush brush, Rect bounds, double opacity, int transformSlot, int fadeSlot,
+        double scaleX = 1.0, double scaleY = 1.0, Size texels = default)
     {
         var source = brush.Source;
         if (source == null) return null;
@@ -37,6 +98,10 @@ internal static class NineSlice
         // wrong by that factor.
         var (sourceWidth, sourceHeight) = PixelSize(source);
         if (sourceWidth <= 0 || sourceHeight <= 0) return null;
+
+        // TEXELS of the texture that will be sampled - the same numbers for a bitmap, the BAKE's for a vector.
+        var texelWidth = texels.Width > 0 ? texels.Width : sourceWidth;
+        var texelHeight = texels.Height > 0 ? texels.Height : sourceHeight;
 
         var slice = Clamp(brush.Slice);
 
@@ -101,8 +166,8 @@ internal static class NineSlice
                 // very edge blends in the texel BEYOND it - the neighbouring piece's pixels. On a tiled edge that lands
                 // at every wrap of frac(), which draws a thin line at each tile seam. Pulling the range in to the texel
                 // CENTRES removes it, and costs nothing in the shader.
-                var uv = Inset(us[column], dus[column], sourceWidth);
-                var vv = Inset(vs[row], dvs[row], sourceHeight);
+                var uv = Inset(us[column], dus[column], texelWidth);
+                var vv = Inset(vs[row], dvs[row], texelHeight);
 
                 items.Add(new TextureItem
                 {
@@ -128,8 +193,10 @@ internal static class NineSlice
     private static double Whole(double repeats, bool round)
         => round ? Math.Max(1, Math.Round(repeats)) : repeats;
 
-    // The source's size in TEXELS. A bitmap states it outright; anything else can only offer its logical size, which for
-    // a source with no pixels of its own (a future drawing/visual brush) is the honest answer anyway.
+    // The source's size in ITS OWN units - what a corner is 1:1 at, and what one repeat of an edge motif spans. A bitmap
+    // states it in texels; a drawing has no texels and states its own extent, which is the unit its author cut it in.
+    // NOT the texture's texel count: for a vector those are the bake's, and a bake is made to fit, so reading a corner's
+    // size out of it would make the corner change size whenever the panel did.
     private static (double Width, double Height) PixelSize(ImageSource source) => source switch
     {
         BitmapSource bitmap => (bitmap.PixelWidth, bitmap.PixelHeight),

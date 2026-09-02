@@ -248,7 +248,7 @@ public class GeometryRenderComponent : UIRenderComponent
 
         // The mesh is in LOCAL units and the world scale is applied by the vertex shader, so a tile is sized against the
         // scale here - otherwise the picture would tile by local units and change density with the element's scale.
-        var layout = ImageTiling.Layout(image, box, world.M11, world.M22);
+        var layout = ImageTiling.Layout(image, box, world.M11, world.M22, TextureBatchCollector.SourceIsSlice(image));
         var tint = image.Tint.ToVector4();
         tint.W *= (float)image.Opacity;
 
