@@ -121,7 +121,7 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
         // and the frame region the capture is taken from. A disagreement about either of the first two ends the run.
         public bool MatPending;
         public bool MatWallpaper;
-        public bool MatGlass;
+        public Core.Media.MaterialTreatment MatTreatment;
         public Rect2D MatRegion;
         public ITexture MatSource;          // a picture of the author's own, replacing the built-in source
         public MaterialAnchor MatAnchor;    // and what it is pinned to, which decides the mapping
@@ -161,8 +161,8 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
         public readonly List<(KeySegment Seg, uint First, uint Count, ITexture Texture)> TexKeys = new();
         // Material runs carry the whole description of their source: which image (a capture of the frame, or the
         // desktop), which pass reads it, and which region the capture is taken from.
-        public readonly List<(KeySegment Seg, uint First, uint Count, bool Wallpaper, bool Glass, Rect2D Region,
-            ITexture Source, MaterialAnchor Anchor)> MatKeys = new();
+        public readonly List<(KeySegment Seg, uint First, uint Count, bool Wallpaper, Core.Media.MaterialTreatment Treatment,
+            Rect2D Region, ITexture Source, MaterialAnchor Anchor)> MatKeys = new();
         public readonly List<IRenderUnit> Units = new();
         public Rect2D Scissor;
 
@@ -695,11 +695,11 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
         if (seg == null) return false;
 
         var wallpaper = MaterialRectCollector.IsWallpaper(brush.Material);
-        var glass = MaterialRectCollector.IsGlass(brush.Material);
+        var treatment = MaterialRectCollector.TreatmentOf(brush.Material);
         var source = unit.BrushTexture();
         var anchor = brush.Anchor;
         if (seg.MatPending && seg.MatCount > seg.MatFlushed
-            && (seg.MatWallpaper != wallpaper || seg.MatGlass != glass || !ReferenceEquals(seg.MatSource, source)
+            && (seg.MatWallpaper != wallpaper || seg.MatTreatment != treatment || !ReferenceEquals(seg.MatSource, source)
                 || (source != null && seg.MatAnchor != anchor))) return false;
 
         if (seg.MatCount + 1 > seg.MatItems.Length) Array.Resize(ref seg.MatItems, seg.MatItems.Length * 2);
@@ -723,7 +723,7 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
             FadeSlotFor(unit), source != null && anchor == MaterialAnchor.Element, clipSlot);
         seg.MatRegion = seg.MatPending ? Union(seg.MatRegion, captureRegion) : captureRegion;
         seg.MatWallpaper = wallpaper;
-        seg.MatGlass = glass;
+        seg.MatTreatment = treatment;
         seg.MatSource = source;
         seg.MatAnchor = anchor;
         seg.MatPending = true;
@@ -760,6 +760,13 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
 
     // The same PatternGeomData slots the pattern bake fills, carrying the material's numbers: tint in Color1 (alpha = its
     // strength), blur / grain / refraction in Color3 - as MaterialRectCollector bakes them for the analytic shapes.
+    // The light's three numbers plus the clip slot in the fourth: this carrier has one field left and both need it.
+    private static Vector4F LightWithClip(MaterialBrush brush, int clipSlot)
+    {
+        var light = MaterialRectCollector.LightOf(brush);
+        return new Vector4F(light.X, light.Y, light.Z, clipSlot);
+    }
+
     private static PatternGeometryInstance BuildMaterialInstance(MaterialBrush brush, Matrix4x4F local, Rect localBounds,
         double opacity, int transformSlot, int fadeSlot, bool pinnedToElement, int clipSlot)
     {
@@ -775,13 +782,15 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
             // The tint's ALPHA carries TintOpacity - how much the tint covers the capture - while the element's own
             // opacity rides the fill's alpha in Color3.w, since here the coverage is the geometry rather than a field.
             Color1 = new Vector4F(tint.R / 255f, tint.G / 255f, tint.B / 255f, (float)Math.Clamp(brush.TintOpacity, 0.0, 1.0)),
-            Color2 = Vector4F.Zero,
+            // The NAP, in the three fields a material otherwise leaves empty. Same numbers as the SDF carrier bakes,
+            // from the same helpers, so a velvet path and a velvet rectangle wear one cloth.
+            Color2 = MaterialRectCollector.SurfaceOf(brush),
             Color3 = new Vector4F((float)brush.BlurAmount, (float)brush.NoiseAmount, (float)brush.Refraction,
                 (float)Math.Clamp(opacity * brush.Opacity, 0.0, 1.0)),
-            Noise = Vector4F.Zero,
-            // .w = the rounded ancestor clip's slot (-1 = none): this carrier shares PatternGeomData with the pattern
-            // fill, so it reads the clip from the same place - see BuildPatternInstance.
-            Anim = new Vector4F(0, 0, 0, clipSlot)
+            Noise = MaterialRectCollector.ResponseOf(brush),
+            // .xyz the nap and the light; .w = the rounded ancestor clip's slot (-1 = none): this carrier shares
+            // PatternGeomData with the pattern fill, so it reads the clip from the same place - see BuildPatternInstance.
+            Anim = LightWithClip(brush, clipSlot)
         };
     }
 
@@ -895,7 +904,7 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
             {
                 if (!SceneClean || seg.MatRecreated)
                     seg.MatGpu.SetData(seg.MatItems.AsSpan(seg.MatFlushed, mcount), (uint)(seg.MatFlushed * PatInstanceStride));
-                rec.MatKeys.Add((seg, (uint)seg.MatFlushed, (uint)mcount, seg.MatWallpaper, seg.MatGlass, seg.MatRegion,
+                rec.MatKeys.Add((seg, (uint)seg.MatFlushed, (uint)mcount, seg.MatWallpaper, seg.MatTreatment, seg.MatRegion,
                     seg.MatSource, seg.MatAnchor));
                 seg.MatFlushed = seg.MatCount;
                 seg.MatPending = false;   // the run is closed; the next source starts a fresh one
@@ -1118,16 +1127,24 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
             material.Projection.SetValue(projection);
             material.TransformsAddress.SetValue(TransformsAddress);
             _device.SetScissors(rec.Scissor);
-            foreach (var (seg, first, count, wallpaper, glass, region, source, anchor) in rec.MatKeys)
+            foreach (var (seg, first, count, wallpaper, treatment, region, source, anchor) in rec.MatKeys)
             {
                 // NO backdrop, NO draw - the same refusal the textured runs make, and for the same reason: a pass that
-                // samples an unbound descriptor paints whatever was left there.
-                if (!Backdrop.BindSource(_device, wallpaper, region, source, anchor,
+                // samples an unbound descriptor paints whatever was left there. A SHEEN reads no backdrop at all, so
+                // the refusal does not apply to it: asking would refuse every velvet surface there is.
+                if (treatment is not (Core.Media.MaterialTreatment.Sheen or Core.Media.MaterialTreatment.Metal)
+                    && !Backdrop.BindSource(_device, wallpaper, region, source, anchor,
                         material.SourceTexture, material.SourceSampler, material.SourceUv)) continue;
                 material.InstancesAddress.SetValue(seg.MatGpu.GetDeviceAddress() + (ulong)(first * PatInstanceStride));
                 _device.SetVertexBuffer(seg.VtxBuffer);
                 _device.PrimitiveTopology = seg.Topology;
-                (glass ? material.MaterialGlassMeshPass : material.MaterialFrostedMeshPass).Apply();
+                (treatment switch
+                {
+                    Core.Media.MaterialTreatment.Glass => material.MaterialGlassMeshPass,
+                    Core.Media.MaterialTreatment.Sheen => material.MaterialSheenMeshPass,
+                    Core.Media.MaterialTreatment.Metal => material.MaterialMetalMeshPass,
+                    _ => material.MaterialFrostedMeshPass
+                }).Apply();
                 if (seg.Indexed)
                     _device.DrawIndexed(seg.VtxBuffer, seg.IdxBuffer, instanceCount: count, indexCount: seg.IndexCount);
                 else

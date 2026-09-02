@@ -159,11 +159,85 @@
                         <TextBlock Text="{Binding MaterialStroke}" MarginLeft="8" Width="48"/>
                     </StackPanel>
 
-                    <TextBlock Text="Tint strength — glass takes its colour from behind, so keep it low there"
-                               Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2" TextWrapping="WrapByWords"/>
-                    <StackPanel Orientation="Horizontal" MarginBottom="10">
-                        <Slider Minimum="0" Maximum="1" Value="{Binding MaterialTintOpacity, Mode=TwoWay}" Width="240"/>
-                        <TextBlock Text="{Binding MaterialTintOpacity}" MarginLeft="8" Width="48"/>
+                    <StackPanel Orientation="Vertical"
+                                Visibility="{Binding MaterialKind, Converter={conv:MaterialKnobVisibilityConverter}, ConverterParameter=Tint}">
+                        <TextBlock Text="Tint strength — glass takes its colour from behind, so keep it low there"
+                                   Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2" TextWrapping="WrapByWords"/>
+                        <StackPanel Orientation="Horizontal" MarginBottom="10">
+                            <Slider Minimum="0" Maximum="1" Value="{Binding MaterialTintOpacity, Mode=TwoWay}" Width="240"/>
+                            <TextBlock Text="{Binding MaterialTintOpacity}" MarginLeft="8" Width="48"/>
+                        </StackPanel>
+                    </StackPanel>
+
+                    <!-- THE SURFACE BRANCH. Velvet and metal share the grain and the light - they describe one lit
+                         surface and differ only in the BRDF that reads it - so those knobs are shown for both. The
+                         light ones are what the branch is proved on: a flat rectangle has one normal, so if the relief
+                         is not really there, turning the light changes nothing. -->
+                    <StackPanel Orientation="Vertical"
+                                Visibility="{Binding MaterialKind, Converter={conv:MaterialKnobVisibilityConverter}, ConverterParameter=Surface}">
+                        <TextBlock Text="Grain scale — px per fibre clump, or per scratch of the grinding"
+                                   Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2" TextWrapping="WrapByWords"/>
+                        <StackPanel Orientation="Horizontal" MarginBottom="10">
+                            <Slider Minimum="1" Maximum="40" Value="{Binding MaterialGrainScale, Mode=TwoWay}" Width="240"/>
+                            <TextBlock Text="{Binding MaterialGrainScale}" MarginLeft="8" Width="48"/>
+                        </StackPanel>
+
+                        <TextBlock Text="Grain direction — which way the pile is combed, or the grinding runs"
+                                   Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2" TextWrapping="WrapByWords"/>
+                        <StackPanel Orientation="Horizontal" MarginBottom="10">
+                            <Slider Minimum="0" Maximum="360" Value="{Binding MaterialGrainDirection, Mode=TwoWay}" Width="240"/>
+                            <TextBlock Text="{Binding MaterialGrainDirection}" MarginLeft="8" Width="48"/>
+                        </StackPanel>
+
+                        <TextBlock Text="Roughness — 0 is a mirror; on cloth it is how far the sheen spreads"
+                                   Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2" TextWrapping="WrapByWords"/>
+                        <StackPanel Orientation="Horizontal" MarginBottom="10">
+                            <Slider Minimum="0" Maximum="1" Value="{Binding MaterialRoughness, Mode=TwoWay}" Width="240"/>
+                            <TextBlock Text="{Binding MaterialRoughness}" MarginLeft="8" Width="48"/>
+                        </StackPanel>
+
+                        <TextBlock Text="Light angle — where the light comes from"
+                                   Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2" TextWrapping="WrapByWords"/>
+                        <StackPanel Orientation="Horizontal" MarginBottom="10">
+                            <Slider Minimum="0" Maximum="360" Value="{Binding MaterialLightAngle, Mode=TwoWay}" Width="240"/>
+                            <TextBlock Text="{Binding MaterialLightAngle}" MarginLeft="8" Width="48"/>
+                        </StackPanel>
+
+                        <TextBlock Text="Light elevation — 0 grazes the nap, 1 flattens it"
+                                   Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2" TextWrapping="WrapByWords"/>
+                        <StackPanel Orientation="Horizontal" MarginBottom="10">
+                            <Slider Minimum="0" Maximum="1" Value="{Binding MaterialLightElevation, Mode=TwoWay}" Width="240"/>
+                            <TextBlock Text="{Binding MaterialLightElevation}" MarginLeft="8" Width="48"/>
+                        </StackPanel>
+
+                    </StackPanel>
+
+                    <StackPanel Orientation="Vertical"
+                                Visibility="{Binding MaterialKind, Converter={conv:MaterialKnobVisibilityConverter}, ConverterParameter=Nap}">
+                        <TextBlock Text="Cloth colour" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
+                        <ColorPickerButton Width="48" Height="32" SelectedColor="{Binding MaterialNapColor, Mode=TwoWay}" MarginBottom="10"/>
+
+                        <TextBlock Text="Sheen colour — the light caught on the tips of the fibres"
+                                   Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2" TextWrapping="WrapByWords"/>
+                        <ColorPickerButton Width="48" Height="32" SelectedColor="{Binding MaterialSheenColor, Mode=TwoWay}" MarginBottom="10"/>
+                    </StackPanel>
+
+                    <!-- METAL. Steel, gold and chrome are THIS material with other numbers - that is what separates
+                         them, so they are knobs rather than six entries in the dropdown. -->
+                    <StackPanel Orientation="Vertical"
+                                Visibility="{Binding MaterialKind, Converter={conv:MaterialKnobVisibilityConverter}, ConverterParameter=Metal}">
+                        <TextBlock Text="Metal — a starting point; every knob below stays free"
+                                   Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2" TextWrapping="WrapByWords"/>
+                        <DropDown ItemsSource="{Binding MetalPresets}" SelectedItem="{Binding MetalPreset, Mode=TwoWay}"
+                                  Width="270" MarginBottom="10"/>
+
+                        <TextBlock Text="Metal colour — grey is steel, yellow is gold, pink is copper"
+                                   Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2" TextWrapping="WrapByWords"/>
+                        <ColorPickerButton Width="48" Height="32" SelectedColor="{Binding MaterialMetalColor, Mode=TwoWay}" MarginBottom="10"/>
+
+                        <TextBlock Text="Environment — what it reflects. Procedural: behind a UI there is no room"
+                                   Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2" TextWrapping="WrapByWords"/>
+                        <ColorPickerButton Width="48" Height="32" SelectedColor="{Binding MaterialEnvironmentColor, Mode=TwoWay}" MarginBottom="10"/>
                     </StackPanel>
 
                     <StackPanel Orientation="Vertical"
@@ -185,11 +259,14 @@
                         </StackPanel>
                     </StackPanel>
 
-                    <TextBlock Text="Grain — hides the banding an 8-bit capture brings"
-                               Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2" TextWrapping="WrapByWords"/>
-                    <StackPanel Orientation="Horizontal" MarginBottom="10">
-                        <Slider Minimum="0" Maximum="0.2" Value="{Binding MaterialGrain, Mode=TwoWay}" Width="240"/>
-                        <TextBlock Text="{Binding MaterialGrain}" MarginLeft="8" Width="48"/>
+                    <StackPanel Orientation="Vertical"
+                                Visibility="{Binding MaterialKind, Converter={conv:MaterialKnobVisibilityConverter}, ConverterParameter=FilmGrain}">
+                        <TextBlock Text="Grain — hides the banding an 8-bit capture brings"
+                                   Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2" TextWrapping="WrapByWords"/>
+                        <StackPanel Orientation="Horizontal" MarginBottom="10">
+                            <Slider Minimum="0" Maximum="0.2" Value="{Binding MaterialGrain, Mode=TwoWay}" Width="240"/>
+                            <TextBlock Text="{Binding MaterialGrain}" MarginLeft="8" Width="48"/>
+                        </StackPanel>
                     </StackPanel>
 
                     <TextBlock Text="Tint colour" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>

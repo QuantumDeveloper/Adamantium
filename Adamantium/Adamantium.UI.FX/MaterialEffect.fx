@@ -43,7 +43,325 @@ struct MaterialRectData
     float4 Stroke0;      // .x width (LOGICAL units - scaled by Scale below), .y alignment
     float4 Stroke1;      // dash offset / trim / flags: this batch bakes only whole solid pens, so they stay at default
     float4 Clip;         // .x = the ROUNDED CLIP's slot, or -1; .yzw spare
+    float4 Surface;      // SURFACES: .rgb what it is made of (cloth colour / metal F0), .a grain scale in device px
+    float4 Response;     // SURFACES: .rgb what it answers light with (sheen colour / environment), .a roughness
+    float4 Light;        // SURFACES: .x grain direction (rad), .y light angle (rad), .z elevation, .w anisotropy
 };
+
+// ---------------------------------------------------------------------------------------------------------------
+// SHEEN: a lit SURFACE, and the only treatment here that looks at nothing behind it. Three decisions, taken once for
+// the whole surface branch (velvet now; suede, wool and felt are this with a coarser nap):
+//
+//   1. THE NORMAL COMES FROM A NOISE FIELD. A flat rectangle has one normal over its whole area, so any lighting model
+//      applied to it collapses into a flat fill. The noise is read as the HEIGHT of the nap and its gradient is the
+//      normal - which is why this is a surface and not a gradient with a highlight painted on.
+//   2. THE LIGHT IS A BRUSH PROPERTY. The view is fixed and orthographic (down -Z), so a scene light would be a
+//      pretence: one direction and one elevation are the honest amount of state.
+//   3. NOTHING IS CAPTURED. Velvet does not answer "what is behind me", it answers "what am I made of", so it is
+//      priced like a pattern.
+//
+/// Value noise WITH ITS DERIVATIVE, from one evaluation. The four corner hashes that give the height also give the
+/// slope, because a bilinear-smoothstep interpolant has a closed-form gradient - so a relief costs one lookup rather
+/// than the three or four TAPS central differences would need.
+///
+/// That difference is a measurement, not a preference: the first version sampled simplex noise four times per fragment,
+/// and once a second surface material shared the file vkCreateShadersEXT began failing on launch after launch - the
+/// driver ceiling this file already warns about, and the reason materials are a separate effect at all.
+///
+/// Returns (height, d/dx, d/dy).
+float3 NoiseD(float2 p)
+{
+    float2 i = floor(p);
+    float2 f = p - i;
+
+    float a = Hash21(i);
+    float b = Hash21(i + float2(1.0, 0.0));
+    float c = Hash21(i + float2(0.0, 1.0));
+    float d = Hash21(i + float2(1.0, 1.0));
+
+    float2 u = f * f * (3.0 - 2.0 * f);
+    float2 du = 6.0 * f * (1.0 - f);
+
+    float k1 = b - a;
+    float k2 = c - a;
+    float k3 = a - b - c + d;
+
+    return float3(a + k1 * u.x + k2 * u.y + k3 * u.x * u.y,
+                  du.x * (k1 + k3 * u.y),
+                  du.y * (k2 + k3 * u.x));
+}
+
+// ---------------------------------------------------------------------------------------------------------------
+// TWO RELIEFS, ON PURPOSE. Velvet and metal are not one material with different numbers - a pile of fibres and a ground
+// steel face have nothing in common but the fact that both are lit. What they may share is the RECORD they are packed
+// into; what they must not share is how they look. An earlier version gave them one field, and velvet came out looking
+// like brushed metal - which is the whole objection to it.
+
+/// VELVET's nap: an irregular field, stretched 4:1 so the fibres lie combed. Simplex, sampled around the fragment,
+/// because cloth wants a field with no period in it at all - a cheaper wave sum reads as corduroy at once.
+float NapHeight(float2 p, float scale, float dir)
+{
+    float2 axis = float2(cos(dir), sin(dir));
+    float2 along = float2(dot(p, axis), dot(p, float2(-axis.y, axis.x)) * 4.0);
+    return SimplexNoise(along / max(scale, 0.5));
+}
+
+float3 NapNormal(float2 p, float scale, float dir)
+{
+    float e = max(scale * 0.35, 0.5);
+    float dx = NapHeight(p + float2(e, 0), scale, dir) - NapHeight(p - float2(e, 0), scale, dir);
+    float dy = NapHeight(p + float2(0, e), scale, dir) - NapHeight(p - float2(0, e), scale, dir);
+
+    return normalize(float3(-dx * 2.2, -dy * 2.2, 1.0));
+}
+
+/// METAL's grinding: scratches, not fibres - far more stretched, far shallower, and taken from the cheap noise whose
+/// derivative comes with it.
+///
+/// <para>DAMPED where the scratches fall below a pixel: fine grinding on a scrolling panel goes under the sampling rate
+/// and boils, a shimmer far worse than the detail is worth. fwidth says how much of the field one pixel spans; past one
+/// period there is nothing left to resolve and the relief is faded to flat rather than aliased.</para>
+float3 MetalNormal(float2 p, float scale, float dir)
+{
+    float2 axis = float2(cos(dir), sin(dir));
+    float2 across = float2(-axis.y, axis.x);
+
+    // Fixed, and generous: the scratches of a ground face run one way. It is the RELIEF that is directional here - the
+    // reflection lobe is not, see MetalSurface.
+    const float stretch = 16.0;
+
+    float s = max(scale, 0.5);
+    float2 q = float2(dot(p, axis) / (s * stretch), dot(p, across) / s);
+
+    float3 n = NoiseD(q);
+    float2 g = axis * (n.y / (s * stretch)) + across * (n.z / s);
+
+    // SHALLOW. A scratch tilts the surface by a few degrees; deepening it to make the scale knob legible was tried and
+    // made the plate worse, not better - it stops being a ground face and starts being a landscape.
+    float footprint = length(fwidth(q));
+    float depth = 0.06 * saturate(1.0 / (1.0 + footprint * 3.0));
+
+    return normalize(float3(-g * depth * s, 1.0));
+}
+
+// The light, as the whole branch states it: a direction on the surface plus an elevation, with 0 grazing and 1 straight
+// on. Grazing is what lights a nap and what makes a metal's grinding visible; overhead flattens both.
+float3 BranchLight(float4 light)
+{
+    float elev = saturate(light.z);
+    float2 dir = float2(cos(light.y), sin(light.y));
+    return normalize(float3(dir * (1.0 - elev), max(elev, 0.08)));
+}
+
+/// The Charlie sheen distribution glTF states as KHR_materials_sheen. What makes velvet velvet is in the exponent:
+/// brightness rises towards GRAZING angles, so the rim of a fold lights up while its face stays dark - the opposite of
+/// an ordinary specular lobe, and the reason a plain Blinn-Phong here looks like plastic.
+float SheenD(float ndoth, float roughness)
+{
+    float a = max(roughness, 0.07);
+    float invR = 1.0 / a;
+    float sin2 = max(1.0 - ndoth * ndoth, 0.0001);
+    return (2.0 + invR) * pow(sin2, invR * 0.5) / 6.2831853;
+}
+
+// Ashikhmin's visibility term - the cheap one the sheen extension names, and enough here: there is one light and no
+// shadowing geometry to speak of.
+float SheenV(float ndotl, float ndotv)
+{
+    return 1.0 / max(4.0 * (ndotl + ndotv - ndotl * ndotv), 0.0001);
+}
+
+/// The whole surface, in the shape's own device-pixel space. Shared by both carriers so a velvet rectangle and a velvet
+/// path cannot drift apart in appearance - the only thing that differs between them is how coverage is found.
+float4 SheenSurface(float2 p, float4 surface, float4 response, float4 light)
+{
+    float3 n = NapNormal(p, surface.a, light.x);
+
+    float3 l = BranchLight(light);
+    float3 v = float3(0.0, 0.0, 1.0);
+    float3 h = normalize(l + v);
+
+    float ndotl = saturate(dot(n, l));
+    float ndotv = saturate(dot(n, v));
+    float ndoth = saturate(dot(n, h));
+
+    // The cloth itself: a soft wrap rather than a hard Lambert, because a nap scatters light round its own fibres and a
+    // clamped cosine would leave half of it dead black.
+    float wrap = saturate((dot(n, l) + 0.6) / 1.6);
+    float3 body = surface.rgb * (0.25 + 0.75 * wrap);
+
+    float3 gleam = response.rgb * (SheenD(ndoth, response.a) * SheenV(ndotl, ndotv) * ndotl);
+
+    return float4(body + gleam, 1.0);
+}
+
+// ---------------------------------------------------------------------------------------------------------------
+// METAL: the same lit surface, answering with the other half - a GGX lobe stretched along the grinding, and something
+// to REFLECT. The third of the branch's shared decisions lives here: what a metal reflects is PROCEDURAL. Behind a user
+// interface there is no world, so a capture would give a mirror of the window rather than of a room.
+
+/// The studio: floor below, sky above, a bright band where they meet. Taken by a single "how far up is this ray
+/// looking" number, from -1 to 1.
+///
+/// <para>Which number that is, is the whole difference between a plate that reads as metal and one that reads as paint.
+/// The obvious answer - the REFLECTED RAY's height - is wrong here and was tried: the view is fixed and orthographic
+/// down -Z and the surface is flat, so every fragment reflects almost straight up, the environment comes back the same
+/// colour everywhere, and what is left is a flat fill with one needle of a highlight crawling over it. That needle was
+/// also the flicker.</para>
+///
+/// <para>A real plate sweeps its environment ACROSS ITSELF: the far edge shows the floor, the near edge the sky, and the
+/// grinding only shakes that sweep. So the ray's height is where the fragment sits on the plate, tilted by the relief -
+/// which is what the caller composes.</para>
+float3 StudioEnvironment(float h, float3 sky)
+{
+    // A room, not a two-tone card. The floor is DIM but never black - a plate in a lit room still gets light from below,
+    // and a near-black floor is what once turned the grinding into hard black bars. The range between them is what
+    // makes metal read as metal, though: too narrow and the plate goes back to looking like painted plastic.
+    float3 ground = sky * 0.30;
+    float3 horizon = sky * 1.30;   // the band where they meet is the brightest thing in the room
+    float t = saturate(h * 0.5 + 0.5);
+    return lerp(lerp(ground, horizon, saturate(t * 2.0)), sky, saturate(t * 2.0 - 1.0));
+}
+
+// ---- A METAL'S BRDF, written as one --------------------------------------------------------------------------
+// Cook-Torrance with an ANISOTROPIC GGX, in the forms Filament states them. A metal has no diffuse lobe at all: every
+// photon it returns is a specular reflection, and its colour IS its reflectance at normal incidence. So the whole
+// appearance is D, G and F over one light plus what it reflects of the room - nothing else, and no tuning constants.
+
+/// Anisotropic GGX normal distribution. Two roughnesses instead of one - along the grinding and across it - and that
+/// difference is the whole of a brushed finish: the highlight is smeared into a long streak perpendicular to the
+/// scratches, because the microfacets scatter widely in one direction and hardly at all in the other.
+float MetalDistribution(float at, float ab, float ToH, float BoH, float NoH)
+{
+    float a2 = at * ab;
+    float3 d = float3(ab * ToH, at * BoH, a2 * NoH);
+    float d2 = max(dot(d, d), 1e-8);
+    float b2 = a2 / d2;
+    return a2 * b2 * b2 * (1.0 / 3.14159265);
+}
+
+/// Height-correlated Smith visibility for that distribution - the shadowing/masking term WITH the 1/(4 NoL NoV)
+/// denominator already folded in, which is why the specular below multiplies rather than divides.
+float MetalVisibility(float at, float ab, float ToV, float BoV, float NoV, float ToL, float BoL, float NoL)
+{
+    float lambdaV = NoL * length(float3(at * ToV, ab * BoV, NoV));
+    float lambdaL = NoV * length(float3(at * ToL, ab * BoL, NoL));
+    return 0.5 / max(lambdaV + lambdaL, 1e-5);
+}
+
+/// Schlick's Fresnel over a metal's F0 - for a conductor that is its colour, which is why gold reflects gold.
+float3 MetalFresnel(float3 f0, float u)
+{
+    float f = pow(1.0 - u, 5.0);
+    return f0 + (1.0 - f0) * f;
+}
+
+/// Bring the plate back into the range a display holds WITHOUT losing its colour. A display clips per channel, and
+/// per-channel clipping is colour-blind: gold reflects nearly all of the red it is given and less than half of the blue,
+/// so as it brightens the red pins at white while the blue is still climbing, and every metal converges on the same pale
+/// plate - which is exactly why gold, copper and steel were telling each other apart on paper and not on screen.
+/// Scaling all three channels by the SAME factor, chosen from the colour's own peak, keeps the ratio between them - and
+/// that ratio is the whole of what makes gold gold. Below the knee a display is honest and nothing is touched.
+float3 ToneRollOff(float3 c)
+{
+    const float knee = 0.75;
+
+    float peak = max(c.r, max(c.g, c.b));
+    if (peak <= knee) return c;
+
+    float mapped = knee + (1.0 - knee) * (1.0 - exp(-(peak - knee) / (1.0 - knee)));
+    return c * (mapped / peak);
+}
+
+/// <param name="bevelTilt">Which way, and how hard, the EDGE turns the surface over. Zero in the middle of the plate.
+/// A milled plate has a chamfer, and that chamfer is where a metal announces itself: the face reflects one part of the
+/// room, and the edge - being turned - reflects a quite different one, so a bright rim appears against the field. It is
+/// the one place on a flat plate where the normal genuinely changes, which is why leaving it out left the material
+/// leaning on the room sweep alone.</param>
+float4 MetalSurface(float2 p, float2 halfExtent, float2 bevelTilt, float4 surface, float4 response, float4 light)
+{
+    float3 n = MetalNormal(p, surface.a, light.x);
+
+    // The chamfer, folded into the same normal everything else reads - so the highlight, the room and the scratches all
+    // agree about which way the surface faces there, instead of the rim being painted on afterwards.
+    n = normalize(float3(n.xy + bevelTilt, n.z));
+
+    float3 l = BranchLight(light);
+    float3 v = float3(0.0, 0.0, 1.0);
+    float3 h = normalize(l + v);
+
+    // The grinding's own frame: tangent along it, bitangent across.
+    float3 t = normalize(float3(cos(light.x), sin(light.x), 0.0));
+    float3 b = normalize(cross(n, t));
+    t = normalize(cross(b, n));
+
+    // ONE roughness. An anisotropic lobe was here and is gone: stretching it changed the highlight's shape on paper but
+    // barely anything on screen, because under a fixed orthographic view with a single light there is no sweep of angles
+    // for the long axis to show itself over. A knob whose effect cannot be seen is worse than no knob, so what remains
+    // directional in this material is the RELIEF, which is visible, and not the lobe, which was not.
+    float perceptual = clamp(response.a, 0.045, 1.0);
+    float a = perceptual * perceptual;
+
+    // ...widened by however much the normal varies WITHIN the pixel. Not a fudge: a pixel covering a spread of normals
+    // must show the average of what they reflect, and a wider lobe IS that average. Without it a narrow lobe is
+    // enormously bright over a very narrow range of normals, and every scroll step makes pixels jump on and off the
+    // highlight - the crawling fireflies.
+    float3 dnx = ddx(n);
+    float3 dny = ddy(n);
+    a = saturate(a + (dot(dnx, dnx) + dot(dny, dny)) * 0.5);
+
+    float at = max(a, 0.002);
+    float ab = at;
+
+    float NoV = abs(dot(n, v)) + 1e-5;
+    float NoL = saturate(dot(n, l));
+    float NoH = saturate(dot(n, h));
+    float VoH = saturate(dot(v, h));
+
+    // THE LIGHT, through the anisotropic lobe. D x V x F, with the visibility term already carrying 1/(4 NoL NoV).
+    // This - not the environment - is what makes a brushed plate look brushed: the lobe is long across the scratches,
+    // so one light source is smeared into a band right across them.
+    float3 f0 = surface.rgb;
+    float3 spec = MetalDistribution(at, ab, dot(t, h), dot(b, h), NoH)
+                * MetalVisibility(at, ab, dot(t, v), dot(b, v), NoV, dot(t, l), dot(b, l), NoL)
+                * MetalFresnel(f0, VoH) * NoL;
+
+    // THE ROOM, and it is a NEAR room. A conductor has no diffuse lobe, so everything it shows away from the highlight
+    // is reflected - and how that reflection varies across the plate is the whole difference between metal and paint.
+    //
+    // Under a fixed orthographic view a FLAT plate has one normal, so every point reflects the same DIRECTION. With the
+    // environment at infinity that makes the plate one flat colour, which is exactly what it looked like. But a room is
+    // not at infinity: the ray leaving each point travels a finite distance before it lands, so points at the top of
+    // the plate look at the ceiling and points at the bottom at the floor. That is why a real steel panel carries a
+    // soft vertical sweep of the room across itself.
+    //
+    // NOT curvature, and the difference matters: a curved bar changes the NORMAL, which would also bend the highlight
+    // and warp the scratches. Here the normal stays flat and only the point of the room being looked at moves - which
+    // is what finite distance means.
+    float2 uv = p / max(halfExtent, float2(1.0, 1.0));   // -1..1 across the plate
+    float3 r = reflect(-v, n);
+
+    const float roomDistance = 1.7;   // in plate half-heights: how far the walls stand off
+    float upness = clamp((uv.y + r.y * roomDistance) / (1.0 + roomDistance) * 2.0, -1.0, 1.0);
+
+    // Prefiltered by roughness the cheap way the split-sum approximation allows: a rough surface averages the room over
+    // a wide lobe, and the average of this environment is its own mid-tone. A polished plate keeps the sweep sharp; a
+    // satin one washes it towards flat, which is the honest difference between the two finishes.
+    float3 sharp = StudioEnvironment(upness, response.rgb);
+    float3 blurred = StudioEnvironment(0.0, response.rgb);
+    float3 env = lerp(sharp, blurred, saturate(perceptual * 1.6)) * MetalFresnel(f0, NoV);
+
+    // ROLL THE HIGHLIGHT OFF instead of clipping it. A GGX peak at low roughness is worth hundreds, and a display holds
+    // one - so without this the light has a knife-edge range: a few degrees of blow-out to white, and outside them no
+    // highlight at all and nothing left but a flat reflection. Compressing by the highlight's own peak channel makes it
+    // saturate towards the METAL'S OWN COLOUR and keeps it legible across the whole sweep of the light.
+    //
+    // Only the specular. The environment is already inside the display's range, and compressing it too would drag the
+    // whole plate grey - which is the "dull, cannot make out the surface" end of the same complaint.
+    spec = spec / (1.0 + max(spec.r, max(spec.g, spec.b)));
+
+    return float4(ToneRollOff(env + spec), 1.0);
+}
 
 struct MaterialPSInput
 {
@@ -241,6 +559,56 @@ float4 MaterialGlassPS(MaterialPSInput input) : SV_Target
 }
 
 
+[shader("fragment")]
+float4 MaterialSheenPS(MaterialPSInput input) : SV_Target
+{
+    MaterialRectData* items = (MaterialRectData*)InstancesAddress;
+    MaterialRectData it = items[input.InstId];
+
+    float isPolygon = step(it.Params.x, -1.5);
+    float isEllipse = step(it.Params.x, -0.0001) * (1.0 - isPolygon);
+    float lim = min(input.Half.x, input.Half.y);
+    float4 r4 = lerp(min(input.Radii, float4(lim, lim, lim, lim)), input.Radii, isPolygon);
+    float d = BrushShapeDistance(input.Local, input.Half, r4, 2, isEllipse + isPolygon * 2.0);
+
+    // The grain is read in the SHAPE's own space, not the frame's: cloth belongs to the thing it covers, so a velvet
+    // pane scrolled across the window keeps its weave instead of swimming through a fixed field.
+    float4 surface = SheenSurface(input.Local, it.Surface, it.Response, it.Light);
+
+    // No film grain: see the metal pass - a surface has no capture whose banding would need hiding.
+    float4 painted = CompositeFillStroke(d, float4(saturate(surface.rgb), it.Params.z), it.StrokeColor,
+                                         it.Stroke0.x * input.Scale, it.Stroke0.y, 1.0, 0.0);
+    return float4(painted.rgb, painted.a * input.Fade * ClipCoverage(input.Position.xy, input.ClipBox, input.ClipRadii));
+}
+
+
+[shader("fragment")]
+float4 MaterialMetalPS(MaterialPSInput input) : SV_Target
+{
+    MaterialRectData* items = (MaterialRectData*)InstancesAddress;
+    MaterialRectData it = items[input.InstId];
+
+    float isPolygon = step(it.Params.x, -1.5);
+    float isEllipse = step(it.Params.x, -0.0001) * (1.0 - isPolygon);
+    float lim = min(input.Half.x, input.Half.y);
+    float4 r4 = lerp(min(input.Radii, float4(lim, lim, lim, lim)), input.Radii, isPolygon);
+    float d = BrushShapeDistance(input.Local, input.Half, r4, 2, isEllipse + isPolygon * 2.0);
+
+    // THE CHAMFER, from the shape's own distance field: which way is out, and how far into the bevel this fragment is.
+    // Squared, so the face stays flat and the turn happens in the last few pixels rather than as a dome.
+    const float bevelWidth = 9.0;   // device px of milled edge
+    float2 outward = GlassSlope(d, input.Local);
+    float rise = GlassCurve(d, bevelWidth);
+    float4 surface = MetalSurface(input.Local, input.Half, outward * rise * 0.9, it.Surface, it.Response, it.Light);
+
+    // No film grain here. It exists to hide the banding an 8-bit CAPTURE brings, and a surface captures nothing - adding
+    // it would be noise laid over a material that already has its own.
+    float4 painted = CompositeFillStroke(d, float4(saturate(surface.rgb), it.Params.z), it.StrokeColor,
+                                         it.Stroke0.x * input.Scale, it.Stroke0.y, 1.0, 0.0);
+    return float4(painted.rgb, painted.a * input.Fade * ClipCoverage(input.Position.xy, input.ClipBox, input.ClipRadii));
+}
+
+
 // ---- THE SAME MATERIALS ON ARBITRARY GEOMETRY -----------------------------------------------------------------
 // An authored outline arrives as triangles, so these passes do LESS than the analytic ones above: no distance field, no
 // radii, no edge to anti-alias - coverage IS the geometry. What remains is the material itself: read the capture, tint,
@@ -344,10 +712,51 @@ float4 MaterialGlassMeshPS(MaterialMeshPSInput input) : SV_Target
 }
 
 
+[shader("fragment")]
+float4 MaterialSheenMeshPS(MaterialMeshPSInput input) : SV_Target
+{
+    PatternGeomData* items = (PatternGeomData*)InstancesAddress;
+    PatternGeomData it = items[input.InstId];
+
+    // The same surface the SDF pass draws, read in the mesh's own local space so a velvet path and a velvet rectangle
+    // wear the same cloth. Color2 / Noise / Anim.xyz carry the nap here - this carrier shares its record with the
+    // pattern fill, and those are the fields a material leaves untouched.
+    float2 halfSize = max(it.LocalBounds.zw * 0.5, float2(1.0, 1.0));
+    float2 centred = input.Local - (it.LocalBounds.xy + halfSize);
+    float4 surface = SheenSurface(centred, it.Color2, it.Noise, it.Anim);
+
+    // No film grain - see the SDF pass: a surface has no capture whose banding would need hiding.
+    return float4(saturate(surface.rgb), input.Fade * it.Color3.w * ClipCoverage(input.Position.xy, input.ClipBox, input.ClipRadii));
+}
+
+[shader("fragment")]
+float4 MaterialMetalMeshPS(MaterialMeshPSInput input) : SV_Target
+{
+    PatternGeomData* items = (PatternGeomData*)InstancesAddress;
+    PatternGeomData it = items[input.InstId];
+
+    float2 halfSize = max(it.LocalBounds.zw * 0.5, float2(1.0, 1.0));
+    float2 centred = input.Local - (it.LocalBounds.xy + halfSize);
+
+    // The chamfer again, but from the bounding box: an authored outline has no distance field here, so the turn follows
+    // the box rather than the true edge - the same approximation the glass mesh pass already makes.
+    float2 fromCentre = centred / halfSize;
+    float edge = saturate(max(abs(fromCentre.x), abs(fromCentre.y)));
+    float rise = saturate((edge - 0.82) / 0.18);
+    float len = length(fromCentre);
+    float2 outward = len > 1e-5 ? fromCentre / len : float2(0.0, 0.0);
+    float4 surface = MetalSurface(centred, halfSize, outward * rise * rise * 0.9, it.Color2, it.Noise, it.Anim);
+
+    // No film grain - see the SDF pass.
+    return float4(saturate(surface.rgb), input.Fade * it.Color3.w * ClipCoverage(input.Position.xy, input.ClipBox, input.ClipRadii));
+}
+
+
 // =====================================================================================================================
 // TECHNIQUE - one pass per TREATMENT and CARRIER. Frosted serves both Acrylic and Mica: they differ in what is CAPTURED,
-// not in what is done with it. Glass bends the same capture instead of scattering it. Sdf and Mesh are the two carriers:
-// a shape described by a formula, and one that arrives as triangles.
+// not in what is done with it. Glass bends the same capture instead of scattering it. Sheen reads no capture at all - it
+// lights a surface. Sdf and Mesh are the two carriers: a shape described by a formula, and one that arrives as
+// triangles.
 // =====================================================================================================================
 technique Material
 {
@@ -377,6 +786,34 @@ technique Material
         Profile = 6.6;
         VertexShader = MaterialFillVS;
         PixelShader = MaterialGlassMeshPS;
+    }
+
+    pass SheenSdf
+    {
+        Profile = 6.6;
+        VertexShader = MaterialRectInstancedVS;
+        PixelShader = MaterialSheenPS;
+    }
+
+    pass SheenMesh
+    {
+        Profile = 6.6;
+        VertexShader = MaterialFillVS;
+        PixelShader = MaterialSheenMeshPS;
+    }
+
+    pass MetalSdf
+    {
+        Profile = 6.6;
+        VertexShader = MaterialRectInstancedVS;
+        PixelShader = MaterialMetalPS;
+    }
+
+    pass MetalMesh
+    {
+        Profile = 6.6;
+        VertexShader = MaterialFillVS;
+        PixelShader = MaterialMetalMeshPS;
     }
 
 }

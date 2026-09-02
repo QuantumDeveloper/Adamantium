@@ -395,6 +395,19 @@ public partial class BrushesViewModel : TabPageViewModel
     [Bindable] private double _materialStroke = 0;
     [Bindable] private double _materialOpacity = 1.0;
 
+    // The SURFACE branch - the first material knobs that describe what a thing is made of rather than what shows
+    // through it. Grain, roughness and the light are shared by velvet and metal; the colours are each material's own.
+    [Bindable] private Color _materialNapColor = new Color(38, 20, 54, 255);
+    [Bindable] private Color _materialSheenColor = new Color(228, 214, 255, 255);
+    [Bindable] private Color _materialMetalColor = new Color(196, 199, 202, 255);
+    [Bindable] private Color _materialEnvironmentColor = new Color(226, 228, 231, 255);
+    [Bindable] private double _materialGrainScale = 6;
+    [Bindable] private double _materialGrainDirection = 0;
+    [Bindable] private double _materialRoughness = 0.35;
+    [Bindable] private double _materialAnisotropy = 0.7;
+    [Bindable] private double _materialLightAngle = 315;
+    [Bindable] private double _materialLightElevation = 0.45;
+
     /// <summary>What mica may read, as ONE list - "built-in or mine" and "which of mine" are the same question asked
     /// twice. Chosen to differ in DETAIL: tile-sample is 64x64 across the whole desktop, texture.jpg is 1920x1200.
     /// </summary>
@@ -417,7 +430,29 @@ public partial class BrushesViewModel : TabPageViewModel
     partial void OnMaterialKindChanged(MaterialType value)
     {
         LiveMaterial.Material = value;
+        SeedSurface(value);
         RaisePropertyChanged(nameof(HasOwnSource));
+    }
+
+    /// <summary>Grain, roughness and the light are ONE set of knobs shared by every surface, and each material reads
+    /// them differently - the roughness that makes steel polished spreads velvet's sheen over the whole fold instead of
+    /// its rim. Carrying the previous material's numbers across therefore shows the new one at its worst, so entering a
+    /// surface seeds its own starting point; everything stays free to be pushed around afterwards.</summary>
+    private void SeedSurface(MaterialType value)
+    {
+        switch (value)
+        {
+            case MaterialType.Velvet:
+                MaterialRoughness = 0.35;
+                MaterialGrainScale = 6;
+                MaterialAnisotropy = 0.7;
+                break;
+
+            case MaterialType.Metal:
+                MetalPreset ??= MetalPresets[0];
+                ApplyMetal(MetalPreset);
+                break;
+        }
     }
 
     // Loaded HERE, when it is picked, rather than up front: the whole set would otherwise be decoded on every start of
@@ -437,6 +472,33 @@ public partial class BrushesViewModel : TabPageViewModel
     partial void OnMaterialBlurChanged(double value) => LiveMaterial.BlurAmount = value;
     partial void OnMaterialGrainChanged(double value) => LiveMaterial.NoiseAmount = value;
     partial void OnMaterialRefractionChanged(double value) => LiveMaterial.Refraction = value;
+    partial void OnMaterialNapColorChanged(Color value) => LiveMaterial.NapColor = value;
+    partial void OnMaterialSheenColorChanged(Color value) => LiveMaterial.SheenColor = value;
+    /// <summary>The named metals, as a starting point for the knobs rather than a mode: picking one writes the numbers
+    /// and leaves them free to be pushed around, which is the only way to tell what each of them actually does.</summary>
+    public MetalPreset[] MetalPresets { get; } = MetalPreset.All;
+
+    [Bindable] private MetalPreset _metalPreset;
+
+    partial void OnMetalPresetChanged(MetalPreset value) => ApplyMetal(value);
+
+    private void ApplyMetal(MetalPreset metal)
+    {
+        if (metal == null) return;
+
+        MaterialMetalColor = metal.Colour;
+        MaterialRoughness = metal.Roughness;
+        MaterialGrainScale = metal.Grain;
+    }
+
+    partial void OnMaterialMetalColorChanged(Color value) => LiveMaterial.MetalColor = value;
+    partial void OnMaterialEnvironmentColorChanged(Color value) => LiveMaterial.EnvironmentColor = value;
+    partial void OnMaterialGrainScaleChanged(double value) => LiveMaterial.GrainScale = value;
+    partial void OnMaterialGrainDirectionChanged(double value) => LiveMaterial.GrainDirection = value;
+    partial void OnMaterialRoughnessChanged(double value) => LiveMaterial.Roughness = value;
+    partial void OnMaterialAnisotropyChanged(double value) => LiveMaterial.Anisotropy = value;
+    partial void OnMaterialLightAngleChanged(double value) => LiveMaterial.LightAngle = value;
+    partial void OnMaterialLightElevationChanged(double value) => LiveMaterial.LightElevation = value;
 
     /// <summary>What lies UNDER the material - the whole point of a backdrop is that it has something to show, and a
     /// flat colour proves nothing. Switchable because different fields expose different faults: a moving noise shows
