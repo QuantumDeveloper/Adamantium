@@ -608,8 +608,31 @@ public abstract class VirtualizingPanel : Panel, IScrollableContent
     /// and this only interpolates the difference on the render transform, which is why a wrapping panel can open a hole
     /// without tiles sliding over each other. Nothing animates the first time an item is seen (it has no previous place),
     /// and scrolling moves nothing, since the grid is absolute and an item's slot does not change when the view does.</summary>
+    // Rows promoted for the duration of an open gap. A promotion costs a transform slot, so it is not left behind: the
+    // moment the gap closes they all go back to being ordinary children.
+    private readonly HashSet<UIComponent> _promoted = new();
+
+    /// <summary>Makes a row carry its own subtree (or stop). The snapshot records this, and the draw side bakes the
+    /// subtree node-relative or world-baked accordingly - so a change nobody announced leaves the two disagreeing about
+    /// where everything is. Idempotent, which is what keeps it cheap to call every arrange.</summary>
+    private static void AsMotionNode(UIComponent row, bool on)
+    {
+        if (row.IsRenderMotionNode == on) return;
+
+        row.IsRenderMotionNode = on;
+        RenderDirty.MarkTransform(row);
+        RenderDirty.MarkSubtreeGeometry(row);   // its subtree is baked in a DIFFERENT space now - re-take the record
+    }
+
     protected void AnimateLayoutMoves(Func<int, Rect> slotRect)
     {
+        // Gap closed: nothing is travelling any more, so give the slots back.
+        if (DropGapIndex < 0 && _promoted.Count > 0)
+        {
+            foreach (var row in _promoted) AsMotionNode(row, false);
+            _promoted.Clear();
+        }
+
         var items = Owner?.Items;
         if (items == null) return;
 
@@ -629,9 +652,22 @@ public abstract class VirtualizingPanel : Panel, IScrollableContent
             var now = slotRect(SlotOf(index)).Location;
             var moved = _lastItemPos.TryGetValue(item, out var before) && before != now;
             _lastItemPos[item] = now;
-            if (!moved || !animate) continue;
+            if (!moved) continue;
 
             if (Owner.ItemContainerGenerator.ContainerFromIndex(index) is not UIComponent container) continue;
+
+            // A ROW TRAVELS AS ONE THING. Promoted to a motion node, its subtree is baked relative to IT and the shader
+            // applies its slot matrix to everything beneath - so the parts that live only in a shared-mesh arena travel
+            // with it. Without this the row rode an ANCESTOR's slot: the row's own movement never reached its drag grip,
+            // and the grip stayed where the row had been while the rest of it left. Measured at 23 px apart mid-slide.
+            AsMotionNode(container, true);
+            _promoted.Add(container);
+
+            // ...and the record still has to be re-taken, because a gap shift moves only the rows BELOW it and one
+            // matrix cannot say that: a slot moves the whole list or none of it.
+            RenderDirty.MarkSubtreeGeometry(container);
+
+            if (!animate) continue;
             if (container.RenderTransform is not { } transform)
             {
                 transform = new Transform();

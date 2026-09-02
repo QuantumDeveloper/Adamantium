@@ -334,6 +334,7 @@ public partial class DragDropDemoViewModel : TabPageViewModel
     private static void Add(object arg, ObservableCollection<string> target)
     {
         if (arg is not DragDropEventArgs e) return;
+
         // Insert BEFORE the reference item (survives the source removal shifting indices in the same list); append if none.
         var at = e.InsertBefore is string before && target.IndexOf(before) is var idx and >= 0 ? idx : target.Count;
         foreach (var item in ItemsOf(e))
