@@ -61,5 +61,16 @@ public enum MaterialType
     /// <para>What it reflects is PROCEDURAL: behind a user interface there is no world, so capturing the frame would
     /// give a mirror of the window rather than of a room. A studio gradient - sky above the horizon, floor below - is
     /// cheap, controllable, and reads as metal. A capture-based mirror stays a separate material.</para></summary>
-    Metal
+    Metal,
+
+    /// <summary>WOOD: the third surface, and the one whose appearance is FIGURE rather than lighting. A board is a
+    /// slice through a stack of concentric annual rings, so what shows on its face is where the cut plane crossed
+    /// them - which is why timber shows arches and not stripes, and why the pattern is in the COLOUR while the light
+    /// only varnishes it.
+    ///
+    /// <para>Two colours, not one: a ring is a broad pale band of spring growth ending in a narrow dense dark one, and
+    /// the contrast between those two - see <see cref="MaterialBrush.EarlyWoodColor"/> and
+    /// <see cref="MaterialBrush.LateWoodColor"/> - is what separates oak from walnut far more than any single "wood
+    /// colour" could.</para></summary>
+    Wood
 }

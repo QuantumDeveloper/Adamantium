@@ -119,6 +119,35 @@ public sealed class MaterialBrush : Brush
     public static readonly AdamantiumProperty EnvironmentColorProperty = AdamantiumProperty.Register(nameof(EnvironmentColor),
         typeof(Color), typeof(MaterialBrush), new PropertyMetadata(new Color(226, 228, 231, 255), PropertyMetadataOptions.AffectsPaint));
 
+    /// <summary>Spring growth: the broad PALE band that makes up most of an annual ring, laid down while the tree is
+    /// growing fast and its cells are wide and thin-walled. Wood only.</summary>
+    public static readonly AdamantiumProperty EarlyWoodColorProperty = AdamantiumProperty.Register(nameof(EarlyWoodColor),
+        typeof(Color), typeof(MaterialBrush), new PropertyMetadata(new Color(186, 140, 92, 255), PropertyMetadataOptions.AffectsPaint));
+
+    /// <summary>Summer growth: the narrow DARK band that closes each ring, dense and thick-walled. The ring line
+    /// everybody sees is the sharp step from this back to the next year's spring growth, and the contrast between the
+    /// two is what tells oak from walnut. Wood only.</summary>
+    public static readonly AdamantiumProperty LateWoodColorProperty = AdamantiumProperty.Register(nameof(LateWoodColor),
+        typeof(Color), typeof(MaterialBrush), new PropertyMetadata(new Color(104, 62, 34, 255), PropertyMetadataOptions.AffectsPaint));
+
+    /// <summary>How the board was sawn out of the log - see <see cref="WoodCut"/>. Not a choice of texture but of
+    /// VIEWPOINT: the rings are the same either way, and the cut decides where the plane crossed them. Wood only.
+    /// </summary>
+    public static readonly AdamantiumProperty CutProperty = AdamantiumProperty.Register(nameof(Cut),
+        typeof(WoodCut), typeof(MaterialBrush), new PropertyMetadata(WoodCut.Flat, PropertyMetadataOptions.AffectsPaint));
+
+    /// <summary>Whether the wood is FINISHED - lacquered, French polished, varnished - or left raw. A separate answer
+    /// from <see cref="Roughness"/> and not a value of it: bare timber has no film on it to reflect anything, however
+    /// smoothly it is planed, while a finished board carries a clear coat that shows the room and glares along the
+    /// edge. Roughness then says what KIND of finish, from oiled satin to a mirror.
+    ///
+    /// <para>The visible difference is mostly at the RIM, and that is honest rather than a shortcut: on a face seen
+    /// straight on a clear coat reflects about four per cent, but at a grazing angle it reflects nearly everything -
+    /// which is why a polished table looks like wood from above and like a mirror from the end of the room.</para>
+    /// </summary>
+    public static readonly AdamantiumProperty VarnishedProperty = AdamantiumProperty.Register(nameof(Varnished),
+        typeof(bool), typeof(MaterialBrush), new PropertyMetadata(true, PropertyMetadataOptions.AffectsPaint));
+
     /// <summary>Where the light comes from, in degrees around the surface. A brush property and not a scene light on
     /// purpose: the view here is fixed and orthographic, so a whole lighting rig would be a pretence - one direction
     /// is the honest amount of state.</summary>
@@ -208,6 +237,30 @@ public sealed class MaterialBrush : Brush
         set => SetValue(MetalColorProperty, value);
     }
 
+    public WoodCut Cut
+    {
+        get => GetValue<WoodCut>(CutProperty);
+        set => SetValue(CutProperty, value);
+    }
+
+    public bool Varnished
+    {
+        get => GetValue<bool>(VarnishedProperty);
+        set => SetValue(VarnishedProperty, value);
+    }
+
+    public Color EarlyWoodColor
+    {
+        get => GetValue<Color>(EarlyWoodColorProperty);
+        set => SetValue(EarlyWoodColorProperty, value);
+    }
+
+    public Color LateWoodColor
+    {
+        get => GetValue<Color>(LateWoodColorProperty);
+        set => SetValue(LateWoodColorProperty, value);
+    }
+
     public Color EnvironmentColor
     {
         get => GetValue<Color>(EnvironmentColorProperty);
@@ -271,6 +324,10 @@ public sealed class MaterialBrush : Brush
             NapColor = NapColor,
             SheenColor = SheenColor,
             MetalColor = MetalColor,
+            EarlyWoodColor = EarlyWoodColor,
+            LateWoodColor = LateWoodColor,
+            Cut = Cut,
+            Varnished = Varnished,
             EnvironmentColor = EnvironmentColor,
             GrainScale = GrainScale,
             GrainDirection = GrainDirection,

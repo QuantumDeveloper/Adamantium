@@ -61,6 +61,15 @@ public struct MaterialRectItem
     public Vector4F Response;
 
     /// <summary>SURFACES only: .x grain direction in radians, .y light angle in radians, .z light elevation (0 grazing,
-    /// 1 straight on), .w anisotropy (metal).</summary>
+    /// 1 straight on), .w the FIGURE CODE - which way a board was sawn, plus whether it is varnished.
+    ///
+    /// <para>.w used to hold an anisotropy that nothing read, and that could never have worked on the mesh carrier at
+    /// all: there the fourth component of this field is the rounded clip's slot. So on THIS carrier it was free, and
+    /// the wood took it.</para>
+    ///
+    /// <para>Packed into a spare component rather than given a field of its own, and NOT because that is tidier - a
+    /// thirteenth field was written, measured and works on its own. But adding it while a wood PASS exists loses the
+    /// device every time, and neither alone does; the mechanism is not understood and is recorded in the tech debt.
+    /// Reusing a component that is already there keeps the record at the size that is known to be safe.</para></summary>
     public Vector4F Light;
 }
