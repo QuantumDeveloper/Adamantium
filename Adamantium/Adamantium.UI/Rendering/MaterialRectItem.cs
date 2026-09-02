@@ -47,4 +47,20 @@ public struct MaterialRectItem
     /// <summary>.x = the ROUNDED CLIP's slot, or -1; .yzw spare. Its own field rather than one of Stroke1's unused
     /// components: those are the pen's dash/trim/flags, unused only because this batch bakes solid pens today.</summary>
     public Vector4F Clip;
+
+    /// <summary>SURFACES only (velvet, metal): .rgb what the surface is made of - the cloth's own colour, or the
+    /// metal's reflectance at face-on incidence - and .a the grain's scale in device px.
+    /// <para>Three fields of their own rather than borrowed room in <see cref="Tint"/> and <see cref="Knobs"/>. Those
+    /// hold a tint and a blur, and a field that means one thing for one material and something else for another is the
+    /// shape of bug this batch has already produced once. Shared across the surface BRANCH on purpose, though: velvet
+    /// and steel describe one lit surface and differ only in the BRDF that reads it.</para></summary>
+    public Vector4F Surface;
+
+    /// <summary>SURFACES only: .rgb what the surface answers the light with - the grazing sheen for cloth, the studio
+    /// environment for metal - and .a its roughness.</summary>
+    public Vector4F Response;
+
+    /// <summary>SURFACES only: .x grain direction in radians, .y light angle in radians, .z light elevation (0 grazing,
+    /// 1 straight on), .w anisotropy (metal).</summary>
+    public Vector4F Light;
 }

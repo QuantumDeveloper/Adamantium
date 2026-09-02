@@ -66,6 +66,70 @@ public sealed class MaterialBrush : Brush
     public static readonly AdamantiumProperty AnchorProperty = AdamantiumProperty.Register(nameof(Anchor),
         typeof(MaterialAnchor), typeof(MaterialBrush), new PropertyMetadata(MaterialAnchor.Desktop, PropertyMetadataOptions.AffectsPaint));
 
+    // ---- THE NAP: velvet only, and the first material properties that describe a SURFACE rather than a capture ----
+
+    /// <summary>The cloth's own colour - what velvet looks like where no light is grazing it. Deep and desaturated is
+    /// what reads as fabric; the sheen supplies all the brightness.</summary>
+    public static readonly AdamantiumProperty NapColorProperty = AdamantiumProperty.Register(nameof(NapColor),
+        typeof(Color), typeof(MaterialBrush), new PropertyMetadata(new Color(38, 20, 54, 255), PropertyMetadataOptions.AffectsPaint));
+
+    /// <summary>The colour of the grazing-angle sheen - the light caught on the tips of the fibres. Keeping it apart
+    /// from <see cref="NapColor"/> is what separates dyed silk velvet from wool: the same cloth lit differently.
+    /// </summary>
+    public static readonly AdamantiumProperty SheenColorProperty = AdamantiumProperty.Register(nameof(SheenColor),
+        typeof(Color), typeof(MaterialBrush), new PropertyMetadata(new Color(228, 214, 255, 255), PropertyMetadataOptions.AffectsPaint));
+
+    /// <summary>How coarse the surface's grain is, in device pixels. For velvet it is the fibre clump - small is silk,
+    /// large is wool; for brushed metal it is the width of the grinding. One property for the whole surface branch,
+    /// because it is one thing: the scale of the noise field whose gradient becomes the normal.</summary>
+    public static readonly AdamantiumProperty GrainScaleProperty = AdamantiumProperty.Register(nameof(GrainScale),
+        typeof(double), typeof(MaterialBrush), new PropertyMetadata(6.0, PropertyMetadataOptions.AffectsPaint));
+
+    /// <summary>Which way the grain runs, in degrees - the pile combed for velvet, the grinding for metal. Velvet
+    /// brushed one way is darker than the same cloth brushed the other, and a brushed metal's highlight stretches
+    /// ACROSS its grinding: the same asymmetry, and most of what makes either look real.</summary>
+    public static readonly AdamantiumProperty GrainDirectionProperty = AdamantiumProperty.Register(nameof(GrainDirection),
+        typeof(double), typeof(MaterialBrush), new PropertyMetadata(0.0, PropertyMetadataOptions.AffectsPaint));
+
+    /// <summary>How rough the surface is, 0..1. On velvet it sets how far the sheen spreads (low over the whole fold,
+    /// high in a band along the rim); on metal it is roughness in the ordinary sense - 0 is a mirror, high is cast
+    /// iron. Defaulted to a POLISHED face, which is the plainest thing a metal can be.</summary>
+    public static readonly AdamantiumProperty RoughnessProperty = AdamantiumProperty.Register(nameof(Roughness),
+        typeof(double), typeof(MaterialBrush), new PropertyMetadata(0.08, PropertyMetadataOptions.AffectsPaint));
+
+    /// <summary>How far the highlight is STRETCHED along the grain, 0..1. Zero is an isotropic surface (cast, or
+    /// polished); high is the long smear a brushed finish drags across its grinding, which is the whole look of
+    /// stainless steel. Metal only.</summary>
+    public static readonly AdamantiumProperty AnisotropyProperty = AdamantiumProperty.Register(nameof(Anisotropy),
+        typeof(double), typeof(MaterialBrush), new PropertyMetadata(0.7, PropertyMetadataOptions.AffectsPaint));
+
+    /// <summary>The metal itself, as the colour it reflects at face-on incidence (F0). Grey is steel and aluminium;
+    /// warm yellows are gold and brass; pink-orange is copper. Metal only.</summary>
+    public static readonly AdamantiumProperty MetalColorProperty = AdamantiumProperty.Register(nameof(MetalColor),
+        typeof(Color), typeof(MaterialBrush), new PropertyMetadata(new Color(196, 200, 208, 255), PropertyMetadataOptions.AffectsPaint));
+
+    /// <summary>What the metal has to reflect. PROCEDURAL and not a capture, deliberately: behind a UI there is no
+    /// world, and capturing the frame would give a mirror of the window rather than of a room. One colour - the "sky"
+    /// of a studio gradient, darkened towards the floor - is cheap, controllable, and enough to read as metal. Metal
+    /// only.
+    ///
+    /// <para>NEUTRAL by default, and that matters more than it looks: a metal shows the room MULTIPLIED by its own
+    /// reflectance, so a tinted room stains every metal towards its own hue and gold, copper and steel converge into
+    /// one another. Colour the room deliberately, or not at all.</para></summary>
+    public static readonly AdamantiumProperty EnvironmentColorProperty = AdamantiumProperty.Register(nameof(EnvironmentColor),
+        typeof(Color), typeof(MaterialBrush), new PropertyMetadata(new Color(226, 228, 231, 255), PropertyMetadataOptions.AffectsPaint));
+
+    /// <summary>Where the light comes from, in degrees around the surface. A brush property and not a scene light on
+    /// purpose: the view here is fixed and orthographic, so a whole lighting rig would be a pretence - one direction
+    /// is the honest amount of state.</summary>
+    public static readonly AdamantiumProperty LightAngleProperty = AdamantiumProperty.Register(nameof(LightAngle),
+        typeof(double), typeof(MaterialBrush), new PropertyMetadata(315.0, PropertyMetadataOptions.AffectsPaint));
+
+    /// <summary>How high the light sits, 0 (grazing) to 1 (straight on). Grazing is what lights the nap; overhead
+    /// flattens it, which is a useful thing to be able to see.</summary>
+    public static readonly AdamantiumProperty LightElevationProperty = AdamantiumProperty.Register(nameof(LightElevation),
+        typeof(double), typeof(MaterialBrush), new PropertyMetadata(0.45, PropertyMetadataOptions.AffectsPaint));
+
     public MaterialType Material
     {
         get => GetValue<MaterialType>(MaterialProperty);
@@ -100,6 +164,66 @@ public sealed class MaterialBrush : Brush
     {
         get => GetValue<double>(RefractionProperty);
         set => SetValue(RefractionProperty, value);
+    }
+
+    public Color NapColor
+    {
+        get => GetValue<Color>(NapColorProperty);
+        set => SetValue(NapColorProperty, value);
+    }
+
+    public Color SheenColor
+    {
+        get => GetValue<Color>(SheenColorProperty);
+        set => SetValue(SheenColorProperty, value);
+    }
+
+    public double GrainScale
+    {
+        get => GetValue<double>(GrainScaleProperty);
+        set => SetValue(GrainScaleProperty, value);
+    }
+
+    public double GrainDirection
+    {
+        get => GetValue<double>(GrainDirectionProperty);
+        set => SetValue(GrainDirectionProperty, value);
+    }
+
+    public double Roughness
+    {
+        get => GetValue<double>(RoughnessProperty);
+        set => SetValue(RoughnessProperty, value);
+    }
+
+    public double Anisotropy
+    {
+        get => GetValue<double>(AnisotropyProperty);
+        set => SetValue(AnisotropyProperty, value);
+    }
+
+    public Color MetalColor
+    {
+        get => GetValue<Color>(MetalColorProperty);
+        set => SetValue(MetalColorProperty, value);
+    }
+
+    public Color EnvironmentColor
+    {
+        get => GetValue<Color>(EnvironmentColorProperty);
+        set => SetValue(EnvironmentColorProperty, value);
+    }
+
+    public double LightAngle
+    {
+        get => GetValue<double>(LightAngleProperty);
+        set => SetValue(LightAngleProperty, value);
+    }
+
+    public double LightElevation
+    {
+        get => GetValue<double>(LightElevationProperty);
+        set => SetValue(LightElevationProperty, value);
     }
 
     public Imaging.ImageSource Source
@@ -144,6 +268,16 @@ public sealed class MaterialBrush : Brush
             Refraction = Refraction,
             Source = Source,
             Anchor = Anchor,
+            NapColor = NapColor,
+            SheenColor = SheenColor,
+            MetalColor = MetalColor,
+            EnvironmentColor = EnvironmentColor,
+            GrainScale = GrainScale,
+            GrainDirection = GrainDirection,
+            Roughness = Roughness,
+            Anisotropy = Anisotropy,
+            LightAngle = LightAngle,
+            LightElevation = LightElevation,
             Opacity = Opacity   // the frozen snapshot paints at the same strength the live brush did
         };
         return clone;

@@ -59,8 +59,15 @@ internal sealed class MaterialRectCollector : SdfBatchCollector<MaterialRectItem
     }
 
     /// <summary>The pass the segment being drawn needs. A material is a SOURCE plus a TREATMENT, and both are decided
-    /// per segment: acrylic is capture+frosted, mica is wallpaper+frosted, liquid glass is capture+glass.</summary>
-    protected override IEffectPass DrawPass => _boundGlass ? Effect.MaterialGlassSdfPass : Effect.MaterialFrostedSdfPass;
+    /// per segment: acrylic is capture+frosted, mica is wallpaper+frosted, liquid glass is capture+glass, velvet is
+    /// NOTHING+sheen.</summary>
+    protected override IEffectPass DrawPass => _boundTreatment switch
+    {
+        MaterialTreatment.Glass => Effect.MaterialGlassSdfPass,
+        MaterialTreatment.Sheen => Effect.MaterialSheenSdfPass,
+        MaterialTreatment.Metal => Effect.MaterialMetalSdfPass,
+        _ => Effect.MaterialFrostedSdfPass
+    };
 
     /// <summary>The logical region this segment's instances cover, in DEVICE pixels, grown by the blur margin. Set by
     /// the caller when it flushes; the capture is taken from exactly this.</summary>
@@ -89,9 +96,9 @@ internal sealed class MaterialRectCollector : SdfBatchCollector<MaterialRectItem
     // The same pair again, for the TREATMENT rather than the source: which pass this segment is drawn with. Kept beside
     // the source flags because a segment is defined by BOTH - two materials may share a segment only if they agree
     // about the image bound to it and about the shader that reads it.
-    private readonly System.Collections.Generic.List<bool> _segGlass = new();
-    private bool _pendingGlass;
-    private bool _boundGlass;
+    private readonly System.Collections.Generic.List<MaterialTreatment> _segTreatment = new();
+    private MaterialTreatment _pendingTreatment;
+    private MaterialTreatment _boundTreatment;
 
     // And once more for the author's own picture: WHICH one (a draw binds one) and WHAT IT IS PINNED TO (the anchor
     // decides the mapping). Both inert without a picture.
@@ -133,18 +140,18 @@ internal sealed class MaterialRectCollector : SdfBatchCollector<MaterialRectItem
     {
         while (_segRegion.Count <= index) _segRegion.Add(default);
         while (_segWallpaper.Count <= index) _segWallpaper.Add(false);
-        while (_segGlass.Count <= index) _segGlass.Add(false);
+        while (_segTreatment.Count <= index) _segTreatment.Add(MaterialTreatment.Frosted);
         while (_segSource.Count <= index) _segSource.Add(null);
         while (_segAnchor.Count <= index) _segAnchor.Add(MaterialAnchor.Element);
         _segRegion[index] = CaptureRegion;
         _segWallpaper[index] = _pendingWallpaper;
-        _segGlass[index] = _pendingGlass;
+        _segTreatment[index] = _pendingTreatment;
         _segSource[index] = _pendingSource;
         _segAnchor[index] = _pendingAnchor;
 
         // The next segment starts undecided about all of them, as its own instances decide them.
         _pendingWallpaper = false;
-        _pendingGlass = false;
+        _pendingTreatment = MaterialTreatment.Frosted;
         _pendingSource = null;
         _pendingAnchor = MaterialAnchor.Element;
     }
@@ -153,12 +160,12 @@ internal sealed class MaterialRectCollector : SdfBatchCollector<MaterialRectItem
     {
         while (_segRegion.Count < index) _segRegion.Add(default);
         while (_segWallpaper.Count < index) _segWallpaper.Add(false);
-        while (_segGlass.Count < index) _segGlass.Add(false);
+        while (_segTreatment.Count < index) _segTreatment.Add(MaterialTreatment.Frosted);
         while (_segSource.Count < index) _segSource.Add(null);
         while (_segAnchor.Count < index) _segAnchor.Add(MaterialAnchor.Element);
         _segRegion.Insert(index, index > 0 ? _segRegion[index - 1] : CaptureRegion);
         _segWallpaper.Insert(index, index > 0 && _segWallpaper[index - 1]);
-        _segGlass.Insert(index, index > 0 && _segGlass[index - 1]);
+        _segTreatment.Insert(index, index > 0 ? _segTreatment[index - 1] : MaterialTreatment.Frosted);
         _segSource.Insert(index, index > 0 ? _segSource[index - 1] : null);
         _segAnchor.Insert(index, index > 0 ? _segAnchor[index - 1] : MaterialAnchor.Element);
     }
@@ -167,7 +174,7 @@ internal sealed class MaterialRectCollector : SdfBatchCollector<MaterialRectItem
     {
         if ((uint)index < (uint)_segRegion.Count) CaptureRegion = _segRegion[index];
         if ((uint)index < (uint)_segWallpaper.Count) _boundWallpaper = _segWallpaper[index];
-        if ((uint)index < (uint)_segGlass.Count) _boundGlass = _segGlass[index];
+        if ((uint)index < (uint)_segTreatment.Count) _boundTreatment = _segTreatment[index];
         if ((uint)index < (uint)_segSource.Count) _boundSource = _segSource[index];
         if ((uint)index < (uint)_segAnchor.Count) _boundAnchor = _segAnchor[index];
     }
@@ -178,14 +185,52 @@ internal sealed class MaterialRectCollector : SdfBatchCollector<MaterialRectItem
     public bool SameKind(Brush brush, ITexture source)
         => !HasPending
            || brush is not MaterialBrush m
-           || (IsWallpaper(m.Material) == _pendingWallpaper && IsGlass(m.Material) == _pendingGlass
+           || (IsWallpaper(m.Material) == _pendingWallpaper && TreatmentOf(m.Material) == _pendingTreatment
                && ReferenceEquals(source, _pendingSource) && (source == null || m.Anchor == _pendingAnchor));
 
     // The two halves of a segment's identity, asked by the mesh carrier too - so the answer is stated once here rather
     // than decided again over there.
     public static bool IsWallpaper(MaterialType material) => material == MaterialType.Mica;
 
-    public static bool IsGlass(MaterialType material) => material == MaterialType.LiquidGlass;
+    /// <summary>What this material's shader does with what it was given. See <see cref="MaterialTreatment"/> for why
+    /// this is a value and not "glass, or else frosted".</summary>
+    public static MaterialTreatment TreatmentOf(MaterialType material) => material switch
+    {
+        MaterialType.LiquidGlass => MaterialTreatment.Glass,
+        MaterialType.Velvet => MaterialTreatment.Sheen,
+        MaterialType.Metal => MaterialTreatment.Metal,
+        _ => MaterialTreatment.Frosted
+    };
+
+    /// <summary>Does this material look BEHIND the element at all? The SURFACES do not - they depict what a thing is
+    /// made of, not what shows through it - so a frame holding nothing but velvet or metal must not pay for a capture.
+    /// </summary>
+    public static bool NeedsBackdrop(MaterialType material)
+        => TreatmentOf(material) is not (MaterialTreatment.Sheen or MaterialTreatment.Metal);
+
+    // The surface's three records, packed once here so BOTH carriers bake the same numbers - a velvet rectangle and a
+    // velvet path must not be able to drift apart in appearance, and two copies of this arithmetic is exactly how they
+    // would. What each field MEANS is the pass's business (see MaterialEffect.fx); what they are is one description of
+    // a lit surface, which is why the whole branch shares them.
+    internal static Vector4F SurfaceOf(MaterialBrush m)
+    {
+        var c = TreatmentOf(m.Material) == MaterialTreatment.Metal ? m.MetalColor : m.NapColor;
+        return new Vector4F(c.R / 255f, c.G / 255f, c.B / 255f, (float)Math.Max(m.GrainScale, 0.5));
+    }
+
+    internal static Vector4F ResponseOf(MaterialBrush m)
+    {
+        var c = TreatmentOf(m.Material) == MaterialTreatment.Metal ? m.EnvironmentColor : m.SheenColor;
+        return new Vector4F(c.R / 255f, c.G / 255f, c.B / 255f, (float)Math.Clamp(m.Roughness, 0.0, 1.0));
+    }
+
+    // Degrees on the brush, RADIANS in the record: the shader takes a direction, and turning it there would be a
+    // conversion per fragment for a number that is the same across the whole instance.
+    internal static Vector4F LightOf(MaterialBrush m) => new(
+        (float)(m.GrainDirection * Math.PI / 180.0),
+        (float)(m.LightAngle * Math.PI / 180.0),
+        (float)Math.Clamp(m.LightElevation, 0.0, 1.0),
+        (float)Math.Clamp(m.Anisotropy, 0.0, 1.0));
 
     protected override void DrawSegment(IGraphicsDevice device, Buffer<MaterialRectItem> buffer, uint count, uint firstInstance, Matrix4x4F projection)
     {
@@ -359,7 +404,10 @@ internal sealed class MaterialRectCollector : SdfBatchCollector<MaterialRectItem
             StrokeColor = strokeColor,
             Stroke0 = stroke0,
             Stroke1 = stroke1,
-            Clip = new Vector4F(clipSlot, 0, 0, 0)   // the rounded ancestor clip, -1 = none
+            Clip = new Vector4F(clipSlot, 0, 0, 0),   // the rounded ancestor clip, -1 = none
+            Surface = SurfaceOf(material),
+            Response = ResponseOf(material),
+            Light = LightOf(material)
         };
         return true;
     }
@@ -377,7 +425,7 @@ internal sealed class MaterialRectCollector : SdfBatchCollector<MaterialRectItem
 
         var material = (MaterialBrush)brush;
         if (IsWallpaper(material.Material)) _pendingWallpaper = true;
-        if (IsGlass(material.Material)) _pendingGlass = true;
+        _pendingTreatment = TreatmentOf(material.Material);
         if (source != null)
         {
             _pendingSource = source;
