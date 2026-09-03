@@ -1519,12 +1519,13 @@ public partial class RenderCache
                 }
                 tgru.FillInstanced = false;
             }
-            else if (device != null && (_rectBatch.Active || _ellipseBatch.Active || _gradientRectBatch.Active || _gradientEllipseBatch.Active || _patternBatch.Active || _fractalBatch.Active || _textBatch.Active || (_instancedFill?.Active ?? false)))
+            else if (device != null && (_rectBatch.Active || _ellipseBatch.Active || _gradientRectBatch.Active || _gradientEllipseBatch.Active || _patternBatch.Active || _fractalBatch.Active || _textBatch.Active || (_instancedFill?.Active ?? false) || (_materialBatch?.Active ?? false)))
             {
                 // A non-batchable unit that overlaps any pending batch: flush them first so this unit paints OVER them, as
                 // its later source order requires. Spatially disjoint units (a list's items) don't flush.
                 var lb = LogicalBounds(unit.Component, wt);
-                if (_rectBatch.OverlapsPending(lb) || _ellipseBatch.OverlapsPending(lb) || _gradientRectBatch.OverlapsPending(lb) || _gradientEllipseBatch.OverlapsPending(lb) || _patternBatch.OverlapsPending(lb) || _fractalBatch.OverlapsPending(lb) || _textBatch.OverlapsPending(lb) || (_instancedFill?.OverlapsPending(lb) ?? false))
+                if (_rectBatch.OverlapsPending(lb) || _ellipseBatch.OverlapsPending(lb) || _gradientRectBatch.OverlapsPending(lb) || _gradientEllipseBatch.OverlapsPending(lb) || _patternBatch.OverlapsPending(lb) || _fractalBatch.OverlapsPending(lb) || _textBatch.OverlapsPending(lb) || (_instancedFill?.OverlapsPending(lb) ?? false)
+                    || (_materialBatch?.OverlapsPending(lb) ?? false))
                     FlushBatches(device, fullScissor, ref scissorNarrowed);
             }
             else if (device == null && unit is RectangleRenderUnit rruNoDev)
@@ -1658,6 +1659,18 @@ public partial class RenderCache
         }
 
         if (layer < 7 && (_instancedFill?.OverlapsPending(lb) ?? false))
+        {
+            return true;
+        }
+
+        // BACKDROP MATERIALS flush after every other fill (see FlushBatches), which is what lets them copy a finished
+        // frame - and it is also what puts them ON TOP of anything batched alongside. So a fill that overlaps a pending
+        // material was painted EARLIER and has to be flushed out first, or the material covers it.
+        //
+        // Invisible until a material was given CONTENT. Every earlier use was a bare shape on the stand, where there is
+        // nothing to cover; the first menu with an acrylic background lost its own rows, and the material then copied
+        // them out of the frame it had just drawn them into - the panel showing a blurred ghost of its own text.
+        if (layer < 8 && (_materialBatch?.OverlapsPending(lb) ?? false))
         {
             return true;
         }

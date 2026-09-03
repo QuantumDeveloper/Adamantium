@@ -196,9 +196,12 @@ public class MergedFluentThemeTests
         // A gradient STOP takes a colour, not a brush. Four palette tokens have always been raw colours, and the first
         // merge dropped all four - they were declared differently in the file, so the extraction never saw them. The
         // symptom was surfaces that painted nothing, which says nothing about the cause.
+        // AcrylicFillColorDefault joined them for the same reason: it goes into MaterialBrush.TintColor, which takes a
+        // colour. As a brush it would not resolve and every acrylic surface would paint nothing.
         Assert.That(theme.RawColors.Keys, Is.EquivalentTo(new[]
         {
-            "ShimmerPeakColor", "ShimmerTrackColor", "EdgeFadeColor", "EdgeFadeColorTransparent"
+            "ShimmerPeakColor", "ShimmerTrackColor", "EdgeFadeColor", "EdgeFadeColorTransparent",
+            "AcrylicFillColorDefault"
         }));
     }
 
@@ -207,9 +210,10 @@ public class MergedFluentThemeTests
     {
         var theme = new Fluent();
 
-        // 35 brushes + 4 colours = the 39 keys each of the two palette files declared. Counting only the brushes is
-        // what let four keys go missing unnoticed the first time.
-        Assert.That(theme.Palette.Count + theme.RawColors.Count, Is.EqualTo(39));
+        // 35 brushes + 4 colours = the 39 keys each of the two palette files declared, plus every key added since -
+        // one so far, AcrylicFillColorDefault. Counting only the brushes is what let four keys go missing unnoticed
+        // the first time, so the total is what is guarded; growing it is a deliberate edit here.
+        Assert.That(theme.Palette.Count + theme.RawColors.Count, Is.EqualTo(40));
     }
 
     [Test]

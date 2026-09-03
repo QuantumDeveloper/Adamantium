@@ -60,7 +60,7 @@
                                  every MenuItem's template - so a leaf that never opens a submenu never pays to build+theme it. -->
                             <Popup.ChildTemplate>
                                 <ControlTemplate TargetType="Popup">
-                                    <Border Background="{ResourceReference CardBackgroundFillColorDefault}"
+                                    <Border Background="{ResourceReference AcrylicFlyoutFill}"
                                             BorderBrush="{ResourceReference ControlStrokeColorDefault}"
                                             BorderThickness="1" CornerRadius="6" Padding="4" MinWidth="160">
                                         <!-- Menu taller than the window: capped to the window (MaxHeight set in code) and scrolled
@@ -181,7 +181,7 @@
                             <Popup.ChildTemplate>
                                 <ControlTemplate TargetType="Popup">
                                     <Border x:Name="PART_MenuRoot"
-                                            Background="{ResourceReference CardBackgroundFillColorDefault}"
+                                            Background="{ResourceReference AcrylicFlyoutFill}"
                                             BorderBrush="{ResourceReference ControlStrokeColorDefault}"
                                             BorderThickness="1" CornerRadius="6" Padding="4" MinWidth="160">
                                         <!-- Menu taller than the window: capped to the window (MaxHeight set in code) and scrolled by

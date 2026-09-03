@@ -1,0 +1,42 @@
+<ResourceDictionary xmlns:x="http://adamantium/ui/xaml/extensions"
+        xmlns="http://adamantium/ui">
+
+    <!-- The theme's MATERIALS - surfaces that are made of what is behind them rather than of a colour.
+
+         WHY ONLY THE TRANSIENT SURFACES USE THIS. Acrylic takes a copy of the frame beneath it EVERY FRAME, which is
+         affordable while a menu is open and is not affordable for a window's whole chrome. That is also why real
+         Fluent draws the line where it does: acrylic for what appears and light-dismisses - menus, drop-downs,
+         flyouts, tooltips - and mica, which reads the wallpaper once and follows neither scroll nor content, for the
+         long-lived background. The two are not interchangeable and picking by looks rather than by lifetime is how a
+         theme ends up costing a capture per control.
+
+         The solid keys these replace (CardBackgroundFillColorDefault and friends) stay in the palette: they are the
+         fallback for a platform with no capture, and going back is one attribute.
+
+         The TINT comes from the palette so the variants keep their contract - light and dark supply a colour, the
+         brush itself belongs to the theme. -->
+
+    <!-- The flyout surface: menus, submenus, drop-down lists, the ribbon's flyout, a colour picker's popup.
+         Tint at 0.78 rather than the sandbox's 0.55, and that is a legibility floor, not a taste: a menu can open over
+         anything at all, including a white document, and its text has to stay readable over the worst of them.
+         The blur is what makes it a SURFACE and not a stain: too little and the content beneath stays readable through
+         the panel, which looks like a bug rather than like a material. The number is the reach of the Gaussian's
+         outermost tap in frame pixels, over a copy already shrunk fourfold - so it is a good deal stronger than the
+         same number meant under the old point-sampled kernels, and it does not need to be large. -->
+    <MaterialBrush x:Key="AcrylicFlyoutFill"
+                   Material="Acrylic"
+                   TintColor="{ResourceReference AcrylicFillColorDefault}"
+                   TintOpacity="0.78"
+                   BlurAmount="4"
+                   NoiseAmount="0.03"/>
+
+    <!-- The same material, thinner, for surfaces that sit CLOSE to what they cover and want to be felt through:
+         a tooltip, which is small enough that a heavy tint reads as a black box. -->
+    <MaterialBrush x:Key="AcrylicTooltipFill"
+                   Material="Acrylic"
+                   TintColor="{ResourceReference AcrylicFillColorDefault}"
+                   TintOpacity="0.70"
+                   BlurAmount="3"
+                   NoiseAmount="0.03"/>
+
+</ResourceDictionary>

@@ -7,7 +7,7 @@
          small-styles convention each concern is its own <Style Selector="ToolTip">: simple properties, then the template. -->
 
     <Style Selector="ToolTip">
-        <Setter Property="Background" Value="{ResourceReference CardBackgroundFillColorDefault}"/>
+        <Setter Property="Background" Value="{ResourceReference AcrylicTooltipFill}"/>
         <Setter Property="BorderBrush" Value="{ResourceReference ControlStrokeColorDefault}"/>
         <Setter Property="Foreground" Value="{ObservableResource TextFillColorPrimary}"/>
         <Setter Property="BorderThickness" Value="{ResourceReference StrokeThin}"/>

@@ -21,6 +21,7 @@
   <ResourceContext.Resources>
     <ResourceLink Source="{x:Type fluent:Icons}"/>
     <ResourceLink Source="{x:Type fluent:Metrics}"/>
+    <ResourceLink Source="{x:Type fluent:Materials}"/>
   </ResourceContext.Resources>
 
   <!-- Dark first: it is the variant the application opens on, and order is what says so. A variant is four hundred
