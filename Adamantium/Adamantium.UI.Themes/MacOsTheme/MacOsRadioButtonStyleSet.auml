@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="utf-8"?>
+<StyleSet xmlns="http://adamantium/ui"
+          xmlns:x="http://adamantium/ui/xaml/extensions">
+
+    <!-- The macOS radio button, and it is the checkbox's twin on purpose: same 14, same hairline, same no-hover, same
+         darkening press. A platform's selection controls are one family, and the giveaway when they are not is that the
+         box and the circle in one dialog turn out to be different sizes.
+
+         What is its own: the SELECTED marker is a small white dot on the accent, not a ring with a hole. AppKit fills
+         the circle and puts a dot in it, which at this size is the only way the state survives.
+
+         ON THE SIZE, because 14 was tried first and was wrong here: AppKit's regular radio IS 14 points, but a Mac has
+         drawn it on a 2x screen since Retina, so those 14 points are 28 device pixels and the hairline and the dot keep
+         their shape. At 1x, 14 points are 14 pixels: a 1px ring round a 4px dot stops being a control and becomes a
+         smudge. 16 is the smallest that survives being drawn one pixel to the point. -->
+
+    <Style Selector="RadioButton">
+        <Setter Property="Foreground" Value="{ObservableResource TextFillColorPrimary}"/>
+        <Setter Property="Background" Value="{ResourceReference SelectionControlFillColorOff}"/>
+        <Setter Property="BorderBrush" Value="{ResourceReference ControlStrokeColorDefault}"/>
+        <Setter Property="FontSize" Value="{ResourceReference FontSizeBody}"/>
+        <Setter Property="VerticalContentAlignment" Value="Center"/>
+    </Style>
+
+    <Style Selector="RadioButton">
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="RadioButton">
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Spacing="6">
+                        <Grid Width="16" Height="16" VerticalAlignment="Center">
+                            <Ellipse x:Name="OuterRing"
+                                     Fill="{TemplateBinding Background}"
+                                     Stroke="{TemplateBinding BorderBrush}"
+                                     StrokeThickness="1"/>
+                            <!-- A third of the diameter. Bigger and it stops being a dot on a filled disc and starts
+                                 being a ring, which is the Windows marker; smaller and it disappears at 1x. -->
+                            <Ellipse x:Name="Dot"
+                                     Width="6" Height="6"
+                                     Fill="{ThemeResource AccentForegroundColor}"
+                                     Opacity="0"
+                                     HorizontalAlignment="Center"
+                                     VerticalAlignment="Center"/>
+                        </Grid>
+                        <ContentPresenter x:Name="PART_ContentPresenter"
+                                          Content="{TemplateBinding Content}"
+                                          ContentTemplate="{TemplateBinding ContentTemplate}"
+                                          Foreground="{TemplateBinding Foreground}"
+                                          FontSize="{TemplateBinding FontSize}"
+                                          VerticalAlignment="Center"/>
+                    </StackPanel>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style Selector="RadioButton">
+        <!-- No IsMouseOver trigger, deliberately - see MacOsButtonStyleSet. -->
+        <PropertyTrigger Property="IsChecked" Value="true">
+            <Setter TargetName="OuterRing" Property="Fill" Value="{ThemeResource AccentFillColorDefault}"/>
+            <Setter TargetName="OuterRing" Property="Stroke" Value="{ThemeResource AccentFillColorDefault}"/>
+            <Setter TargetName="Dot" Property="Opacity" Value="1"/>
+            <!-- Un-inherit the ToggleButton accent-label - see the note in MacOsCheckBoxStyleSet. -->
+            <Setter TargetName="PART_ContentPresenter" Property="Foreground" Value="{ObservableResource TextFillColorPrimary}"/>
+        </PropertyTrigger>
+        <PropertyTrigger Property="IsPressed" Value="true">
+            <Setter TargetName="OuterRing" Property="Fill" Value="{ResourceReference ControlFillColorTertiary}"/>
+        </PropertyTrigger>
+        <MultiTrigger>
+            <MultiTrigger.Conditions>
+                <Condition Property="IsChecked" Value="true"/>
+                <Condition Property="IsPressed" Value="true"/>
+            </MultiTrigger.Conditions>
+            <Setter TargetName="OuterRing" Property="Fill" Value="{ThemeResource AccentFillColorTertiary}"/>
+            <Setter TargetName="OuterRing" Property="Stroke" Value="{ThemeResource AccentFillColorTertiary}"/>
+        </MultiTrigger>
+        <PropertyTrigger Property="IsEnabled" Value="false">
+            <Setter TargetName="OuterRing" Property="Fill" Value="{ResourceReference ControlFillColorDisabled}"/>
+            <Setter TargetName="PART_ContentPresenter" Property="Foreground" Value="{ObservableResource TextFillColorDisabled}"/>
+        </PropertyTrigger>
+    </Style>
+
+</StyleSet>

@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="utf-8"?>
+<StyleSet xmlns="http://adamantium/ui"
+          xmlns:x="http://adamantium/ui/xaml/extensions">
+
+    <!-- Two handles on one rail with the chosen span painted between them. The RangeTrack owns the geometry - it sizes
+         both handles' travel against the trough minus BOTH of them, so they can never cross - and this set is the rail
+         and the parts it positions.
+
+         It follows the plain slider exactly, and that is the whole point of it being here: BOTH HANDLES ARE WHITE. With
+         accent handles the pair reads as the two ENDS OF THE BLUE BAND, and a range slider is then a blue bar with
+         nothing on it to take hold of - which is worse here than on a plain slider, because there are two things to
+         take hold of and the user has to tell them apart from the band and from each other.
+
+         The band itself keeps SQUARE ends: it butts against a round handle on either side, and rounding it there would
+         read as a gap rather than as a join. -->
+
+    <!-- Cross axis 28, not the compact 22 - the room the knobs' shadows need. See the note in MacOsSliderStyleSet. -->
+    <Style Selector="RangeSlider">
+        <Setter Property="MinHeight" Value="{ResourceReference ControlHeight}"/>
+        <Setter Property="MinWidth" Value="{ResourceReference ControlMinWidth}"/>
+        <!-- The band is the RAIL's thickness, not the control's default 6. That default is a hit-target decision - the
+             band is a handle in its own right, and a fatter one is easier to grab - but on a Mac the chosen span and the
+             empty groove are one continuous track, and a span standing proud of the groove reads as a separate object
+             laid on top of it. It also shows up the joint: a square end butting a ROUND knob leaves a notch either side
+             of the meeting point, and the notch is as tall as the band is thick. -->
+        <Setter Property="BandThickness" Value="{ResourceReference SliderTrackThickness}"/>
+    </Style>
+
+    <Style Selector="RangeSlider">
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="RangeSlider">
+                    <!-- End-of-travel room for the knobs' halos - see MacOsSliderStyleSet. Worn by the whole layout so
+                         the rail, the band and the track stay in step. -->
+                    <Grid x:Name="Layout" Margin="4 0">
+                        <!-- The same unset groove the switch and the plain slider use - one material for "nothing
+                             chosen here", and the only value in the palette that is actually visible on the window. -->
+                        <Border x:Name="Rail" Height="{ResourceReference SliderTrackThickness}" CornerRadius="2"
+                                Background="{ResourceReference SelectionControlFillColorOff}"
+                                VerticalAlignment="Center"/>
+                        <RangeTrack x:Name="PART_Track"
+                                    Orientation="{TemplateBinding Orientation}"
+                                    Minimum="{TemplateBinding Minimum}"
+                                    Maximum="{TemplateBinding Maximum}"
+                                    LowerValue="{TemplateBinding LowerValue}"
+                                    UpperValue="{TemplateBinding UpperValue}"
+                                    MinimumBandLength="{TemplateBinding MinimumRangeWidth}">
+                            <!-- The band is a THUMB: it shows the span AND drags the whole span at once. Unlike a plain
+                                 slider's fill it is anchored to neither end, so the track arranges it between the two
+                                 handles instead of the control sizing it. -->
+                            <RangeTrack.CenterThumb>
+                                <Thumb x:Name="SelectedBand" Height="{TemplateBinding BandThickness}">
+                                    <Thumb.Template>
+                                        <ControlTemplate TargetType="Thumb">
+                                            <Border Background="{ThemeResource AccentFillColorDefault}"/>
+                                        </ControlTemplate>
+                                    </Thumb.Template>
+                                </Thumb>
+                            </RangeTrack.CenterThumb>
+                            <!-- Both handles are the shared knob - see MacOsSliderKnobStyleSet. Taken by class, so each
+                                 one lights on ITS OWN drag: the trigger is on the Thumb, so grabbing the lower handle
+                                 says nothing about the upper one. -->
+                            <RangeTrack.LowerThumb>
+                                <Thumb Width="20" Height="20" Classes="SliderKnob"/>
+                            </RangeTrack.LowerThumb>
+                            <RangeTrack.UpperThumb>
+                                <Thumb Width="20" Height="20" Classes="SliderKnob"/>
+                            </RangeTrack.UpperThumb>
+                        </RangeTrack>
+                    </Grid>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- Vertical: the rail and the band are laid out horizontally by the template above, so both axes are swapped. The
+         track gets its Orientation by TemplateBinding, so the handles already travel the right way. -->
+    <Style Selector="RangeSlider">
+        <PropertyTrigger Property="Orientation" Value="Vertical">
+            <!-- MinWidth is a horizontal min-LENGTH; left at 120 it forces a dead hit area beside a 4-wide rail. Moved
+                 to the knob's cross size rather than to zero - at zero the control is exactly as wide as a knob, and a
+                 knob with no room around it has its shadow clipped. See MacOsSliderStyleSet. -->
+            <Setter Property="MinWidth" Value="{ResourceReference ControlHeight}"/>
+            <Setter TargetName="Layout" Property="Margin" Value="0 4"/>
+            <Setter Property="MinHeight" Value="{ResourceReference ControlMinLength}"/>
+            <Setter TargetName="Rail" Property="Width" Value="{ResourceReference SliderTrackThickness}"/>
+            <Setter TargetName="Rail" Property="Height" Value="Auto"/>
+            <Setter TargetName="Rail" Property="HorizontalAlignment" Value="Center"/>
+            <Setter TargetName="Rail" Property="VerticalAlignment" Value="Stretch"/>
+            <Setter TargetName="SelectedBand" Property="Width" Value="{TemplateBinding BandThickness}"/>
+            <Setter TargetName="SelectedBand" Property="Height" Value="Auto"/>
+            <!-- Minimum at the BOTTOM, the span grows UP. The track defaults to top=min (the scrollbar convention), so
+                 a vertical one has to opt into the reversal. -->
+            <Setter TargetName="PART_Track" Property="IsDirectionReversed" Value="true"/>
+        </PropertyTrigger>
+    </Style>
+
+</StyleSet>

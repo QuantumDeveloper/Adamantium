@@ -49,10 +49,14 @@ public static class HaloBake
     /// among them - see <see cref="Living"/>.</summary>
     public static HaloBand[] From(Aura aura, Shadow shadow)
     {
-        // A switched-off band keeps its settings and simply is not drawn - see Aura.IsEnabled.
-        // A switched-off band keeps its settings and simply is not drawn - see Aura.IsEnabled.
-        if (aura is not { IsEnabled: true } or { IsLiving: true }) aura = null;
-        if (shadow is not { IsEnabled: true }) shadow = null;
+        // A switched-off band is baked TRANSPARENT rather than dropped, so the record it owns survives being switched
+        // off and back on. Dropping it made IsEnabled a change in how many records the element holds - which a patch
+        // cannot make - so a glow coming on cost a walk of the scene, or, on an element that wore no other band, was
+        // silently never drawn. See HaloBand.IsEmpty for the rule and its cost.
+        //
+        // A LIVING aura is the exception and is still dropped here: it is drawn by its own pass (see Living), so a still
+        // record for it would be a second drawing of the same glow.
+        if (aura is { IsLiving: true }) aura = null;
         if (aura == null && shadow == null) return null;
 
         // SHADOW first, then aura - the order they are drawn in. A shadow falls on what lies BEHIND the element, while an
@@ -76,8 +80,10 @@ public static class HaloBake
     private static HaloBand FromAura(Aura aura)
     {
         if (aura == null) return default;
+        // Switched off = alpha zero, NOT absent: the band keeps its geometry and so keeps its record.
+        var opacity = aura.IsEnabled ? aura.Opacity : 0.0;
         return new HaloBand(Vector2F.Zero, (float)System.Math.Max(0.0, aura.Spread),
-            (float)System.Math.Max(0.0, aura.Radius), Premultiplied(aura.Color, aura.Opacity), aura.Inner);
+            (float)System.Math.Max(0.0, aura.Radius), Premultiplied(aura.Color, opacity), aura.Inner);
     }
 
     // A shadow's Spread may be NEGATIVE - a shadow that only peeks out from under one edge - so it is not clamped the
@@ -85,8 +91,10 @@ public static class HaloBake
     private static HaloBand FromShadow(Shadow shadow)
     {
         if (shadow == null) return default;
+        // Switched off = alpha zero, NOT absent - see FromAura.
+        var opacity = shadow.IsEnabled ? shadow.Opacity : 0.0;
         return new HaloBand(new Vector2F((float)shadow.OffsetX, (float)shadow.OffsetY), (float)shadow.Spread,
-            (float)System.Math.Max(0.0, shadow.BlurRadius), Premultiplied(shadow.Color, shadow.Opacity), shadow.Inner);
+            (float)System.Math.Max(0.0, shadow.BlurRadius), Premultiplied(shadow.Color, opacity), shadow.Inner);
     }
 
     private static Vector4F Premultiplied(Color color, double opacity)

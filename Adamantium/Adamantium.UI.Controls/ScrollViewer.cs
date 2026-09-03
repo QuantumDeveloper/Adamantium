@@ -52,6 +52,24 @@ public class ScrollViewer : ContentControl
     public static bool GetScrollChaining(AdamantiumComponent e) => e.GetValue<bool>(ScrollChainingProperty);
     public static void SetScrollChaining(AdamantiumComponent e, bool value) => e.SetValue(ScrollChainingProperty, value);
 
+    // TRUE only while BOTH bars are showing - which is the one moment the square where they cross belongs to neither of
+    // them. A template needs this and could not work it out: each bar's own Visibility is decided here from the metrics,
+    // and a style trigger cannot ask a sibling part what it came out as.
+    //
+    // Read-only because it is an OBSERVATION, not a setting: it says what the metrics produced. What is DONE about the
+    // corner stays with the theme, which is the split the rest of this control keeps (see the note on auto-hide in the
+    // Fluent ScrollViewer set) - one theme fills the square, another lets the content show through it, a third insets
+    // both bars away from it entirely.
+    public static readonly AdamantiumProperty IsScrollBarCornerOccupiedProperty = AdamantiumProperty.RegisterReadOnly(
+        nameof(IsScrollBarCornerOccupied), typeof(bool), typeof(ScrollViewer), new PropertyMetadata(false));
+
+    /// <summary>Both scrollbars are visible, so the square where they meet is covered by neither.</summary>
+    public bool IsScrollBarCornerOccupied
+    {
+        get => GetValue<bool>(IsScrollBarCornerOccupiedProperty);
+        private set => SetValue(IsScrollBarCornerOccupiedProperty, value);
+    }
+
     // Changing bar visibility at runtime (e.g. a TextBox toggling wrap) must re-push the CanScroll flags onto the
     // presenter - Disabled means "don't scroll this axis" (measure the content to the viewport so it wraps/fits), any
     // other value means "scrollable". Without this the presenter kept the flags captured once in OnApplyTemplate.
@@ -433,6 +451,11 @@ public class ScrollViewer : ContentControl
             _verticalBar.Visibility = ComputeVisibility(VerticalScrollBarVisibility, extent.Height, viewport.Height);
         if (_horizontalBar != null)
             _horizontalBar.Visibility = ComputeVisibility(HorizontalScrollBarVisibility, extent.Width, viewport.Width);
+
+        // A bar the template never supplied is not a bar that is showing: an absent part reads as false, so a viewer
+        // with one bar (or none) never claims the corner.
+        IsScrollBarCornerOccupied = _verticalBar is { Visibility: Visibility.Visible }
+                                    && _horizontalBar is { Visibility: Visibility.Visible };
     }
 
     private static Visibility ComputeVisibility(ScrollBarVisibility mode, double extent, double viewport) => mode switch

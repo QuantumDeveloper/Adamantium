@@ -162,7 +162,11 @@ internal sealed class HaloRectCollector : ShapeSdfCollector<HaloRectItem>
 
             var color = band.Color;
             color.W *= (float)opacity;
-            if (color.W <= 0f) continue;
+            // A TRANSPARENT band is still WRITTEN. It owns a record - see HaloBand.IsEmpty - and skipping it here made
+            // this bake disagree with the two places that count records (CountBands, and TryAdd's own arithmetic): the
+            // count said two, the bake wrote one, and the record the bake passed over kept whatever it held last. That
+            // is a glow switched off staying lit, through a PATCH and through a full WALK alike, until something else
+            // rewrote the arena. Nothing is drawn for it either way; the shader is handed alpha zero.
             if (written >= dst.Length) break;
 
             dst[written++] = new HaloRectItem

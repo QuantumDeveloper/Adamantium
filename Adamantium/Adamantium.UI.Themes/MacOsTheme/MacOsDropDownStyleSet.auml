@@ -1,0 +1,125 @@
+<?xml version="1.0" encoding="utf-8"?>
+<StyleSet xmlns="http://adamantium/ui"
+          xmlns:x="http://adamantium/ui/xaml/extensions">
+
+    <!-- The macOS pop-up button. After the traffic lights this is the most recognisable control on the platform, and
+         all of the recognition is in one detail:
+
+         THE INDICATOR IS AN ACCENT BADGE WITH TWO CHEVRONS, not a grey chevron in the corner. A Windows drop-down puts
+         a small dark arrow at the right-hand end of an otherwise plain box; a Mac puts a filled blue tile there with a
+         white chevron pointing UP and another pointing DOWN. The two arrows are the point: they say the list opens in
+         BOTH directions from the current value - a Mac pop-up menu appears over the button with the chosen row under
+         the pointer, rather than dropping below it - and that is why one arrow would be the wrong drawing even before
+         it was the wrong colour.
+
+         The badge is inset 2 from the button's edge on three sides, which means the header's Padding cannot wrap it -
+         hence the padding sits on the CONTENT presenter here rather than on the header Border.
+
+         NO HOVER, as everywhere in this theme. Pressing darkens the button.
+
+         The chevrons are drawn here rather than added to the icon dictionary: they are two triangles that exist for
+         this one control, and an icon resource would have to carry the on-accent colour with it. -->
+
+    <Style Selector="DropDown" BasedOn="ItemsControl">
+        <Setter Property="Background" Value="{ResourceReference ControlFillColorDefault}"/>
+        <!-- Stated, not omitted: hover leaves it as it was. See MacOsButtonStyleSet. -->
+        <Setter Property="BackgroundPointerOver" Value="{ResourceReference ControlFillColorDefault}"/>
+        <Setter Property="BorderBrush" Value="{ResourceReference ControlStrokeColorDefault}"/>
+        <Setter Property="Foreground" Value="{ObservableResource TextFillColorPrimary}"/>
+        <Setter Property="BorderThickness" Value="{ResourceReference StrokeControl}"/>
+        <Setter Property="CornerRadius" Value="{ResourceReference CornerRadiusDefault}"/>
+        <Setter Property="Padding" Value="{ResourceReference PaddingControl}"/>
+        <Setter Property="MinHeight" Value="{ResourceReference ControlHeight}"/>
+        <Setter Property="MinWidth" Value="{ResourceReference ControlMinWidth}"/>
+        <Setter Property="FontSize" Value="{ResourceReference FontSizeBody}"/>
+        <Setter Property="ItemsPanel">
+            <Setter.Value>
+                <ItemsPanelTemplate>
+                    <StackPanel Orientation="Vertical"/>
+                </ItemsPanelTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style Selector="DropDown">
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="DropDown">
+                    <Grid>
+                        <!-- No Padding on the header: the badge has to reach the edge, so the padding is worn by the
+                             content presenter instead. -->
+                        <Border x:Name="PART_Header"
+                                CornerRadius="{TemplateBinding CornerRadius}"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}">
+                            <Grid ColumnDefinitions="*,Auto">
+                                <ContentPresenter
+                                        x:Name="PART_ContentPresenter"
+                                        Margin="{TemplateBinding Padding}"
+                                        HorizontalAlignment="Left"
+                                        VerticalAlignment="Center"
+                                        Foreground="{TemplateBinding Foreground}"
+                                        FontSize="{TemplateBinding FontSize}"
+                                        Content="{TemplateBinding DisplayContent}"
+                                        ContentTemplate="{TemplateBinding ItemTemplate}"
+                                        ContentTemplateSelector="{TemplateBinding ItemTemplateSelector}"/>
+                                <Border x:Name="Indicator" Grid.Column="1"
+                                        Width="18" Margin="0 2 2 2" CornerRadius="4"
+                                        Background="{ThemeResource AccentFillColorDefault}"
+                                        VerticalAlignment="Stretch">
+                                    <StackPanel Orientation="Vertical" Spacing="3"
+                                                HorizontalAlignment="Center" VerticalAlignment="Center">
+                                        <Path Data="M0,4 L8,4 L4,0 Z"
+                                              Fill="{ThemeResource AccentForegroundColor}"/>
+                                        <Path Data="M0,0 L8,0 L4,4 Z"
+                                              Fill="{ThemeResource AccentForegroundColor}"/>
+                                    </StackPanel>
+                                </Border>
+                            </Grid>
+                        </Border>
+
+                        <Popup x:Name="PART_Popup"
+                               Placement="Bottom" FlipToFit="True" VerticalOffset="2">
+                            <!-- Built LAZILY on first open, as in Fluent: a closed list would otherwise cost a card,
+                                 two scrollbars and a container per row, and most lists are never opened. The popup's
+                                 DataContext is the DropDown, so these plain {Binding}s reach it - {TemplateBinding}
+                                 cannot, a ChildTemplate being built against the POPUP. -->
+                            <Popup.ChildTemplate>
+                                <ControlTemplate TargetType="Popup">
+                                    <!-- Rounder and more generously padded than Fluent's card: a Mac menu is a floating
+                                         sheet with its rows held off the edges, not a bordered list box. -->
+                                    <Border Background="{ResourceReference AcrylicFlyoutFill}"
+                                            BorderBrush="{ResourceReference ControlStrokeColorDefault}"
+                                            BorderThickness="1"
+                                            CornerRadius="6"
+                                            Padding="4"
+                                            MinWidth="{Binding ActualWidth}">
+                                        <ScrollViewer MaxHeight="{Binding MaxDropDownHeight}"
+                                                      HorizontalScrollBarVisibility="Disabled"
+                                                      VerticalScrollBarVisibility="Auto">
+                                            <ItemsPresenter x:Name="PART_ItemsPresenter"/>
+                                        </ScrollViewer>
+                                    </Border>
+                                </ControlTemplate>
+                            </Popup.ChildTemplate>
+                        </Popup>
+                    </Grid>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style Selector="DropDown">
+        <!-- No IsMouseOver trigger - see the header. -->
+        <PropertyTrigger Property="IsDropDownOpen" Value="true">
+            <Setter TargetName="PART_Header" Property="Background" Value="{ResourceReference ControlFillColorTertiary}"/>
+        </PropertyTrigger>
+        <PropertyTrigger Property="IsEnabled" Value="false">
+            <Setter TargetName="PART_Header" Property="Background" Value="{ResourceReference ControlFillColorDisabled}"/>
+            <Setter TargetName="Indicator" Property="Background" Value="{ThemeResource AccentFillColorDisabled}"/>
+            <Setter TargetName="PART_ContentPresenter" Property="Foreground" Value="{ObservableResource TextFillColorDisabled}"/>
+        </PropertyTrigger>
+    </Style>
+
+</StyleSet>
