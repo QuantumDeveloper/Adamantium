@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="utf-8"?>
+<StyleSet xmlns="http://adamantium/ui"
+          xmlns:x="http://adamantium/ui/xaml/extensions">
+
+    <!-- The macOS switch. Same parts as Fluent's - a track and a thumb in a row with the label - and three differences
+         that are the whole of why one is recognisable and the other is not:
+
+         THE THUMB FILLS THE TRACK. A Mac switch is a knob riding in a groove barely bigger than itself, held off the
+         ends by a hair; Fluent's is a small dot in a wide capsule with room to spare. That single proportion is most of
+         the recognition, before any colour.
+
+         THE THUMB IS WHITE IN BOTH STATES, and white in both APPEARANCES. It is a physical knob, and a knob does not
+         change colour when it is moved - Fluent repaints it to the on-accent contrast colour, which reads as the fill
+         sliding rather than as something being pushed.
+
+         ON IS THE ACCENT, not green. Green is the iOS switch; the Mac takes the user's accent colour, like everything
+         else that means "on" on this platform. -->
+
+    <Style Selector="ToggleSwitch">
+        <Setter Property="Foreground" Value="{ObservableResource TextFillColorPrimary}"/>
+        <Setter Property="Background" Value="{ResourceReference ControlFillColorTertiary}"/>
+        <Setter Property="BorderBrush" Value="{ResourceReference ControlStrokeColorDefault}"/>
+        <Setter Property="FontSize" Value="{ResourceReference FontSizeBody}"/>
+        <Setter Property="VerticalContentAlignment" Value="Center"/>
+    </Style>
+
+    <Style Selector="ToggleSwitch">
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ToggleSwitch">
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Spacing="8">
+                        <!-- NO BORDER, and the arithmetic is the reason as much as the look. A Mac track is a solid
+                             capsule, not an outlined one; and a 1px border would take the inner box to 36x20, into
+                             which an 18 thumb with 2 all round does not fit vertically at all - 18+2+2 is 22. An
+                             over-constrained box lays out however it must, and what showed on screen was the thumb
+                             sitting off-centre at one end. Without it the inner box is 38x22 and the numbers close
+                             exactly: 2 above and below, 2 at whichever end the thumb is at. -->
+                        <Border x:Name="SwitchTrack"
+                                Width="38" Height="22" CornerRadius="11"
+                                Background="{TemplateBinding Background}"
+                                BorderThickness="0"
+                                VerticalAlignment="Center">
+                            <Grid HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
+                                <!-- 18 in a 22 track: two all round, which is the proportion described above. ONE
+                                     margin, not one per end - the inset stated once and only the ALIGNMENT moving, so
+                                     the two ends cannot drift apart.
+
+                                     A BORDER WITH A FULL RADIUS, not an Ellipse, and that is measured rather than
+                                     preferred: the thumb sat further from the right end than from the left, and the
+                                     LAYOUT is symmetric for both primitives (AlignedMarginTests measures exactly two
+                                     at either edge for a Border and for an Ellipse alike). What differs is how the
+                                     shape fills the box it was given, which no layout test can see. A rounded Border
+                                     is the same primitive the track itself is, and it fills its box. -->
+                                <Border x:Name="SwitchThumb"
+                                        Width="18" Height="18" CornerRadius="9"
+                                        Background="#FFFFFF"
+                                        HorizontalAlignment="Left"
+                                        VerticalAlignment="Center"
+                                        Margin="2"/>
+                            </Grid>
+                        </Border>
+                        <ContentPresenter x:Name="PART_ContentPresenter"
+                                          Content="{TemplateBinding Content}"
+                                          ContentTemplate="{TemplateBinding ContentTemplate}"
+                                          Foreground="{TemplateBinding Foreground}"
+                                          FontSize="{TemplateBinding FontSize}"
+                                          VerticalAlignment="Center"/>
+                    </StackPanel>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style Selector="ToggleSwitch">
+        <!-- No hover on the track, for the reason the button gives: a Mac control answers the press, not the pointer. -->
+        <PropertyTrigger Property="IsChecked" Value="true">
+            <Setter TargetName="SwitchTrack" Property="Background" Value="{ThemeResource AccentFillColorDefault}"/>
+            <Setter TargetName="SwitchThumb" Property="HorizontalAlignment" Value="Right"/>
+            <!-- The thumb is NOT repainted here - see the header. It stays the knob it was. -->
+            <!-- Un-inherit the ToggleButton accent-label: a switch's label sits on the window, not on the switch. -->
+            <Setter TargetName="PART_ContentPresenter" Property="Foreground" Value="{ObservableResource TextFillColorPrimary}"/>
+        </PropertyTrigger>
+        <PropertyTrigger Property="IsEnabled" Value="false">
+            <Setter TargetName="SwitchTrack" Property="Background" Value="{ResourceReference ControlFillColorDisabled}"/>
+            <Setter TargetName="SwitchThumb" Property="Background" Value="{ResourceReference ControlFillColorDefault}"/>
+            <Setter TargetName="PART_ContentPresenter" Property="Foreground" Value="{ResourceReference TextFillColorDisabled}"/>
+        </PropertyTrigger>
+    </Style>
+
+</StyleSet>

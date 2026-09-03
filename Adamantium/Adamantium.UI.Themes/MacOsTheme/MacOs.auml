@@ -91,6 +91,7 @@
         <StyleInclude Source="{x:Type mac:MacOsWindowStyleSet}"/>
         <StyleInclude Source="{x:Type mac:MacOsTitleBarStyleSet}"/>
         <StyleInclude Source="{x:Type mac:MacOsButtonStyleSet}"/>
+        <StyleInclude Source="{x:Type mac:MacOsToggleSwitchStyleSet}"/>
   </Theme.StyleIncludes>
 
 </Theme>
