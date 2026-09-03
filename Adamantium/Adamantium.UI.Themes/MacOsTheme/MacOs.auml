@@ -8,9 +8,11 @@
        SystemDarkVariant="Dark"
        ResourceContext.Scope="Theme">
 
-  <!-- The macOS theme, and at this point it is a WINDOW and a CAPTION and nothing else yet.
+  <!-- The macOS theme: so far a WINDOW, a CAPTION, and the controls that carry a STATE - the push button, the switch,
+       the checkbox and the radio button. Those four were taken first on purpose: state is what a platform's controls
+       are recognised by, long before its lists or its fields are.
 
-       SCAFFOLDING, SAID OUT LOUD: the STYLE SETS below, bar the two macOS ones, are still Fluent's. That is not the
+       SCAFFOLDING, SAID OUT LOUD: the STYLE SETS below, bar the macOS ones, are still Fluent's. That is not the
        finished shape - a theme owns its own sets, as Editor Pro does - it is what lets the chrome be looked at today
        instead of after fifty files. Each gets replaced by a macOS one as the work goes on, and this comment shrinks
        with the list.
@@ -35,23 +37,21 @@
   </Theme.Variants>
 
   <Theme.StyleIncludes>
-        <!-- Borrowed from Fluent until each has a macOS counterpart. FIRST, because macOS's own come after and the
-             later set wins: the traffic lights are Buttons, and Fluent's plain Button style would otherwise paint over
-             the class style that makes them coloured circles. -->
+        <!-- Borrowed from Fluent until each has a macOS counterpart, and the borrowed one is then DELETED here rather
+             than left to lose: a Template setter is the only thing the winning set wins outright. Every OTHER style in
+             the losing set is still live, and its triggers address parts BY NAME - so Fluent's IsChecked trigger went
+             on writing SwitchTrack's border brush and SwitchThumb's margin into the macOS switch's identically-named
+             parts, which is what put 2 at one end of the track and 4 at the other. A part name is not private to a
+             template; two sets for one control are two sets, not an override. -->
+        <!-- FIRST, because macOS's own come after and the later set wins a tie: the traffic lights are Buttons, and
+             Fluent's plain Button style would otherwise paint over the class style that makes them coloured circles. -->
         <StyleInclude Source="{x:Type fluent:TextBlockStyleSet}"/>
         <StyleInclude Source="{x:Type fluent:BorderStyleSet}"/>
         <StyleInclude Source="{x:Type fluent:ContentControlStyleSet}"/>
         <StyleInclude Source="{x:Type fluent:RepeatButtonStyleSet}"/>
         <StyleInclude Source="{x:Type fluent:ThumbStyleSet}"/>
-        <StyleInclude Source="{x:Type fluent:ScrollBarStyleSet}"/>
-        <StyleInclude Source="{x:Type fluent:ScrollViewerStyleSet}"/>
         <StyleInclude Source="{x:Type fluent:ZoomBoxStyleSet}"/>
         <StyleInclude Source="{x:Type fluent:ToggleButtonStyleSet}"/>
-        <StyleInclude Source="{x:Type fluent:CheckBoxStyleSet}"/>
-        <StyleInclude Source="{x:Type fluent:RadioButtonStyleSet}"/>
-        <StyleInclude Source="{x:Type fluent:ToggleSwitchStyleSet}"/>
-        <StyleInclude Source="{x:Type fluent:SliderStyleSet}"/>
-        <StyleInclude Source="{x:Type fluent:RangeSliderStyleSet}"/>
         <StyleInclude Source="{x:Type fluent:NumericUpDownStyleSet}"/>
         <StyleInclude Source="{x:Type fluent:ProgressBarStyleSet}"/>
         <StyleInclude Source="{x:Type fluent:RingProgressBarStyleSet}"/>
@@ -67,9 +67,7 @@
         <StyleInclude Source="{x:Type fluent:KeyTipAdornerStyleSet}"/>
         <StyleInclude Source="{x:Type fluent:TilesHostStyleSet}"/>
         <StyleInclude Source="{x:Type fluent:FlipTileStyleSet}"/>
-        <StyleInclude Source="{x:Type fluent:DropDownStyleSet}"/>
         <StyleInclude Source="{x:Type fluent:DropDownItemStyleSet}"/>
-        <StyleInclude Source="{x:Type fluent:TextBoxStyleSet}"/>
         <StyleInclude Source="{x:Type fluent:ToolTipStyleSet}"/>
         <StyleInclude Source="{x:Type fluent:TabControlStyleSet}"/>
         <StyleInclude Source="{x:Type fluent:TabItemStyleSet}"/>
@@ -92,6 +90,15 @@
         <StyleInclude Source="{x:Type mac:MacOsTitleBarStyleSet}"/>
         <StyleInclude Source="{x:Type mac:MacOsButtonStyleSet}"/>
         <StyleInclude Source="{x:Type mac:MacOsToggleSwitchStyleSet}"/>
+        <StyleInclude Source="{x:Type mac:MacOsCheckBoxStyleSet}"/>
+        <StyleInclude Source="{x:Type mac:MacOsRadioButtonStyleSet}"/>
+        <StyleInclude Source="{x:Type mac:MacOsTextBoxStyleSet}"/>
+        <StyleInclude Source="{x:Type mac:MacOsScrollBarStyleSet}"/>
+        <StyleInclude Source="{x:Type mac:MacOsScrollViewerStyleSet}"/>
+        <StyleInclude Source="{x:Type mac:MacOsDropDownStyleSet}"/>
+        <StyleInclude Source="{x:Type mac:MacOsSliderStyleSet}"/>
+        <StyleInclude Source="{x:Type mac:MacOsRangeSliderStyleSet}"/>
+        <StyleInclude Source="{x:Type mac:MacOsSliderKnobStyleSet}"/>
   </Theme.StyleIncludes>
 
 </Theme>

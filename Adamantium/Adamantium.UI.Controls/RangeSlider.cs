@@ -363,12 +363,18 @@ public class RangeSlider : RangeLimitsBase
         return vertical ? bounds.Y + bounds.Height / 2 : bounds.X + bounds.Width / 2;
     }
 
-    // Which handle owns this position along the track, if any. The three never overlap along it, so at most one answers.
-    private Thumb CoveringHandle(double pos, bool vertical)
+    // Which handle owns this position along the track. They DO overlap: the band runs from one thumb's centre to the
+    // other's, under both of them (see RangeTrack), so a press on an end thumb lands on the band as well - and the order
+    // of these three lines is the whole of what decides between them.
+    //
+    // END THUMBS FIRST, and it is the same order the eye is given: they are painted OVER the band, so the thing under
+    // the pointer is the thumb. Asked the other way round - which is how this read while the three could not overlap -
+    // a press aimed at a handle started dragging the whole span instead, and the handle it was aimed at never moved.
+    internal Thumb CoveringHandle(double pos, bool vertical)
     {
-        if (CoversAlong(_track.CenterThumb, pos, vertical)) return _track.CenterThumb;
         if (CoversAlong(_track.LowerThumb, pos, vertical)) return _track.LowerThumb;
         if (CoversAlong(_track.UpperThumb, pos, vertical)) return _track.UpperThumb;
+        if (CoversAlong(_track.CenterThumb, pos, vertical)) return _track.CenterThumb;
         return null;
     }
 

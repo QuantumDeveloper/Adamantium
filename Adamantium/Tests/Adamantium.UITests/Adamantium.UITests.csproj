@@ -24,6 +24,8 @@
     <ItemGroup>
       <ProjectReference Include="..\..\Adamantium.Mathematics\Adamantium.Mathematics.csproj" />
       <ProjectReference Include="..\..\Adamantium.UI\Adamantium.UI.csproj" />
+      <!-- The themes themselves, so a style set can be measured as SHIPPED rather than as a hand-copied lookalike. -->
+      <ProjectReference Include="..\..\Adamantium.UI.Themes\Adamantium.UI.Themes.csproj" />
       <!-- Needed by the [Category("Gpu")] integration tests to spin up a headless render device. -->
       <ProjectReference Include="..\..\Adamantium.Graphics\Adamantium.Graphics.csproj" />
     </ItemGroup>

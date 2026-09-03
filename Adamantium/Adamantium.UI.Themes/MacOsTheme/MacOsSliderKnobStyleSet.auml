@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="utf-8"?>
+<StyleSet xmlns="http://adamantium/ui"
+          xmlns:x="http://adamantium/ui/xaml/extensions">
+
+    <!-- The knob both sliders take hold of, as ONE style rather than as an inline template in each of them - because it
+         now has a STATE (it glows while it is being dragged), and a state needs a trigger, and a trigger needs a part it
+         can name. An inline Thumb.Template has no name to offer, and duplicating this into the two slider sets would put
+         two styles on one selector, which is its own bug.
+
+         Opted into by class - <Thumb Classes="SliderKnob"/> - so the scrollbar's thumb and the splitter's are untouched.
+
+         WHITE IN BOTH APPEARANCES, like the switch's: it is a physical knob, and a knob does not change colour with the
+         lighting. What changes with the appearance is what SEPARATES it from the background, and that is a colour the
+         variant supplies (see SliderKnobShadowColor - a real shadow in the light appearance, nothing in the dark one,
+         where a white circle on #323232 already stands out).
+
+         HELD = LIT. An aura, not a bigger shadow: a shadow says how high a thing floats, and the knob does not rise
+         when you grab it - it becomes the thing you are working with, which is what light says. It appears only while
+         dragging, so the resting control never glows.
+
+         The 4 of reach is not a taste either: the knob is 20 in a 28 control, so there are exactly four clear on each
+         side, and neither band may ask for more - the engine does not grow layout for a halo, and the excess would be
+         cut by the first ancestor that clips with nothing to say it had happened. -->
+
+    <Style Selector="Thumb.SliderKnob">
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Thumb">
+                    <Border x:Name="Knob"
+                            CornerRadius="10"
+                            Background="#FFFFFF"
+                            BorderBrush="{ResourceReference ControlStrokeColorSecondary}"
+                            BorderThickness="1">
+                        <Border.Shadow>
+                            <!-- Opacity 1: the strength lives in the palette colour's alpha, so a variant that wants no
+                                 shadow says so in one place instead of in two that have to agree. -->
+                            <Shadow OffsetY="1" BlurRadius="3" Opacity="1"
+                                    Color="{ObservableResource SliderKnobShadowColor}"/>
+                        </Border.Shadow>
+                        <!-- DECLARED HERE, SWITCHED OFF - not handed over by the trigger as a finished object. An Aura
+                             built inside Setter.Value only comes into existence at the moment of the drag, which is why
+                             it arrived late. Living in the template it is there from the start, and the trigger below
+                             has nothing to do but flip the switch - which is exactly what Aura.IsEnabled is for.
+
+                             AND THE COLOUR IS {ObservableResource}, NOT {ResourceReference}. A ResourceReference is a
+                             one-shot lookup performed WHEN THE ELEMENT ATTACHES to the tree; an Aura is a property
+                             VALUE and never attaches, so the lookup never ran and it kept Aura's own default - white.
+                             Every other colour-served key in the themes (the tab strip's edge fades, the shimmer
+                             stops - all of them on GradientStop.Color, which sits exactly where this does) uses
+                             ObservableResource for the same reason. -->
+                        <Border.Aura>
+                            <!-- A RIM plus a short fade, not a wide soft glow: Spread is the solid part the fade starts
+                                 outside of. Four pixels of soft haze around a bright white circle is swallowed by the
+                                 knob and reads as nothing having happened. Total reach stays 4 - all the room there
+                                 is - and is spent on something that can be seen. -->
+                            <Aura x:Name="KnobAura" IsEnabled="False"
+                                  Spread="1" Radius="3" Opacity="0.95"
+                                  Color="{ObservableResource SliderKnobAuraColor}"/>
+                        </Border.Aura>
+                    </Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style Selector="Thumb.SliderKnob">
+        <!-- IsDragging is set in Thumb.BeginDrag, which runs from the mouse-DOWN handler - so this is a press, not a
+             movement, which is what a Mac answers to. -->
+        <PropertyTrigger Property="IsDragging" Value="true">
+            <!-- The knob's own fill, FIRST, because it is the half of this that always reads. The aura is the accent,
+                 and a knob spends half its travel standing on the accent-filled part of the rail, where an accent glow
+                 is its background's colour to the byte - invisible by construction, and the reason the glow alone
+                 looked like it fired only some of the time. What is behind the knob cannot hide the knob. -->
+            <Setter TargetName="Knob" Property="Background" Value="{ObservableResource SliderKnobFillPressed}"/>
+            <!-- The knob's own rim goes accent too, and not for decoration: the aura's inner edge and the knob's fill
+                 edge are the SAME contour, both anti-aliased, so neither covers the pixel they share - and whatever
+                 lies behind shows through it as a hairline. On a slider what lies behind is the rail, which is exactly
+                 where it was seen. The rim is drawn WITH the knob, so it covers that seam. -->
+            <Setter TargetName="Knob" Property="BorderBrush" Value="{ThemeResource AccentFillColorDefault}"/>
+            <Setter TargetName="KnobAura" Property="IsEnabled" Value="True"/>
+        </PropertyTrigger>
+    </Style>
+
+</StyleSet>

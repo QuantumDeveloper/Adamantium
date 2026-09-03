@@ -39,6 +39,15 @@ public readonly struct HaloBand
     /// <summary>How far past the outline this band reaches - what the drawn quad has to be grown by to hold it.</summary>
     public float Reach => Spread + Softness + System.Math.Max(System.Math.Abs(Offset.X), System.Math.Abs(Offset.Y));
 
-    /// <summary>Nothing to draw: fully transparent, or a band with no width at all.</summary>
-    public bool IsEmpty => Color.W <= 0.0f || (Spread + Softness) <= 0.0f;
+    /// <summary>No band at all - one with no width to it. Note what this does NOT ask: whether it is currently
+    /// TRANSPARENT.
+    /// <para>A band's alpha decides whether it paints; its geometry decides whether it EXISTS. A transparent band still
+    /// occupies a record, and that is the whole point of the distinction: a glow switched on by a trigger would
+    /// otherwise be a change in how many records the element owns, and a patch can only rewrite records that are
+    /// already there - so switching it on cost the frame a walk of the scene, or, where the element wore no other band,
+    /// silently did not draw at all. Held as a record from the start, the same switch is an ordinary recolour.</para>
+    /// <para>The cost is one instance per element that OWNS an aura or a shadow while it is invisible, which is a set
+    /// that already pays for the ones it shows; an element with neither carries no bands at all and is untouched.</para>
+    /// </summary>
+    public bool IsEmpty => (Spread + Softness) <= 0.0f;
 }

@@ -21,21 +21,56 @@
   <ThemeVariantDefinition.Colors>
     <!-- The window is the SURFACE and the content is the paper on it - the opposite way round from Fluent. -->
     <PaletteColor Key="SolidBackgroundFillColorBase" Color="#ECECEC"/>
-    <PaletteColor Key="SolidBackgroundFillColorSecondary" Color="#E3E3E3"/>
+    <!-- The WELL - a list, a field, an editor - and it is WHITE, which is the sentence above taken literally. The dark
+         variant sinks its wells BELOW the window (#1E1E1E under #323232); the mirror of that is not "darker again" but
+         AWAY from the body, and away from #ECECEC is up. A grey well made the paper the same material as the surface it
+         lay on, which is the one thing this pair of variants exists to avoid. -->
+    <PaletteColor Key="SolidBackgroundFillColorSecondary" Color="#FFFFFF"/>
     <PaletteColor Key="SolidBackgroundFillColorTertiary" Color="#F5F5F5"/>
     <PaletteColor Key="SmokeFillColorDefault" Color="#59000000"/>
     <PaletteColor Key="CardBackgroundFillColorDefault" Color="#FFFFFF"/>
     <PaletteColor Key="LayerFillColorDefault" Color="#F6F6F6"/>
     <PaletteColor Key="TileFillColorDefault" Color="#0A000000"/>
 
+    <!-- Controls - see MacOsDark for the reasoning; the light side was already right, because white on #ECECEC is a
+         step whether you meant it or not. Tertiary is the PRESSED value and so is the darkest of the three. -->
     <PaletteColor Key="ControlFillColorDefault" Color="#FFFFFF"/>
-    <PaletteColor Key="ControlFillColorSecondary" Color="#F0F0F0"/>
-    <PaletteColor Key="ControlFillColorTertiary" Color="#E8E8E8"/>
-    <PaletteColor Key="ControlFillColorDisabled" Color="#0A000000"/>
+    <PaletteColor Key="ControlFillColorSecondary" Color="#F5F5F5"/>
+    <PaletteColor Key="ControlFillColorTertiary" Color="#E2E2E4"/>
+    <!-- Solid rather than a black wash: a translucent disabled fill over a white control gave a grey that changed with
+         whatever the control happened to be standing on. -->
+    <PaletteColor Key="ControlFillColorDisabled" Color="#E6E6E8"/>
     <PaletteColor Key="SubtleFillColorSecondary" Color="#0F000000"/>
     <PaletteColor Key="SubtleFillColorTertiary" Color="#08000000"/>
     <PaletteColor Key="ControlStrokeColorDefault" Color="#1F000000"/>
     <PaletteColor Key="ControlStrokeColorSecondary" Color="#2E000000"/>
+
+    <!-- The UNSET surface of a selection control - see MacOsDark for why it is one key and its own. The light side had
+         the same problem in the other direction: #E8E8E8 on an #ECECEC window is four levels apart. -->
+    <PaletteColor Key="SelectionControlFillColorOff" Color="#D2D2D6"/>
+
+    <!-- The overlay scroller's thumb - see MacOsDark for why it is translucent. -->
+    <PaletteColor Key="ScrollThumbFillColor" Color="#66000000"/>
+
+    <!-- A slider knob is white in both appearances, so what separates it from its background is NOT its own colour -
+        which means the separation has to vary by variant even though the knob does not. Here it is a shadow: white on
+        a white content well is otherwise held up by a hairline alone. Served As="Color" because Shadow.Color is a
+        colour, not a brush.
+
+        KEPT DELIBERATELY FAINT (20%, down from 30%). A shadow is translucent, so it composites with WHATEVER it falls
+        on - and a slider knob always straddles two things at once: the accent-filled side of the rail and the empty
+        side. The stronger it is, the more plainly the same ring reads as two different rings, one over blue and one
+        over grey. No amount of moving the rail hides that, because it is not geometry: it is the shadow doing exactly
+        what a shadow does. Strength is the only lever, and the hairline is what keeps the knob findable once the
+        shadow stops shouting. -->
+    <PaletteColor Key="SliderKnobShadowColor" Color="#33000000" As="Color"/>
+    <!-- The glow while the knob is HELD. Same blue as the focus stroke: both mean "this is the thing you are working
+         with right now", and answering that with two different blues would be two answers to one question. -->
+    <PaletteColor Key="SliderKnobAuraColor" Color="#007AFF" As="Color"/>
+    <!-- The knob while it is HELD. A glow alone cannot carry this: the aura is the accent, and half the time the knob
+         is standing on the accent-filled part of the rail, where an accent glow is the same colour as its background
+         to the byte. The knob's own fill is behind nothing and always reads. -->
+    <PaletteColor Key="SliderKnobFillPressed" Color="#E6E6E8"/>
 
     <PaletteColor Key="OnAccentOverlayPointerOver" Color="#1AFFFFFF"/>
     <PaletteColor Key="OnAccentOverlayPressed" Color="#00000000"/>

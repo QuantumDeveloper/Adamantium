@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="utf-8"?>
+<StyleSet xmlns="http://adamantium/ui"
+          xmlns:x="http://adamantium/ui/xaml/extensions">
+
+    <!-- The macOS text field. The template is the engine's - a themed Border round PART_TextPresenter inside the
+         scrolling content host - because that is what the control requires, not what Windows prefers. What is macOS
+         here is which SURFACE the field is made of:
+
+         A FIELD IS A WELL, NOT A CONTROL. Fluent builds it out of a ControlFill, the same material as a button, so a
+         field and a button sitting side by side are the same colour and only their outlines differ. A Mac sinks a
+         field into the window the way it sinks a list or an editor - it is content you type into, not a thing you
+         press. Hence SolidBackgroundFillColorSecondary, the well, shared with every other content surface.
+
+         NO HOVER, as everywhere else in this theme.
+
+         FOCUS IS THE BORDER, and only the border. A Mac also puts a wide halo round a focused field; that halo is the
+         application's ONE focus ring on the adorner layer, and a template that drew its own would be a second answer
+         to the same question. The fill does NOT change on focus either - Fluent lightens it, which reads as the field
+         becoming a control again just as it becomes editable. -->
+
+    <Style Selector="TextBox">
+        <Setter Property="Background" Value="{ResourceReference SolidBackgroundFillColorSecondary}"/>
+        <Setter Property="Foreground" Value="{ObservableResource TextFillColorPrimary}"/>
+        <!-- Dimmer than the text, so the watermark reads as a hint rather than as something already typed. -->
+        <Setter Property="PlaceholderForeground" Value="{ResourceReference TextFillColorTertiary}"/>
+        <Setter Property="FloatingPlaceholderForeground" Value="{ThemeResource AccentFillColorDefault}"/>
+        <Setter Property="BorderBrush" Value="{ResourceReference ControlStrokeColorDefault}"/>
+        <Setter Property="CaretBrush" Value="{ResourceReference TextFillColorPrimary}"/>
+        <Setter Property="BorderThickness" Value="{ResourceReference StrokeControl}"/>
+        <Setter Property="CornerRadius" Value="{ResourceReference CornerRadiusDefault}"/>
+        <Setter Property="Padding" Value="{ResourceReference PaddingField}"/>
+        <Setter Property="MinWidth" Value="{ResourceReference ControlMinWidth}"/>
+        <Setter Property="MinHeight" Value="{ResourceReference ControlHeight}"/>
+        <Setter Property="FontSize" Value="{ResourceReference FontSizeBody}"/>
+    </Style>
+
+    <Style Selector="TextBox">
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="TextBox">
+                    <Border x:Name="PART_Border"
+                            Background="{TemplateBinding Background}"
+                            BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}"
+                            CornerRadius="{TemplateBinding CornerRadius}"
+                            Padding="{TemplateBinding Padding}"
+                            ClipToBounds="True">
+                        <ScrollViewer x:Name="PART_ContentHost"
+                                      HorizontalScrollBarVisibility="{TemplateBinding HorizontalScrollBarVisibility}"
+                                      VerticalScrollBarVisibility="{TemplateBinding VerticalScrollBarVisibility}">
+                            <TextPresenter x:Name="PART_TextPresenter"
+                                           HorizontalAlignment="Stretch"
+                                           VerticalAlignment="Stretch"/>
+                        </ScrollViewer>
+                    </Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style Selector="TextBox">
+        <!-- No IsMouseOver trigger, deliberately - see the header. -->
+        <PropertyTrigger Property="IsFocused" Value="true">
+            <Setter TargetName="PART_Border" Property="BorderBrush" Value="{ThemeResource AccentFillColorDefault}"/>
+        </PropertyTrigger>
+        <PropertyTrigger Property="IsEnabled" Value="false">
+            <Setter TargetName="PART_Border" Property="Background" Value="{ResourceReference ControlFillColorDisabled}"/>
+            <Setter TargetName="PART_TextPresenter" Property="Foreground" Value="{ObservableResource TextFillColorDisabled}"/>
+        </PropertyTrigger>
+    </Style>
+
+</StyleSet>

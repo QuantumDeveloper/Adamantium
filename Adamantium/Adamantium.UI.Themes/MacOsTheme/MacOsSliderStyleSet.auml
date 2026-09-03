@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="utf-8"?>
+<StyleSet xmlns="http://adamantium/ui"
+          xmlns:x="http://adamantium/ui/xaml/extensions">
+
+    <!-- The macOS linear slider. The skeleton is the engine's - a rail, an accent fill from the start to the handle,
+         and a Track that owns the thumb's sizing and the pixel-to-value mapping - and one thing is macOS:
+
+         THE KNOB IS WHITE, not the accent. Fluent makes the handle the same blue as the filled part of the rail, so the
+         two merge and the handle reads as the END OF THE FILL rather than as a thing you take hold of. A Mac keeps the
+         knob white on every slider, over the filled side and the empty side alike: the blue says how far along you are,
+         the white circle says where to grab. It carries a hairline for the same reason the rest of this theme's
+         controls do - to seat it on whatever it happens to be over.
+
+         The unset rail takes the shared selection-off fill, so the slider's empty groove and the switch's empty groove
+         are the same material - which they are, and which is also the only way either of them is visible against the
+         window. See the note in MacOsDark. -->
+
+    <!-- The cross axis is ControlHeight (28) and not the compact 22, and the extra six are NOT decoration: the knob is
+         20, so 28 leaves four clear on each side, and the knob's shadow needs three sideways and four below. A shadow
+         does not enlarge the layout that hosts it - the engine says so outright in Media/Shadow - so a control sized to
+         its own knob has its shadow cut by the first ancestor that clips, silently. The room has to be here. -->
+    <Style Selector="Slider">
+        <Setter Property="MinHeight" Value="{ResourceReference ControlHeight}"/>
+        <Setter Property="MinWidth" Value="{ResourceReference ControlMinWidth}"/>
+    </Style>
+
+    <Style Selector="Slider">
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Slider">
+                    <!-- Four at each END of the travel, for the same reason the cross axis is 28: at the extremes the
+                         knob's box reaches the control's edge and its halo has nowhere to go. Worn by the WHOLE layout
+                         rather than by the knob, so the rail, the accent fill and the track are inset together and
+                         their geometry stays in step - insetting only the track would leave the fill measuring against
+                         a length the knob no longer travels. The vertical trigger moves it to the other axis. -->
+                    <Grid x:Name="Layout" Margin="4 0">
+                        <Border x:Name="Rail" Height="{ResourceReference SliderTrackThickness}" CornerRadius="2"
+                                Background="{ResourceReference SelectionControlFillColorOff}"
+                                VerticalAlignment="Center"/>
+                        <!-- The control sets this part's Width on every Value change, so it recomputes live; a part
+                             sized only by the Track's arrange would not repaint on a width change. -->
+                        <Border x:Name="PART_SelectionRange" Height="{ResourceReference SliderTrackThickness}" CornerRadius="2"
+                                Background="{ThemeResource AccentFillColorDefault}"
+                                HorizontalAlignment="Left" VerticalAlignment="Center" Width="0"/>
+                        <Track x:Name="PART_Track"
+                               Orientation="{TemplateBinding Orientation}"
+                               Minimum="{TemplateBinding Minimum}"
+                               Maximum="{TemplateBinding Maximum}"
+                               Value="{TemplateBinding Value}"
+                               ViewportSize="0">
+                            <Track.DecreaseRepeatButton>
+                                <ScrollBarPageButton Focusable="false"/>
+                            </Track.DecreaseRepeatButton>
+                            <!-- The handle. Its Width/Height drive the Track's slider-mode sizing; how it LOOKS - and
+                                 what it does while held - is MacOsSliderKnobStyleSet, taken by class so that the
+                                 scrollbar's thumb and the splitter's are not caught by it. -->
+                            <Track.Thumb>
+                                <Thumb Width="20" Height="20" Classes="SliderKnob"/>
+                            </Track.Thumb>
+                            <!-- Empty, so the rail shows through past the thumb. -->
+                            <Track.IncreaseRepeatButton>
+                                <ScrollBarPageButton Focusable="false"/>
+                            </Track.IncreaseRepeatButton>
+                        </Track>
+                    </Grid>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- Vertical: the base template lays the rail and the fill out horizontally, so both are swapped here. The Track
+         gets its Orientation by TemplateBinding already, so only the chrome needs turning. -->
+    <Style Selector="Slider">
+        <PropertyTrigger Property="Orientation" Value="Vertical">
+            <!-- MinWidth is a horizontal min-LENGTH; left at 120 it would force a vertical slider that WIDE, a dead hit
+                 area either side of a 4-wide rail. Move the minimum onto the other axis - but to the knob's own cross
+                 size, NOT to zero. At zero the control is as wide as its widest child, which is the knob itself, and a
+                 knob filling its box edge to edge has nowhere to cast a shadow: it gets clipped, most visibly on
+                 whichever side is against a clipping ancestor. -->
+            <Setter Property="MinWidth" Value="{ResourceReference ControlHeight}"/>
+            <!-- The end-of-travel room moves to the other axis with everything else. -->
+            <Setter TargetName="Layout" Property="Margin" Value="0 4"/>
+            <Setter Property="MinHeight" Value="{ResourceReference ControlMinLength}"/>
+            <Setter TargetName="Rail" Property="Width" Value="{ResourceReference SliderTrackThickness}"/>
+            <Setter TargetName="Rail" Property="Height" Value="Auto"/>
+            <Setter TargetName="Rail" Property="HorizontalAlignment" Value="Center"/>
+            <Setter TargetName="Rail" Property="VerticalAlignment" Value="Stretch"/>
+            <Setter TargetName="PART_SelectionRange" Property="Width" Value="{ResourceReference SliderTrackThickness}"/>
+            <Setter TargetName="PART_SelectionRange" Property="Height" Value="0"/>
+            <Setter TargetName="PART_SelectionRange" Property="HorizontalAlignment" Value="Center"/>
+            <!-- Bottom-anchored: with the Track reversed the accent fills UPWARD to meet the thumb. -->
+            <Setter TargetName="PART_SelectionRange" Property="VerticalAlignment" Value="Bottom"/>
+            <!-- Minimum at the BOTTOM, value grows UP. The Track defaults to top=min for scrollbars, so a vertical
+                 slider has to opt into the reversal. -->
+            <Setter TargetName="PART_Track" Property="IsDirectionReversed" Value="true"/>
+        </PropertyTrigger>
+    </Style>
+
+</StyleSet>

@@ -19,7 +19,7 @@ public abstract class TriggerActivatorBase : ITriggerActivator
     // value, drop any {ThemeResource}/{TemplateBinding} subscription). Tracking the real target - rather than re-asking
     // FindTarget at teardown - keeps cleanup correct across a runtime template swap, where FindTarget would by then
     // return the NEW part and leave the old one dirty and still subscribed (a leak).
-    private readonly Dictionary<ISetter, (IFundamentalUIComponent Target, Action Teardown)> _applied = new();
+    private readonly Dictionary<ISetter, (IAdamantiumComponent Target, Action Teardown)> _applied = new();
     private bool _conditionMet;
 
     // TEMP (leak hunt): activators made and torn down. An activator holds its CONTEXT, and a template trigger's context
@@ -97,7 +97,7 @@ public abstract class TriggerActivatorBase : ITriggerActivator
         // Snapshot and clear state BEFORE running teardowns: a teardown clears a trigger value, whose property-changed
         // callback can re-enter this activator (RemoveSetter/ApplySetter) and mutate _applied - iterating it live throws
         // "Collection was modified". This is what broke a runtime theme swap on the first triggered control it hit.
-        (IFundamentalUIComponent Target, Action Teardown)[] teardowns = [.. _applied.Values];
+        (IAdamantiumComponent Target, Action Teardown)[] teardowns = [.. _applied.Values];
         var wasConditionMet = _conditionMet;
         _applied.Clear();
         _conditionMet = false;
@@ -171,7 +171,18 @@ public abstract class TriggerActivatorBase : ITriggerActivator
     // both the base and Accent button). A plain string is parsed.
     private void ApplySetter(ISetter setter)
     {
-        var component = Context.FindTarget(setter.TargetName) as IFundamentalUIComponent;
+        // A setter's target need not be a UI ELEMENT. A named Aura or Shadow declared inside a template is an
+        // AdamantiumComponent with properties like anything else, and switching one on is exactly what a state trigger
+        // is for - Aura.IsEnabled says so in its own summary. This resolved as IFundamentalUIComponent, so the cast
+        // produced null for such a target and the setter did nothing, SILENTLY: the part was found by name, the trigger
+        // fired, and nothing happened.
+        //
+        // Everything a plain-value setter needs - GetProperty, SetTriggerValue, ClearTriggerValue - is on
+        // IAdamantiumComponent. Only the markers that link to a POSITION IN THE TREE need more than that (a tree-scoped
+        // resource lookup, a ThemeResource, a relative binding), and each of those still asks for an element below.
+        var target = Context.FindTarget(setter.TargetName);
+        var component = target as IAdamantiumComponent;
+        var element = target as IFundamentalUIComponent;
 
         // Already applied? Same part -> nothing to do (live markers keep themselves current; static ones don't change).
         // Different part (the template was swapped under us) -> undo the old one before re-targeting the new part.
@@ -193,16 +204,24 @@ public abstract class TriggerActivatorBase : ITriggerActivator
             case ResourceReference resourceReference:
                 // Context.Theme is captured when the trigger is wired up - which for an inline <X.Styles> happens during
                 // construction, before the element is themed, so it can be null. Fall back to the current theme (the
-                // trigger fires later, once live). Resolve tree-scoped from the target so a Local resource is reachable.
+                // trigger fires later, once live).
                 var theme = Context.Theme ?? UIAppContext.Current?.ThemeManager?.CurrentTheme;
-                if (theme != null && theme.TryGetResource(component, resourceReference.Name, out var resource))
-                    component.SetTriggerValue(prop, resource, setter);
+                // Tree-scoped from the target when there IS a tree position, so a Local resource is reachable; by key
+                // alone for a non-element target (an Aura, a Shadow), which has nowhere to be scoped from.
+                object resource = null;
+                var found = theme != null && (element != null
+                    ? theme.TryGetResource(element, resourceReference.Name, out resource)
+                    : theme.TryGetResource(resourceReference.Name, out resource));
+                if (found) component.SetTriggerValue(prop, resource, setter);
                 _applied[setter] = (component, () => component.ClearTriggerValue(prop, setter));
                 break;
 
-            case ThemeResource themeResource:
-                themeResource.Apply(component, setter.Property, ValuePriority.Trigger, setter);
-                _applied[setter] = (component, () => ThemeResource.Remove(component, setter.Property, ValuePriority.Trigger, setter));
+            // A live link to the ACTIVE THEME's accent/focus, which is established against an element. A non-element
+            // target cannot hold one; {ObservableResource} is the marker that reaches those (its Apply takes any
+            // IAdamantiumComponent), which is what a named Aura's colour uses.
+            case ThemeResource themeResource when element != null:
+                themeResource.Apply(element, setter.Property, ValuePriority.Trigger, setter);
+                _applied[setter] = (component, () => ThemeResource.Remove(element, setter.Property, ValuePriority.Trigger, setter));
                 break;
 
             case ObservableResource observableResource:
@@ -210,21 +229,22 @@ public abstract class TriggerActivatorBase : ITriggerActivator
                 _applied[setter] = (component, () => ObservableResource.Remove(component, setter.Property, ValuePriority.Trigger, setter));
                 break;
 
-            case TemplateBinding templateBinding:
-                ApplyTemplateBinding(setter, component, prop, templateBinding);
+            case TemplateBinding templateBinding when element != null:
+                ApplyTemplateBinding(setter, element, prop, templateBinding);
                 break;
 
             // {Ancestor}/{Self} as a part-targeting trigger value: wire a live binding at Trigger priority, torn down on
             // exit. NOTE: unlike the per-token stack above, two triggers writing the SAME part property via a relative
             // binding don't stack (removal clears the whole binding slot) - fine for the normal single-trigger case.
-            case Ancestor ancestor:
-                ancestor.Apply(component, setter.Property, ValuePriority.Trigger);
-                _applied[setter] = (component, () => component.RemoveBinding(setter.Property));
+            // Both walk the TREE to find their source, so both need a target that is in one.
+            case Ancestor ancestor when element != null:
+                ancestor.Apply(element, setter.Property, ValuePriority.Trigger);
+                _applied[setter] = (component, () => element.RemoveBinding(setter.Property));
                 break;
 
-            case Self self:
-                self.Apply(component, setter.Property, ValuePriority.Trigger);
-                _applied[setter] = (component, () => component.RemoveBinding(setter.Property));
+            case Self self when element != null:
+                self.Apply(element, setter.Property, ValuePriority.Trigger);
+                _applied[setter] = (component, () => element.RemoveBinding(setter.Property));
                 break;
 
             default:

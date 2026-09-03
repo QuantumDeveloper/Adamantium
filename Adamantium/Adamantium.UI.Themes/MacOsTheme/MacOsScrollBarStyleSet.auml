@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="utf-8"?>
+<StyleSet xmlns="http://adamantium/ui"
+          xmlns:x="http://adamantium/ui/xaml/extensions">
+
+    <!-- The macOS OVERLAY scroller. A Mac has had two kinds since Lion - the legacy one that lives in a gutter and
+         takes layout space, and the overlay one that floats on the content and takes none - and the overlay is what a
+         Mac shows unless a mouse with a wheel says otherwise. This is that one, and everything below follows from it:
+
+         NO TROUGH. The bar's own background is transparent. A scroller lying ON the content cannot paint a strip behind
+         itself without cutting a permanent grey channel down the side of whatever is being read. Fluent's trough is
+         right for a bar that sits in a gutter; it is wrong for one that floats.
+
+         THE THUMB IS A TRANSLUCENT CAPSULE, inset from the bar's edges. Translucent because it has to stay readable
+         over a white paragraph and over a dark image alike - see the palette note. Inset because the capsule must not
+         touch the window edge; that gap is what makes it read as lying on top rather than as a border.
+
+         NO ARROWS, which is not a decision to make here - the engine's ScrollBar has none and the Track supplies the
+         thumb plus two invisible paging areas either side of it. Said out loud only because it IS one of the things
+         that tells a Mac scroller from a Windows one, and someone will come looking for where it was done.
+
+         WHAT IS NOT DONE: a real Mac scroller WIDENS under the pointer and grows a faint track while it is there. That
+         needs BarThickness to change on hover, which the control supports; it is left out rather than half-built, and
+         the resting state is what is on screen almost all of the time. -->
+
+    <Style Selector="ScrollBar">
+        <Setter Property="Background" Value="Transparent"/>
+        <!-- 11 across with a 7 thumb inside it: the 2 either side is the gap that lifts the capsule off the edge. -->
+        <Setter Property="BarThickness" Value="11"/>
+    </Style>
+
+    <Style Selector="ScrollBar">
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ScrollBar">
+                    <Border Background="{TemplateBinding Background}">
+                        <Track x:Name="PART_Track"
+                               Orientation="{TemplateBinding Orientation}"
+                               Minimum="{TemplateBinding Minimum}"
+                               Maximum="{TemplateBinding Maximum}"
+                               Value="{TemplateBinding Value}"
+                               ViewportSize="{TemplateBinding ViewportSize}">
+                            <Track.DecreaseRepeatButton>
+                                <ScrollBarPageButton Focusable="false"/>
+                            </Track.DecreaseRepeatButton>
+                            <Track.Thumb>
+                                <!-- The template is inline rather than a Thumb style, so that the global Thumb set -
+                                     which the splitter and anything else without its own thumb still use - is left
+                                     alone. An inline Template is a Local value and outranks that set either way. -->
+                                <Thumb>
+                                    <Thumb.Template>
+                                        <ControlTemplate TargetType="Thumb">
+                                            <!-- Margin 2 on all four sides: across the bar it makes the 11 into a 7
+                                                 capsule, and along it, it keeps the rounded ends off the very top and
+                                                 bottom of the travel. CornerRadius half the width - a capsule, not a
+                                                 rounded rectangle. -->
+                                            <Border Margin="2"
+                                                    CornerRadius="3.5"
+                                                    Background="{ResourceReference ScrollThumbFillColor}"/>
+                                        </ControlTemplate>
+                                    </Thumb.Template>
+                                </Thumb>
+                            </Track.Thumb>
+                            <Track.IncreaseRepeatButton>
+                                <ScrollBarPageButton Focusable="false"/>
+                            </Track.IncreaseRepeatButton>
+                        </Track>
+                    </Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+</StyleSet>

@@ -2333,12 +2333,27 @@ public partial class RenderCache
     // like is exactly what a patch rewrites; how many there are is what it cannot change.
     private bool HaloRunStillDescribes(IRenderUnit u)
     {
-        if (_haloRunsByUnit.Count == 0 || !_haloRunsByUnit.TryGetValue(u, out var runs)) return true;
-
         // The SAME opacity the bake folds in, because the bake drops a band whose alpha reaches zero through it. Asking
         // without it, a faded shape counts bands the arena does not hold and the unit refuses the patch for good.
         var bands = u.RenderData.Halo;
         var opacity = u.RenderData.Opacity;
+
+        // NO RUN AT ALL is not the same as "nothing changed". A unit that wears no band is never put in the map (see
+        // NoteHaloRun), so a unit lighting its FIRST band looked up nothing and this answered "still describes" - the
+        // patch was allowed, PatchHalo returned at its own first line for want of a run, and the frame was repainted
+        // faithfully WITHOUT the band. Nothing refused, nothing walked, nothing drawn.
+        //
+        // Found on a slider knob that glows while it is dragged: in the light appearance the knob already wore a
+        // shadow, so a run existed, the count went 1 -> 2 and the refusal below did its job; in the dark appearance the
+        // shadow is transparent and dropped, so there was no run and the glow never appeared at all. Same markup, same
+        // trigger, opposite behaviour - which is what "it works sometimes" turned out to mean.
+        if (_haloRunsByUnit.Count == 0 || !_haloRunsByUnit.TryGetValue(u, out var runs))
+        {
+            if (CountBands(bands, inner: false, opacity) != 0) return false;
+            if (CountBands(bands, inner: true, opacity) != 0) return false;
+            var appearing = u.RenderData.LivingHalo;
+            return appearing is not { } band || band.Color.W * (float)opacity <= 0f;
+        }
         if (CountBands(bands, inner: false, opacity) != runs.UnderCount) return false;
         if (CountBands(bands, inner: true, opacity) != runs.OverCount) return false;
 
@@ -2353,6 +2368,10 @@ public partial class RenderCache
     }
 
     // How many records this side's bands would take - the same test the bake makes, so the two cannot disagree.
+    // ALPHA IS NOT ASKED, and that is the whole of the fix: a band holds its record whether or not it is currently
+    // painting (see HaloBand.IsEmpty), so a glow switching on or a shadow fading to nothing leaves the count alone and
+    // the patch can simply rewrite it. Asking here what the bake no longer asks would put the two back out of step -
+    // the unit would refuse its patch for good, which is the failure this replaces.
     private static int CountBands(Core.Media.HaloBand[] bands, bool inner, double opacity)
     {
         if (bands == null) return 0;
@@ -2361,7 +2380,6 @@ public partial class RenderCache
         foreach (var band in bands)
         {
             if (band.IsEmpty || band.Inner != inner) continue;
-            if (band.Color.W * (float)opacity <= 0f) continue;
             n++;
         }
         return n;

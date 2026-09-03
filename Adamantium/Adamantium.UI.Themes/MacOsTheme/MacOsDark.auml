@@ -44,15 +44,57 @@
     <PaletteColor Key="TileFillColorDefault" Color="#14FFFFFF"/>
 
     <!-- Controls. A Mac control is a filled capsule rather than an outlined box, so the FILLS carry the weight and the
-         strokes stay faint. -->
-    <PaletteColor Key="ControlFillColorDefault" Color="#1AFFFFFF"/>
-    <PaletteColor Key="ControlFillColorSecondary" Color="#26FFFFFF"/>
-    <PaletteColor Key="ControlFillColorTertiary" Color="#0FFFFFFF"/>
-    <PaletteColor Key="ControlFillColorDisabled" Color="#0DFFFFFF"/>
+         strokes stay faint - and that sentence only comes true if the fill is actually a colour.
+
+         These were a few per cent of white, inherited from a system that OUTLINES its controls and can afford a fill
+         that barely registers. Over #323232 they landed around #414141, nine to twenty levels off the window, so a
+         button and a pop-up button were held up by their hairline alone and read as drawn ON the window rather than
+         RAISED off it. Solid now, and a real step - which is the third time this variant has been caught making the
+         same mistake, after the switch's groove and the empty checkbox.
+
+         The ORDER matters and is not Fluent's: Tertiary is the PRESSED value and so is DARKER than the resting fill,
+         because a Mac pushes a control down a shade where Windows lightens it. Secondary is the step above rest, for
+         the borrowed sets that still reach for a hover fill. -->
+    <PaletteColor Key="ControlFillColorDefault" Color="#545456"/>
+    <PaletteColor Key="ControlFillColorSecondary" Color="#5E5E61"/>
+    <PaletteColor Key="ControlFillColorTertiary" Color="#3C3C3E"/>
+    <!-- Disabled sits just above the window: present, clearly not available, and not competing with live controls. -->
+    <PaletteColor Key="ControlFillColorDisabled" Color="#3A3A3C"/>
     <PaletteColor Key="SubtleFillColorSecondary" Color="#14FFFFFF"/>
     <PaletteColor Key="SubtleFillColorTertiary" Color="#0AFFFFFF"/>
     <PaletteColor Key="ControlStrokeColorDefault" Color="#1FFFFFFF"/>
     <PaletteColor Key="ControlStrokeColorSecondary" Color="#2EFFFFFF"/>
+
+    <!-- The UNSET surface of a selection control - the switch's groove, the empty checkbox, the empty radio. One key,
+         because it is one surface: all three say "not chosen" and all three have to be FOUND before they can say it.
+
+         It is not a ControlFill, and that is the whole point. Every ControlFill above is a few per cent of white, which
+         over #323232 lands within ten levels of the window and disappears. The switch has no outline at all, so its
+         groove vanished entirely and the white knob read as flush against an edge that could not be seen; the box and
+         the ring do have a hairline, but a 12%-white hairline round a 10%-white fill is not a shape either.
+
+         And the step has to be a GENEROUS one, not merely a measurable one. At the off end the groove shows as a 2px
+         band between the window and a pure-white knob; the eye adapts to the knob and the boundary on its far side goes
+         with it, so a grey that reads fine in isolation still loses that band. #48484A was already 22 levels off the
+         body and was still being lost - this is another step and a half again. -->
+    <PaletteColor Key="SelectionControlFillColorOff" Color="#5E5E61"/>
+
+    <!-- The overlay scroller's thumb. TRANSLUCENT, because an overlay scroller lies ON the content rather than in a
+         gutter beside it: it has to be readable over a white paragraph and over a dark image, and only a colour that
+         lets both through does that. -->
+    <PaletteColor Key="ScrollThumbFillColor" Color="#80FFFFFF"/>
+
+    <!-- NO shadow under the slider knob here, and the transparency is the way a VARIANT says so: the knob's template is
+         shared, and a variant supplies colours rather than structure. Nothing is paid for it either - a fully
+         transparent band is dropped at bake time (HaloBand.IsEmpty).
+         Why none: a shadow separates a white knob from a LIGHT background. On #323232 a white circle already separates
+         itself, and 30% black behind it darkens almost nothing - it was work that produced no picture. -->
+    <PaletteColor Key="SliderKnobShadowColor" Color="#00000000" As="Color"/>
+    <!-- The glow while the knob is HELD - see MacOsLight. This one the dark variant DOES want: it is not there to make
+         the knob findable, it is there to say the knob is being dragged, and that has to read in both appearances. -->
+    <PaletteColor Key="SliderKnobAuraColor" Color="#0A84FF" As="Color"/>
+    <!-- The knob while it is HELD - see MacOsLight for why the glow cannot carry this on its own. -->
+    <PaletteColor Key="SliderKnobFillPressed" Color="#D6D6D8"/>
 
     <!-- On the accent: a Mac presses a control by DARKENING it rather than by veiling it in white. -->
     <PaletteColor Key="OnAccentOverlayPointerOver" Color="#1AFFFFFF"/>

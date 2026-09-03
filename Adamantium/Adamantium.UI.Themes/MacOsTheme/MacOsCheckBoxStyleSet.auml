@@ -1,0 +1,117 @@
+<?xml version="1.0" encoding="utf-8"?>
+<StyleSet xmlns="http://adamantium/ui"
+          xmlns:x="http://adamantium/ui/xaml/extensions">
+
+    <!-- The macOS checkbox. Four differences from Fluent's, and each is a platform convention rather than a taste:
+
+         IT IS SMALL. 16 across, against Fluent's 20. AppKit sizes the box to the TEXT beside it - the box and a line of
+         body type are about the same height - where Windows gives it a square of its own that stands clear of the
+         label. So the pair reads as one line of writing rather than as a control with a caption.
+
+         AppKit's own number is 14, and 14 was tried: a Mac has drawn these on a 2x screen since Retina, so 14 points
+         are 28 device pixels and the tick keeps its shape. At 1x they are 14 pixels and a 1.8-wide tick inside them
+         goes to mush. 16 is the smallest that survives one pixel to the point - see MacOsRadioButtonStyleSet, which
+         holds the same line for the same reason.
+
+         MIXED IS A DASH, NOT A SQUARE. The three-state marker on a Mac is a single horizontal bar. A filled square is
+         the Windows marker, and it is the one thing that gives a re-coloured Fluent checkbox away instantly.
+
+         NO HOVER. Same decision as the button and the switch, for the same reason: a Mac control answers the press.
+
+         PRESSING DARKENS IT, in both states - the off box and the accent-filled one alike. -->
+
+    <Style Selector="CheckBox">
+        <Setter Property="Foreground" Value="{ObservableResource TextFillColorPrimary}"/>
+        <!-- The unset box takes the shared selection-off fill, not a ControlFill - a 12%-white hairline round a
+             10%-white fill is not a shape you can find. See the note in MacOsDark. -->
+        <Setter Property="Background" Value="{ResourceReference SelectionControlFillColorOff}"/>
+        <Setter Property="BorderBrush" Value="{ResourceReference ControlStrokeColorDefault}"/>
+        <Setter Property="BorderThickness" Value="{ResourceReference StrokeControl}"/>
+        <Setter Property="FontSize" Value="{ResourceReference FontSizeBody}"/>
+        <Setter Property="VerticalContentAlignment" Value="Center"/>
+    </Style>
+
+    <Style Selector="CheckBox">
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="CheckBox">
+                    <!-- 6 to the label, not Fluent's 8: the smaller box sits closer to its text, which is what keeps
+                         the pair reading as one line. -->
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Spacing="6">
+                        <Border x:Name="Box"
+                                Width="16" Height="16" CornerRadius="4"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                VerticalAlignment="Center">
+                            <!-- Both markers overlaid, only ever one shown - a Border holds one child, so a Grid centres
+                                 them over each other. -->
+                            <Grid>
+                                <!-- The geometry starts at (0,0) on purpose: a Path's box is its geometry bounds, so
+                                     leading empty space would push the centred glyph down and right. -->
+                                <Path x:Name="CheckGlyph"
+                                      Data="M0,3.6 L3,6.6 L8.6,0"
+                                      Stroke="{ThemeResource AccentForegroundColor}"
+                                      StrokeThickness="2"
+                                      StrokeLineJoin="Round"
+                                      Opacity="0"
+                                      HorizontalAlignment="Center"
+                                      VerticalAlignment="Center"/>
+                                <Border x:Name="MixedGlyph"
+                                        Width="9" Height="2" CornerRadius="1"
+                                        Background="{ThemeResource AccentForegroundColor}"
+                                        Opacity="0"
+                                        HorizontalAlignment="Center"
+                                        VerticalAlignment="Center"/>
+                            </Grid>
+                        </Border>
+                        <ContentPresenter x:Name="PART_ContentPresenter"
+                                          Content="{TemplateBinding Content}"
+                                          ContentTemplate="{TemplateBinding ContentTemplate}"
+                                          Foreground="{TemplateBinding Foreground}"
+                                          FontSize="{TemplateBinding FontSize}"
+                                          VerticalAlignment="Center"/>
+                    </StackPanel>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style Selector="CheckBox">
+        <!-- No IsMouseOver trigger, deliberately - see the header. -->
+        <PropertyTrigger Property="IsChecked" Value="true">
+            <Setter TargetName="Box" Property="Background" Value="{ThemeResource AccentFillColorDefault}"/>
+            <Setter TargetName="Box" Property="BorderBrush" Value="{ThemeResource AccentFillColorDefault}"/>
+            <Setter TargetName="CheckGlyph" Property="Opacity" Value="1"/>
+            <!-- Un-inherit the ToggleButton accent-label: a CheckBox IS-A ToggleButton, so that set's IsChecked trigger
+                 also fires here and paints PART_ContentPresenter with the on-accent colour. A checkbox's label sits on
+                 the window, not on the box. -->
+            <Setter TargetName="PART_ContentPresenter" Property="Foreground" Value="{ObservableResource TextFillColorPrimary}"/>
+        </PropertyTrigger>
+        <!-- Three-state: "null" parses to a null bool?, so the trigger matches the mixed state. -->
+        <PropertyTrigger Property="IsChecked" Value="null">
+            <Setter TargetName="Box" Property="Background" Value="{ThemeResource AccentFillColorDefault}"/>
+            <Setter TargetName="Box" Property="BorderBrush" Value="{ThemeResource AccentFillColorDefault}"/>
+            <Setter TargetName="MixedGlyph" Property="Opacity" Value="1"/>
+            <Setter TargetName="PART_ContentPresenter" Property="Foreground" Value="{ObservableResource TextFillColorPrimary}"/>
+        </PropertyTrigger>
+        <!-- Pressed goes DOWN in lightness, and it is declared after the checked triggers so it lands on top of the
+             value stack while held and pops off cleanly on release. -->
+        <PropertyTrigger Property="IsPressed" Value="true">
+            <Setter TargetName="Box" Property="Background" Value="{ResourceReference ControlFillColorTertiary}"/>
+        </PropertyTrigger>
+        <MultiTrigger>
+            <MultiTrigger.Conditions>
+                <Condition Property="IsChecked" Value="true"/>
+                <Condition Property="IsPressed" Value="true"/>
+            </MultiTrigger.Conditions>
+            <Setter TargetName="Box" Property="Background" Value="{ThemeResource AccentFillColorTertiary}"/>
+            <Setter TargetName="Box" Property="BorderBrush" Value="{ThemeResource AccentFillColorTertiary}"/>
+        </MultiTrigger>
+        <PropertyTrigger Property="IsEnabled" Value="false">
+            <Setter TargetName="Box" Property="Background" Value="{ResourceReference ControlFillColorDisabled}"/>
+            <Setter TargetName="PART_ContentPresenter" Property="Foreground" Value="{ObservableResource TextFillColorDisabled}"/>
+        </PropertyTrigger>
+    </Style>
+
+</StyleSet>

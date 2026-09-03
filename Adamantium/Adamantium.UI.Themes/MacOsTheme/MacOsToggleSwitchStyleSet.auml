@@ -18,7 +18,9 @@
 
     <Style Selector="ToggleSwitch">
         <Setter Property="Foreground" Value="{ObservableResource TextFillColorPrimary}"/>
-        <Setter Property="Background" Value="{ResourceReference ControlFillColorTertiary}"/>
+        <!-- Its own key, not a ControlFill: with no outline round the groove, its colour is the only thing that says
+             where the track ends - see the note in MacOsDark. -->
+        <Setter Property="Background" Value="{ResourceReference SelectionControlFillColorOff}"/>
         <Setter Property="BorderBrush" Value="{ResourceReference ControlStrokeColorDefault}"/>
         <Setter Property="FontSize" Value="{ResourceReference FontSizeBody}"/>
         <Setter Property="VerticalContentAlignment" Value="Center"/>
@@ -45,18 +47,20 @@
                                      margin, not one per end - the inset stated once and only the ALIGNMENT moving, so
                                      the two ends cannot drift apart.
 
-                                     A BORDER WITH A FULL RADIUS, not an Ellipse, and that is measured rather than
-                                     preferred: the thumb sat further from the right end than from the left, and the
-                                     LAYOUT is symmetric for both primitives (AlignedMarginTests measures exactly two
-                                     at either edge for a Border and for an Ellipse alike). What differs is how the
-                                     shape fills the box it was given, which no layout test can see. A rounded Border
-                                     is the same primitive the track itself is, and it fills its box. -->
-                                <Border x:Name="SwitchThumb"
-                                        Width="18" Height="18" CornerRadius="9"
-                                        Background="#FFFFFF"
-                                        HorizontalAlignment="Left"
-                                        VerticalAlignment="Center"
-                                        Margin="2"/>
+                                     The thumb sat 2 from one end and 4 from the other, and the cause was not here at
+                                     all: the theme was still including FLUENT's ToggleSwitch set alongside this one,
+                                     and its IsChecked trigger writes Margin="0 0 4 0" onto a part called SwitchThumb -
+                                     which is what this part is called. Removing that include is the fix; see MacOs.auml.
+                                     Blaming the Ellipse cost two rounds, and swapping it for a Border appeared to cure
+                                     it only because the same Fluent trigger also sets Fill, which a Border has not, so
+                                     the trigger failed before reaching the margin. AlignedMarginTests stands as the
+                                     measurement: the two primitives place IDENTICALLY, to the number. -->
+                                <Ellipse x:Name="SwitchThumb"
+                                         Width="18" Height="18"
+                                         Fill="#FFFFFF"
+                                         HorizontalAlignment="Left"
+                                         VerticalAlignment="Center"
+                                         Margin="2"/>
                             </Grid>
                         </Border>
                         <ContentPresenter x:Name="PART_ContentPresenter"
@@ -82,7 +86,7 @@
         </PropertyTrigger>
         <PropertyTrigger Property="IsEnabled" Value="false">
             <Setter TargetName="SwitchTrack" Property="Background" Value="{ResourceReference ControlFillColorDisabled}"/>
-            <Setter TargetName="SwitchThumb" Property="Background" Value="{ResourceReference ControlFillColorDefault}"/>
+            <Setter TargetName="SwitchThumb" Property="Fill" Value="{ResourceReference ControlFillColorDefault}"/>
             <Setter TargetName="PART_ContentPresenter" Property="Foreground" Value="{ResourceReference TextFillColorDisabled}"/>
         </PropertyTrigger>
     </Style>
