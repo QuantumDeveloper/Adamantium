@@ -23,6 +23,20 @@ public class StackPanel : VirtualizingPanel
       new PropertyMetadata(Orientation.Vertical,
          PropertyMetadataOptions.AffectsMeasure | PropertyMetadataOptions.AffectsArrange));
 
+   /// <summary>The gap BETWEEN children along the stacking axis - not after the last one. The container's business
+   /// rather than each child's: a margin per child repeats one number, trails a gap off the last one, and doubles up
+   /// when a middle child is collapsed. Here a collapsed child takes neither slot nor gap.</summary>
+   public static readonly AdamantiumProperty SpacingProperty = AdamantiumProperty.Register(nameof(Spacing),
+      typeof(double), typeof(StackPanel),
+      new PropertyMetadata(0.0,
+         PropertyMetadataOptions.AffectsMeasure | PropertyMetadataOptions.AffectsArrange));
+
+   /// <summary>Item extent PLUS the gap - one item's start to the next. EVERY place that turns an index into a position
+   /// uses this and not the extent: the realized window, a slot's rectangle, the drop target under the pointer, and the
+   /// answer for an item that is not realized. One of them disagreeing is a row drawn where the hit-test is not.
+   /// </summary>
+   private double Pitch => _itemExtent + Math.Max(0, Spacing);
+
 
    /// <summary>Items stack at a uniform extent, so where the n-th one sits is arithmetic - and stays answerable for an
    /// item that has been virtualized away, which is exactly when someone needs to scroll to it.</summary>
@@ -32,7 +46,7 @@ public class StackPanel : VirtualizingPanel
       if (!IsItemsHost || _itemExtent <= 0 || index < 0) return false;
 
       var vertical = Orientation == Orientation.Vertical;
-      var along = index * _itemExtent;
+      var along = index * Pitch;
       rect = vertical
          ? new Rect(0, along, RenderSize.Width, _itemExtent)
          : new Rect(along, 0, _itemExtent, RenderSize.Height);
@@ -53,6 +67,12 @@ public class StackPanel : VirtualizingPanel
    {
       get => GetValue<Orientation>(OrientationProperty);
       set => SetValue(OrientationProperty, value);
+   }
+
+   public double Spacing
+   {
+      get => GetValue<double>(SpacingProperty);
+      set => SetValue(SpacingProperty, value);
    }
 
    // ---- Plain container layout (unchanged behaviour: a StackPanel used with explicit Children) ------------------
@@ -89,12 +109,15 @@ public class StackPanel : VirtualizingPanel
 
       double measuredWidth = 0;
       double measuredHeight = 0;
-
+      var gap = Math.Max(0, Spacing);
+      var stacked = 0;   // children that actually take a slot - a collapsed one takes neither slot nor gap
 
       foreach (var child in Children)
       {
          child.Measure(new Size(childAvailableWidth, childAvailableHeight));
+         if (child.Visibility == Visibility.Collapsed) continue;
          Size size = child.DesiredSize;
+         stacked++;
 
          if (Orientation == Orientation.Vertical)
          {
@@ -107,6 +130,11 @@ public class StackPanel : VirtualizingPanel
             measuredHeight = Math.Max(measuredHeight, size.Height);
          }
       }
+
+      // BETWEEN, so one fewer gap than children and none at all for a single child.
+      var gaps = gap * Math.Max(0, stacked - 1);
+      if (Orientation == Orientation.Vertical) measuredHeight += gaps;
+      else measuredWidth += gaps;
 
       return new Size(measuredWidth, measuredHeight);
    }
@@ -132,8 +160,14 @@ public class StackPanel : VirtualizingPanel
          : (double.IsInfinity(finalSize.Width) ? cross : finalSize.Width);
 
       double main = 0;
+      var gap = Math.Max(0, Spacing);
+      var placed = false;
       foreach (var child in Children)
       {
+         if (child.Visibility == Visibility.Collapsed) continue;
+         if (placed) main += gap;   // between the previous child and this one, never after the last
+         placed = true;
+
          if (horizontal)
          {
             child.Arrange(new Rect(main, 0, child.DesiredSize.Width, childCross));
@@ -178,6 +212,7 @@ public class StackPanel : VirtualizingPanel
          {
             var container = (IMeasurableComponent)RealizeInWindow(i);
             container.Measure(childConstraint);
+            if (i > 0) runningMain += Math.Max(0, Spacing);   // between rows only
             _itemStarts.Add(runningMain);
             runningMain += vertical ? container.DesiredSize.Height : container.DesiredSize.Width;
             crossMaxAll = Math.Max(crossMaxAll, vertical ? container.DesiredSize.Width : container.DesiredSize.Height);
@@ -214,8 +249,9 @@ public class StackPanel : VirtualizingPanel
       }
 
       var mainOffset = vertical ? offset.Y : offset.X;
-      var first = Math.Max(0, (int)Math.Floor(mainOffset / _itemExtent) - Buffer);
-      var last = Math.Min(count - 1, (int)Math.Ceiling((mainOffset + effectiveViewport) / _itemExtent) + Buffer);
+      var pitch = Pitch;
+      var first = Math.Max(0, (int)Math.Floor(mainOffset / pitch) - Buffer);
+      var last = Math.Min(count - 1, (int)Math.Ceiling((mainOffset + effectiveViewport) / pitch) + Buffer);
       _lastFirst = first;
 
       // Reconcile the realized set to exactly [first,last]: containers leaving the window are rebound in place to the
@@ -230,7 +266,8 @@ public class StackPanel : VirtualizingPanel
          crossMax = Math.Max(crossMax, vertical ? container.DesiredSize.Width : container.DesiredSize.Height);
       }
 
-      var mainExtent = count * _itemExtent;
+      // count pitches less the trailing gap: the last item ends the extent, the gap after it does not exist.
+      var mainExtent = count * pitch - Math.Max(0, Spacing);
       return vertical ? new Size(crossMax, mainExtent) : new Size(mainExtent, crossMax);
    }
 
@@ -261,9 +298,10 @@ public class StackPanel : VirtualizingPanel
       _arrangeIndexBuf.AddRange(Owner.ItemContainerGenerator.RealizedIndices);
 
       // SLOT, not index: while a drop gap is open everything from it on moves along by one, opening one item-sized hole.
+      var pitch = Pitch;
       Rect SlotRect(int slot) => vertical
-         ? new Rect(0, slot * _itemExtent, cross, _itemExtent)
-         : new Rect(slot * _itemExtent, 0, _itemExtent, cross);
+         ? new Rect(0, slot * pitch, cross, _itemExtent)
+         : new Rect(slot * pitch, 0, _itemExtent, cross);
 
       void ArrangeAt(int index)
       {
@@ -297,7 +335,7 @@ public class StackPanel : VirtualizingPanel
       if (!IsItemsHost || !IsVirtualizing || _itemExtent <= 1) return false;
 
       var main = Math.Max(0, Orientation == Orientation.Vertical ? point.Y : point.X);
-      index = Math.Clamp((int)(main / _itemExtent), 0, Owner.Items?.Count ?? 0);
+      index = Math.Clamp((int)(main / Pitch), 0, Owner.Items?.Count ?? 0);
       return true;
    }
 }
