@@ -731,11 +731,20 @@ public abstract class AdamantiumComponent : IAdamantiumComponent
         SetStyleValue(property, value, style);
     }
 
+    /// <summary>Apply one style's contribution: RECORD FIRST, THEN WRITE WHAT WINS. Every style writes at the same
+    /// priority, so writing the incoming value straight through made the last style applied the winner - and handed the
+    /// outcome to the order a theme lists its sets in. A less specific rule arriving later is now recorded, ranked
+    /// below, and changes nothing.</summary>
     public void SetStyleValue(AdamantiumProperty property, object value, Style style)
     {
-        SetValue(property, value, ValuePriority.Style);
         AddStyleEntry(property.Name, value, style);
+        SetValue(property, EffectiveStyleValue(property.Name, value), ValuePriority.Style);
     }
+
+    private object EffectiveStyleValue(string propertyName, object fallback)
+        => styleValues != null && styleValues.TryGetValue(propertyName, out var entry)
+            ? entry.EffectiveValue
+            : fallback;
 
     public void RemoveStyleValue(string propertyName, Style style)
     {

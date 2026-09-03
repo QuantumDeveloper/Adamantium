@@ -92,4 +92,65 @@ public class StyleBandBySelectorTests
         // each other, or which block a rule is written in would silently decide who wins.
         Assert.That(OnlySetterOf(withoutBasedOn).StyleBand, Is.EqualTo(OnlySetterOf(withBasedOn).StyleBand));
     }
+
+    private static Style ClassTriggerStyle(System.Type selects, string className, string value)
+    {
+        var setter = new Setter("Foreground", value);
+        var trigger = new PropertyTrigger { Property = "IsChecked", Value = "true" };
+        trigger.Add(setter);
+
+        var selector = new StyleSelector { Types = { selects } };
+        selector.Classes.Add(className);
+
+        var style = new Style { Selector = selector };
+        style.Triggers.Add(trigger);
+        return style;
+    }
+
+    [Test]
+    public void AClassStyle_OutranksAPlainTypeStyle_WhicheverWasDeclaredFirst()
+    {
+        var theme = new Theme("bands");
+        var set = new StyleSet();
+
+        // Declared in the order that used to decide the outcome: the plain type LAST, so under banding-by-order it won.
+        var narrowed = ClassTriggerStyle(typeof(ToggleSwitch), "Special", "narrowed");
+        var plain = TriggerStyle(typeof(ToggleSwitch), "plain");
+
+        foreach (var style in new[] { narrowed, plain }) set.Add(style);
+        theme.AddStyleSet(set);
+
+        // The control has to CARRY the class, or the narrowed style never attaches and never gets a band at all.
+        var control = new ToggleSwitch();
+        control.ClassNames.Add("Special");
+        narrowed.Attach(control);
+        plain.Attach(control);
+
+        // A style that names a class has said something narrower than one that names only the type, and that is a fact
+        // about the SELECTORS - so it cannot depend on which style set a theme happened to include later. This is what
+        // repainted the macOS traffic lights as plain buttons the moment a Button style set was appended to the theme.
+        Assert.That(OnlySetterOf(narrowed).StyleBand, Is.GreaterThan(OnlySetterOf(plain).StyleBand));
+    }
+
+    [Test]
+    public void AClassOnABaseType_OutranksAPlainStyleOnADeeperType()
+    {
+        var theme = new Theme("bands");
+        var set = new StyleSet();
+
+        var classOnBase = ClassTriggerStyle(typeof(ToggleButton), "Special", "class");
+        var plainOnDerived = TriggerStyle(typeof(ToggleSwitch), "derived");
+
+        foreach (var style in new[] { classOnBase, plainOnDerived }) set.Add(style);
+        theme.AddStyleSet(set);
+
+        var control = new ToggleSwitch();
+        control.ClassNames.Add("Special");
+        classOnBase.Attach(control);
+        plainOnDerived.Attach(control);
+
+        // The web's order, and the one worth keeping: a class beats any DEPTH of type. Someone who wrote a class asked
+        // for these particular controls; someone who wrote a type asked for all of them.
+        Assert.That(OnlySetterOf(classOnBase).StyleBand, Is.GreaterThan(OnlySetterOf(plainOnDerived).StyleBand));
+    }
 }

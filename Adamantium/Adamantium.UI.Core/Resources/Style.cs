@@ -7,9 +7,8 @@ public class Style : AdamantiumComponent
 {
     private Dictionary<AdamantiumProperty, ISetter> settersDict;
 
-    // The activators THIS style created on each component (a subset of the component's shared ActiveActivators list).
-    // Kept so Attach/Detach are idempotent: re-applying a style (a theme swap re-themes WITHOUT a prior detach) must
-    // undo its previous activators instead of piling up more - each carries a live PropertyChanged subscription.
+    // The activators THIS style created per component, so Attach/Detach stay idempotent: a theme swap re-applies
+    // WITHOUT detaching first, and each activator carries a live PropertyChanged subscription.
     private readonly ConditionalWeakTable<IFundamentalUIComponent, List<ITriggerActivator>> _activatorsByComponent = new();
 
     public Style()
@@ -24,11 +23,9 @@ public class Style : AdamantiumComponent
 
     public StyleSelector Selector { get; set; }
 
-    /// <summary>Explicit style inheritance (the antidote to type matching being EXACT now): the base type(s) this style
-    /// builds on. Their setters + triggers are applied FIRST when this style attaches, so this style's own contributions
-    /// override them. Multiple bases compose like mixins - listed left-to-right, LATER wins over earlier (own wins over
-    /// all). A base type's styles are found by exact type in the theme, recursively (a base may itself be BasedOn another).
-    /// Parsed from the same type syntax as <see cref="Selector"/> (e.g. <c>BasedOn="ToggleButton"</c>).</summary>
+    /// <summary>Explicit style inheritance - the antidote to type matching being EXACT. The bases' setters and triggers
+    /// apply FIRST, so this style overrides them; several compose like mixins, left to right. Found by exact type in the
+    /// theme, recursively. Same type syntax as <see cref="Selector"/>.</summary>
     public StyleSelector BasedOn { get; set; }
 
     public SetterCollection Setters { get; }
@@ -155,10 +152,9 @@ public class Style : AdamantiumComponent
 
     private List<Style> _resolvedBases;
 
-    // The base styles this style is BasedOn, in application order (base-first, deduped, recursive - a base may itself be
-    // BasedOn another). Resolved by EXACT type from the theme; empty when there is no BasedOn (the common case). Memoized:
-    // a style's bases are constant for its lifetime (a theme swap builds fresh Style objects), so thousands of identical
-    // containers don't each re-scan the theme.
+    // The bases this style is BasedOn, base-first, deduped and recursive; empty when there is no BasedOn, the common
+    // case. Memoized because a style's bases are constant for its lifetime - a theme swap builds fresh Style objects -
+    // so thousands of identical containers do not each re-scan the theme.
     private IReadOnlyList<Style> ResolveBases()
     {
         if (_resolvedBases != null) return _resolvedBases;
@@ -168,24 +164,24 @@ public class Style : AdamantiumComponent
             var seen = new HashSet<Style> { this };   // guard against a self/cyclic BasedOn
             theme.CollectBasedOn(BasedOn, result, seen);
         }
-        // Band every style in the chain, and this one, by what its selector SELECTS - see StyleBandOfSelector.
-        foreach (var baseStyle in result) baseStyle.StampBand(baseStyle.StyleBandOfSelector());
-        StampBand(StyleBandOfSelector());
+        // Push each style's band down onto its trigger setters - the band itself is decided by the selector, not here.
+        foreach (var baseStyle in result) baseStyle.StampBand();
+        StampBand();
 
         return _resolvedBases = result;
     }
 
-    /// <summary>How LOCAL this style's rules are: the inheritance depth of the type its selector names. A style on the
-    /// control's own type outranks one on a type it derives from, so the deriving control always has the last word.
-    /// <para>It is the SELECTOR that says this, not the BasedOn chain, because a control's rules are spread over
-    /// SEVERAL style blocks (one concern each, per the small-styles convention) while the base arrives through the one
-    /// block that says <c>BasedOn</c>. Banding by position in the collected chain therefore ranked a BASE style above a
-    /// derived one whose block simply declared no BasedOn of its own - and every trigger a derived control writes to
-    /// un-inherit a base rule lives in exactly such a block. Measured: ToggleButton pulls in three style blocks, so its
-    /// checked-label rule landed on band 2 while the ToggleSwitch rule meant to overrule it sat on band 0. The label of
-    /// a checked switch, checkbox and radio button came out white on a light panel.</para>
-    /// <para>A selector with no type facet bands at 0. Selecting several types takes the SHALLOWEST: the style speaks
-    /// for all of them, so it can only claim the specificity of the least specific.</para></summary>
+    /// <summary>How specific this style is, read the way the web reads it: an id beats any number of classes, a class
+    /// beats any depth of type. Packed into one number so the value stack compares with one compare.
+    ///
+    /// <para>THE SELECTOR DECIDES, AND NOTHING ELSE. Not the BasedOn chain - a control spreads its rules over several
+    /// blocks and only one of them says BasedOn, so ranking by position there once put a BASE rule above the derived
+    /// rule meant to overrule it. And not the include order either - counting only the type put a class style and a
+    /// plain type style in one band, so whichever set a theme listed later won.</para>
+    ///
+    /// <para>No type facet bands at 0; several types take the SHALLOWEST, since the style speaks for all of them.
+    /// Property conditions (<c>[Prop=Value]</c>) count with the classes, as attribute selectors do in CSS.</para>
+    /// </summary>
     private int StyleBandOfSelector()
     {
         var shallowest = int.MaxValue;
@@ -196,24 +192,37 @@ public class Style : AdamantiumComponent
             if (depth < shallowest) shallowest = depth;
         }
 
-        return shallowest == int.MaxValue ? 0 : shallowest;
+        var typeDepth = shallowest == int.MaxValue ? 0 : shallowest;
+
+        // Weights, not tiers, only because the band is one int. Both are far above anything reachable: an inheritance
+        // chain is a dozen deep at most, and nobody writes a thousand classes into one selector.
+        const int ClassWeight = 1_000;
+        const int IdWeight = 1_000_000;
+
+        var narrowing = Selector.Classes.Count + Selector.ClassGroups.Count + Selector.Conditions.Count;
+        var identity = string.IsNullOrEmpty(Selector.Id) ? 0 : 1;
+
+        return identity * IdWeight + narrowing * ClassWeight + typeDepth;
     }
 
-    /// <summary>Mark every trigger setter of THIS style with its band (see <see cref="StyleBandOfSelector"/>), so the
-    /// trigger value stack can prefer the more local rule. Idempotent: the band is a property of the style alone.</summary>
-    private void StampBand(int band)
+    /// <summary>Copy this style's band onto its trigger setters, which is all a trigger setter can be asked. It does
+    /// not DECIDE the band - <see cref="Band"/> does, from the selector - so there is one answer to "how specific is
+    /// this style" rather than one per caller.</summary>
+    private void StampBand()
     {
-        if (_band == band) return;
-        _band = band;
-
         foreach (var trigger in Triggers)
         {
             if (trigger?.Setters is not { } setters) continue;
-            foreach (var setter in setters) setter.StyleBand = band;
+            foreach (var setter in setters) setter.StyleBand = Band;
         }
     }
 
     private int _band = -1;
+
+    /// <summary>How specific this style is, computed once from the selector alone (see
+    /// <see cref="StyleBandOfSelector"/>) and therefore answerable at any time - before attaching, without a BasedOn,
+    /// in any order. Read by the value stack.</summary>
+    internal int Band => _band >= 0 ? _band : _band = StyleBandOfSelector();
 
     // Add an activator to both the component's shared list (so a template-change reevaluation sees it) and this style's
     // own per-component record (so Detach/re-Attach can remove exactly the ones it added).
@@ -272,11 +281,9 @@ public class Style : AdamantiumComponent
         foreach (var activator in activators) activator?.ResumeActions();
     }
 
-    // A PLAIN FIELD on the component, not an attached property, and the difference is measured: this is read once per
-    // node on every attach - ResumeActivators is called unconditionally for the whole subtree - and the answer is null
-    // for nearly all of them, because most controls carry no style triggers at all. A property read to be told "nothing
-    // here" was the largest remaining item of the attach walk after the IsInitialized latch. Element triggers were
-    // already a plain field next to this one (`_triggerActivators`); style triggers now live the same way.
+    // A PLAIN FIELD on the component rather than an attached property, and that is measured: this is read once per node
+    // on every attach and answers null for nearly all of them. A property read to be told "nothing here" was the largest
+    // remaining item of the attach walk after the IsInitialized latch.
     private static List<ITriggerActivator> GetActiveActivators(IFundamentalUIComponent component)
     {
         return (component as FundamentalUIComponent)?.StyleActivators;

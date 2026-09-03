@@ -13,17 +13,29 @@ internal class StyleValueContainer
         _styleHash = new HashSet<Style>();
     }
 
+    /// <summary>Record one style's contribution, KEPT ORDERED BY SPECIFICITY - least specific first, so the last entry
+    /// is the one in force. Ordering rather than appending is what stops the order styles are DECLARED in from deciding
+    /// the outcome: a plain setter writes at one priority, so before this the last style applied simply won. Equal
+    /// specificity keeps insertion order, as the web does.</summary>
     public void AddValue(Style style, object value)
     {
-        if (!_styleHash.Contains(style))
-        {
-            _values.Add(new StyleValuePair(style, value));
-            _styleHash.Add(style);
-        }
+        if (_styleHash.Contains(style))
+            return;
+
+        var band = style?.Band ?? 0;
+        var at = _values.Count;
+        while (at > 0 && (_values[at - 1].Style?.Band ?? 0) > band) at--;
+
+        _values.Insert(at, new StyleValuePair(style, value));
+        _styleHash.Add(style);
     }
 
-    /// <summary>Takes one style's contribution out and answers with the value in force AFTER it is gone - the last of
-    /// the contributions still standing, since the last one applied is the one that wins.
+    /// <summary>The contribution in force: the most specific one recorded, or nothing at all.</summary>
+    public object EffectiveValue =>
+        _values.Count > 0 ? _values[^1].Value : AdamantiumProperty.UnsetValue;
+
+    /// <summary>Takes one style's contribution out and answers with the value in force AFTER it is gone - the most
+    /// specific of the contributions still standing (the list is kept in specificity order, see AddValue).
     /// <para>It used to answer with the entry sitting immediately BEFORE the removed one, which is the same thing only
     /// while styles are taken off in exact reverse order of application. A theme swap does not oblige: it applies the
     /// incoming set and then drops the outgoing one, so the entry removed is the one at the BOTTOM - and "the entry
