@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="utf-8" ?>
+
+<!-- The DARK variant of the macOS theme.
+
+     WHAT MAKES IT NOT A TINTED FLUENT. Three things, and they run through every number below:
+
+     THE WINDOW IS LIGHTER AND THE CONTENT IS DARKER - which is the opposite of Fluent, and the single change that
+     makes this palette read as a Mac rather than as a recoloured Windows. A dark Mac window sits near #323232 and the
+     things you read and type into are WELLS sunk into it at #1E1E1E: a list, a text field, an editor. Fluent stacks
+     the other way, a #202020 window with lighter cards on top. A first attempt here put every surface within a few
+     points of Fluent's and the result was indistinguishable from it, which is what the structure - not the hue - was
+     carrying all along.
+
+     THE CONTRASTS ARE SOFTER. Windows separates surfaces with strokes; a Mac separates them with a hairline that is
+     barely there, and leans on the surfaces themselves being different. So the stroke colours here are weaker and the
+     surface steps are larger than Fluent's.
+
+     THE ACCENT IS THE SYSTEM BLUE, and on a Mac the user chooses it. #0A84FF is the dark-appearance default. -->
+
+<ThemeVariantDefinition xmlns="http://adamantium/ui"
+                        Key="Dark">
+
+  <ThemeVariantDefinition.Values>
+    <ThemeValue Property="AccentColor" Value="#0A84FF"/>
+    <ThemeValue Property="AccentFillColorDisabled" Value="#3A3A3C"/>
+    <!-- A Mac's focus ring is the ACCENT, not white - the accent with a wide soft halo, which is the platform's most
+         recognisable interaction cue. The halo needs a ring that can be blurred; until then the accent alone. -->
+    <ThemeValue Property="FocusStrokeColorOuter" Value="#0A84FF"/>
+    <ThemeValue Property="FocusStrokeColorInner" Value="#00000000"/>
+  </ThemeVariantDefinition.Values>
+
+  <ThemeVariantDefinition.Colors>
+    <!-- The window BODY: the surface everything else is cut into or laid on. -->
+    <PaletteColor Key="SolidBackgroundFillColorBase" Color="#323232"/>
+    <!-- The WELL: what a list, a text field or an editor is sunk to. Darker than the window, which is the whole point. -->
+    <PaletteColor Key="SolidBackgroundFillColorSecondary" Color="#1E1E1E"/>
+    <!-- Raised off the body - a sidebar's selected row, a header strip. -->
+    <PaletteColor Key="SolidBackgroundFillColorTertiary" Color="#3C3C3E"/>
+    <PaletteColor Key="SmokeFillColorDefault" Color="#8C000000"/>
+    <!-- A card is content, so it goes with the wells rather than with the chrome. -->
+    <PaletteColor Key="CardBackgroundFillColorDefault" Color="#262628"/>
+    <!-- The caption's own surface, one step above the body - see MacOsWindowStyleSet. -->
+    <PaletteColor Key="LayerFillColorDefault" Color="#3C3C3E"/>
+    <PaletteColor Key="TileFillColorDefault" Color="#14FFFFFF"/>
+
+    <!-- Controls. A Mac control is a filled capsule rather than an outlined box, so the FILLS carry the weight and the
+         strokes stay faint. -->
+    <PaletteColor Key="ControlFillColorDefault" Color="#1AFFFFFF"/>
+    <PaletteColor Key="ControlFillColorSecondary" Color="#26FFFFFF"/>
+    <PaletteColor Key="ControlFillColorTertiary" Color="#0FFFFFFF"/>
+    <PaletteColor Key="ControlFillColorDisabled" Color="#0DFFFFFF"/>
+    <PaletteColor Key="SubtleFillColorSecondary" Color="#14FFFFFF"/>
+    <PaletteColor Key="SubtleFillColorTertiary" Color="#0AFFFFFF"/>
+    <PaletteColor Key="ControlStrokeColorDefault" Color="#1FFFFFFF"/>
+    <PaletteColor Key="ControlStrokeColorSecondary" Color="#2EFFFFFF"/>
+
+    <!-- On the accent: a Mac presses a control by DARKENING it rather than by veiling it in white. -->
+    <PaletteColor Key="OnAccentOverlayPointerOver" Color="#1AFFFFFF"/>
+    <PaletteColor Key="OnAccentOverlayPressed" Color="#00000000"/>
+    <PaletteColor Key="OnAccentShadePointerOver" Color="#1A000000"/>
+    <PaletteColor Key="OnAccentShadePressed" Color="#40000000"/>
+
+    <PaletteColor Key="DockFoldedStripFill" Color="#17FFFFFF"/>
+    <PaletteColor Key="DockCompassFillColor" Color="#E62C2C2E"/>
+    <PaletteColor Key="DockCompassStrokeColor" Color="#4DFFFFFF"/>
+    <PaletteColor Key="DockCompassPreviewColor" Color="#590A84FF"/>
+
+    <!-- Text. macOS states its secondary and tertiary text as fixed alphas of the primary - 55% and 25% - which is why
+         these are translucent white rather than three greys. -->
+    <PaletteColor Key="TextFillColorPrimary" Color="#FFFFFF"/>
+    <PaletteColor Key="TextFillColorSecondary" Color="#8CFFFFFF"/>
+    <PaletteColor Key="TextFillColorTertiary" Color="#40FFFFFF"/>
+    <PaletteColor Key="TextFillColorDisabled" Color="#40FFFFFF"/>
+
+    <!-- The system colours, as macOS states them for dark appearance. -->
+    <PaletteColor Key="SystemFillColorSuccess" Color="#32D74B"/>
+    <PaletteColor Key="SystemFillColorCaution" Color="#FFD60A"/>
+    <PaletteColor Key="SystemFillColorCritical" Color="#FF453A"/>
+
+    <PaletteColor Key="SkeletonPulseFill" Color="#FFFFFF"/>
+    <PaletteColor Key="ShimmerTrackFill" Color="#14FFFFFF"/>
+
+    <PaletteColor Key="KeyTipPlateFill" Color="#F2F2F7"/>
+    <PaletteColor Key="KeyTipPlateStroke" Color="#48484A"/>
+    <PaletteColor Key="KeyTipForeground" Color="#1C1C1E"/>
+
+    <!-- Served as raw COLOURS, not brushes: a gradient stop takes a colour, and so does a material's tint. -->
+    <PaletteColor Key="ShimmerPeakColor" Color="#99FFFFFF" As="Color"/>
+    <PaletteColor Key="ShimmerTrackColor" Color="#14FFFFFF" As="Color"/>
+    <PaletteColor Key="EdgeFadeColor" Color="#E6323232" As="Color"/>
+    <PaletteColor Key="EdgeFadeColorTransparent" Color="#00323232" As="Color"/>
+    <PaletteColor Key="AcrylicFillColorDefault" Color="#3A3A3A" As="Color"/>
+  </ThemeVariantDefinition.Colors>
+
+</ThemeVariantDefinition>

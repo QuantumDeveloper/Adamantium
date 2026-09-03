@@ -1,0 +1,50 @@
+<ResourceDictionary xmlns:x="http://adamantium/ui/xaml/extensions"
+        xmlns:sys="clr-namespace:System;assembly=System.Runtime"
+        xmlns="http://adamantium/ui">
+
+    <!-- The macOS theme's own numbers. It takes the rest from the Fluent metrics for now (see MacOs.auml); what is here
+         is what actually differs, and every one of these is a platform convention rather than a taste.
+
+         OVERRIDING BY NAME is how this works: both dictionaries are linked, and the one linked later answers first, so
+         a key restated here replaces Fluent's while every key not restated still resolves. -->
+
+    <!-- A Mac caption is SHORTER than a Windows one - 28 against 36 - and the difference is felt rather than measured:
+         it is what makes the window read as content with a strip on top instead of a frame around content. -->
+    <sys:Double x:Key="TitleBarHeight">28</sys:Double>
+
+    <!-- NOT HERE: the Mac title is semi-bold, and the engine has no font weight to say so with - neither TextBlock nor
+         the themes carry one. Left undone rather than faked; it belongs with whatever adds weights. -->
+
+    <!-- The lights: 12 across, 8 apart, 20 in from the edge. Fixed, not derived from the caption's height - they are a
+         constant of the platform the way a scrollbar's width is, and a caption made taller does not grow them. -->
+    <sys:Double x:Key="TrafficLightSize">12</sys:Double>
+    <sys:Double x:Key="TrafficLightGap">8</sys:Double>
+    <sys:Double x:Key="TrafficLightsInset">20</sys:Double>
+    <CornerRadius x:Key="TrafficLightRadius">6</CornerRadius>
+
+    <!-- The symbol inside a light: near-black and TRANSLUCENT, so it reads on all three colours without a per-light
+         glyph colour. Not a palette key - the lights it sits on are platform constants, so this is one too. -->
+    <SolidColorBrush x:Key="TrafficLightGlyph" Color="#99000000"/>
+
+    <!-- WINDOW CORNERS. The single most recognisable number in the whole theme: a Mac window is generously rounded
+         where a Windows one is barely. -->
+    <CornerRadius x:Key="WindowCornerRadius">10</CornerRadius>
+
+    <!-- ── Controls ───────────────────────────────────────────────────────────────────────────────────────────────
+         Restated here rather than in each style set, and that is the point of the metrics being a contract: these keys
+         are asked for by every borrowed Fluent set too, so the whole theme gets denser and rounder from four numbers -
+         which is the difference a platform's controls actually have, before any of them is re-templated.
+
+         SHORTER AND ROUNDER. A Mac control is 28 where a Windows one is 32, and its corner is 6 where Windows uses 4 -
+         at these sizes that reads as a capsule rather than as a rounded box, which is the look. -->
+    <sys:Double x:Key="ControlHeight">28</sys:Double>
+    <sys:Double x:Key="ControlHeightCompact">22</sys:Double>
+    <CornerRadius x:Key="CornerRadiusDefault">6</CornerRadius>
+    <Thickness x:Key="PaddingControl">12 4 12 5</Thickness>
+    <Thickness x:Key="PaddingControlCompact">9 3 9 4</Thickness>
+
+    <!-- A HAIRLINE, not a stroke. Fluent draws control borders 2 wide; a Mac's are one device pixel and are there to
+         seat the control on its surface rather than to outline it. -->
+    <Thickness x:Key="StrokeControl">1</Thickness>
+
+</ResourceDictionary>

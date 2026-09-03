@@ -1,0 +1,248 @@
+<?xml version="1.0" encoding="utf-8"?>
+<StyleSet xmlns="http://adamantium/ui"
+          xmlns:x="http://adamantium/ui/xaml/extensions">
+
+    <!-- The macOS caption. Three things separate it from the Windows one, and all three are conventions rather than
+         decoration - a Mac user reads a window by them:
+
+         THE LIGHTS SIT LEFT, and closing is outermost - close, minimise, zoom. This template lays them out in that
+         order directly, so it needs no reordering trigger; CaptionButtonPlacement is still set to Left because that is
+         the window's own statement of where its caption controls live, and the placement belongs to the theme rather
+         than to every window that uses it.
+
+         THE TITLE IS CENTRED IN THE WINDOW, not beside the icon. Centred in the WINDOW and not in the space left over:
+         a caption with commands on one side would otherwise push the title off-centre, and on a Mac a title that drifts
+         reads as a mistake. So the title is its own layer spanning the whole bar, and the interactive things sit over
+         it - the drag area, the lights, the commands.
+
+         THE LIGHTS ARE COLOURED CIRCLES AND SHOW THEIR GLYPHS ONLY UNDER THE POINTER. That is not a flourish either:
+         at rest the caption is meant to be quiet, and the symbols appear when the hand is on its way to them. -->
+
+    <Style Selector="TitleBar">
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="Foreground" Value="{ObservableResource TextFillColorPrimary}"/>
+        <Setter Property="Height" Value="{ResourceReference TitleBarHeight}"/>
+        <Setter Property="FontSize" Value="{ResourceReference FontSizeChrome}"/>
+        <!-- The whole reason this style set exists. Stated once, here, so no window has to know it. -->
+        <Setter Property="CaptionButtonPlacement" Value="Left"/>
+        <!-- A Mac caption carries no application icon. -->
+        <Setter Property="ShowIcon" Value="False"/>
+    </Style>
+
+    <Style Selector="TitleBar">
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="TitleBar">
+                    <!-- COLUMNS for the things that have a side, and the title as a LAYER ACROSS them. Both halves
+                         matter. Columns because a side is a place, and asking a stretched child to align itself inside
+                         a shared cell is a wish rather than a layout - the commands did exactly that and landed on top
+                         of the lights. The title spanning all three because it must be centred on the WINDOW: centred
+                         in the space left over, it would drift the moment one side held more than the other, and a
+                         drifting title is the first thing that reads as wrong on a Mac.
+
+                         The drag area spans too, underneath everything: whatever part of the caption is not a control
+                         drags the window. -->
+                    <!-- The hairline under the caption is what separates it from the body - see the window's comment on
+                         why the caption is its own surface. A Border, because a Grid is a panel and has no edge. -->
+                    <Border Background="{TemplateBinding Background}"
+                            BorderThickness="0 0 0 1" BorderBrush="{ObservableResource ControlStrokeColorDefault}">
+                    <Grid ColumnDefinitions="Auto,*,Auto">
+
+                        <Border x:Name="PART_DragArea" Grid.Column="0" Grid.ColumnSpan="3" Background="Transparent"/>
+
+                        <!-- NOT HIT-TESTABLE, and it has to be said out loud: the title spans the whole bar so it can
+                             be centred on the WINDOW, which puts it on top of the drag area underneath. Caption drag
+                             only begins when the drag area is genuinely the topmost thing under the pointer, so a
+                             title that takes hits is a window that cannot be dragged by its middle - which is most of
+                             it. A label is not interactive anyway. -->
+                        <TextBlock x:Name="PART_Title" Grid.Column="0" Grid.ColumnSpan="3" IsHitTestVisible="False"
+                                Text="{TemplateBinding Title}"
+                                HorizontalAlignment="Center" VerticalAlignment="Center"
+                                FontSize="{TemplateBinding FontSize}"
+                                Foreground="{TemplateBinding Foreground}"
+                                TextTrimming="CharEllipses"/>
+
+                        <!-- The lights. Named exactly as the control looks them up - parts are found by NAME, and the
+                             control wires close / minimise / zoom to these three. The gap belongs to the PANEL: hiding
+                             one light (a window that cannot be zoomed) then closes up on its own instead of leaving a
+                             double gap where a margin used to be. -->
+                        <!-- EVERYTHING ON THE LEFT LIVES IN THE Auto COLUMN, and that is a rule rather than tidiness:
+                             the star column belongs to the DRAG AREA. A control put there sizes to the whole column
+                             whatever its alignment says, and covers the very middle of the caption - which is where a
+                             window is normally dragged from. -->
+                        <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center"
+                                MarginLeft="{ResourceReference TrafficLightsInset}">
+
+                            <StackPanel x:Name="PART_ButtonsPanel" Orientation="Horizontal" VerticalAlignment="Center"
+                                    Spacing="{ResourceReference TrafficLightGap}">
+                                <Button x:Name="PART_CloseButton" Classes="TrafficLight CloseLight" Focusable="False"/>
+                                <Button x:Name="PART_MinButton" Classes="TrafficLight MinimiseLight" Focusable="False"/>
+                                <Button x:Name="PART_MaxButton" Classes="TrafficLight ZoomLight" Focusable="False"/>
+                            </StackPanel>
+
+                        <!-- LEFT commands, after the lights - on a Mac what the application puts on this side follows
+                             the window's own controls rather than preceding them. -->
+                        <ItemsControl x:Name="PART_LeftCommands"
+                                ItemsSource="{TemplateBinding LeftWindowCommands}"
+                                VerticalAlignment="Center" MarginLeft="12">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate><StackPanel Orientation="Horizontal" Spacing="2"/></ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Button Classes="CaptionCommand" VerticalAlignment="Center"
+                                            ToolTip="{Binding ToolTip}"
+                                            Command="{Binding Command}"
+                                            CommandParameter="{Binding CommandParameter}">
+                                        <Path Data="{Binding Icon}"
+                                                Stroke="{Ancestor TitleBar, Foreground}" StrokeThickness="1"
+                                                HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Button>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                        </StackPanel>
+
+                        <!-- Whatever the application puts in the caption, on the right where a Mac keeps it. The ITEM
+                             TEMPLATE is not optional: a WindowCommand is a command and an icon, and without a template
+                             saying so an ItemsControl shows what ToString gives - the type's own name, four times
+                             across the caption. -->
+                        <ItemsControl x:Name="PART_RightCommands" Grid.Column="2"
+                                ItemsSource="{TemplateBinding RightWindowCommands}"
+                                VerticalAlignment="Center" MarginRight="8">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate><StackPanel Orientation="Horizontal"/></ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Button Classes="CaptionCommand" VerticalAlignment="Center"
+                                            ToolTip="{Binding ToolTip}"
+                                            Command="{Binding Command}"
+                                            CommandParameter="{Binding CommandParameter}">
+                                        <Path Data="{Binding Icon}"
+                                                Stroke="{Ancestor TitleBar, Foreground}" StrokeThickness="1"
+                                                HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Button>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </Grid>
+                    </Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style Selector="TitleBar">
+        <PropertyTrigger Property="ShowMinButton" Value="false">
+            <Setter TargetName="PART_MinButton" Property="Visibility" Value="Collapsed"/>
+        </PropertyTrigger>
+        <PropertyTrigger Property="ShowMaxRestoreButton" Value="false">
+            <Setter TargetName="PART_MaxButton" Property="Visibility" Value="Collapsed"/>
+        </PropertyTrigger>
+        <PropertyTrigger Property="ShowCloseButton" Value="false">
+            <Setter TargetName="PART_CloseButton" Property="Visibility" Value="Collapsed"/>
+        </PropertyTrigger>
+        <PropertyTrigger Property="ShowTitle" Value="false">
+            <Setter TargetName="PART_Title" Property="Visibility" Value="Collapsed"/>
+        </PropertyTrigger>
+    </Style>
+
+    <!-- What all three lights share: a circle of a fixed size. They do not scale with the caption - they are a constant
+         of the platform the way a scrollbar's width is. The COLOURS and the glyphs are per light, below; none of them
+         are palette keys, because Apple's three are the same in light and dark and so belong to the platform rather
+         than to a variant. -->
+    <Style Selector="Button.TrafficLight">
+        <Setter Property="Width" Value="{ResourceReference TrafficLightSize}"/>
+        <Setter Property="Height" Value="{ResourceReference TrafficLightSize}"/>
+        <Setter Property="MinWidth" Value="0"/>
+        <Setter Property="MinHeight" Value="0"/>
+        <Setter Property="Padding" Value="0"/>
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="CornerRadius" Value="{ResourceReference TrafficLightRadius}"/>
+        <Setter Property="Focusable" Value="False"/>
+    </Style>
+
+    <!-- ONE TEMPLATE PER LIGHT, and the repetition is deliberate. The glyph differs and it is GEOMETRY: routing three
+         different path strings through one template means carrying them in some general-purpose slot (Tag) and hoping
+         a converter turns them back into geometry - a silent failure when it does not, which is a caption with three
+         blank circles and nothing in the log. Written out, each light says what it draws.
+
+         The glyph rides at zero opacity until the pointer arrives. Drawn rather than typed: these symbols are eight
+         pixels across, and a font at that size hints itself into mush. -->
+    <Style Selector="Button.CloseLight">
+        <Setter Property="Background" Value="#FF5F57"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border Background="{TemplateBinding Background}" CornerRadius="{TemplateBinding CornerRadius}">
+                        <Path x:Name="LightGlyph" Data="M0,0 L6,6 M6,0 L0,6" Opacity="0"
+                                Stroke="{ResourceReference TrafficLightGlyph}" StrokeThickness="1.1"
+                                HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+        <PropertyTrigger Property="IsMouseOver" Value="true">
+            <Setter TargetName="LightGlyph" Property="Opacity" Value="1"/>
+        </PropertyTrigger>
+    </Style>
+
+    <Style Selector="Button.MinimiseLight">
+        <Setter Property="Background" Value="#FEBC2E"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border Background="{TemplateBinding Background}" CornerRadius="{TemplateBinding CornerRadius}">
+                        <Path x:Name="LightGlyph" Data="M0,3 L7,3" Opacity="0"
+                                Stroke="{ResourceReference TrafficLightGlyph}" StrokeThickness="1.1"
+                                HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+        <PropertyTrigger Property="IsMouseOver" Value="true">
+            <Setter TargetName="LightGlyph" Property="Opacity" Value="1"/>
+        </PropertyTrigger>
+    </Style>
+
+    <Style Selector="Button.ZoomLight">
+        <Setter Property="Background" Value="#28C840"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border Background="{TemplateBinding Background}" CornerRadius="{TemplateBinding CornerRadius}">
+                        <!-- FULL SCREEN, not zoom: two triangles opening towards opposite corners. The green button
+                             stopped being a "+" with Big Sur - the plus is what it shows while Option is held, when it
+                             means zoom-to-fit instead. FILLED, unlike the close and minimise glyphs, because these are
+                             solid arrowheads rather than strokes. -->
+                        <Path x:Name="LightGlyph" Data="M0,0 L4,0 L0,4 Z M7,7 L3,7 L7,3 Z" Opacity="0"
+                                Fill="{ResourceReference TrafficLightGlyph}"
+                                HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+        <PropertyTrigger Property="IsMouseOver" Value="true">
+            <Setter TargetName="LightGlyph" Property="Opacity" Value="1"/>
+        </PropertyTrigger>
+    </Style>
+
+    <!-- A caption command: flat, square, quiet - a Mac keeps its caption plain, so this is a glyph with a hover and
+         nothing else. -->
+    <Style Selector="Button.CaptionCommand">
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="BackgroundPointerOver" Value="{ResourceReference SubtleFillColorSecondary}"/>
+        <Setter Property="BackgroundPressed" Value="{ResourceReference SubtleFillColorTertiary}"/>
+        <Setter Property="Foreground" Value="{ObservableResource TextFillColorPrimary}"/>
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="MinHeight" Value="0"/>
+        <Setter Property="MinWidth" Value="0"/>
+        <Setter Property="Width" Value="22"/>
+        <Setter Property="Height" Value="22"/>
+        <Setter Property="Padding" Value="0"/>
+        <Setter Property="CornerRadius" Value="4"/>
+        <Setter Property="Focusable" Value="False"/>
+    </Style>
+
+</StyleSet>

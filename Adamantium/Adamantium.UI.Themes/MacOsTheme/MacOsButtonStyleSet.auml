@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="utf-8"?>
+<StyleSet xmlns="http://adamantium/ui"
+          xmlns:x="http://adamantium/ui/xaml/extensions">
+
+    <!-- The macOS push button. Same shape of style set as Fluent's - one template, the states as brushes on the control,
+         triggers projecting them - because that shape is the engine's, not Windows'. What differs is the behaviour and
+         the weight:
+
+         IT DOES NOT REACT TO HOVER. That is the defining difference and it is deliberate, not an omission: an AppKit
+         push button lights up when it is PRESSED and not when the pointer merely crosses it. Windows treats hover as
+         feedback that a thing is live; a Mac treats the button's own presence as that, and reserves the change for the
+         action. A macOS theme that highlights on hover reads as a Windows theme wearing Mac colours.
+
+         IT IS SEATED, NOT OUTLINED. The border is a hairline whose job is to sit the control on its surface; the fill
+         carries the shape. Hence StrokeControl at 1 in the macOS metrics against Fluent's 2.
+
+         PRESSING DARKENS IT. Windows swaps to a paler fill; a Mac pushes the whole control down a shade, which is why
+         the pressed brushes here go DOWN in lightness rather than up. -->
+
+    <Style Selector="Button">
+        <Setter Property="Background" Value="{ResourceReference ControlFillColorDefault}"/>
+        <Setter Property="BorderBrush" Value="{ResourceReference ControlStrokeColorDefault}"/>
+        <Setter Property="Foreground" Value="{ObservableResource TextFillColorPrimary}"/>
+
+        <!-- Hover leaves it exactly as it was - see above. Stated rather than left out, so that the next person can see
+             it was a decision and not a forgotten setter. -->
+        <Setter Property="BackgroundPointerOver" Value="{ResourceReference ControlFillColorDefault}"/>
+        <Setter Property="BackgroundPressed" Value="{ResourceReference ControlFillColorTertiary}"/>
+        <Setter Property="BackgroundDisabled" Value="{ResourceReference ControlFillColorDisabled}"/>
+        <Setter Property="ForegroundPressed" Value="{ObservableResource TextFillColorPrimary}"/>
+        <Setter Property="ForegroundDisabled" Value="{ResourceReference TextFillColorDisabled}"/>
+
+        <Setter Property="BorderThickness" Value="{ResourceReference StrokeControl}"/>
+        <Setter Property="CornerRadius" Value="{ResourceReference CornerRadiusDefault}"/>
+        <Setter Property="Padding" Value="{ResourceReference PaddingControl}"/>
+        <Setter Property="MinHeight" Value="{ResourceReference ControlHeight}"/>
+        <Setter Property="FontSize" Value="{ResourceReference FontSizeBody}"/>
+        <Setter Property="HorizontalContentAlignment" Value="Center"/>
+        <Setter Property="VerticalContentAlignment" Value="Center"/>
+    </Style>
+
+    <Style Selector="Button">
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border x:Name="InnerBorder"
+                            CornerRadius="{TemplateBinding CornerRadius}"
+                            Background="{TemplateBinding Background}"
+                            BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}"
+                            Padding="{TemplateBinding Padding}">
+                        <ContentPresenter
+                                x:Name="PART_ContentPresenter"
+                                HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
+                                Foreground="{TemplateBinding Foreground}"
+                                FontSize="{TemplateBinding FontSize}"
+                                Content="{TemplateBinding Content}"
+                                ContentTemplate="{TemplateBinding ContentTemplate}"
+                                ContentTemplateSelector="{TemplateBinding ContentTemplateSelector}"/>
+                    </Border>
+                    <!-- No focus ring here either: the application draws ONE, on the adorner layer. See Fluent's note -
+                         a ring restated in a template is a second answer to the same question. -->
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style Selector="Button">
+        <!-- No IsMouseOver trigger at all. The brush above already says hover changes nothing; a trigger that assigns
+             the same value would only invite someone to "fix" it later by giving it a different one. -->
+        <PropertyTrigger Property="IsPressed" Value="true">
+            <Setter TargetName="InnerBorder" Property="Background" Value="{TemplateBinding BackgroundPressed}"/>
+            <Setter TargetName="PART_ContentPresenter" Property="Foreground" Value="{TemplateBinding ForegroundPressed}"/>
+        </PropertyTrigger>
+        <PropertyTrigger Property="IsEnabled" Value="false">
+            <Setter TargetName="InnerBorder" Property="Background" Value="{TemplateBinding BackgroundDisabled}"/>
+            <Setter TargetName="PART_ContentPresenter" Property="Foreground" Value="{TemplateBinding ForegroundDisabled}"/>
+        </PropertyTrigger>
+    </Style>
+
+    <!-- THE DEFAULT BUTTON. On a Mac this is not "a button someone styled blue" - it is the one the Return key presses,
+         and it is filled with the accent precisely so that it can be found without reading. Same template, only the
+         brushes change; pressed goes DARKER, as everything here does. -->
+    <Style Selector="Button.Accent">
+        <Setter Property="Background" Value="{ThemeResource AccentFillColorDefault}"/>
+        <Setter Property="BorderBrush" Value="{ThemeResource AccentFillColorDefault}"/>
+        <Setter Property="Foreground" Value="{ThemeResource AccentForegroundColor}"/>
+        <Setter Property="BackgroundPointerOver" Value="{ThemeResource AccentFillColorDefault}"/>
+        <Setter Property="BackgroundPressed" Value="{ThemeResource AccentFillColorTertiary}"/>
+        <Setter Property="BackgroundDisabled" Value="{ThemeResource AccentFillColorDisabled}"/>
+        <Setter Property="ForegroundPressed" Value="{ThemeResource AccentForegroundColor}"/>
+    </Style>
+</StyleSet>

@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<Theme xmlns="http://adamantium/ui"
+       xmlns:x="http://adamantium/ui/xaml/extensions"
+       xmlns:fluent="clr-namespace:Adamantium.UI.Themes.FluentTheme"
+       xmlns:mac="clr-namespace:Adamantium.UI.Themes.MacOsTheme"
+       Name="macOS"
+       SystemLightVariant="Light"
+       SystemDarkVariant="Dark"
+       ResourceContext.Scope="Theme">
+
+  <!-- The macOS theme, and at this point it is a WINDOW and a CAPTION and nothing else yet.
+
+       SCAFFOLDING, SAID OUT LOUD: the STYLE SETS below, bar the two macOS ones, are still Fluent's. That is not the
+       finished shape - a theme owns its own sets, as Editor Pro does - it is what lets the chrome be looked at today
+       instead of after fifty files. Each gets replaced by a macOS one as the work goes on, and this comment shrinks
+       with the list.
+
+       The PALETTE is no longer borrowed: MacOsLight and MacOsDark answer every key themselves.
+
+       Borrowing works at all because the KEYS are a contract between themes: a template asks for
+       SolidBackgroundFillColorBase or FontSizeChrome and every theme answers it. macOS's own metrics are linked after
+       Fluent's - the later link answers first - so the handful of numbers that actually differ (caption height, corner
+       radius, the lights) override while everything else still resolves. -->
+
+  <ResourceContext.Resources>
+    <ResourceLink Source="{x:Type fluent:Icons}"/>
+    <ResourceLink Source="{x:Type fluent:Metrics}"/>
+    <ResourceLink Source="{x:Type fluent:Materials}"/>
+    <ResourceLink Source="{x:Type mac:MacOsMetrics}"/>
+  </ResourceContext.Resources>
+
+  <Theme.Variants>
+    <mac:MacOsDark/>
+    <mac:MacOsLight/>
+  </Theme.Variants>
+
+  <Theme.StyleIncludes>
+        <!-- Borrowed from Fluent until each has a macOS counterpart. FIRST, because macOS's own come after and the
+             later set wins: the traffic lights are Buttons, and Fluent's plain Button style would otherwise paint over
+             the class style that makes them coloured circles. -->
+        <StyleInclude Source="{x:Type fluent:TextBlockStyleSet}"/>
+        <StyleInclude Source="{x:Type fluent:BorderStyleSet}"/>
+        <StyleInclude Source="{x:Type fluent:ContentControlStyleSet}"/>
+        <StyleInclude Source="{x:Type fluent:RepeatButtonStyleSet}"/>
+        <StyleInclude Source="{x:Type fluent:ThumbStyleSet}"/>
+        <StyleInclude Source="{x:Type fluent:ScrollBarStyleSet}"/>
+        <StyleInclude Source="{x:Type fluent:ScrollViewerStyleSet}"/>
+        <StyleInclude Source="{x:Type fluent:ZoomBoxStyleSet}"/>
+        <StyleInclude Source="{x:Type fluent:ToggleButtonStyleSet}"/>
+        <StyleInclude Source="{x:Type fluent:CheckBoxStyleSet}"/>
+        <StyleInclude Source="{x:Type fluent:RadioButtonStyleSet}"/>
+        <StyleInclude Source="{x:Type fluent:ToggleSwitchStyleSet}"/>
+        <StyleInclude Source="{x:Type fluent:SliderStyleSet}"/>
+        <StyleInclude Source="{x:Type fluent:RangeSliderStyleSet}"/>
+        <StyleInclude Source="{x:Type fluent:NumericUpDownStyleSet}"/>
+        <StyleInclude Source="{x:Type fluent:ProgressBarStyleSet}"/>
+        <StyleInclude Source="{x:Type fluent:RingProgressBarStyleSet}"/>
+        <StyleInclude Source="{x:Type fluent:BusyIndicatorStyleSet}"/>
+        <StyleInclude Source="{x:Type fluent:ItemsControlStyleSet}"/>
+        <StyleInclude Source="{x:Type fluent:ListBoxStyleSet}"/>
+        <StyleInclude Source="{x:Type fluent:ListBoxItemStyleSet}"/>
+        <StyleInclude Source="{x:Type fluent:DropInsertionIndicatorStyleSet}"/>
+        <StyleInclude Source="{x:Type fluent:DragHandleStyleSet}"/>
+        <StyleInclude Source="{x:Type fluent:SelectionAdornerStyleSet}"/>
+        <StyleInclude Source="{x:Type fluent:HoverAdornerStyleSet}"/>
+        <StyleInclude Source="{x:Type fluent:FocusAdornerStyleSet}"/>
+        <StyleInclude Source="{x:Type fluent:KeyTipAdornerStyleSet}"/>
+        <StyleInclude Source="{x:Type fluent:TilesHostStyleSet}"/>
+        <StyleInclude Source="{x:Type fluent:FlipTileStyleSet}"/>
+        <StyleInclude Source="{x:Type fluent:DropDownStyleSet}"/>
+        <StyleInclude Source="{x:Type fluent:DropDownItemStyleSet}"/>
+        <StyleInclude Source="{x:Type fluent:TextBoxStyleSet}"/>
+        <StyleInclude Source="{x:Type fluent:ToolTipStyleSet}"/>
+        <StyleInclude Source="{x:Type fluent:TabControlStyleSet}"/>
+        <StyleInclude Source="{x:Type fluent:TabItemStyleSet}"/>
+        <StyleInclude Source="{x:Type fluent:RibbonStyleSet}"/>
+        <StyleInclude Source="{x:Type fluent:SlidePanelStyleSet}"/>
+        <StyleInclude Source="{x:Type fluent:OverlayWindowStyleSet}"/>
+        <StyleInclude Source="{x:Type fluent:ResizeGripperStyleSet}"/>
+        <StyleInclude Source="{x:Type fluent:MenuStyleSet}"/>
+        <StyleInclude Source="{x:Type fluent:TreeViewStyleSet}"/>
+        <StyleInclude Source="{x:Type fluent:GridSplitterStyleSet}"/>
+        <StyleInclude Source="{x:Type fluent:DockingStyleSet}"/>
+        <StyleInclude Source="{x:Type fluent:ColorPickerStyleSet}"/>
+        <StyleInclude Source="{x:Type fluent:ColorPickerButtonStyleSet}"/>
+        <StyleInclude Source="{x:Type fluent:ColorWheelStyleSet}"/>
+
+        <!-- macOS's own. The ORDER of these is deliberately the one that used to break: the plain Button style set is
+             LAST, after the caption that specialises Button into traffic lights. It stays that way as a standing check
+             that specificity is decided by the SELECTORS and not by this list - see Style.StyleBandOfSelector. -->
+        <StyleInclude Source="{x:Type mac:MacOsWindowStyleSet}"/>
+        <StyleInclude Source="{x:Type mac:MacOsTitleBarStyleSet}"/>
+        <StyleInclude Source="{x:Type mac:MacOsButtonStyleSet}"/>
+  </Theme.StyleIncludes>
+
+</Theme>
