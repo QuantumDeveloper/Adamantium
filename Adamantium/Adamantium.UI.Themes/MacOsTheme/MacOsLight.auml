@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="utf-8" ?>
+
+<!-- The LIGHT variant of the macOS theme. See MacOsDark for what separates these palettes from Fluent's; the same
+     three things hold here, upside down.
+
+     One difference is specific to light appearance and worth naming: a Mac's light window is NOT white. The body sits
+     near #ECECEC and the content areas within it are white, so a window reads as paper laid on a surface. Fluent does
+     the opposite - white window, grey cards - and getting this the wrong way round is what makes a light macOS skin
+     look like a washed-out Windows one. -->
+
+<ThemeVariantDefinition xmlns="http://adamantium/ui"
+                        Key="Light">
+
+  <ThemeVariantDefinition.Values>
+    <ThemeValue Property="AccentColor" Value="#007AFF"/>
+    <ThemeValue Property="AccentFillColorDisabled" Value="#D1D1D6"/>
+    <ThemeValue Property="FocusStrokeColorOuter" Value="#007AFF"/>
+    <ThemeValue Property="FocusStrokeColorInner" Value="#00000000"/>
+  </ThemeVariantDefinition.Values>
+
+  <ThemeVariantDefinition.Colors>
+    <!-- The window is the SURFACE and the content is the paper on it - the opposite way round from Fluent. -->
+    <PaletteColor Key="SolidBackgroundFillColorBase" Color="#ECECEC"/>
+    <PaletteColor Key="SolidBackgroundFillColorSecondary" Color="#E3E3E3"/>
+    <PaletteColor Key="SolidBackgroundFillColorTertiary" Color="#F5F5F5"/>
+    <PaletteColor Key="SmokeFillColorDefault" Color="#59000000"/>
+    <PaletteColor Key="CardBackgroundFillColorDefault" Color="#FFFFFF"/>
+    <PaletteColor Key="LayerFillColorDefault" Color="#F6F6F6"/>
+    <PaletteColor Key="TileFillColorDefault" Color="#0A000000"/>
+
+    <PaletteColor Key="ControlFillColorDefault" Color="#FFFFFF"/>
+    <PaletteColor Key="ControlFillColorSecondary" Color="#F0F0F0"/>
+    <PaletteColor Key="ControlFillColorTertiary" Color="#E8E8E8"/>
+    <PaletteColor Key="ControlFillColorDisabled" Color="#0A000000"/>
+    <PaletteColor Key="SubtleFillColorSecondary" Color="#0F000000"/>
+    <PaletteColor Key="SubtleFillColorTertiary" Color="#08000000"/>
+    <PaletteColor Key="ControlStrokeColorDefault" Color="#1F000000"/>
+    <PaletteColor Key="ControlStrokeColorSecondary" Color="#2E000000"/>
+
+    <PaletteColor Key="OnAccentOverlayPointerOver" Color="#1AFFFFFF"/>
+    <PaletteColor Key="OnAccentOverlayPressed" Color="#00000000"/>
+    <PaletteColor Key="OnAccentShadePointerOver" Color="#1A000000"/>
+    <PaletteColor Key="OnAccentShadePressed" Color="#40000000"/>
+
+    <PaletteColor Key="DockFoldedStripFill" Color="#12000000"/>
+    <PaletteColor Key="DockCompassFillColor" Color="#E6F2F2F2"/>
+    <PaletteColor Key="DockCompassStrokeColor" Color="#4D000000"/>
+    <PaletteColor Key="DockCompassPreviewColor" Color="#59007AFF"/>
+
+    <!-- The same fixed alphas macOS uses for secondary and tertiary text, over black this time. -->
+    <PaletteColor Key="TextFillColorPrimary" Color="#000000"/>
+    <PaletteColor Key="TextFillColorSecondary" Color="#8C000000"/>
+    <PaletteColor Key="TextFillColorTertiary" Color="#40000000"/>
+    <PaletteColor Key="TextFillColorDisabled" Color="#40000000"/>
+
+    <PaletteColor Key="SystemFillColorSuccess" Color="#28CD41"/>
+    <PaletteColor Key="SystemFillColorCaution" Color="#FFCC00"/>
+    <PaletteColor Key="SystemFillColorCritical" Color="#FF3B30"/>
+
+    <PaletteColor Key="SkeletonPulseFill" Color="#000000"/>
+    <PaletteColor Key="ShimmerTrackFill" Color="#14000000"/>
+
+    <PaletteColor Key="KeyTipPlateFill" Color="#2C2C2E"/>
+    <PaletteColor Key="KeyTipPlateStroke" Color="#8E8E93"/>
+    <PaletteColor Key="KeyTipForeground" Color="#F2F2F7"/>
+
+    <PaletteColor Key="ShimmerPeakColor" Color="#59000000" As="Color"/>
+    <PaletteColor Key="ShimmerTrackColor" Color="#14000000" As="Color"/>
+    <PaletteColor Key="EdgeFadeColor" Color="#E6ECECEC" As="Color"/>
+    <PaletteColor Key="EdgeFadeColorTransparent" Color="#00ECECEC" As="Color"/>
+    <PaletteColor Key="AcrylicFillColorDefault" Color="#F2F2F2" As="Color"/>
+  </ThemeVariantDefinition.Colors>
+
+</ThemeVariantDefinition>

@@ -1,0 +1,110 @@
+<?xml version="1.0" encoding="utf-8"?>
+<StyleSet xmlns="http://adamantium/ui"
+          xmlns:x="http://adamantium/ui/xaml/extensions">
+
+    <!-- The macOS window. Two things differ from the Windows one, and both are about the window reading as ONE SURFACE
+         rather than as a frame around content:
+
+         THE CORNERS ARE GENEROUSLY ROUNDED. It is the most recognisable number in the theme.
+
+         THE CAPTION IS NOT A BAR. On Windows the caption is painted with the accent and separates itself from the
+         content; on a Mac it is the top of the same surface, so it takes the window's own background and the title
+         simply sits on it. That is why the caption colours below are the window's background rather than the accent -
+         the same properties, answered the way this platform answers them. -->
+
+    <Style Selector="Window">
+        <Setter Property="Background" Value="{ObservableResource SolidBackgroundFillColorBase}"/>
+        <Setter Property="Foreground" Value="{ObservableResource TextFillColorPrimary}"/>
+        <!-- The caption is a SURFACE OF ITS OWN, just barely. Not the accent bar Windows paints - a Mac caption belongs
+             to the window - but not a seamless continuation either: it sits a layer above the body, and a hairline
+             under it (in the caption's own template) is what separates them. Given the same colour as the body it
+             reads as nothing at all, which is what it did. Inactive drops back to the body colour, so an unfocused
+             window loses the distinction along with its title's contrast. -->
+        <Setter Property="TitleBarBackground" Value="{ObservableResource LayerFillColorDefault}"/>
+        <Setter Property="InactiveTitleBarBackground" Value="{ObservableResource SolidBackgroundFillColorBase}"/>
+        <!-- The title dims when the window loses focus, which on a Mac is the main way an inactive window says so. -->
+        <Setter Property="TitleBarForeground" Value="{ObservableResource TextFillColorPrimary}"/>
+        <Setter Property="InactiveTitleBarForeground" Value="{ObservableResource TextFillColorSecondary}"/>
+        <Setter Property="LoadingIndicatorText" Value="Switching theme…"/>
+    </Style>
+
+    <Style Selector="Window">
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Window">
+                    <Border x:Name="PART_WindowBorder" Background="{TemplateBinding Background}"
+                            CornerRadius="{ResourceReference WindowCornerRadius}"
+                            BorderThickness="1" BorderBrush="{ObservableResource ControlStrokeColorDefault}"
+                            ClipToBounds="True">
+                        <Grid RowDefinitions="Auto,*">
+                            <TitleBar x:Name="PART_TitleBar" Grid.Row="0"
+                                    Height="{TemplateBinding TitleBarHeight}"
+                                    Background="{TemplateBinding InactiveTitleBarBackground}"
+                                    Foreground="{TemplateBinding InactiveTitleBarForeground}"
+                                    Title="{TemplateBinding Title}"
+                                    LeadingContent="{TemplateBinding TitleBarLeadingContent}"
+                                    LeftWindowCommands="{TemplateBinding LeftWindowCommands}"
+                                    RightWindowCommands="{TemplateBinding RightWindowCommands}"
+                                    CaptionButtonPlacement="{TemplateBinding CaptionButtonPlacement}"/>
+
+                            <ContentPresenter x:Name="PART_ContentPresenter" Grid.Row="1"
+                                    Content="{TemplateBinding Content}"
+                                    ContentTemplate="{TemplateBinding ContentTemplate}"
+                                    ContentTemplateSelector="{TemplateBinding ContentTemplateSelector}"/>
+
+                            <ResizeGripper x:Name="PART_ResizeGripper" Grid.Row="1"
+                                    HorizontalAlignment="Right" VerticalAlignment="Bottom"
+                                    Width="26" Height="26" Visibility="Collapsed"/>
+
+                            <!-- The theme-swap scrim, kept as the Fluent window has it: the ENGINE owns the state
+                                 (Window.IsThemeChanging) and a theme that dropped this would silently lose the only
+                                 feedback a swap gives. The spinner's template is set INLINE on purpose - a re-templated
+                                 spinner gets a new owner the compositor cannot drive, and it freezes mid-swap. -->
+                            <Border x:Name="PART_ThemeOverlay" Grid.Row="1"
+                                    Background="{ObservableResource SmokeFillColorDefault}"
+                                    Visibility="Collapsed">
+                                <StackPanel Orientation="Vertical"
+                                        HorizontalAlignment="Center" VerticalAlignment="Center">
+                                    <BusyIndicator x:Name="PART_ThemeSpinner" IsActive="False"
+                                            Width="48" Height="48" HorizontalAlignment="Center">
+                                        <BusyIndicator.Template>
+                                            <ControlTemplate TargetType="BusyIndicator">
+                                                <Grid>
+                                                    <Ellipse Stroke="{ObservableResource ControlFillColorTertiary}"
+                                                             StrokeThickness="4" Fill="Transparent" EllipseType="EdgeToEdge"/>
+                                                    <Ellipse Stroke="{ThemeResource AccentFillColorDefault}"
+                                                             StrokeThickness="4" Fill="Transparent" EllipseType="EdgeToEdge"
+                                                             StartAngle="0" StopAngle="90" RenderTransformOrigin="0.5,0.5">
+                                                        <Ellipse.RenderTransform>
+                                                            <Transform x:Name="RingSpin"/>
+                                                        </Ellipse.RenderTransform>
+                                                    </Ellipse>
+                                                </Grid>
+                                            </ControlTemplate>
+                                        </BusyIndicator.Template>
+                                    </BusyIndicator>
+                                    <TextBlock Text="{TemplateBinding LoadingIndicatorText}" HorizontalAlignment="Center"
+                                            Margin="0,18,0,0" Foreground="{ObservableResource TextFillColorSecondary}"/>
+                                </StackPanel>
+                            </Border>
+                        </Grid>
+                    </Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style Selector="Window">
+        <PropertyTrigger Property="UseCustomChrome" Value="false">
+            <Setter TargetName="PART_TitleBar" Property="Visibility" Value="Collapsed"/>
+        </PropertyTrigger>
+        <PropertyTrigger Property="ResizeMode" Value="CanResizeWithGrip">
+            <Setter TargetName="PART_ResizeGripper" Property="Visibility" Value="Visible"/>
+        </PropertyTrigger>
+        <PropertyTrigger Property="IsThemeChanging" Value="true">
+            <Setter TargetName="PART_ThemeOverlay" Property="Visibility" Value="Visible"/>
+            <Setter TargetName="PART_ThemeSpinner" Property="IsActive" Value="True"/>
+        </PropertyTrigger>
+    </Style>
+
+</StyleSet>

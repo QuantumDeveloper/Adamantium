@@ -403,6 +403,11 @@ public abstract class UIApplication : FundamentalUIComponent, IService, IUIAppli
         var editorPro = new Themes.EditorProTheme.EditorPro();
         ThemeManager.AddTheme(editorPro.Name, editorPro);
 
+        // The macOS skin, and at this point it is a window and a caption: it owns those two style sets and borrows the
+        // rest from Fluent while they are written. Registered like the others - ADAM_THEME=macOS opens on it.
+        var macOs = new Themes.MacOsTheme.MacOs();
+        ThemeManager.AddTheme(macOs.Name, macOs);
+
         // Which theme the application OPENS on. Fluent unless told otherwise; ADAM_THEME names another registered one.
         // A theme is only really exercised by being the current one from the first frame - a swap into it is a
         // different path, and a theme that stalls the swap cannot be told apart from one that stalls at startup
