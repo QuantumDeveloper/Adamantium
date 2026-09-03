@@ -59,6 +59,10 @@
     <PaletteColor Key="ShimmerTrackColor" Color="#14FFFFFF" As="Color"/>
     <PaletteColor Key="EdgeFadeColor" Color="#E6161616" As="Color"/>
     <PaletteColor Key="EdgeFadeColorTransparent" Color="#00161616" As="Color"/>
+    <!-- What ACRYLIC is tinted with. A colour and not a brush because it goes into MaterialBrush.TintColor, and darker
+         than the solid surfaces it replaces on purpose: the tint is laid over whatever the surface happens to be
+         standing on, so it has to carry the contrast a menu's text needs even above a pale document. -->
+    <PaletteColor Key="AcrylicFillColorDefault" Color="#2C2C2C" As="Color"/>
   </ThemeVariantDefinition.Colors>
 
 </ThemeVariantDefinition>

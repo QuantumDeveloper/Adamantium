@@ -66,7 +66,7 @@
                                  a ChildTemplate is built against the POPUP, not the control that owns it. -->
                             <Popup.ChildTemplate>
                                 <ControlTemplate TargetType="Popup">
-                                    <Border Background="{ResourceReference CardBackgroundFillColorDefault}"
+                                    <Border Background="{ResourceReference AcrylicFlyoutFill}"
                                             BorderBrush="{ResourceReference ControlStrokeColorDefault}"
                                             BorderThickness="1"
                                             CornerRadius="4"

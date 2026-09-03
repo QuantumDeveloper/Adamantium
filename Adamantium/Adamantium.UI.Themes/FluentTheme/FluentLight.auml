@@ -55,6 +55,8 @@
     <PaletteColor Key="ShimmerTrackColor" Color="#14000000" As="Color"/>
     <PaletteColor Key="EdgeFadeColor" Color="#E6DFDFDF" As="Color"/>
     <PaletteColor Key="EdgeFadeColorTransparent" Color="#00DFDFDF" As="Color"/>
+    <!-- What ACRYLIC is tinted with - see the dark variant. Every variant must answer the same keys. -->
+    <PaletteColor Key="AcrylicFillColorDefault" Color="#F9F9F9" As="Color"/>
   </ThemeVariantDefinition.Colors>
 
 </ThemeVariantDefinition>

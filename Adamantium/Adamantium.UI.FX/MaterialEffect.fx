@@ -565,16 +565,41 @@ float2 CaptureUv(float2 fragment, float4 sourceUv)
 // measurement in hand.
 // Takes the SCALE, not the whole mapping: a picture pinned to the element has no rectangle in the frame at all, and
 // only the tap spacing is wanted here.
+/// A GAUSSIAN, written the standard way, and the two ad-hoc kernels it replaces are the reason to say so. First a cross
+/// of five taps, then a thirteen-tap tent: both are a handful of POINTS with nothing sampled between them, so at a
+/// small radius they barely blur and at a large one they stop blurring and start duplicating - a thin thing beneath the
+/// panel came through as several copies of itself, and a checkerboard came through as moire.
+///
+/// <para>Separable weights, applied as their outer product: a 9x9 Gaussian sampled as 5x5 BILINEAR fetches. Each fetch
+/// sits BETWEEN two texels at the offset the standard formulation gives (Rakos), so one sample carries two texels
+/// already weighted - which is what buys a 9-wide kernel for 25 fetches instead of 81. The offsets scale with the
+/// radius, and because the Gaussian falls off smoothly there is no radius at which the taps come apart.</para>
 float4 BlurCapture(float2 uv, float2 uvScale, float radiusPx)
 {
-    // The tap spacing is the radius in FRAME pixels put through the same scale - the mapping is already stated that way.
-    float2 texel = radiusPx * uvScale;
-    float4 sum = SourceTexture.Sample(SourceSampler, uv);
-    sum += SourceTexture.Sample(SourceSampler, uv + float2( texel.x,  0.0));
-    sum += SourceTexture.Sample(SourceSampler, uv + float2(-texel.x,  0.0));
-    sum += SourceTexture.Sample(SourceSampler, uv + float2( 0.0,  texel.y));
-    sum += SourceTexture.Sample(SourceSampler, uv + float2( 0.0, -texel.y));
-    return sum / 5.0;
+    // The standard linear-sampling Gaussian: three distinct offsets and weights per axis, mirrored into five taps.
+    const float3 gw = float3(0.2270270270, 0.3162162162, 0.0702702703);
+    const float3 go = float3(0.0, 1.3846153846, 3.2307692308);
+
+    float weights[5] = { gw.z, gw.y, gw.x, gw.y, gw.z };
+    float offsets[5] = { -go.z, -go.y, go.x, go.y, go.z };
+
+    // The radius is stated in FRAME pixels; put it through the same scale the mapping uses, and normalise so the
+    // outermost tap lands exactly at that radius.
+    float2 step = (radiusPx / go.z) * uvScale;
+
+    float4 sum = float4(0.0, 0.0, 0.0, 0.0);
+    [unroll]
+    for (int i = 0; i < 5; i++)
+    {
+        [unroll]
+        for (int j = 0; j < 5; j++)
+        {
+            float2 o = float2(offsets[i], offsets[j]) * step;
+            sum += SourceTexture.Sample(SourceSampler, uv + o) * (weights[i] * weights[j]);
+        }
+    }
+
+    return sum;   // the separable weights sum to 1, so their outer product does too
 }
 
 [shader("fragment")]

@@ -8,7 +8,7 @@
          convention: properties, template, triggers. -->
 
     <Style Selector="SlidePanel">
-        <Setter Property="Background" Value="{ResourceReference CardBackgroundFillColorDefault}"/>
+        <Setter Property="Background" Value="{ResourceReference AcrylicFlyoutFill}"/>
         <Setter Property="Foreground" Value="{ObservableResource TextFillColorPrimary}"/>
         <Setter Property="BorderBrush" Value="{ResourceReference ControlStrokeColorDefault}"/>
         <Setter Property="BorderThickness" Value="{ResourceReference StrokeThin}"/>
