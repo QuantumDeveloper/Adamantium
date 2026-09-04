@@ -2,16 +2,27 @@
 <StyleSet xmlns="http://adamantium/ui"
           xmlns:x="http://adamantium/ui/xaml/extensions">
 
-    <!-- SlidePanel: a panel that slides in from a window edge and overlays everything (hosted in the popup/overlay layer
-         via an edge-docked Popup). The template = Popup(PART_Popup) > Border(PART_Drawer) chrome > header row (title +
-         PART_CloseButton) + content. The slide + open/close are driven in code (SlidePanel). Per the small-styles
-         convention: properties, template, triggers. -->
+    <!-- The slide-over panel: an inspector that comes in from an edge. Same parts as Fluent's - a docked popup holding a
+         header row and the content - and three things are macOS:
+
+         THE CLOSE BUTTON IS AN ICON BUTTON, with a hover plate. It used to be a plain Button, and in this theme a plain
+         button does not answer the pointer at all - which is right for a bordered push button and wrong for a bare
+         glyph, so the cross sat there looking like a picture. See Button.Icon in MacOsButtonStyleSet; the correction is
+         explained there rather than here, because it is about buttons and not about panels.
+
+         THE HEADER IS SET IN THE SUBTITLE SIZE, not the title. A Mac inspector titles itself quietly - the panel is a
+         companion to the window, not a document of its own - and Fluent's title size makes a 264-wide drawer read as a
+         page with a masthead.
+
+         THE SURFACE IS THE SHARED FLYOUT ONE, which in this theme is liquid glass. Nothing is said about it here on
+         purpose: the panel asks for a role and the theme answers with a material (see MacOsMaterials), and repeating
+         the material's name in every consumer is exactly what made the keys need renaming in the first place. -->
 
     <Style Selector="SlidePanel">
         <Setter Property="Background" Value="{ResourceReference FlyoutSurfaceFill}"/>
         <Setter Property="Foreground" Value="{ObservableResource TextFillColorPrimary}"/>
         <Setter Property="BorderBrush" Value="{ResourceReference ControlStrokeColorDefault}"/>
-        <Setter Property="BorderThickness" Value="{ResourceReference StrokeThin}"/>
+        <Setter Property="BorderThickness" Value="{ResourceReference StrokeControl}"/>
         <Setter Property="Padding" Value="{ResourceReference PaddingPanel}"/>
     </Style>
 
@@ -20,8 +31,8 @@
             <Setter.Value>
                 <ControlTemplate TargetType="SlidePanel">
                     <Popup x:Name="PART_Popup"
-                                    DockEdge="{TemplateBinding Placement}"
-                                    DockFill="{TemplateBinding FullWindow}">
+                           DockEdge="{TemplateBinding Placement}"
+                           DockFill="{TemplateBinding FullWindow}">
                         <Border x:Name="PART_Drawer"
                                 Width="{TemplateBinding Width}"
                                 Height="{TemplateBinding Height}"
@@ -32,15 +43,19 @@
                                 Padding="{TemplateBinding Padding}"
                                 ClipToBounds="True">
                             <Grid RowDefinitions="Auto,*">
-                                <Grid Grid.Row="0" ColumnDefinitions="*,Auto" Margin="0,0,0,12">
+                                <Grid Grid.Row="0" ColumnDefinitions="*,Auto" Margin="0,0,0,10">
                                     <ContentPresenter Grid.Column="0"
                                             Content="{TemplateBinding Header}"
                                             Foreground="{TemplateBinding Foreground}"
-                                            FontSize="{ResourceReference FontSizeTitle}"
+                                            FontSize="{ResourceReference FontSizeSubtitle}"
                                             VerticalAlignment="Center"/>
+                                    <!-- 22, not 28: the glyph is 10, and a plate half again its size round it is what a
+                                         Mac's toolbar glyphs wear. At 28 the plate appears as a square tile that has
+                                         little to do with the cross inside it. -->
                                     <Button x:Name="PART_CloseButton" Grid.Column="1"
-                                            Width="28" Height="28"
-                                            Background="Transparent" BorderThickness="0" Padding="0"
+                                            Classes="Icon"
+                                            Width="22" Height="22"
+                                            CornerRadius="{ResourceReference CornerRadiusDefault}"
                                             VerticalAlignment="Top">
                                         <Image Source="{ResourceReference CloseIcon}" Width="10" Height="10"
                                                HorizontalAlignment="Center" VerticalAlignment="Center"/>

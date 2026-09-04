@@ -26,10 +26,22 @@ namespace Adamantium.UI.Rendering;
 /// </summary>
 internal sealed class BackdropCapture : IDisposable
 {
-    // How much smaller the copy is than the region it came from. 4 is the useful compromise: a quarter in each axis is
-    // a 16th of the pixels and already a visible blur, while staying sharp enough that a LiquidGlass refraction reads
-    // as glass rather than as fog.
+    // How much smaller the copy is than the region it came from, for a material that BLURS it. A quarter in each axis
+    // is a 16th of the pixels and is already a visible blur, so the frosted pass gets a wide, cheap blur out of very few
+    // taps - the shrink is doing most of the work for it.
+    //
+    // NOT FOR GLASS, and this used to say it was. The refracting pass samples the copy SHARPLY and displaces it, so
+    // whatever detail the shrink threw away is detail the lens has nothing left to bend: the copy's resolution is the
+    // material's whole detail budget (see the notes on the capture region). Asked for at a quarter size, liquid glass
+    // came out looking like frosted plastic no matter how strong its refraction was - correctly, because it was bending
+    // an image that had no detail finer than four pixels in it to begin with. Which resolution a material wants is now
+    // the material's own answer; see Sharp.
     public const int Downscale = 4;
+
+    /// <summary>What a material that BENDS the copy asks for instead: no shrink at all. The copy is of the element's own
+    /// region plus a margin - a menu or a panel, not the window - so a full-resolution blit of it is one small transfer,
+    /// and it is the only way the lens has anything to bend.</summary>
+    public const int Sharp = 1;
 
     // ONE TEXTURE PER FRAME IN FLIGHT, not one texture. The capture is written by a blit and read by a shader in the
     // SAME frame, so a single image is written by frame N while frame N-1 is still sampling it - a write-after-read the
@@ -49,9 +61,11 @@ internal sealed class BackdropCapture : IDisposable
     /// <summary>Copy the frame region behind an element into this capture, breaking the render pass open around the
     /// transfer and re-opening it afterwards. Returns false when there is nothing to copy (no target, empty region) -
     /// the caller then draws the element without a backdrop rather than with a stale one.</summary>
-    public bool Capture(IGraphicsDevice device, Rect2D region)
+    public bool Capture(IGraphicsDevice device, Rect2D region, int downscale = Downscale)
     {
         if (device is not GraphicsDevice gd) return false;
+
+        downscale = Math.Max(1, downscale);
 
         var source = gd.CurrentRenderTarget?.ResolveTexture;
         if (source == null) return false;
@@ -62,10 +76,10 @@ internal sealed class BackdropCapture : IDisposable
         var y = (int)Math.Clamp(region.Offset.Y, 0, (int)source.Height);
         var right = (int)Math.Clamp(region.Offset.X + region.Extent.Width, 0, source.Width);
         var bottom = (int)Math.Clamp(region.Offset.Y + region.Extent.Height, 0, source.Height);
-        if (right - x < Downscale || bottom - y < Downscale) return false;
+        if (right - x < downscale || bottom - y < downscale) return false;
 
-        var w = (uint)Math.Max(1, (right - x) / Downscale);
-        var h = (uint)Math.Max(1, (bottom - y) / Downscale);
+        var w = (uint)Math.Max(1, (right - x) / downscale);
+        var h = (uint)Math.Max(1, (bottom - y) / downscale);
         EnsureTexture(gd, w, h);
         _current = _ring[gd.CurrentFrame % (uint)_ring.Length];
         if (_current == null) return false;

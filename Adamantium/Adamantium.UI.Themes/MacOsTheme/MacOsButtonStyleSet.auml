@@ -91,4 +91,32 @@
         <Setter Property="BackgroundDisabled" Value="{ThemeResource AccentFillColorDisabled}"/>
         <Setter Property="ForegroundPressed" Value="{ThemeResource AccentForegroundColor}"/>
     </Style>
+
+    <!-- THE ICON BUTTON, and it is the exception to the no-hover rule above - which is a correction, not a special
+         case. "A Mac answers the press, not the pointer" is true of a BORDERED push button: it is already visible as a
+         button, so lighting it under the cursor tells you nothing you did not know. A borderless one - a close cross in
+         a panel header, a toolbar glyph - is a bare symbol with no outline at all, and what the hover plate says is
+         "this symbol is a control, and it is THIS one", which nothing else in its appearance says. AppKit lights those,
+         and taking it away is how a header full of glyphs stops looking clickable.
+         The plate is a SUBTLE fill, not a control fill: it appears under the pointer and must not read as a button that
+         was there all along. Pressing takes it a step further rather than lightening it, as everything here does. -->
+    <Style Selector="Button.Icon">
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="BorderBrush" Value="Transparent"/>
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="BackgroundPointerOver" Value="{ResourceReference SubtleFillColorSecondary}"/>
+        <Setter Property="BackgroundPressed" Value="{ResourceReference ControlFillColorTertiary}"/>
+        <Setter Property="BackgroundDisabled" Value="Transparent"/>
+        <Setter Property="Padding" Value="0"/>
+        <Setter Property="MinHeight" Value="0"/>
+    </Style>
+
+    <!-- ...and the hover TRIGGER it needs, which the plain button deliberately does without. Its own style, because the
+         plain button's trigger block states its absence as a decision - adding one there would contradict the sentence
+         written beside it. -->
+    <Style Selector="Button.Icon">
+        <PropertyTrigger Property="IsMouseOver" Value="true">
+            <Setter TargetName="InnerBorder" Property="Background" Value="{TemplateBinding BackgroundPointerOver}"/>
+        </PropertyTrigger>
+    </Style>
 </StyleSet>

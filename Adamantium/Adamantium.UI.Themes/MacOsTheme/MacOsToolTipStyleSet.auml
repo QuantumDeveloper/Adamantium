@@ -2,18 +2,27 @@
 <StyleSet xmlns="http://adamantium/ui"
           xmlns:x="http://adamantium/ui/xaml/extensions">
 
-    <!-- ToolTip: the themed hover card. Colours come from the palette/theme via {ResourceReference} (and {ThemeResource}
-         if ever accent-tinted) so a theme or accent swap restyles it live - nothing here is hard-coded in C#. Per the
-         small-styles convention each concern is its own <Style Selector="ToolTip">: simple properties, then the template. -->
+    <!-- The macOS help tag. The same shape of set as Fluent's - the colours come from the palette, so a theme or accent
+         swap restyles it live - and two differences:
+
+         IT IS GLASS, like every other transient surface here (see MacOsMaterials), and its lens is the gentler of the
+         two: the displacement is measured in device pixels from the EDGE, so a flyout's strength on a card this small
+         would bend its way into the middle and leave no flat part to read on.
+         Said plainly, because it is the trade this material makes: glass does not hide what is behind it the way
+         acrylic did - it bends it. A help tag over a busy picture is the case to look at first, and going back to an
+         opaque card is one attribute (SolidBackgroundFillColorTertiary, which the palette still answers).
+
+         BODY TEXT, not caption. A Mac help tag is set at the ordinary size: it is a sentence to READ, not a label to
+         glance at, and shrinking it is how a tooltip becomes something people stop bothering with. -->
 
     <Style Selector="ToolTip">
         <Setter Property="Background" Value="{ResourceReference TooltipSurfaceFill}"/>
         <Setter Property="BorderBrush" Value="{ResourceReference ControlStrokeColorDefault}"/>
         <Setter Property="Foreground" Value="{ObservableResource TextFillColorPrimary}"/>
-        <Setter Property="BorderThickness" Value="{ResourceReference StrokeThin}"/>
+        <Setter Property="BorderThickness" Value="{ResourceReference StrokeControl}"/>
         <Setter Property="CornerRadius" Value="{ResourceReference CornerRadiusDefault}"/>
         <Setter Property="Padding" Value="{ResourceReference PaddingTight}"/>
-        <Setter Property="FontSize" Value="{ResourceReference FontSizeCaption}"/>
+        <Setter Property="FontSize" Value="{ResourceReference FontSizeBody}"/>
         <Setter Property="HorizontalContentAlignment" Value="Left"/>
         <Setter Property="VerticalContentAlignment" Value="Center"/>
     </Style>

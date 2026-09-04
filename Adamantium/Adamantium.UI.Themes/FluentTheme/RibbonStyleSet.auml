@@ -131,7 +131,7 @@
                             <Popup x:Name="PART_Flyout" Grid.Row="1" Placement="Bottom">
                                 <Border Width="{TemplateBinding ActualWidth}"
                                         Height="{TemplateBinding GroupsAreaHeight}"
-                                        Background="{ResourceReference AcrylicFlyoutFill}"
+                                        Background="{ResourceReference FlyoutSurfaceFill}"
                                         BorderBrush="{ResourceReference ControlStrokeColorDefault}"
                                         BorderThickness="0 1 0 1"
                                         ClipToBounds="True">

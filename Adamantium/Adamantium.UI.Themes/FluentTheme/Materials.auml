@@ -3,6 +3,13 @@
 
     <!-- The theme's MATERIALS - surfaces that are made of what is behind them rather than of a colour.
 
+         THE KEYS NAME A ROLE, NOT A MATERIAL: FlyoutSurfaceFill is "whatever a menu, a drop-down, a ribbon flyout or a
+         slide panel is made of in this theme", and every template asks for it by that name. They used to be called
+         AcrylicFlyoutFill and AcrylicTooltipFill, which made the material part of the contract - so the macOS theme,
+         which answers these with liquid glass, either had to lie in the name or re-template four controls it borrows
+         wholesale to change one surface. A theme answering a role with a different material is the entire point of the
+         keys being shared.
+
          WHY ONLY THE TRANSIENT SURFACES USE THIS. Acrylic takes a copy of the frame beneath it EVERY FRAME, which is
          affordable while a menu is open and is not affordable for a window's whole chrome. That is also why real
          Fluent draws the line where it does: acrylic for what appears and light-dismisses - menus, drop-downs,
@@ -23,7 +30,7 @@
          the panel, which looks like a bug rather than like a material. The number is the reach of the Gaussian's
          outermost tap in frame pixels, over a copy already shrunk fourfold - so it is a good deal stronger than the
          same number meant under the old point-sampled kernels, and it does not need to be large. -->
-    <MaterialBrush x:Key="AcrylicFlyoutFill"
+    <MaterialBrush x:Key="FlyoutSurfaceFill"
                    Material="Acrylic"
                    TintColor="{ResourceReference AcrylicFillColorDefault}"
                    TintOpacity="0.78"
@@ -32,7 +39,7 @@
 
     <!-- The same material, thinner, for surfaces that sit CLOSE to what they cover and want to be felt through:
          a tooltip, which is small enough that a heavy tint reads as a black box. -->
-    <MaterialBrush x:Key="AcrylicTooltipFill"
+    <MaterialBrush x:Key="TooltipSurfaceFill"
                    Material="Acrylic"
                    TintColor="{ResourceReference AcrylicFillColorDefault}"
                    TintOpacity="0.70"

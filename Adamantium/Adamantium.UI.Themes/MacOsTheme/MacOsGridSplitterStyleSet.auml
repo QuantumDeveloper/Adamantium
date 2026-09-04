@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<StyleSet xmlns="http://adamantium/ui"
+          xmlns:x="http://adamantium/ui/xaml/extensions">
+
+    <!-- The divider between two panes. The drag mechanics are the control's (it is a Thumb subtype) and the resize
+         cursor is set from its own ResizeDirection, so this is only the look - and on a Mac the look is: NOTHING
+         HAPPENS UNDER THE POINTER.
+
+         Fluent lights the divider with the accent on hover, which announces "you may drag me". A Mac says that with the
+         CURSOR - the pointer becomes the resize arrows over the split, and the divider itself stays the hairline it
+         was. Colouring it as well is saying the same thing twice, in a place the eye is not looking: the divider sits
+         between two panes of content, and a blue line appearing there reads as something being selected.
+
+         So: a hairline, always the same, and the cursor does the talking. -->
+
+    <Style Selector="GridSplitter">
+        <Setter Property="Background" Value="{ResourceReference ControlStrokeColorDefault}"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="GridSplitter">
+                    <Border Background="{TemplateBinding Background}"/>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- No IsMouseOver trigger, deliberately - see above. Stated as an absence with a reason, so the next person can
+         see it was decided rather than forgotten. -->
+
+</StyleSet>
