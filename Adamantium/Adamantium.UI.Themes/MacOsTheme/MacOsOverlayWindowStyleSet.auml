@@ -1,0 +1,149 @@
+<?xml version="1.0" encoding="utf-8"?>
+<StyleSet xmlns="http://adamantium/ui"
+          xmlns:x="http://adamantium/ui/xaml/extensions">
+
+    <!-- The macOS in-window card window. Same machinery as the borrowed set - the manager owns the scrim, the cascade,
+         the z-order and Escape - and one decision differs, the same one this theme already made for the real window:
+
+         THE CAPTION IS NOT AN ACCENT BAR. Fluent paints it with the accent and writes the title in the on-accent colour;
+         a Mac's caption belongs to the WINDOW and takes its own surface, with the title in ordinary text. So the strip
+         here is a layer above the card rather than a band of colour on top of it, and INACTIVE says so by dimming the
+         TITLE - not by repainting the strip.
+
+         THE CORNERS are the window's own generous radius, the most recognisable number in this theme, so a card reads as
+         the same kind of object as the window behind it. -->
+
+    <Style Selector="OverlayWindow">
+        <Setter Property="Background" Value="{ResourceReference CardBackgroundFillColorDefault}"/>
+        <Setter Property="Foreground" Value="{ObservableResource TextFillColorPrimary}"/>
+        <Setter Property="BorderBrush" Value="{ResourceReference ControlStrokeColorSecondary}"/>
+        <Setter Property="BorderThickness" Value="{ResourceReference StrokeThin}"/>
+        <Setter Property="CornerRadius" Value="{ResourceReference WindowCornerRadius}"/>
+        <Setter Property="Padding" Value="{ResourceReference PaddingSurface}"/>
+        <Setter Property="OverlayBrush" Value="{ResourceReference SmokeFillColorDefault}"/>
+        <Setter Property="TitleBarBackground" Value="{ObservableResource LayerFillColorDefault}"/>
+        <Setter Property="TitleForeground" Value="{ObservableResource TextFillColorPrimary}"/>
+        <Setter Property="HorizontalAlignment" Value="Center"/>
+        <Setter Property="VerticalAlignment" Value="Center"/>
+    </Style>
+
+    <Style Selector="OverlayWindow">
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="OverlayWindow">
+                    <Border x:Name="PART_Window"
+                            MinWidth="300"
+                            Background="{TemplateBinding Background}"
+                            BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}"
+                            CornerRadius="{TemplateBinding CornerRadius}"
+                            ClipToBounds="True">
+                        <Grid RowDefinitions="Auto,*">
+
+                            <!-- The lights sit LEFT and are the very same Buttons the window's own caption uses - same
+                                 classes, same size, same gap, same inset - because a card window on a Mac is a window.
+                                 The pin takes a light of its own beside them rather than a glyph button on the far side.
+                                 The TITLE is CENTRED, which is where a Mac puts it; PART_TitleThumb is the transparent,
+                                 hit-testable star column, so dragging works anywhere the lights are not. -->
+                            <Grid x:Name="PART_TitleBar" Grid.Row="0" ColumnDefinitions="Auto,*"
+                                    Background="{TemplateBinding TitleBarBackground}" Height="28">
+                                <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center"
+                                        MarginLeft="{ResourceReference TrafficLightsInset}"
+                                        Spacing="{ResourceReference TrafficLightGap}">
+                                    <Grid>
+                                        <Button x:Name="PART_CloseButton" Classes="TrafficLight CloseLight" Focusable="False"/>
+                                        <Image x:Name="CloseGlyph" Source="{ResourceReference TrafficLightCloseGlyph}"
+                                                Opacity="0" IsHitTestVisible="False" Width="7" Height="7"
+                                                HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Grid>
+                                    <Grid x:Name="PinCell" Visibility="Collapsed">
+                                        <Button x:Name="PART_PinButton" Classes="TrafficLight PinLight" Focusable="False"/>
+                                        <Image x:Name="PinGlyphImage" Source="{ResourceReference PinGlyph}"
+                                                Opacity="0" IsHitTestVisible="False" Width="7" Height="7"
+                                                HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Grid>
+                                </StackPanel>
+
+                                <Grid x:Name="PART_TitleThumb" Grid.Column="1" Background="Transparent">
+                                    <StackPanel Orientation="Horizontal"
+                                            HorizontalAlignment="Center" VerticalAlignment="Center">
+                                        <ContentPresenter x:Name="PART_Icon" Content="{TemplateBinding Icon}"
+                                                Foreground="{TemplateBinding TitleForeground}"
+                                                VerticalAlignment="Center" Margin="0,0,6,0"/>
+                                        <ContentPresenter x:Name="PART_Title" Content="{TemplateBinding Title}"
+                                                Foreground="{TemplateBinding TitleForeground}"
+                                                FontSize="{ResourceReference FontSizeChrome}"
+                                                VerticalAlignment="Center"/>
+                                    </StackPanel>
+                                </Grid>
+                            </Grid>
+
+                            <ContentPresenter x:Name="PART_ContentPresenter" Grid.Row="1"
+                                    Content="{TemplateBinding Content}"
+                                    ContentTemplate="{TemplateBinding ContentTemplate}"
+                                    ContentTemplateSelector="{TemplateBinding ContentTemplateSelector}"
+                                    Margin="{TemplateBinding Padding}"/>
+
+                            <!-- PublishToWindow=False: this is an in-window card, not the OS window, so it must not drive
+                                 the native resize - the control resizes itself with a managed drag. -->
+                            <ResizeGripper x:Name="PART_ResizeGrip" Grid.Row="1" Visibility="Collapsed"
+                                    PublishToWindow="False" Width="18" Height="18"
+                                    HorizontalAlignment="Right" VerticalAlignment="Bottom"/>
+                        </Grid>
+                    </Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- The pin's own light. It is not one of the three a Mac window has, so it takes a neutral grey and lights up
+         accent when pinned - which is the lights' whole vocabulary. Its own palette key, and that is the point: the
+         first version borrowed ControlFillColorTertiary, which in the dark variant is #3C3C3E - the caption's own
+         ground, to the byte. The button was there, sized and hit-testable, and completely invisible. -->
+    <Style Selector="Button.PinLight">
+        <Setter Property="Background" Value="{ObservableResource PinLightColor}"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border Background="{TemplateBinding Background}"
+                            CornerRadius="{TemplateBinding CornerRadius}"/>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style Selector="OverlayWindow">
+        <!-- The glyph lights when the pointer reaches the card's caption, the same signal the window's own caption uses
+             - a glyph inside the button's template could only ever answer for that one button. -->
+        <PropertyTrigger Property="IsMouseOver" Value="true">
+            <Setter TargetName="CloseGlyph" Property="Opacity" Value="1"/>
+            <Setter TargetName="PinGlyphImage" Property="Opacity" Value="1"/>
+        </PropertyTrigger>
+    </Style>
+
+    <Style Selector="OverlayWindow">
+        <PropertyTrigger Property="CanClose" Value="false">
+            <Setter TargetName="PART_CloseButton" Property="Visibility" Value="Collapsed"/>
+        </PropertyTrigger>
+        <PropertyTrigger Property="CanPin" Value="true">
+            <Setter TargetName="PinCell" Property="Visibility" Value="Visible"/>
+        </PropertyTrigger>
+        <PropertyTrigger Property="CanResize" Value="true">
+            <Setter TargetName="PART_ResizeGrip" Property="Visibility" Value="Visible"/>
+        </PropertyTrigger>
+        <!-- Pinned lights up its own light, the way the lights say anything at all. -->
+        <PropertyTrigger Property="IsPinned" Value="true">
+            <Setter TargetName="PART_PinButton" Property="Background" Value="{ThemeResource AccentFillColorDefault}"/>
+        </PropertyTrigger>
+        <PropertyTrigger Property="ShowTitleBar" Value="false">
+            <Setter TargetName="PART_TitleBar" Property="Visibility" Value="Collapsed"/>
+        </PropertyTrigger>
+        <!-- Inactive dims the TITLE and drops the strip back to the card's own ground, so an unfocused card loses the
+             distinction without the caption changing colour - the same way this theme's real window says it. -->
+        <PropertyTrigger Property="IsActive" Value="false">
+            <Setter Property="TitleBarBackground" Value="{ObservableResource CardBackgroundFillColorDefault}"/>
+            <Setter Property="TitleForeground" Value="{ObservableResource TextFillColorSecondary}"/>
+        </PropertyTrigger>
+    </Style>
+
+</StyleSet>

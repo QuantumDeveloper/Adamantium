@@ -71,6 +71,8 @@
          is standing on the accent-filled part of the rail, where an accent glow is the same colour as its background
          to the byte. The knob's own fill is behind nothing and always reads. -->
     <PaletteColor Key="SliderKnobFillPressed" Color="#E6E6E8"/>
+    <PaletteColor Key="SliderKnobRimColor" Color="#C7C7CC"/>
+    <PaletteColor Key="PinLightColor" Color="#B4B4B8"/>
 
     <PaletteColor Key="OnAccentOverlayPointerOver" Color="#1AFFFFFF"/>
     <PaletteColor Key="OnAccentOverlayPressed" Color="#00000000"/>

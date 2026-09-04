@@ -275,6 +275,9 @@ namespace Adamantium.Graphics.Fonts
 
         private void ProcessTextureData(IReadOnlyList<GlyphTextureData> textureDataArray)
         {
+            GlyphIntegrityProbe.EnterUpload(this);
+            foreach (var textureData in textureDataArray) GlyphIntegrityProbe.Inspect(this, textureData);
+
             Atlas.TransitionImageLayout(ImageLayout.TransferDstOptimal);
             var commandBuffer = GraphicsDevice.BeginSingleTimeCommand();
             var buffers = new List<Buffer>();
@@ -330,6 +333,8 @@ namespace Adamantium.Graphics.Fonts
             {
                 buffer?.Dispose();
             }
+
+            GlyphIntegrityProbe.LeaveUpload(this);
         }
 
         public RectangleF GetUVCoordinatesForGlyph(uint glyphIndex)

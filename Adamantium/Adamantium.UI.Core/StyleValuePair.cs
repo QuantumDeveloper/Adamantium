@@ -11,5 +11,5 @@ internal class StyleValuePair
     }
     public Style Style { get; }
     
-    public object Value { get; }
+    public object Value { get; set; }
 }

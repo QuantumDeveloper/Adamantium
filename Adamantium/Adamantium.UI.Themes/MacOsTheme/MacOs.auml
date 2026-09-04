@@ -35,6 +35,7 @@
     <ResourceLink Source="{x:Type fluent:Metrics}"/>
     <ResourceLink Source="{x:Type fluent:Materials}"/>
     <ResourceLink Source="{x:Type mac:MacOsMetrics}"/>
+    <ResourceLink Source="{x:Type mac:MacOsIcons}"/>
     <!-- LAST, so its keys answer first: the transient surfaces are LIQUID GLASS here, not acrylic, and they replace
          Fluent's under the same names - which is what reaches the menu, the ribbon flyout and the slide panel, all of
          them still Fluent's own sets. See MacOsMaterials. -->
@@ -61,28 +62,29 @@
         <!-- ZoomBox stays borrowed and is expected to: its template is a ScrollViewer around a ContentPresenter and
              carries no colour of its own, and the scroller inside it is already this theme's own. -->
         <StyleInclude Source="{x:Type fluent:ZoomBoxStyleSet}"/>
+        <!-- KEPT, and only for its CLASS variants (Dots, Bar, Ripple, Arc, Ants, Shimmer): those are effects an
+             application asks for by name. The plain indicator is replaced by MacOsBusyIndicatorStyleSet below - both
+             select on the bare type, so the macOS one wins by being included later, and Fluent's IsActive trigger
+             addresses a part named RingSpin that the macOS template does not have, so it lands on nothing. -->
         <StyleInclude Source="{x:Type fluent:BusyIndicatorStyleSet}"/>
         <StyleInclude Source="{x:Type fluent:ItemsControlStyleSet}"/>
         <StyleInclude Source="{x:Type fluent:DropInsertionIndicatorStyleSet}"/>
         <StyleInclude Source="{x:Type fluent:DragHandleStyleSet}"/>
         <StyleInclude Source="{x:Type fluent:SelectionAdornerStyleSet}"/>
         <StyleInclude Source="{x:Type fluent:HoverAdornerStyleSet}"/>
-        <StyleInclude Source="{x:Type fluent:FocusAdornerStyleSet}"/>
         <StyleInclude Source="{x:Type fluent:KeyTipAdornerStyleSet}"/>
         <StyleInclude Source="{x:Type fluent:TilesHostStyleSet}"/>
         <StyleInclude Source="{x:Type fluent:FlipTileStyleSet}"/>
         <StyleInclude Source="{x:Type fluent:TabControlStyleSet}"/>
         <StyleInclude Source="{x:Type fluent:TabItemStyleSet}"/>
         <StyleInclude Source="{x:Type fluent:RibbonStyleSet}"/>
-        <StyleInclude Source="{x:Type fluent:OverlayWindowStyleSet}"/>
+        
         <!-- The resize grip stays Fluent's, and that is a CORRECTION rather than a leftover. A macOS one was written -
              invisible, on the reasoning that a Mac resizes from any edge - and that reasoning is about a NORMAL window,
              where this control is not shown at all. It appears only under ResizeMode=CanResizeWithGrip, which means a
              window with no resize borders at all: there the grip is the ONLY way to resize, and hiding it leaves no
              affordance and no other edge to try. -->
         <StyleInclude Source="{x:Type fluent:ResizeGripperStyleSet}"/>
-        <StyleInclude Source="{x:Type fluent:MenuStyleSet}"/>
-        <StyleInclude Source="{x:Type fluent:TreeViewStyleSet}"/>
         <StyleInclude Source="{x:Type fluent:DockingStyleSet}"/>
         <StyleInclude Source="{x:Type fluent:ColorPickerStyleSet}"/>
         <StyleInclude Source="{x:Type fluent:ColorPickerButtonStyleSet}"/>
@@ -116,6 +118,11 @@
         <StyleInclude Source="{x:Type mac:MacOsRepeatButtonStyleSet}"/>
         <StyleInclude Source="{x:Type mac:MacOsToggleButtonStyleSet}"/>
         <StyleInclude Source="{x:Type mac:MacOsNumericUpDownStyleSet}"/>
+        <StyleInclude Source="{x:Type mac:MacOsBusyIndicatorStyleSet}"/>
+        <StyleInclude Source="{x:Type mac:MacOsFocusAdornerStyleSet}"/>
+        <StyleInclude Source="{x:Type mac:MacOsMenuStyleSet}"/>
+        <StyleInclude Source="{x:Type mac:MacOsOverlayWindowStyleSet}"/>
+        <StyleInclude Source="{x:Type mac:MacOsTreeViewStyleSet}"/>
   </Theme.StyleIncludes>
 
 </Theme>

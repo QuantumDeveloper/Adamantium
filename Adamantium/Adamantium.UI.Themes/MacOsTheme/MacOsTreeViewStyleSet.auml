@@ -1,0 +1,124 @@
+<?xml version="1.0" encoding="utf-8"?>
+<StyleSet xmlns="http://adamantium/ui"
+          xmlns:x="http://adamantium/ui/xaml/extensions">
+
+    <!-- The macOS tree - a source list. The whole set, not a patch over Fluent's: a theme owns its control outright, and
+         two sets on one selector is two sets, not an override.
+
+         What is macOS here is the ROW's plate: inset by 4 rather than running edge to edge, and 24 tall. Both are
+         agreement with THIS theme's own list rows (MacOsListBoxItemStyleSet), which are inset by exactly the same 4 - a
+         tree whose plate runs into the corners of the well beside it is the theme disagreeing with itself. The whole row
+         still takes the click; the inset is on the chrome, not the hit area.
+
+         The tree itself, its flattening and the expander glyph are unchanged from the borrowed set - none of them differ
+         on a Mac - and are restated here rather than left behind, because that is what owning the set means. -->
+
+    <Style Selector="TreeView" BasedOn="ItemsControl">
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="ItemsPanel">
+            <Setter.Value>
+                <ItemsPanelTemplate>
+                    <StackPanel Orientation="Vertical"/>
+                </ItemsPanelTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style Selector="TreeView">
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="TreeView">
+                    <Border Background="{TemplateBinding Background}">
+                        <!-- CanContentScroll so the ScrollViewer measures the items host at the VIEWPORT and delegates
+                             scrolling to the virtualizing panel; horizontal scroll disabled so rows stretch full width. -->
+                        <ScrollViewer x:Name="PART_ScrollViewer" CanContentScroll="True"
+                                      HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+                            <ItemsPresenter x:Name="PART_ItemsPresenter"/>
+                        </ScrollViewer>
+                    </Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style Selector="TreeViewItem" BasedOn="ItemsControl">
+        <Setter Property="Foreground" Value="{ObservableResource TextFillColorPrimary}"/>
+        <Setter Property="FontSize" Value="{ResourceReference FontSizeBody}"/>
+    </Style>
+
+    <Style Selector="TreeViewItem">
+        <Setter Property="ExpanderTemplate">
+            <Setter.Value>
+                <ControlTemplate TargetType="ToggleButton">
+                    <Grid Width="16" Height="16" Background="Transparent">
+                        <Image x:Name="ChevronRight"
+                                Source="{ResourceReference ChevronRightIcon}"
+                                Width="{ResourceReference DropDownIconSize}"
+                                Height="{ResourceReference DropDownIconSize}"
+                                HorizontalAlignment="Center"
+                                VerticalAlignment="Center"/>
+                        <Image x:Name="ChevronDown"
+                                Source="{ResourceReference ChevronDownIcon}"
+                                Width="{ResourceReference DropDownIconSize}"
+                                Height="{ResourceReference DropDownIconSize}"
+                                HorizontalAlignment="Center"
+                                VerticalAlignment="Center"
+                                Visibility="Collapsed"/>
+                    </Grid>
+                    <ControlTemplate.Triggers>
+                        <PropertyTrigger Property="IsChecked" Value="true">
+                            <Setter TargetName="ChevronRight" Property="Visibility" Value="Collapsed"/>
+                            <Setter TargetName="ChevronDown" Property="Visibility" Value="Visible"/>
+                        </PropertyTrigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style Selector="TreeViewItem">
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="TreeViewItem">
+                    <Border x:Name="Root" Background="Transparent" CornerRadius="4" Margin="4 1" MinHeight="24">
+                        <Grid>
+                            <Border x:Name="HoverOverlay" Background="Transparent" CornerRadius="4"/>
+                            <Grid ColumnDefinitions="Auto,16,*" Margin="4 2 6 2">
+                                <Border Grid.Column="0" Width="{TemplateBinding Indent}"/>
+                                <!-- Pinned to its 16x16 glyph: the base ToggleButton style reaches this by IS-A and would
+                                     otherwise lend it a MinHeight and a Padding that push the arrow off the row's centre. -->
+                                <ToggleButton x:Name="PART_Expander" Grid.Column="1"
+                                        Template="{TemplateBinding ExpanderTemplate}"
+                                        Width="16" Height="16" MinWidth="0" MinHeight="0" Padding="0"
+                                        HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                <ContentPresenter x:Name="PART_ContentPresenter" Grid.Column="2"
+                                        Content="{TemplateBinding Header}"
+                                        ContentTemplate="{TemplateBinding HeaderTemplate}"
+                                        Foreground="{TemplateBinding Foreground}"
+                                        FontSize="{TemplateBinding FontSize}"
+                                        VerticalAlignment="Center" Margin="4 0 0 0"/>
+                            </Grid>
+                        </Grid>
+                    </Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style Selector="TreeViewItem">
+        <!-- Hover is IsPointerOverHeader (this row only, not its subtree) and sits ABOVE the selection fill, so a
+             selected row that is also hovered stays accent instead of reverting to grey. Selection is declared LAST so
+             it wins the Root background. -->
+        <PropertyTrigger Property="IsPointerOverHeader" Value="true">
+            <Setter TargetName="HoverOverlay" Property="Background" Value="{ResourceReference SubtleFillColorSecondary}"/>
+        </PropertyTrigger>
+        <PropertyTrigger Property="HasItems" Value="false">
+            <Setter TargetName="PART_Expander" Property="Visibility" Value="Hidden"/>
+        </PropertyTrigger>
+        <PropertyTrigger Property="IsSelected" Value="true">
+            <Setter TargetName="Root" Property="Background" Value="{ThemeResource AccentFillColorDefault}"/>
+            <Setter TargetName="PART_ContentPresenter" Property="Foreground" Value="{ThemeResource AccentForegroundColor}"/>
+        </PropertyTrigger>
+    </Style>
+
+</StyleSet>

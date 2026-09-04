@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<StyleSet xmlns="http://adamantium/ui"
+          xmlns:x="http://adamantium/ui/xaml/extensions">
+
+    <!-- The focus ring for the whole application - the adorner stage draws this one style around whatever the keyboard
+         reached, so what is written here is every control's focus visual.
+
+         ONE LINE, NOT TWO. Fluent draws a thick accent ring with a thin inner line just inside it, which is how UWP
+         keeps a ring legible on an accent-filled button. A Mac does not layer two lines: it puts a single wide band of
+         accent around the control and lets its TRANSLUCENCE do the work the second line does elsewhere - over an
+         accent-filled control the band goes darker rather than disappearing, because it is the same blue at partial
+         alpha over the blue beneath it.
+
+         WIDER AND SOFTER: 3 against Fluent's 2, at 60% - a Mac's ring reads as a halo the control is sitting in, not as
+         a border it has grown. The full-strength accent is reserved for things that are FILLED with it.
+
+         The OUTSET is left exactly as the borrowed set had it, and that is not laziness: a ring that stands off its
+         control is clipped by whatever clips the control, and the adorner's arrange takes the outset into its size but
+         not its position, so an offset ring comes out lopsided. Both are seam bugs, both are written down, and until
+         they are fixed a Mac-accurate standing-off ring would look worse here than a tracing one. -->
+
+    <Style Selector="FocusAdorner">
+        <Setter Property="Outset" Value="{ResourceReference FocusRingOutset}"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="FocusAdorner">
+                    <Grid IsHitTestVisible="False">
+                        <Border BorderThickness="3"
+                                Opacity="0.6"
+                                BorderBrush="{ThemeResource AccentFillColorDefault}"
+                                CornerRadius="{TemplateBinding AdornedCornerRadius}"/>
+                    </Grid>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+</StyleSet>

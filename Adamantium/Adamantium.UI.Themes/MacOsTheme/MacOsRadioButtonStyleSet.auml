@@ -16,8 +16,10 @@
 
     <Style Selector="RadioButton">
         <Setter Property="Foreground" Value="{ObservableResource TextFillColorPrimary}"/>
-        <Setter Property="Background" Value="{ResourceReference SelectionControlFillColorOff}"/>
-        <Setter Property="BorderBrush" Value="{ResourceReference ControlStrokeColorDefault}"/>
+        <!-- Same material as the unset CheckBox, and for the same reason - see MacOsCheckBoxStyleSet. The two are one
+             family and must not drift apart. -->
+        <Setter Property="Background" Value="{ResourceReference ControlFillColorDefault}"/>
+        <Setter Property="BorderBrush" Value="{ResourceReference ControlStrokeColorSecondary}"/>
         <Setter Property="FontSize" Value="{ResourceReference FontSizeBody}"/>
         <Setter Property="VerticalContentAlignment" Value="Center"/>
     </Style>

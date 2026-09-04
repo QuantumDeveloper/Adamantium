@@ -271,6 +271,7 @@ public class Slider : RangeBase
         // The track fills the slider, so the arranged main-axis length is the fill's 100%.
         UpdateFill(Orientation == Orientation.Horizontal ? size.Width : size.Height);
         ForceArrangeFill();
+
         return size;
     }
 

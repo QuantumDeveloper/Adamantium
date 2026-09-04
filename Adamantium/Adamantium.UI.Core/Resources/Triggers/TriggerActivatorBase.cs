@@ -75,6 +75,8 @@ public abstract class TriggerActivatorBase : ITriggerActivator
     /// holds; Enter/Exit actions fire only on the EDGE - when the condition crosses, not on every change.</summary>
     protected void ApplyState(bool conditionMet)
     {
+        TriggerProbe.Note(_trigger, Context?.HostComponent, conditionMet, _conditionMet);
+
         if (_trigger.Setters != null)
         {
             foreach (var setter in _trigger.Setters)
@@ -279,7 +281,10 @@ public abstract class TriggerActivatorBase : ITriggerActivator
 
     private void RemoveSetter(ISetter setter)
     {
-        if (_applied.Remove(setter, out var applied))
-            applied.Teardown();
+        var had = _applied.Remove(setter, out var applied);
+        var target = had ? applied.Target : null;
+        if (had) applied.Teardown();
+
+        TriggerProbe.NoteRemoval(_trigger, Context?.HostComponent, setter, had, target);
     }
 }
