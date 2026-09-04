@@ -1,0 +1,158 @@
+<?xml version="1.0" encoding="utf-8"?>
+<StyleSet xmlns="http://adamantium/ui"
+          xmlns:x="http://adamantium/ui/xaml/extensions">
+
+    <!-- The macOS spinner, and it is a different OBJECT from Fluent's, not a recolour of it.
+
+         WHAT SPINS IS NOTHING. Fluent turns an accent arc around a dim ring; a Mac draws a fixed wheel of spokes and
+         runs a FADE around it. Nothing rotates - each spoke sits still and dims in its turn, one eighth of a cycle
+         apart, which is what gives the thing its stepped, mechanical read.
+
+         IT IS GREY, NOT ACCENT. This indicator says "wait", not "here is your selection". The accent is spent on the
+         thing the user chose; spending it here would put the loudest colour in the theme on something nobody acts on.
+
+         THE GEOMETRY IS TIED TO BusySize (40 in the borrowed metrics): a spoke is drawn at the top and rotated about
+         the CONTROL's centre, so RotationCenterY is the distance from the spoke's own top edge to that centre. The two
+         numbers move together - change the size and the centre has to follow, which is why the size is stated on the
+         control here rather than left to a caller.
+
+         The class variants (Dots, Bar, Ripple, Arc, Ants, Shimmer) stay Fluent's: they are effects an application asks
+         for BY NAME, not the platform's own indicator, and a theme has no business silently answering a request for
+         "Ripple" with something else. -->
+
+    <Style Selector="BusyIndicator">
+        <Setter Property="Width" Value="{ResourceReference BusySize}"/>
+        <Setter Property="Height" Value="{ResourceReference BusySize}"/>
+        <Setter Property="HorizontalAlignment" Value="Center"/>
+        <Setter Property="VerticalAlignment" Value="Center"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="BusyIndicator">
+                    <Grid>
+                        <Rectangle x:Name="Spoke1" Width="4" Height="11" CornerRadius="2" Margin="0 2 0 0"
+                                   HorizontalAlignment="Center" VerticalAlignment="Top"
+                                   Fill="{ObservableResource TextFillColorSecondary}"/>
+                        <Rectangle x:Name="Spoke2" Width="4" Height="11" CornerRadius="2" Margin="0 2 0 0"
+                                   HorizontalAlignment="Center" VerticalAlignment="Top"
+                                   Fill="{ObservableResource TextFillColorSecondary}">
+                            <Rectangle.RenderTransform>
+                                <Transform RotationAngle="45" RotationCenterX="2" RotationCenterY="18"/>
+                            </Rectangle.RenderTransform>
+                        </Rectangle>
+                        <Rectangle x:Name="Spoke3" Width="4" Height="11" CornerRadius="2" Margin="0 2 0 0"
+                                   HorizontalAlignment="Center" VerticalAlignment="Top"
+                                   Fill="{ObservableResource TextFillColorSecondary}">
+                            <Rectangle.RenderTransform>
+                                <Transform RotationAngle="90" RotationCenterX="2" RotationCenterY="18"/>
+                            </Rectangle.RenderTransform>
+                        </Rectangle>
+                        <Rectangle x:Name="Spoke4" Width="4" Height="11" CornerRadius="2" Margin="0 2 0 0"
+                                   HorizontalAlignment="Center" VerticalAlignment="Top"
+                                   Fill="{ObservableResource TextFillColorSecondary}">
+                            <Rectangle.RenderTransform>
+                                <Transform RotationAngle="135" RotationCenterX="2" RotationCenterY="18"/>
+                            </Rectangle.RenderTransform>
+                        </Rectangle>
+                        <Rectangle x:Name="Spoke5" Width="4" Height="11" CornerRadius="2" Margin="0 2 0 0"
+                                   HorizontalAlignment="Center" VerticalAlignment="Top"
+                                   Fill="{ObservableResource TextFillColorSecondary}">
+                            <Rectangle.RenderTransform>
+                                <Transform RotationAngle="180" RotationCenterX="2" RotationCenterY="18"/>
+                            </Rectangle.RenderTransform>
+                        </Rectangle>
+                        <Rectangle x:Name="Spoke6" Width="4" Height="11" CornerRadius="2" Margin="0 2 0 0"
+                                   HorizontalAlignment="Center" VerticalAlignment="Top"
+                                   Fill="{ObservableResource TextFillColorSecondary}">
+                            <Rectangle.RenderTransform>
+                                <Transform RotationAngle="225" RotationCenterX="2" RotationCenterY="18"/>
+                            </Rectangle.RenderTransform>
+                        </Rectangle>
+                        <Rectangle x:Name="Spoke7" Width="4" Height="11" CornerRadius="2" Margin="0 2 0 0"
+                                   HorizontalAlignment="Center" VerticalAlignment="Top"
+                                   Fill="{ObservableResource TextFillColorSecondary}">
+                            <Rectangle.RenderTransform>
+                                <Transform RotationAngle="270" RotationCenterX="2" RotationCenterY="18"/>
+                            </Rectangle.RenderTransform>
+                        </Rectangle>
+                        <Rectangle x:Name="Spoke8" Width="4" Height="11" CornerRadius="2" Margin="0 2 0 0"
+                                   HorizontalAlignment="Center" VerticalAlignment="Top"
+                                   Fill="{ObservableResource TextFillColorSecondary}">
+                            <Rectangle.RenderTransform>
+                                <Transform RotationAngle="315" RotationCenterX="2" RotationCenterY="18"/>
+                            </Rectangle.RenderTransform>
+                        </Rectangle>
+                    </Grid>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- One cycle is 0.8s and the eight spokes are 0.1s apart, so the dark spoke appears to step round the wheel once a
+         cycle. Each spoke runs the SAME animation - full to faint - and only its Delay differs; that is the whole
+         mechanism, and it is why nothing here rotates. -->
+    <Style Selector="BusyIndicator">
+        <PropertyTrigger Property="IsActive" Value="True">
+            <PropertyTrigger.EnterActions>
+                <RunAnimationAction TargetName="Spoke1">
+                    <Animation Duration="0:0:0.8" IterationCount="Infinity">
+                        <KeyFrame Cue="0"><Setter Property="Opacity" Value="1"/></KeyFrame>
+                        <KeyFrame Cue="1"><Setter Property="Opacity" Value="0.15"/></KeyFrame>
+                    </Animation>
+                </RunAnimationAction>
+                <RunAnimationAction TargetName="Spoke2">
+                    <Animation Duration="0:0:0.8" Delay="0:0:0.1" IterationCount="Infinity">
+                        <KeyFrame Cue="0"><Setter Property="Opacity" Value="1"/></KeyFrame>
+                        <KeyFrame Cue="1"><Setter Property="Opacity" Value="0.15"/></KeyFrame>
+                    </Animation>
+                </RunAnimationAction>
+                <RunAnimationAction TargetName="Spoke3">
+                    <Animation Duration="0:0:0.8" Delay="0:0:0.2" IterationCount="Infinity">
+                        <KeyFrame Cue="0"><Setter Property="Opacity" Value="1"/></KeyFrame>
+                        <KeyFrame Cue="1"><Setter Property="Opacity" Value="0.15"/></KeyFrame>
+                    </Animation>
+                </RunAnimationAction>
+                <RunAnimationAction TargetName="Spoke4">
+                    <Animation Duration="0:0:0.8" Delay="0:0:0.3" IterationCount="Infinity">
+                        <KeyFrame Cue="0"><Setter Property="Opacity" Value="1"/></KeyFrame>
+                        <KeyFrame Cue="1"><Setter Property="Opacity" Value="0.15"/></KeyFrame>
+                    </Animation>
+                </RunAnimationAction>
+                <RunAnimationAction TargetName="Spoke5">
+                    <Animation Duration="0:0:0.8" Delay="0:0:0.4" IterationCount="Infinity">
+                        <KeyFrame Cue="0"><Setter Property="Opacity" Value="1"/></KeyFrame>
+                        <KeyFrame Cue="1"><Setter Property="Opacity" Value="0.15"/></KeyFrame>
+                    </Animation>
+                </RunAnimationAction>
+                <RunAnimationAction TargetName="Spoke6">
+                    <Animation Duration="0:0:0.8" Delay="0:0:0.5" IterationCount="Infinity">
+                        <KeyFrame Cue="0"><Setter Property="Opacity" Value="1"/></KeyFrame>
+                        <KeyFrame Cue="1"><Setter Property="Opacity" Value="0.15"/></KeyFrame>
+                    </Animation>
+                </RunAnimationAction>
+                <RunAnimationAction TargetName="Spoke7">
+                    <Animation Duration="0:0:0.8" Delay="0:0:0.6" IterationCount="Infinity">
+                        <KeyFrame Cue="0"><Setter Property="Opacity" Value="1"/></KeyFrame>
+                        <KeyFrame Cue="1"><Setter Property="Opacity" Value="0.15"/></KeyFrame>
+                    </Animation>
+                </RunAnimationAction>
+                <RunAnimationAction TargetName="Spoke8">
+                    <Animation Duration="0:0:0.8" Delay="0:0:0.7" IterationCount="Infinity">
+                        <KeyFrame Cue="0"><Setter Property="Opacity" Value="1"/></KeyFrame>
+                        <KeyFrame Cue="1"><Setter Property="Opacity" Value="0.15"/></KeyFrame>
+                    </Animation>
+                </RunAnimationAction>
+            </PropertyTrigger.EnterActions>
+            <PropertyTrigger.ExitActions>
+                <StopAnimationAction TargetName="Spoke1"/>
+                <StopAnimationAction TargetName="Spoke2"/>
+                <StopAnimationAction TargetName="Spoke3"/>
+                <StopAnimationAction TargetName="Spoke4"/>
+                <StopAnimationAction TargetName="Spoke5"/>
+                <StopAnimationAction TargetName="Spoke6"/>
+                <StopAnimationAction TargetName="Spoke7"/>
+                <StopAnimationAction TargetName="Spoke8"/>
+            </PropertyTrigger.ExitActions>
+        </PropertyTrigger>
+    </Style>
+
+</StyleSet>

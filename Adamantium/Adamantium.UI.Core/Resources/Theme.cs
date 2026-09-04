@@ -21,14 +21,7 @@ public class Theme : AdamantiumComponent, ITheme
         };
         ResourceManager = UIAppContext.Current.ResourceManager;
         MergedStyles = new StyleSet();
-        MergedStyles.Styles.CollectionChanged += (_, e) =>
-        {
-            if (e.NewItems != null)
-                foreach (Style style in e.NewItems)
-                    style?.MarkThemeOwned();
-
-            _typeStyleCache.Clear();
-        };
+        MergedStyles.Styles.CollectionChanged += (_, _) => _typeStyleCache.Clear();
         // Seed the theme's font so it's a real (non-null) property value from the start: a {ThemeResource FontFamily}
         // binding reads the raw GetValue, and a theme can override it (live) to restyle all text.
         FontFamily = SystemDefaultFontFamily;
@@ -513,7 +506,7 @@ public class Theme : AdamantiumComponent, ITheme
 
             var sibling = new Theme(Name) { _variantRoot = root, FontFamily = FontFamily };
             foreach (var styleSet in StyleSets) sibling.StyleSets.Add(styleSet);
-            sibling.MergedStyles.AddStyles(MergedStyles.Styles);
+            sibling.Merge(MergedStyles.Styles);
 
             // The definitions are DATA and are shared: a variant's colour table is read, never written, and having two
             // copies drift apart would be a bug nobody could see.
@@ -574,7 +567,16 @@ public class Theme : AdamantiumComponent, ITheme
     public void AddStyleSet(StyleSet styleSet)
     {
         StyleSets.Add(styleSet);
-        MergedStyles.AddStyles(styleSet.Styles);
+        Merge(styleSet.Styles);
+    }
+
+    /// <summary>Takes styles into this theme, stamping each as the THEME'S - which is what stops it outranking the
+    /// application's own styles for the same type (see <see cref="Style.Band"/>).</summary>
+    private void Merge(IEnumerable<Style> styles)
+    {
+        var taken = styles as IList<Style> ?? styles.ToList();
+        foreach (var style in taken) style?.MarkThemeOwned();
+        MergedStyles.AddStyles(taken);
     }
 
     public void Initialize()
@@ -598,7 +600,7 @@ public class Theme : AdamantiumComponent, ITheme
         }
 
         var styles = StyleSets.SelectMany(x => x.Styles).ToList();
-        MergedStyles.AddStyles(styles);
+        Merge(styles);
         StyleSets.CollectionChanged += OnStyleSetRepositoriesChanged;
         Initialized = true;
         Initializing = false;

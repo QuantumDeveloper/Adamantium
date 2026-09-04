@@ -1,0 +1,39 @@
+<ResourceDictionary xmlns:x="http://adamantium/ui/xaml/extensions"
+        xmlns="http://adamantium/ui">
+
+    <!-- The traffic lights' glyphs. Drawings rather than inline Paths in three templates: a glyph is a picture, and a
+         picture belongs in the icon dictionary where it can be found, reused and swapped - which is what DrawingImage
+         was made for. Inline they were three copies of the same idea, each invisible to anyone looking for "the close
+         glyph".
+
+         All three are STROKED, not filled: at eight pixels across a filled shape closes up, and these are line drawings
+         in the original too. The colour is the theme's own TrafficLightGlyph, so a variant can darken them. -->
+
+    <DrawingImage x:Key="TrafficLightCloseGlyph">
+        <GeometryDrawing Geometry="M0,0 L6,6 M6,0 L0,6"
+                         Stroke="{ResourceReference TrafficLightGlyph}"
+                         StrokeThickness="1.1"/>
+    </DrawingImage>
+
+    <DrawingImage x:Key="TrafficLightMinimiseGlyph">
+        <GeometryDrawing Geometry="M0,3 L7,3"
+                         Stroke="{ResourceReference TrafficLightGlyph}"
+                         StrokeThickness="1.1"/>
+    </DrawingImage>
+
+    <!-- Zoom: two opposed corner wedges, the shape a Mac uses for "fill the screen". Filled here on purpose - a wedge
+         IS an area, and stroking it would draw its outline instead. -->
+    <DrawingImage x:Key="TrafficLightZoomGlyph">
+        <GeometryDrawing Geometry="M0,0 L4,0 L0,4 Z M7,7 L3,7 L7,3 Z"
+                         Brush="{ResourceReference TrafficLightGlyph}"/>
+    </DrawingImage>
+
+    <!-- The PIN, for the card window's fourth light. A thumbtack seen head-on: a cap, flared shoulders, a tapering neck
+         and a point. Filled, so it still reads as a pin at seven pixels - an outline at that size closes into a blob.
+         Not a Mac light, but it has to say what it does, and a coloured dot says nothing. -->
+    <DrawingImage x:Key="PinGlyph">
+        <GeometryDrawing Geometry="M4,0 L8,0 L8,3 L10,5 L10,6 L6.8,6 L6.8,9 L6,11 L5.2,9 L5.2,6 L2,6 L2,5 L4,3 Z"
+                         Brush="{ResourceReference TrafficLightGlyph}"/>
+    </DrawingImage>
+
+</ResourceDictionary>

@@ -22,10 +22,12 @@
 
     <Style Selector="CheckBox">
         <Setter Property="Foreground" Value="{ObservableResource TextFillColorPrimary}"/>
-        <!-- The unset box takes the shared selection-off fill, not a ControlFill - a 12%-white hairline round a
-             10%-white fill is not a shape you can find. See the note in MacOsDark. -->
-        <Setter Property="Background" Value="{ResourceReference SelectionControlFillColorOff}"/>
-        <Setter Property="BorderBrush" Value="{ResourceReference ControlStrokeColorDefault}"/>
+        <!-- An unset box is a CONTROL, not a well: LIGHTER than the window in both appearances (white on #ECECEC,
+             #545456 on #323232), because it is a thing you press rather than a place you type into. A well - darker
+             than the window - reads as a hole, which is what it looked like when this was tried. It used to take the
+             switch's track grey instead, which had barely any contrast against either ground. -->
+        <Setter Property="Background" Value="{ResourceReference ControlFillColorDefault}"/>
+        <Setter Property="BorderBrush" Value="{ResourceReference ControlStrokeColorSecondary}"/>
         <Setter Property="BorderThickness" Value="{ResourceReference StrokeControl}"/>
         <Setter Property="FontSize" Value="{ResourceReference FontSizeBody}"/>
         <Setter Property="VerticalContentAlignment" Value="Center"/>

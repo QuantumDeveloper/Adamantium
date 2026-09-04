@@ -1,6 +1,10 @@
 using System;
 using Adamantium.MVVM;
 using Adamantium.Navigation;
+using Adamantium.UI.Controls;
+using Adamantium.UI.Core.Media;
+using Adamantium.UI.Core.Media.Drawings;
+using Adamantium.UI.Core.Media.Imaging;
 
 namespace Adamantium.Game.Sandbox.ViewModels;
 
@@ -28,8 +32,25 @@ public partial class OverlayDemoViewModel : AdamantiumViewModel, IOverlayAware
         top = 80 + n * 32;
     }
 
-    // A title-bar icon (a glyph - VM-clean, no UI object). Demonstrates the OverlayWindow's icon slot.
-    public object Icon => "□";
+    /// <summary>The card's title-bar icon: a small floating panel - a rounded frame with its own caption strip and a
+    /// second sheet peeking out behind it, which is what this window IS. Drawn, not typed: it used to be the literal
+    /// character "□", and a character is a box in every font that lacks it, so it read as a rendering fault.</summary>
+    public object Icon => new Image
+    {
+        Width = 12,
+        Height = 12,
+        Source = new DrawingImage
+        {
+            Drawing = new GeometryDrawing
+            {
+                Geometry = new SVGParser().Parse(
+                    "M4,1 L11,1 L11,8 L4,8 Z " +          // the sheet behind
+                    "M1,4 L8,4 L8,11 L1,11 Z " +          // the card in front
+                    "M1,4 L8,4 L8,6 L1,6 Z"),             // its caption strip
+                Brush = Brushes.Gray
+            }
+        }
+    };
 
     // Open at Left/Top (below) rather than centred, to show explicit positioning.
     public OverlayStartupLocation StartupLocation => OverlayStartupLocation.Manual;

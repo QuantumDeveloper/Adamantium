@@ -22,6 +22,7 @@
         <!-- No rest Background on purpose: a transparent fill still builds a fill unit and an anti-aliased fringe per
              row, which in a long list is paid for nothing. The triggers paint one when there is something to say. -->
         <Setter Property="Foreground" Value="{ObservableResource TextFillColorPrimary}"/>
+        <Setter Property="BackgroundPointerOver" Value="{ResourceReference SubtleFillColorSecondary}"/>
         <Setter Property="BackgroundPressed" Value="{ResourceReference ControlFillColorTertiary}"/>
         <Setter Property="BackgroundSelected" Value="{ThemeResource AccentFillColorDefault}"/>
         <Setter Property="ForegroundSelected" Value="{ThemeResource AccentForegroundColor}"/>
@@ -61,9 +62,12 @@
         </Setter>
     </Style>
 
-    <!-- No IsMouseOver trigger - see the header. Pressed, then selected; the trigger value stack is ordered by
-         ACTIVATION, so the selected plate declared after pressed is the one that stands once both are gone. -->
+    <!-- Hover FIRST, then pressed, then selected: the trigger value stack is ordered by ACTIVATION, so the plate
+         declared last is the one that stands once the others are gone. -->
     <Style Selector="ListBoxItem">
+        <PropertyTrigger Property="IsMouseOver" Value="true">
+            <Setter TargetName="ItemBorder" Property="Background" Value="{TemplateBinding BackgroundPointerOver}"/>
+        </PropertyTrigger>
         <PropertyTrigger Property="IsPressed" Value="true">
             <Setter TargetName="ItemBorder" Property="Background" Value="{TemplateBinding BackgroundPressed}"/>
         </PropertyTrigger>

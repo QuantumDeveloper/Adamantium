@@ -33,7 +33,7 @@
     <!-- The window BODY: the surface everything else is cut into or laid on. -->
     <PaletteColor Key="SolidBackgroundFillColorBase" Color="#323232"/>
     <!-- The WELL: what a list, a text field or an editor is sunk to. Darker than the window, which is the whole point. -->
-    <PaletteColor Key="SolidBackgroundFillColorSecondary" Color="#1E1E1E"/>
+    <PaletteColor Key="SolidBackgroundFillColorSecondary" Color="#232325"/>
     <!-- Raised off the body - a sidebar's selected row, a header strip. -->
     <PaletteColor Key="SolidBackgroundFillColorTertiary" Color="#3C3C3E"/>
     <PaletteColor Key="SmokeFillColorDefault" Color="#8C000000"/>
@@ -95,6 +95,8 @@
     <PaletteColor Key="SliderKnobAuraColor" Color="#0A84FF" As="Color"/>
     <!-- The knob while it is HELD - see MacOsLight for why the glow cannot carry this on its own. -->
     <PaletteColor Key="SliderKnobFillPressed" Color="#D6D6D8"/>
+    <PaletteColor Key="SliderKnobRimColor" Color="#BFBFC4"/>
+    <PaletteColor Key="PinLightColor" Color="#8E8E93"/>
 
     <!-- On the accent: a Mac presses a control by DARKENING it rather than by veiling it in white. -->
     <PaletteColor Key="OnAccentOverlayPointerOver" Color="#1AFFFFFF"/>

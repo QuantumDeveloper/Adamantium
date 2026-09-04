@@ -29,7 +29,7 @@
                     <Border x:Name="Knob"
                             CornerRadius="10"
                             Background="#FFFFFF"
-                            BorderBrush="{ResourceReference ControlStrokeColorSecondary}"
+                            BorderBrush="{ObservableResource SliderKnobRimColor}"
                             BorderThickness="1">
                         <Border.Shadow>
                             <!-- Opacity 1: the strength lives in the palette colour's alpha, so a variant that wants no

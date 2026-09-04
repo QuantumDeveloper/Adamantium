@@ -19,6 +19,18 @@ internal class StyleValueContainer
     /// specificity keeps insertion order, as the web does.</summary>
     public void AddValue(Style style, object value)
     {
+        // A style writes the SAME property more than once when it has a BasedOn: the base's setters are applied first
+        // and its own after, both under this style as the owner. The second write is the one that must stand - it is
+        // what BasedOn means - so a repeat REPLACES the recorded value instead of being dropped. Dropping it gave
+        // MenuScrollViewer the plain ScrollViewer template it is BasedOn, so every menu grew a scrollbar where its own
+        // template draws step arrows.
+        foreach (var recorded in _values)
+        {
+            if (recorded.Style != style) continue;
+            recorded.Value = value;
+            return;
+        }
+
         if (_styleHash.Contains(style))
             return;
 

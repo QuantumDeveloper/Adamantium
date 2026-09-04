@@ -21,7 +21,7 @@
             <Setter.Value>
                 <ControlTemplate TargetType="ListBox">
                     <Border Background="{TemplateBinding Background}"
-                            BorderBrush="{ResourceReference ControlStrokeColorDefault}"
+                            BorderBrush="{ResourceReference ControlStrokeColorSecondary}"
                             BorderThickness="{ResourceReference StrokeControl}"
                             CornerRadius="{ResourceReference CornerRadiusDefault}">
                         <!-- OWNER-QUALIFIED, so it reaches ScrollViewer's ATTACHED properties: a bare
