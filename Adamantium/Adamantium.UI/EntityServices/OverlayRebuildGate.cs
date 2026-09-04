@@ -24,9 +24,26 @@ internal sealed class OverlayRebuildGate
     /// own redraws, and the arrival is global.</summary>
     private int _seenGlyphVersion;
 
-    public bool HasChanged(IReadOnlyList<IUIComponent> flat)
+    private long _seenPaintMarks;
+
+    public bool HasChanged(IReadOnlyList<IUIComponent> flat, RenderDirtyScope scope)
     {
         var changed = false;
+
+        // A RECOLOUR - an opacity, a brush pulse, a theme fade - was the one kind of change this gate could not see. It
+        // leaves the commands, the geometry, the positions and the open set all identical, so every question below
+        // answers "no" and the stage keeps replaying the picture it last built. That is why a title bar's traffic-light
+        // glyphs, faded in and out by a trigger writing Opacity, stopped obeying the trigger as soon as the window
+        // settled: while it was still opening something else moved the gate every frame and hid the defect.
+        // Asked as a COUNTER rather than of the mark set itself: the sets are cleared once per frame by the loop thread
+        // (UIApplication.RenderDirty.Clear), and this stage builds later, on the render thread - it would find them
+        // already empty. The count only grows, so a mark can't be missed no matter which thread wins.
+        var marks = scope?.TotalPaintMarks ?? 0;
+        if (marks != _seenPaintMarks)
+        {
+            _seenPaintMarks = marks;
+            changed = true;
+        }
 
         // LETTERS THAT LANDED are a change to what this stage draws, and until now the gate never asked. An overlay is
         // built by BuildFromComponents, which fuses record and apply and so never runs the content path's late-glyph

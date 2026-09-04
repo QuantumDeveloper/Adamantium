@@ -79,7 +79,7 @@ public class AdornerRenderProcessor : EntityProcessor<WindowRenderService>
         // The same gate the popup stage uses: rebuild only when this stage could look different from last frame. Without
         // it the adorners were walked and re-recorded on EVERY frame - measured at 2732 walks in 25 idle seconds, to draw
         // nothing at all.
-        if (_gate.HasChanged(_flat))
+        if (_gate.HasChanged(_flat, _scope))
         {
             _cache.BuildFromComponents(_flat, projection);
             _cache.ProcessCommands(projection, AssociatedService.RenderScale);

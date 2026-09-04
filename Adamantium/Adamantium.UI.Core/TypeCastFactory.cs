@@ -35,7 +35,11 @@ public static class TypeCastFactory
                 {
                     return Double.NaN;
                 }
-                return Convert.ChangeType(input, finalType);
+                // INVARIANT, not the machine's locale: markup is a machine format written once, and "0.5" means one half
+                // wherever it is read. Converting under the current culture made every fractional value in every theme
+                // silently unparseable on a comma-decimal machine (measured on ru-UA: Opacity="0.5" -> UnsetValue), so
+                // the property kept its default and the markup did nothing at all.
+                return Convert.ChangeType(input, finalType, System.Globalization.CultureInfo.InvariantCulture);
             }
 
             if (finalType.IsEnum) return Enum.Parse(finalType, input.ToString(), ignoreCase: true);
