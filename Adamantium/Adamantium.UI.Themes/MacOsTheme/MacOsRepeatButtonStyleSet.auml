@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="utf-8"?>
+<StyleSet xmlns="http://adamantium/ui"
+          xmlns:x="http://adamantium/ui/xaml/extensions">
+
+    <!-- The standalone repeat button - a stepper's arrows, a spinner. It is a Button in everything but the auto-repeat,
+         so it says what the button says: NO HOVER, and pressing DARKENS it. See MacOsButtonStyleSet for why, at length;
+         the short of it is that a bordered control is already visibly a control, and a Mac keeps the change for the
+         action rather than spending it on the pointer passing by.
+         Its colours and metrics were already macOS's - they come from the palette and the metrics, which are a contract
+         answered per theme - so hover is the whole of what this set exists to change.
+
+         AND IT CARRIES THE PAGE-BUTTON RESET, which is the real reason this file is not two lines. A ScrollBar's trough
+         areas are a RepeatButton SUBTYPE and style matching is IS-A, so the chrome above lands on them unless it is
+         taken back off. Left out, every scrollbar grows a filled, bordered trough - and it would have been left out,
+         because the reset lives in Fluent's repeat-button set and dropping that include drops it too. -->
+
+    <Style Selector="RepeatButton">
+        <Setter Property="Background" Value="{ResourceReference ControlFillColorDefault}"/>
+        <Setter Property="BorderBrush" Value="{ResourceReference ControlStrokeColorDefault}"/>
+        <Setter Property="Foreground" Value="{ObservableResource TextFillColorPrimary}"/>
+
+        <!-- Hover leaves it exactly as it was. Stated rather than omitted, so the next reader can see it was decided. -->
+        <Setter Property="BackgroundPointerOver" Value="{ResourceReference ControlFillColorDefault}"/>
+        <Setter Property="BackgroundPressed" Value="{ResourceReference ControlFillColorTertiary}"/>
+        <Setter Property="BackgroundDisabled" Value="{ResourceReference ControlFillColorDisabled}"/>
+        <Setter Property="ForegroundPressed" Value="{ObservableResource TextFillColorPrimary}"/>
+        <Setter Property="ForegroundDisabled" Value="{ResourceReference TextFillColorDisabled}"/>
+
+        <Setter Property="BorderThickness" Value="{ResourceReference StrokeControl}"/>
+        <Setter Property="CornerRadius" Value="{ResourceReference CornerRadiusDefault}"/>
+        <Setter Property="Padding" Value="{ResourceReference PaddingControlCompact}"/>
+        <Setter Property="FontSize" Value="{ResourceReference FontSizeBody}"/>
+        <Setter Property="HorizontalContentAlignment" Value="Center"/>
+        <Setter Property="VerticalContentAlignment" Value="Center"/>
+    </Style>
+
+    <Style Selector="RepeatButton">
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="RepeatButton">
+                    <Border x:Name="InnerBorder"
+                            CornerRadius="{TemplateBinding CornerRadius}"
+                            Background="{TemplateBinding Background}"
+                            BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}"
+                            Padding="{TemplateBinding Padding}">
+                        <ContentPresenter
+                                x:Name="PART_ContentPresenter"
+                                HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
+                                Foreground="{TemplateBinding Foreground}"
+                                FontSize="{TemplateBinding FontSize}"
+                                Content="{TemplateBinding Content}"
+                                ContentTemplate="{TemplateBinding ContentTemplate}"
+                                ContentTemplateSelector="{TemplateBinding ContentTemplateSelector}"/>
+                    </Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- The trough areas of a scrollbar and a slider's track: a RepeatButton subtype that has to be INVISIBLE and still
+         hit-testable, so a click in the trough pages. Every brush transparent, including the state ones - a hover brush
+         left standing would tint the trough as the pointer crossed it. A component still hit-tests its box with a
+         transparent background, so paging keeps working. -->
+    <Style Selector="ScrollBarPageButton">
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="BorderBrush" Value="Transparent"/>
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="CornerRadius" Value="0"/>
+        <Setter Property="Padding" Value="0"/>
+        <Setter Property="BackgroundPointerOver" Value="Transparent"/>
+        <Setter Property="BackgroundPressed" Value="Transparent"/>
+        <Setter Property="BackgroundDisabled" Value="Transparent"/>
+    </Style>
+
+    <!-- No IsMouseOver trigger, deliberately - see the header. -->
+    <Style Selector="RepeatButton">
+        <PropertyTrigger Property="IsPressed" Value="true">
+            <Setter TargetName="InnerBorder" Property="Background" Value="{TemplateBinding BackgroundPressed}"/>
+            <Setter TargetName="PART_ContentPresenter" Property="Foreground" Value="{TemplateBinding ForegroundPressed}"/>
+        </PropertyTrigger>
+        <PropertyTrigger Property="IsEnabled" Value="false">
+            <Setter TargetName="InnerBorder" Property="Background" Value="{TemplateBinding BackgroundDisabled}"/>
+            <Setter TargetName="PART_ContentPresenter" Property="Foreground" Value="{TemplateBinding ForegroundDisabled}"/>
+        </PropertyTrigger>
+    </Style>
+
+</StyleSet>

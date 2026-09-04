@@ -2,13 +2,17 @@
 <StyleSet xmlns="http://adamantium/ui"
           xmlns:x="http://adamantium/ui/xaml/extensions">
 
-    <!-- Deliberately EMPTY, and it exists to say so.
-         No default Foreground on TextBlock. Plain text takes this theme's primary colour by INHERITANCE from the window
-         (see WindowStyleSet), never from a per-TextBlock setter. A Style-priority Foreground here would outrank the
-         inherited value a control pushes onto its own content when its state changes - a selected row recolouring its
-         text - so templated text could never follow selection, press or disabling. Inheritance lets the nearest
-         ancestor win: the window's default reaches loose text, and a control overrides it inside itself.
-         The file is here rather than absent because this theme owns an answer for every control, and "nothing, for
-         this reason" is an answer. Without it the next person to notice that TextBlock has no style adds one. -->
+    <!-- Plain text, and in THIS theme it is the file that carries the theme's density: the body size here is 12 against
+         Fluent's 14, so a label that fell back to TextBlock's own C# default stood out beside controls that had gone
+         denser around it.
+
+         The file used to be deliberately empty - see the long note in Fluent's copy for why a setter here was once
+         fatal, and why it no longer is: a selector that narrows by nothing but the type is filed as a default for the
+         type, below inheritance, so it dresses loose text without masking what a control says about its own content. -->
+
+    <Style Selector="TextBlock">
+        <Setter Property="Foreground" Value="{ObservableResource TextFillColorPrimary}"/>
+        <Setter Property="FontSize" Value="{ResourceReference FontSizeBody}"/>
+    </Style>
 
 </StyleSet>

@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="utf-8"?>
+<StyleSet xmlns="http://adamantium/ui"
+          xmlns:x="http://adamantium/ui/xaml/extensions">
+
+    <!-- The macOS toggle button - a push button that STAYS DOWN. AppKit's push-on/push-off: the bold and italic buttons
+         in a font bar, a toolbar button that latches. It is the push button of MacOsButtonStyleSet plus one state, so it
+         inherits that set's two rules and adds nothing of its own shape:
+
+         NO HOVER, still. Same reason as the plain button - a Mac answers the press, not the pointer - and it holds in
+         BOTH states here. Fluent dims the accent a notch while the pointer is over a checked toggle; that is a Windows
+         affordance, and copying it would put the one hover reaction of this theme on the one control that least needs
+         it (a latched button is already the loudest thing in its row).
+
+         CHECKED IS THE ACCENT, and this is the half that agrees with Fluent. On a Mac a latched button is filled - that
+         is the whole point of the type - and the accent is what fills it. Not a segmented control: those are a different
+         control with a plate rather than an accent, and TabControl is where that argument belongs.
+
+         PRESSING DARKENS, in both states, which is the reason the trigger block below is longer than Fluent's by one
+         MultiTrigger. A single IsPressed trigger paints the NEUTRAL pressed fill, and on a checked button that neutral
+         lands on top of the accent - grey plate, accent hairline, and content still wearing the on-accent foreground,
+         which in the light theme is white text on near-white. So checked+pressed says explicitly that it wants the
+         accent taken DOWN a step, and is declared last so it wins while both are true. -->
+
+    <Style Selector="ToggleButton">
+        <Setter Property="Background" Value="{ResourceReference ControlFillColorDefault}"/>
+        <Setter Property="BorderBrush" Value="{ResourceReference ControlStrokeColorDefault}"/>
+        <Setter Property="Foreground" Value="{ObservableResource TextFillColorPrimary}"/>
+
+        <!-- Hover leaves it as it was - stated, not omitted. See MacOsButtonStyleSet. -->
+        <Setter Property="BackgroundPointerOver" Value="{ResourceReference ControlFillColorDefault}"/>
+        <Setter Property="BackgroundPressed" Value="{ResourceReference ControlFillColorTertiary}"/>
+        <Setter Property="BackgroundDisabled" Value="{ResourceReference ControlFillColorDisabled}"/>
+        <Setter Property="ForegroundPressed" Value="{ObservableResource TextFillColorPrimary}"/>
+        <Setter Property="ForegroundDisabled" Value="{ResourceReference TextFillColorDisabled}"/>
+
+        <Setter Property="BorderThickness" Value="{ResourceReference StrokeControl}"/>
+        <Setter Property="CornerRadius" Value="{ResourceReference CornerRadiusDefault}"/>
+        <Setter Property="Padding" Value="{ResourceReference PaddingControl}"/>
+        <Setter Property="MinHeight" Value="{ResourceReference ControlHeight}"/>
+        <Setter Property="FontSize" Value="{ResourceReference FontSizeBody}"/>
+        <Setter Property="HorizontalContentAlignment" Value="Center"/>
+        <Setter Property="VerticalContentAlignment" Value="Center"/>
+    </Style>
+
+    <Style Selector="ToggleButton">
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ToggleButton">
+                    <Border x:Name="InnerBorder"
+                            CornerRadius="{TemplateBinding CornerRadius}"
+                            Background="{TemplateBinding Background}"
+                            BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}"
+                            Padding="{TemplateBinding Padding}">
+                        <ContentPresenter
+                                x:Name="PART_ContentPresenter"
+                                HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
+                                Foreground="{TemplateBinding Foreground}"
+                                FontSize="{TemplateBinding FontSize}"
+                                Content="{TemplateBinding Content}"
+                                ContentTemplate="{TemplateBinding ContentTemplate}"
+                                ContentTemplateSelector="{TemplateBinding ContentTemplateSelector}"/>
+                    </Border>
+                    <!-- No focus ring: the application draws ONE, on the adorner layer. -->
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style Selector="ToggleButton">
+        <!-- No IsMouseOver trigger, in either state - see the head of this file. -->
+        <PropertyTrigger Property="IsChecked" Value="true">
+            <Setter TargetName="InnerBorder" Property="Background" Value="{ThemeResource AccentFillColorDefault}"/>
+            <Setter TargetName="InnerBorder" Property="BorderBrush" Value="{ThemeResource AccentFillColorDefault}"/>
+            <Setter TargetName="PART_ContentPresenter" Property="Foreground" Value="{ThemeResource AccentForegroundColor}"/>
+        </PropertyTrigger>
+        <PropertyTrigger Property="IsPressed" Value="true">
+            <Setter TargetName="InnerBorder" Property="Background" Value="{TemplateBinding BackgroundPressed}"/>
+            <Setter TargetName="PART_ContentPresenter" Property="Foreground" Value="{TemplateBinding ForegroundPressed}"/>
+        </PropertyTrigger>
+        <!-- Checked AND pressed: the accent goes down a step instead of being replaced by the neutral pressed fill.
+             Declared LAST so it sits on top of the trigger value stack while both conditions hold. -->
+        <MultiTrigger>
+            <MultiTrigger.Conditions>
+                <Condition Property="IsChecked" Value="true"/>
+                <Condition Property="IsPressed" Value="true"/>
+            </MultiTrigger.Conditions>
+            <Setter TargetName="InnerBorder" Property="Background" Value="{ThemeResource AccentFillColorTertiary}"/>
+            <Setter TargetName="InnerBorder" Property="BorderBrush" Value="{ThemeResource AccentFillColorTertiary}"/>
+            <Setter TargetName="PART_ContentPresenter" Property="Foreground" Value="{ThemeResource AccentForegroundColor}"/>
+        </MultiTrigger>
+        <PropertyTrigger Property="IsEnabled" Value="false">
+            <Setter TargetName="InnerBorder" Property="Background" Value="{TemplateBinding BackgroundDisabled}"/>
+            <Setter TargetName="PART_ContentPresenter" Property="Foreground" Value="{TemplateBinding ForegroundDisabled}"/>
+        </PropertyTrigger>
+    </Style>
+
+</StyleSet>

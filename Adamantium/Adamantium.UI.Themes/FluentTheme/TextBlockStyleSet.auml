@@ -2,12 +2,23 @@
 <StyleSet xmlns="http://adamantium/ui"
           xmlns:x="http://adamantium/ui/xaml/extensions">
 
-    <!-- No default Foreground on TextBlock. Plain text takes the theme's primary colour by INHERITANCE from the window
-         (WindowStyleSet sets Foreground = TextFillColorPrimary), NOT a per-TextBlock Style setter. A Style-priority
-         Foreground here would outrank the Inherited value a control pushes onto its content on a state change (a selected
-         ListBoxItem recolouring its text to AccentForegroundColor), so templated content text could never follow selection/
-         pressed/disabled - invisible in the dark theme (both ~white), wrong in the light theme. Inheritance lets the nearest
-         ancestor win: the window default applies to loose text, a control overrides it for its own content. -->
-    <!-- (intentionally no TextBlock Foreground style - see above) -->
+    <!-- Plain text. This file was EMPTY for most of its life, and the reason it no longer has to be is worth stating,
+         because the old reason was a good one.
+
+         A setter here used to land at Style priority, which outranks INHERITED - and inheritance is the channel a
+         control uses to recolour its OWN content when its state changes (a selected row pushing the accent onto its
+         presenter, the text below following). So a default colour on TextBlock silently stopped every selected row,
+         pressed button and disabled label from following its state, everywhere in the application, with nothing in any
+         log to say so. The theme's answer was to have no style at all and let the window seed the colour by
+         inheritance - which worked, and left the framework one natural style away from breaking.
+
+         A selector that narrows by NOTHING but the type is now filed as exactly what it is: a default FOR THAT TYPE
+         (ValuePriority.TypeDefault), weaker than anything a nearer ancestor actually says. So this style dresses loose
+         text and steps aside inside a control. Both halves are pinned in TypeDefaultSlotTests. -->
+
+    <Style Selector="TextBlock">
+        <Setter Property="Foreground" Value="{ObservableResource TextFillColorPrimary}"/>
+        <Setter Property="FontSize" Value="{ResourceReference FontSizeBody}"/>
+    </Style>
 
 </StyleSet>

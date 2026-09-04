@@ -738,7 +738,35 @@ public abstract class AdamantiumComponent : IAdamantiumComponent
     public void SetStyleValue(AdamantiumProperty property, object value, Style style)
     {
         AddStyleEntry(property.Name, value, style);
-        SetValue(property, EffectiveStyleValue(property.Name, value), ValuePriority.Style);
+        WriteStyleValue(property, EffectiveStyleValue(property.Name, value), StyleSlotFor(property, property.Name, style));
+    }
+
+    /// <summary>Which slot a style's contribution belongs in. An INHERITABLE property set by a selector that narrows by
+    /// nothing but the type is a default FOR THAT TYPE and goes to <see cref="ValuePriority.TypeDefault"/>, below
+    /// inheritance; everything else keeps <see cref="ValuePriority.Style"/>. See ValuePriority.TypeDefault for what this
+    /// buys, and Style.IsTypeDefault for where the line is drawn.</summary>
+    private ValuePriority StyleSlotFor(AdamantiumProperty property, string propertyName, Style applied)
+    {
+        if (!property.CanInherit) return ValuePriority.Style;
+
+        var winner = styleValues != null && styleValues.TryGetValue(propertyName, out var entry)
+            ? entry.EffectiveStyle
+            : applied;
+
+        return winner is { IsTypeDefault: true } ? ValuePriority.TypeDefault : ValuePriority.Style;
+    }
+
+    // Write the style's contribution to ONE of the two style slots and clear the other. Both have to be touched because
+    // the winning entry can change TIER as styles come and go - a class style taken off leaves a bare-type one in force,
+    // and a value left behind in the slot it no longer belongs to would go on winning from there. Cleared FIRST, so the
+    // stale value never outranks the new one even for an instant.
+    private void WriteStyleValue(AdamantiumProperty property, object value, ValuePriority slot)
+    {
+        var other = slot == ValuePriority.Style ? ValuePriority.TypeDefault : ValuePriority.Style;
+        if (Slots(property)?.GetValue(other) is { } held && held != AdamantiumProperty.UnsetValue)
+            SetValue(property, AdamantiumProperty.UnsetValue, other);
+
+        SetValue(property, value, slot);
     }
 
     private object EffectiveStyleValue(string propertyName, object fallback)
@@ -749,7 +777,16 @@ public abstract class AdamantiumComponent : IAdamantiumComponent
     public void RemoveStyleValue(string propertyName, Style style)
     {
         var previousValue = RemoveStyleEntry(propertyName, style);
-        SetValue(propertyName, previousValue, ValuePriority.Style);
+        var property = AdamantiumPropertyMap.ResolveProperty(GetType(), propertyName);
+        if (property == null)
+        {
+            SetValue(propertyName, previousValue, ValuePriority.Style);
+            return;
+        }
+
+        // The style left standing after this removal decides the slot just as it does on the way in - taking a class
+        // style off can leave a bare-type one in force, and that one belongs a tier lower.
+        WriteStyleValue(property, previousValue, StyleSlotFor(property, propertyName, style));
     }
 
     private void AddStyleEntry(string propertyName, object value, Style style)

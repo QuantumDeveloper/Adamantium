@@ -94,9 +94,13 @@ internal class ValueContainer
         return (int)priority == LastSourcePriority ? _defaultValue : AdamantiumProperty.UnsetValue;
     }
 
-    /// <summary>Nothing but the seeded DEFAULT stands here: no local value, no style, no binding - and no inherited one
-    /// cached yet either. That is exactly the case an inheriting property resolves from its ancestors.</summary>
-    public bool IsDefaultOnly => _effectiveFrom >= LastSourcePriority;
+    /// <summary>Nothing EXPLICIT stands here: no local value, no binding, no style - so an inheriting property has
+    /// something to resolve from its ancestors.
+    /// <para>The line is drawn at <see cref="ValuePriority.Inherited"/> rather than at the default slot because two
+    /// slots now sit below it (<see cref="ValuePriority.TypeDefault"/> and the default), and BOTH lose to a value
+    /// coming from above. Asking only about the default slot would have declared an element holding a type default
+    /// "not resolvable" and skipped the walk, so a control's state colour would never have reached it.</para></summary>
+    public bool IsDefaultOnly => _effectiveFrom >= (int)ValuePriority.Inherited;
 
     /// <summary>Which inheritance EPOCH the cached inherited value was resolved in (see
     /// <see cref="AdamantiumProperty.InheritanceEpoch"/>). -1 = never resolved. A stamp per container, so one element
