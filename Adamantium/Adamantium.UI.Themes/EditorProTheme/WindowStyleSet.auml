@@ -27,9 +27,8 @@
              observable link and ignored by a one-shot one. The window's frame kept its original hairline for exactly
              that reason while everything around it recoloured. -->
         <Setter Property="Background" Value="{ObservableResource SolidBackgroundFillColorBase}"/>
-        <!-- Default TEXT colour for the whole window: content inherits it, so plain text is theme-correct without a
-             per-TextBlock style (which would sit at Style priority and MASK a control's selection/state Foreground from
-             reaching its content). -->
+        <!-- The window's own text colour; it no longer seeds the tree - see the Fluent window set for the long version.
+             This theme's body size (12 against Fluent's 14) now lives in TextBlockStyleSet with the colour. -->
         <Setter Property="Foreground" Value="{ObservableResource TextFillColorPrimary}"/>
         <!-- Both grounds the same on purpose - see the note above; the state is carried by the foregrounds. -->
         <Setter Property="TitleBarBackground" Value="{ObservableResource SolidBackgroundFillColorSecondary}"/>

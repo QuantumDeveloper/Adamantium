@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<StyleSet xmlns="http://adamantium/ui"
+          xmlns:x="http://adamantium/ui/xaml/extensions">
+
+    <!-- Plain text. Nothing here differs from Fluent's numbers - macOS's metrics do not override FontSizeBody, so both
+         themes resolve the same key - and the file exists anyway, because this theme answers for every control ITSELF
+         rather than borrowing. "The same as the other theme, and here is where you change it" is an answer; a missing
+         file is a question.
+
+         Worth knowing what a setter here means now: a selector that narrows by nothing but the type is filed as a
+         DEFAULT for that type (ValuePriority.TypeDefault), below inheritance - so this dresses loose text and steps
+         aside inside a control, where the control's own state colour reaches its content. Before that slot existed a
+         style in this file would have silently stopped every selected row and pressed button in the application from
+         following its state, which is why the file used to be empty in every theme. See TypeDefaultSlotTests. -->
+
+    <Style Selector="TextBlock">
+        <Setter Property="Foreground" Value="{ObservableResource TextFillColorPrimary}"/>
+        <Setter Property="FontSize" Value="{ResourceReference FontSizeBody}"/>
+    </Style>
+
+</StyleSet>

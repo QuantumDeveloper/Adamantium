@@ -196,7 +196,6 @@ public class Style : AdamantiumComponent
 
         // Weights, not tiers, only because the band is one int. Both are far above anything reachable: an inheritance
         // chain is a dozen deep at most, and nobody writes a thousand classes into one selector.
-        const int ClassWeight = 1_000;
         const int IdWeight = 1_000_000;
 
         var narrowing = Selector.Classes.Count + Selector.ClassGroups.Count + Selector.Conditions.Count;
@@ -216,6 +215,17 @@ public class Style : AdamantiumComponent
             foreach (var setter in setters) setter.StyleBand = Band;
         }
     }
+
+    /// <summary>The weight one class, condition or id adds to a band. Anything below it is a selector that narrows by
+    /// NOTHING but the type - see <see cref="IsTypeDefault"/>.</summary>
+    internal const int ClassWeight = 1_000;
+
+    /// <summary>This style says something about a TYPE and nothing else: no class, no <c>[Prop=Value]</c>, no id.
+    /// <para>Setters of INHERITABLE properties from such a style are written at <see cref="ValuePriority.TypeDefault"/>
+    /// rather than <see cref="ValuePriority.Style"/>, so they behave as what they are - a default for the type, which
+    /// anything a nearer ancestor actually says overrules. A selector that narrows at all is a statement about
+    /// particular elements and keeps its full strength.</para></summary>
+    internal bool IsTypeDefault => Band < ClassWeight;
 
     private int _band = -1;
 

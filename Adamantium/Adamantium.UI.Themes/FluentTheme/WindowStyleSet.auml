@@ -9,10 +9,10 @@
         <!-- COLOURS live, metrics one-shot: a resource swapped for a NEW brush (what a colour picker does) is re-resolved
              by {ObservableResource} and ignored by {ResourceReference}. -->
         <Setter Property="Background" Value="{ObservableResource SolidBackgroundFillColorBase}"/>
-        <!-- Default TEXT colour for the whole window: content inherits it, so plain text is theme-correct without a
-             per-TextBlock style (which would sit at Style priority and MASK a control's selection/state Foreground from
-             reaching its content). A control that recolours its content on a state - e.g. a selected ListBoxItem pushing
-             AccentForegroundColor onto its ContentPresenter - now overrides this inherited default for its subtree. -->
+        <!-- The window's own text colour. It does NOT seed the tree any more: a bare-type selector setting an
+             inheritable property is filed as a default FOR THE TYPE (ValuePriority.TypeDefault) and does not travel
+             downwards - which is what stops a window from overruling every control's own colour. Loose text is dressed
+             by TextBlockStyleSet, which is where someone looking for it would look. -->
         <Setter Property="Foreground" Value="{ObservableResource TextFillColorPrimary}"/>
         <Setter Property="TitleBarBackground" Value="{ThemeResource AccentFillColorDefault}"/>
         <Setter Property="InactiveTitleBarBackground" Value="{ObservableResource SolidBackgroundFillColorBase}"/>

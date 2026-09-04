@@ -55,13 +55,12 @@
              template; two sets for one control are two sets, not an override. -->
         <!-- FIRST, because macOS's own come after and the later set wins a tie: the traffic lights are Buttons, and
              Fluent's plain Button style would otherwise paint over the class style that makes them coloured circles. -->
-        <StyleInclude Source="{x:Type fluent:TextBlockStyleSet}"/>
         <StyleInclude Source="{x:Type fluent:BorderStyleSet}"/>
         <StyleInclude Source="{x:Type fluent:ContentControlStyleSet}"/>
-        <StyleInclude Source="{x:Type fluent:RepeatButtonStyleSet}"/>
         <StyleInclude Source="{x:Type fluent:ThumbStyleSet}"/>
+        <!-- ZoomBox stays borrowed and is expected to: its template is a ScrollViewer around a ContentPresenter and
+             carries no colour of its own, and the scroller inside it is already this theme's own. -->
         <StyleInclude Source="{x:Type fluent:ZoomBoxStyleSet}"/>
-        <StyleInclude Source="{x:Type fluent:ToggleButtonStyleSet}"/>
         <StyleInclude Source="{x:Type fluent:NumericUpDownStyleSet}"/>
         <StyleInclude Source="{x:Type fluent:BusyIndicatorStyleSet}"/>
         <StyleInclude Source="{x:Type fluent:ItemsControlStyleSet}"/>
@@ -93,6 +92,7 @@
         <!-- macOS's own. The ORDER of these is deliberately the one that used to break: the plain Button style set is
              LAST, after the caption that specialises Button into traffic lights. It stays that way as a standing check
              that specificity is decided by the SELECTORS and not by this list - see Style.StyleBandOfSelector. -->
+        <StyleInclude Source="{x:Type mac:MacOsTextBlockStyleSet}"/>
         <StyleInclude Source="{x:Type mac:MacOsWindowStyleSet}"/>
         <StyleInclude Source="{x:Type mac:MacOsTitleBarStyleSet}"/>
         <StyleInclude Source="{x:Type mac:MacOsButtonStyleSet}"/>
@@ -114,6 +114,8 @@
         <StyleInclude Source="{x:Type mac:MacOsGridSplitterStyleSet}"/>
         <StyleInclude Source="{x:Type mac:MacOsRingProgressBarStyleSet}"/>
         <StyleInclude Source="{x:Type mac:MacOsSlidePanelStyleSet}"/>
+        <StyleInclude Source="{x:Type mac:MacOsRepeatButtonStyleSet}"/>
+        <StyleInclude Source="{x:Type mac:MacOsToggleButtonStyleSet}"/>
   </Theme.StyleIncludes>
 
 </Theme>
