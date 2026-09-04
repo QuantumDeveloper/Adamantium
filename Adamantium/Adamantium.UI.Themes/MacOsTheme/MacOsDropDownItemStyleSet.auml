@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="utf-8"?>
+<StyleSet xmlns="http://adamantium/ui"
+          xmlns:x="http://adamantium/ui/xaml/extensions">
+
+    <!-- A row in the pop-up button's menu, and two things distinguish it from a list row:
+
+         A MENU ROW FOLLOWS THE POINTER. Everywhere else in this theme hover changes nothing, because a Mac control
+         answers the press. A menu is the exception on the platform itself: the row under the pointer is highlighted
+         while the menu is open, because that is how the pointer says which row a release will choose. A list has no
+         such pending choice, so it has no such highlight - see MacOsListBoxItemStyleSet. The keyboard's row highlights
+         the same way, and must: it is the same statement made by the arrows instead of by the pointer.
+
+         AND THE CHOSEN ROW IS MARKED WITH A TICK, NOT FILLED. This is the correction that matters. Filling it with the
+         accent - which is what this did at first - gives a menu two rows painted the same accent plate, one because it
+         is the current value and one because the pointer happens to be over it, and nothing on screen says which is
+         which. A Mac never had that problem because it never fills the chosen row: it ticks it in the margin and keeps
+         the plate for the pointer alone. So the plate means exactly one thing here - "a release lands HERE" - and the
+         tick means the other - "and THIS is what the control holds now".
+
+         The margin the tick sits in is reserved on every row, chosen or not, so a menu does not re-indent itself as the
+         selection moves. -->
+
+
+    <Style Selector="DropDownItem" BasedOn="ListBoxItem">
+        <Setter Property="Foreground" Value="{ObservableResource TextFillColorPrimary}"/>
+        <Setter Property="BackgroundPointerOver" Value="{ThemeResource AccentFillColorDefault}"/>
+        <Setter Property="BackgroundPressed" Value="{ThemeResource AccentFillColorTertiary}"/>
+        <!-- The chosen row keeps the menu's own colours - it is marked by the TICK, not by a fill. Stated as
+             transparent rather than left out, so that the trigger below has something to bind and nobody wonders
+             whether the omission was an oversight. -->
+        <Setter Property="BackgroundSelected" Value="Transparent"/>
+        <Setter Property="ForegroundSelected" Value="{ObservableResource TextFillColorPrimary}"/>
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="CornerRadius" Value="{ResourceReference CornerRadiusDefault}"/>
+        <Setter Property="Padding" Value="{ResourceReference PaddingRow}"/>
+        <Setter Property="HorizontalContentAlignment" Value="Left"/>
+        <Setter Property="VerticalContentAlignment" Value="Center"/>
+    </Style>
+
+    <Style Selector="DropDownItem">
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="DropDownItem">
+                    <!-- Held off the card's edge, like a list row - the menu card already carries its own padding, so
+                         this is the small extra that keeps the plate clear of the rounded corner. -->
+                    <Border x:Name="ItemBorder"
+                            Margin="0 1"
+                            CornerRadius="{TemplateBinding CornerRadius}"
+                            Background="{TemplateBinding Background}"
+                            BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}"
+                            Padding="{TemplateBinding Padding}">
+                        <Grid ColumnDefinitions="Auto,*">
+                            <!-- The tick's margin, held open on EVERY row: reserved only where it is drawn, the rows
+                                 would shift sideways as the selection moved. The glyph starts at (0,0) because a Path's
+                                 box is its geometry bounds - leading empty space would push it off centre. -->
+                            <Path x:Name="CheckGlyph" Grid.Column="0"
+                                  Data="M0,3.6 L3,6.6 L8.6,0"
+                                  Stroke="{TemplateBinding Foreground}"
+                                  StrokeThickness="2"
+                                  StrokeLineJoin="Round"
+                                  Opacity="0"
+                                  Width="9" Height="7"
+                                  Margin="0 0 8 0"
+                                  HorizontalAlignment="Center"
+                                  VerticalAlignment="Center"/>
+                            <ContentPresenter Grid.Column="1"
+                                x:Name="PART_ContentPresenter"
+                                HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
+                                Foreground="{TemplateBinding Foreground}"
+                                Content="{TemplateBinding Content}"
+                                ContentTemplate="{TemplateBinding ContentTemplate}"
+                                ContentTemplateSelector="{TemplateBinding ContentTemplateSelector}"/>
+                        </Grid>
+                    </Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style Selector="DropDownItem">
+        <!-- THE TICK, and nothing else: no plate, no colour change. What the control holds now. -->
+        <PropertyTrigger Property="IsSelected" Value="true">
+            <Setter TargetName="CheckGlyph" Property="Opacity" Value="1"/>
+        </PropertyTrigger>
+
+        <!-- THE PLATE, and it belongs to the pointer and the arrows alone - the two ways of saying "a release lands
+             here". The row the arrows are on and the row under the pointer are the same statement made by different
+             hands, so they look the same; the chosen row is a different statement and looks different.
+             The tick is repainted with them: on an accent plate the text colour it borrows would be unreadable. -->
+        <!-- ONE trigger, not two. IsHighlighted is now driven by the pointer as well as by the arrows (the row hands
+             the highlight to its owner on mouse-enter), so there is a single mark and a single place that draws it.
+             A second trigger on IsMouseOver would put the plate back on a row the highlight has already left - which is
+             the two-plates-at-once the tick was introduced to end. -->
+        <PropertyTrigger Property="IsHighlighted" Value="true">
+            <Setter TargetName="ItemBorder" Property="Background" Value="{TemplateBinding BackgroundPointerOver}"/>
+            <Setter TargetName="PART_ContentPresenter" Property="Foreground" Value="{ThemeResource AccentForegroundColor}"/>
+            <Setter TargetName="CheckGlyph" Property="Stroke" Value="{ThemeResource AccentForegroundColor}"/>
+        </PropertyTrigger>
+        <PropertyTrigger Property="IsPressed" Value="true">
+            <Setter TargetName="ItemBorder" Property="Background" Value="{TemplateBinding BackgroundPressed}"/>
+        </PropertyTrigger>
+    </Style>
+
+</StyleSet>

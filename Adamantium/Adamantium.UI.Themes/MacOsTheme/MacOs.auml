@@ -8,9 +8,15 @@
        SystemDarkVariant="Dark"
        ResourceContext.Scope="Theme">
 
-  <!-- The macOS theme: so far a WINDOW, a CAPTION, and the controls that carry a STATE - the push button, the switch,
-       the checkbox and the radio button. Those four were taken first on purpose: state is what a platform's controls
-       are recognised by, long before its lists or its fields are.
+  <!-- The macOS theme. Its own, in the order they were taken: the WINDOW and its CAPTION; the controls that carry a
+       STATE (push button, switch, checkbox, radio) - first on purpose, because state is what a platform's controls are
+       recognised by long before its lists are; then the FIELD, the overlay SCROLLERS, the pop-up button and the two
+       sliders; then the LIST family (list, its row, and the menu row that shares its shape), the two progress
+       indicators, the help tag, the divider and the resize corner.
+
+       STILL BORROWED, and the one worth naming: the TAB STRIP. A Mac's tabs are a segmented control rather than paper
+       tabs, so this is a re-drawing and not a re-colouring, and the Fluent set that does it is 683 lines of strip
+       machinery - scrolling, pinning, drag and drop. Not a thing to rewrite without watching it.
 
        SCAFFOLDING, SAID OUT LOUD: the STYLE SETS below, bar the macOS ones, are still Fluent's. That is not the
        finished shape - a theme owns its own sets, as Editor Pro does - it is what lets the chrome be looked at today
@@ -29,6 +35,10 @@
     <ResourceLink Source="{x:Type fluent:Metrics}"/>
     <ResourceLink Source="{x:Type fluent:Materials}"/>
     <ResourceLink Source="{x:Type mac:MacOsMetrics}"/>
+    <!-- LAST, so its keys answer first: the transient surfaces are LIQUID GLASS here, not acrylic, and they replace
+         Fluent's under the same names - which is what reaches the menu, the ribbon flyout and the slide panel, all of
+         them still Fluent's own sets. See MacOsMaterials. -->
+    <ResourceLink Source="{x:Type mac:MacOsMaterials}"/>
   </ResourceContext.Resources>
 
   <Theme.Variants>
@@ -53,12 +63,8 @@
         <StyleInclude Source="{x:Type fluent:ZoomBoxStyleSet}"/>
         <StyleInclude Source="{x:Type fluent:ToggleButtonStyleSet}"/>
         <StyleInclude Source="{x:Type fluent:NumericUpDownStyleSet}"/>
-        <StyleInclude Source="{x:Type fluent:ProgressBarStyleSet}"/>
-        <StyleInclude Source="{x:Type fluent:RingProgressBarStyleSet}"/>
         <StyleInclude Source="{x:Type fluent:BusyIndicatorStyleSet}"/>
         <StyleInclude Source="{x:Type fluent:ItemsControlStyleSet}"/>
-        <StyleInclude Source="{x:Type fluent:ListBoxStyleSet}"/>
-        <StyleInclude Source="{x:Type fluent:ListBoxItemStyleSet}"/>
         <StyleInclude Source="{x:Type fluent:DropInsertionIndicatorStyleSet}"/>
         <StyleInclude Source="{x:Type fluent:DragHandleStyleSet}"/>
         <StyleInclude Source="{x:Type fluent:SelectionAdornerStyleSet}"/>
@@ -67,17 +73,18 @@
         <StyleInclude Source="{x:Type fluent:KeyTipAdornerStyleSet}"/>
         <StyleInclude Source="{x:Type fluent:TilesHostStyleSet}"/>
         <StyleInclude Source="{x:Type fluent:FlipTileStyleSet}"/>
-        <StyleInclude Source="{x:Type fluent:DropDownItemStyleSet}"/>
-        <StyleInclude Source="{x:Type fluent:ToolTipStyleSet}"/>
         <StyleInclude Source="{x:Type fluent:TabControlStyleSet}"/>
         <StyleInclude Source="{x:Type fluent:TabItemStyleSet}"/>
         <StyleInclude Source="{x:Type fluent:RibbonStyleSet}"/>
-        <StyleInclude Source="{x:Type fluent:SlidePanelStyleSet}"/>
         <StyleInclude Source="{x:Type fluent:OverlayWindowStyleSet}"/>
+        <!-- The resize grip stays Fluent's, and that is a CORRECTION rather than a leftover. A macOS one was written -
+             invisible, on the reasoning that a Mac resizes from any edge - and that reasoning is about a NORMAL window,
+             where this control is not shown at all. It appears only under ResizeMode=CanResizeWithGrip, which means a
+             window with no resize borders at all: there the grip is the ONLY way to resize, and hiding it leaves no
+             affordance and no other edge to try. -->
         <StyleInclude Source="{x:Type fluent:ResizeGripperStyleSet}"/>
         <StyleInclude Source="{x:Type fluent:MenuStyleSet}"/>
         <StyleInclude Source="{x:Type fluent:TreeViewStyleSet}"/>
-        <StyleInclude Source="{x:Type fluent:GridSplitterStyleSet}"/>
         <StyleInclude Source="{x:Type fluent:DockingStyleSet}"/>
         <StyleInclude Source="{x:Type fluent:ColorPickerStyleSet}"/>
         <StyleInclude Source="{x:Type fluent:ColorPickerButtonStyleSet}"/>
@@ -99,6 +106,14 @@
         <StyleInclude Source="{x:Type mac:MacOsSliderStyleSet}"/>
         <StyleInclude Source="{x:Type mac:MacOsRangeSliderStyleSet}"/>
         <StyleInclude Source="{x:Type mac:MacOsSliderKnobStyleSet}"/>
+        <StyleInclude Source="{x:Type mac:MacOsListBoxStyleSet}"/>
+        <StyleInclude Source="{x:Type mac:MacOsListBoxItemStyleSet}"/>
+        <StyleInclude Source="{x:Type mac:MacOsDropDownItemStyleSet}"/>
+        <StyleInclude Source="{x:Type mac:MacOsProgressBarStyleSet}"/>
+        <StyleInclude Source="{x:Type mac:MacOsToolTipStyleSet}"/>
+        <StyleInclude Source="{x:Type mac:MacOsGridSplitterStyleSet}"/>
+        <StyleInclude Source="{x:Type mac:MacOsRingProgressBarStyleSet}"/>
+        <StyleInclude Source="{x:Type mac:MacOsSlidePanelStyleSet}"/>
   </Theme.StyleIncludes>
 
 </Theme>

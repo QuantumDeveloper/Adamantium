@@ -29,6 +29,15 @@ public class DropDownItem : ListBoxItem
         set => SetValue(IsHighlightedProperty, value);
     }
 
+    /// <summary>The pointer arriving on this row takes the highlight with it, so the list is never marked in two places
+    /// at once - see <see cref="DropDown.HighlightFromContainer"/>. It also makes Enter commit what the pointer is on,
+    /// which is what anyone who moved the mouse expects it to do.</summary>
+    protected override void OnMouseEnter(MouseEventArgs e)
+    {
+        base.OnMouseEnter(e);
+        (Owner ?? FindOwnerLogically())?.HighlightFromContainer(this);
+    }
+
     protected override void OnMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
         // base sets IsPressed/Focus/Handled (its ListBox lookup is a harmless no-op with no ListBox ancestor here).

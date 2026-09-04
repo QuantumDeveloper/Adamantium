@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<StyleSet xmlns="http://adamantium/ui"
+          xmlns:x="http://adamantium/ui/xaml/extensions">
+
+    <!-- The macOS list. Same parts as Fluent's - a bordered surface round a scroll host round the items presenter -
+         because that is what the control needs; what is macOS is what the surface is MADE of.
+
+         A LIST IS A WELL, the same one a text field is. Fluent builds it from a card fill, which is the material of
+         something laid ON the window; a Mac sinks a list INTO it. That is the same decision already made for the text
+         field, and making it twice from one key is the point - a field and a list side by side have to be the same
+         depth or the window looks like it has two floors.
+
+         Rounder than Fluent's 4, because everything here is: the corner radius is the theme's own. -->
+
+    <Style Selector="ListBox" BasedOn="ItemsControl">
+        <Setter Property="Background" Value="{ResourceReference SolidBackgroundFillColorSecondary}"/>
+    </Style>
+
+    <Style Selector="ListBox">
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ListBox">
+                    <Border Background="{TemplateBinding Background}"
+                            BorderBrush="{ResourceReference ControlStrokeColorDefault}"
+                            BorderThickness="{ResourceReference StrokeControl}"
+                            CornerRadius="{ResourceReference CornerRadiusDefault}">
+                        <!-- OWNER-QUALIFIED, so it reaches ScrollViewer's ATTACHED properties: a bare
+                             {TemplateBinding HorizontalScrollBarVisibility} is looked up as a property of the LIST,
+                             which has none - it resolves to null and throws while the template is being BUILT, which
+                             leaves every list with no template at all. -->
+                        <ScrollViewer x:Name="PART_ScrollHost" CanContentScroll="True"
+                                      HorizontalScrollBarVisibility="{TemplateBinding (ScrollViewer.HorizontalScrollBarVisibility)}"
+                                      VerticalScrollBarVisibility="{TemplateBinding (ScrollViewer.VerticalScrollBarVisibility)}">
+                            <ItemsPresenter x:Name="PART_ItemsPresenter"/>
+                        </ScrollViewer>
+                    </Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+</StyleSet>

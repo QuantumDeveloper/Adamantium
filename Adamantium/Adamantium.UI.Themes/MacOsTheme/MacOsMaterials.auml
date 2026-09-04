@@ -1,0 +1,51 @@
+<ResourceDictionary xmlns:x="http://adamantium/ui/xaml/extensions"
+        xmlns="http://adamantium/ui">
+
+    <!-- The macOS theme's transient surfaces, and they are LIQUID GLASS rather than acrylic.
+
+         THE KEYS ARE THE SHARED ONES. FlyoutSurfaceFill names a ROLE - "the surface a menu, a drop-down, a ribbon
+         flyout or a slide panel is made of" - and three of those sets are still Fluent's own. Answering the key here is
+         what lets the whole theme change material without touching a line of them. (They were called AcrylicFlyoutFill
+         and AcrylicTooltipFill until this went in, which put the MATERIAL in the contract and left this file either
+         lying in the name or re-templating four borrowed controls.)
+
+         WHAT ACTUALLY CHANGES. Acrylic is a BLUR plus a tint - it hides what is behind it and reads as frosted plastic.
+         Liquid glass BENDS what is behind it instead: the capture is sampled with an offset that grows towards the
+         edge, so the shape reads as a thick drop with a lens at its rim, with a faint colour fringe where the bending
+         is strongest and a bright line along the turn. In the middle it is nearly clear.
+
+         TWO CONSEQUENCES WORTH KNOWING BEFORE JUDGING IT:
+
+         There is no BlurAmount here, and its absence is not an oversight - the glass pass never blurs. It samples the
+         capture sharply and displaces it. Setting the knob would leave a number in the theme that does nothing, which
+         is how a file ends up with settings nobody can tell the effect of.
+
+         And the tint is CAPPED AT HALF by the material itself (the pass multiplies the alpha by 0.5, because glass that
+         takes a heavy tint is a panel again). So 1.0 here is not "opaque", it is the most tint this material admits -
+         which is still a good deal clearer than the acrylic it replaces. If a menu over a busy white document turns out
+         to be hard to read, that is this trade showing, and going back is one attribute. -->
+
+    <!-- The flyout surface: menus, submenus, drop-down lists, the ribbon's flyout, a slide panel.
+
+         Refraction is the material's OWN default, and left there deliberately after a spell at 8: the strength is the
+         displacement at the very edge in device pixels, and the lens band it drives reaches twice that inwards. At 8
+         the band is 16px, which on a menu is a hairline nobody reads as glass; at 12 it is 24 and the bend is a thing
+         you can see. It only shows where there is something BEHIND to bend, which is the honest limit of this material
+         and not a number to chase: over a flat panel a lens and a blur both leave a flat panel. -->
+    <MaterialBrush x:Key="FlyoutSurfaceFill"
+                   Material="LiquidGlass"
+                   TintColor="{ResourceReference AcrylicFillColorDefault}"
+                   TintOpacity="1.0"
+                   Refraction="12"
+                   NoiseAmount="0.02"/>
+
+    <!-- A tooltip is small, and the lens is measured in device pixels from the edge - at the flyout's strength the
+         bending would reach the middle of it and there would be no flat part left to read text on. -->
+    <MaterialBrush x:Key="TooltipSurfaceFill"
+                   Material="LiquidGlass"
+                   TintColor="{ResourceReference AcrylicFillColorDefault}"
+                   TintOpacity="1.0"
+                   Refraction="7"
+                   NoiseAmount="0.02"/>
+
+</ResourceDictionary>

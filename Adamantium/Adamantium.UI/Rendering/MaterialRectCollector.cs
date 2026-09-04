@@ -306,7 +306,12 @@ internal sealed class MaterialRectCollector : SdfBatchCollector<MaterialRectItem
 
         // Capture FIRST, then draw - see BackdropCapture: the copy is only correct once everything meant to be
         // BEHIND the material is already in the frame.
-        if (!_capture.Capture(device, region) || _capture.Image == null) return false;
+        //
+        // AT THE RESOLUTION THIS SEGMENT'S MATERIAL WANTS. A blurring material is happy with a quarter-size copy - the
+        // shrink is half its blur - but a REFRACTING one samples it sharply, so a shrunk copy hands the lens an image
+        // with nothing left in it to bend, and the glass comes out looking like frosting however hard it refracts.
+        var sharpness = _boundTreatment == MaterialTreatment.Glass ? BackdropCapture.Sharp : BackdropCapture.Downscale;
+        if (!_capture.Capture(device, region, sharpness) || _capture.Image == null) return false;
 
         uv.SetValue(ToUv(new Vector4F(region.Offset.X, region.Offset.Y, region.Extent.Width, region.Extent.Height)));
         texture.SetResource(_capture.Image);

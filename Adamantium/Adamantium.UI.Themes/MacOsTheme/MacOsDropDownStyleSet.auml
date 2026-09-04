@@ -89,7 +89,7 @@
                                 <ControlTemplate TargetType="Popup">
                                     <!-- Rounder and more generously padded than Fluent's card: a Mac menu is a floating
                                          sheet with its rows held off the edges, not a bordered list box. -->
-                                    <Border Background="{ResourceReference AcrylicFlyoutFill}"
+                                    <Border Background="{ResourceReference FlyoutSurfaceFill}"
                                             BorderBrush="{ResourceReference ControlStrokeColorDefault}"
                                             BorderThickness="1"
                                             CornerRadius="6"

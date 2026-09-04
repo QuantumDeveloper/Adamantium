@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="utf-8"?>
+<StyleSet xmlns="http://adamantium/ui"
+          xmlns:x="http://adamantium/ui/xaml/extensions">
+
+    <!-- A row in a macOS list, and two things make it one:
+
+         SELECTION IS A CAPSULE HELD OFF THE EDGES, not a band across the list. A Windows list paints the chosen row
+         edge to edge, so the highlight reads as a stripe THROUGH the list; a Mac draws a rounded plate INSIDE it, so
+         the highlight reads as a thing sitting in a container. The inset is a margin on the row's chrome only - the
+         row's hit area is still the full width, because clicking the empty strip beside the plate must still choose
+         the row.
+
+         AND IT IS SOLID. Fluent uses a translucent wash and keeps the label's ordinary colour, which is right for a
+         layered interface where the row's own tile must show through. A Mac list is a solid well, so the plate is the
+         accent itself and the label takes the on-accent colour - which the theme derives from the accent, so it stays
+         readable whatever accent is chosen.
+
+         NO HOVER. A row in a Finder list does not light up under the pointer; a MENU row does, and that is a different
+         control - see MacOsDropDownItemStyleSet, which is where the hover lives. -->
+
+    <Style Selector="ListBoxItem">
+        <!-- No rest Background on purpose: a transparent fill still builds a fill unit and an anti-aliased fringe per
+             row, which in a long list is paid for nothing. The triggers paint one when there is something to say. -->
+        <Setter Property="Foreground" Value="{ObservableResource TextFillColorPrimary}"/>
+        <Setter Property="BackgroundPressed" Value="{ResourceReference ControlFillColorTertiary}"/>
+        <Setter Property="BackgroundSelected" Value="{ThemeResource AccentFillColorDefault}"/>
+        <Setter Property="ForegroundSelected" Value="{ThemeResource AccentForegroundColor}"/>
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="CornerRadius" Value="{ResourceReference CornerRadiusDefault}"/>
+        <Setter Property="Padding" Value="{ResourceReference PaddingRow}"/>
+        <!-- Stretch on both axes, as Fluent's does and for its reason: content that wants to be centred can say so
+             about itself, while content that wants the whole slot cannot get back height never handed to it. -->
+        <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+        <Setter Property="VerticalContentAlignment" Value="Stretch"/>
+    </Style>
+
+    <Style Selector="ListBoxItem">
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ListBoxItem">
+                    <!-- The inset that makes the plate a plate. On the CHROME, not on the row: the row still fills the
+                         list's width and still takes a press anywhere along it. -->
+                    <Border x:Name="ItemBorder"
+                            Margin="4 1"
+                            CornerRadius="{TemplateBinding CornerRadius}"
+                            Background="{TemplateBinding Background}"
+                            BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}"
+                            Padding="{TemplateBinding Padding}">
+                        <ContentPresenter
+                                x:Name="PART_ContentPresenter"
+                                HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
+                                Foreground="{TemplateBinding Foreground}"
+                                Content="{TemplateBinding Content}"
+                                ContentTemplate="{TemplateBinding ContentTemplate}"
+                                ContentTemplateSelector="{TemplateBinding ContentTemplateSelector}"/>
+                    </Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- No IsMouseOver trigger - see the header. Pressed, then selected; the trigger value stack is ordered by
+         ACTIVATION, so the selected plate declared after pressed is the one that stands once both are gone. -->
+    <Style Selector="ListBoxItem">
+        <PropertyTrigger Property="IsPressed" Value="true">
+            <Setter TargetName="ItemBorder" Property="Background" Value="{TemplateBinding BackgroundPressed}"/>
+        </PropertyTrigger>
+        <PropertyTrigger Property="IsSelected" Value="true">
+            <Setter TargetName="ItemBorder" Property="Background" Value="{TemplateBinding BackgroundSelected}"/>
+            <Setter TargetName="PART_ContentPresenter" Property="Foreground" Value="{TemplateBinding ForegroundSelected}"/>
+        </PropertyTrigger>
+        <!-- Selected AND pressed: darken the plate rather than lighten it, as everything in this theme does under a
+             press. Declared last so it lands on top of the stack while both hold. -->
+        <MultiTrigger>
+            <MultiTrigger.Conditions>
+                <Condition Property="IsSelected" Value="true"/>
+                <Condition Property="IsPressed" Value="true"/>
+            </MultiTrigger.Conditions>
+            <Setter TargetName="ItemBorder" Property="Background" Value="{ThemeResource AccentFillColorTertiary}"/>
+        </MultiTrigger>
+    </Style>
+
+</StyleSet>

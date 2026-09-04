@@ -262,6 +262,19 @@ public class DropDown : Selector
         IsDropDownOpen = !IsDropDownOpen;
     }
 
+    // The pointer moved onto a row: the highlight goes WITH it.
+    //
+    // There is ONE highlight, and it belongs to whichever hand is steering. Before this the arrows had it and the mouse
+    // had a separate hover state of its own, so a menu opened with the arrows on its current value and the pointer over
+    // some other row showed TWO rows marked - and a theme cannot resolve that, because neither row knows the other
+    // exists. Every menu on every platform behaves this way: moving the mouse moves the keyboard's place too, so that
+    // pressing Enter after wandering with the pointer commits what is under it rather than something forgotten.
+    internal void HighlightFromContainer(DropDownItem container)
+    {
+        var index = ItemContainerGenerator.IndexFromContainer(container);
+        if (index >= 0) Highlight(index);
+    }
+
     // A row was clicked: select its item and dismiss.
     internal void SelectFromContainer(DropDownItem container)
     {
