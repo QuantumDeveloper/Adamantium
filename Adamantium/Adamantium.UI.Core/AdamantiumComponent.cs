@@ -731,20 +731,13 @@ public abstract class AdamantiumComponent : IAdamantiumComponent
         SetStyleValue(property, value, style);
     }
 
-    /// <summary>Apply one style's contribution: RECORD FIRST, THEN WRITE WHAT WINS. Every style writes at the same
-    /// priority, so writing the incoming value straight through made the last style applied the winner - and handed the
-    /// outcome to the order a theme lists its sets in. A less specific rule arriving later is now recorded, ranked
-    /// below, and changes nothing.</summary>
+    /// <summary>Records one style's contribution and writes whichever of them is the most specific.</summary>
     public void SetStyleValue(AdamantiumProperty property, object value, Style style)
     {
         AddStyleEntry(property.Name, value, style);
         WriteStyleValue(property, EffectiveStyleValue(property.Name, value), StyleSlotFor(property, property.Name, style));
     }
 
-    /// <summary>Which slot a style's contribution belongs in. An INHERITABLE property set by a selector that narrows by
-    /// nothing but the type is a default FOR THAT TYPE and goes to <see cref="ValuePriority.TypeDefault"/>, below
-    /// inheritance; everything else keeps <see cref="ValuePriority.Style"/>. See ValuePriority.TypeDefault for what this
-    /// buys, and Style.IsTypeDefault for where the line is drawn.</summary>
     private ValuePriority StyleSlotFor(AdamantiumProperty property, string propertyName, Style applied)
     {
         if (!property.CanInherit) return ValuePriority.Style;
@@ -756,10 +749,6 @@ public abstract class AdamantiumComponent : IAdamantiumComponent
         return winner is { IsTypeDefault: true } ? ValuePriority.TypeDefault : ValuePriority.Style;
     }
 
-    // Write the style's contribution to ONE of the two style slots and clear the other. Both have to be touched because
-    // the winning entry can change TIER as styles come and go - a class style taken off leaves a bare-type one in force,
-    // and a value left behind in the slot it no longer belongs to would go on winning from there. Cleared FIRST, so the
-    // stale value never outranks the new one even for an instant.
     private void WriteStyleValue(AdamantiumProperty property, object value, ValuePriority slot)
     {
         var other = slot == ValuePriority.Style ? ValuePriority.TypeDefault : ValuePriority.Style;
@@ -784,8 +773,6 @@ public abstract class AdamantiumComponent : IAdamantiumComponent
             return;
         }
 
-        // The style left standing after this removal decides the slot just as it does on the way in - taking a class
-        // style off can leave a bare-type one in force, and that one belongs a tier lower.
         WriteStyleValue(property, previousValue, StyleSlotFor(property, propertyName, style));
     }
 

@@ -21,8 +21,14 @@ public class Theme : AdamantiumComponent, ITheme
         };
         ResourceManager = UIAppContext.Current.ResourceManager;
         MergedStyles = new StyleSet();
-        // Any change to the merged style set invalidates the per-type match cache below (init, AddStyleSet, hot-reload).
-        MergedStyles.Styles.CollectionChanged += (_, _) => _typeStyleCache.Clear();
+        MergedStyles.Styles.CollectionChanged += (_, e) =>
+        {
+            if (e.NewItems != null)
+                foreach (Style style in e.NewItems)
+                    style?.MarkThemeOwned();
+
+            _typeStyleCache.Clear();
+        };
         // Seed the theme's font so it's a real (non-null) property value from the start: a {ThemeResource FontFamily}
         // binding reads the raw GetValue, and a theme can override it (live) to restyle all text.
         FontFamily = SystemDefaultFontFamily;

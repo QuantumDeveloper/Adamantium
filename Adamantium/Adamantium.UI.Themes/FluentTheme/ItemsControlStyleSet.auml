@@ -55,12 +55,13 @@
                     <!-- No margin here: the PANEL insets the card by the REAL item's margin (read from a realized tile) so
                          cards line up exactly with the real tiles and keep the same inter-tile gaps for any list. A faint
                          static border outlines the card even at the pulse's low point. -->
+                    <!-- The outline comes from the PALETTE, like every other hairline. It used to be a literal white at
+                         a tenth opacity, which is a dark-theme assumption written into a shared file: on the light theme
+                         it is white on near-white, so the card had no outline at all at the pulse's low point - exactly
+                         the moment the outline exists for. {ObservableResource}, so a palette swap re-points it. -->
                     <Border CornerRadius="4" BorderThickness="1" IsHitTestVisible="False"
-                                     Background="{ObservableResource SkeletonPulseFill}">
-                        <Border.BorderBrush>
-                            <SolidColorBrush Color="#FFFFFFFF" Opacity="0.10"/>
-                        </Border.BorderBrush>
-                    </Border>
+                                     Background="{ObservableResource SkeletonPulseFill}"
+                                     BorderBrush="{ObservableResource ControlStrokeColorDefault}"/>
                 </DataTemplate>
             </Setter.Value>
         </Setter>
