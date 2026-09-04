@@ -113,9 +113,10 @@
     </Style>
 
     <Style Selector="OverlayWindow">
-        <!-- The glyph lights when the pointer reaches the card's caption, the same signal the window's own caption uses
-             - a glyph inside the button's template could only ever answer for that one button. -->
-        <PropertyTrigger Property="IsMouseOver" Value="true">
+        <!-- The CAPTION ZONE, the same signal the window's own title bar gives - not the whole card, which lit the lights
+             from anywhere on the content. The card's caption is markup rather than a TitleBar control, so there is no
+             style to hang this on: SourceName is what lets the trigger sit on the window and ask about its caption. -->
+        <PropertyTrigger SourceName="PART_TitleBar" Property="IsMouseOver" Value="true">
             <Setter TargetName="CloseGlyph" Property="Opacity" Value="1"/>
             <Setter TargetName="PinGlyphImage" Property="Opacity" Value="1"/>
         </PropertyTrigger>

@@ -152,10 +152,8 @@
         </Setter>
     </Style>
 
-    <!-- All three glyphs light together. The signal is the CAPTION's own hover, because that is the only one a style
-         can read: a StackPanel has no template, so a style on the group cannot light anything, and a trigger cannot
-         reach into another control's template. In practice this is what a Mac does too - approach the window's caption
-         and the lights show what they do. -->
+    <!-- All three glyphs light together, and the signal is the CAPTION ZONE - approach the title bar and the lights show
+         what they do, without having to find the 12px group first. -->
     <Style Selector="TitleBar">
         <PropertyTrigger Property="IsMouseOver" Value="true">
             <Setter TargetName="CloseGlyph" Property="Opacity" Value="1"/>

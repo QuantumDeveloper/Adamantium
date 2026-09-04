@@ -249,6 +249,79 @@ public class StyleTriggerTests
         public IAdamantiumComponent FindTarget(string targetName) => _target;
     }
 
+    // A trigger can only be carried by a STYLE, and a style is selected by control type - so a group living inside a
+    // template had no way to answer for itself and the question had to be widened to the whole control (a caption's
+    // traffic lights lit from anywhere on the title bar). SourceName is the read-side mirror of Setter.TargetName.
+    [Test]
+    public void PropertyTrigger_SourceName_ReadsThePartAndNotTheHost()
+    {
+        var host = new Button();
+        host.Template = TwoPartTemplate("Group", "Glyph");
+
+        var trigger = new PropertyTrigger { SourceName = "Group", Property = "IsEnabled", Value = false };
+        trigger.Add(new Setter { TargetName = "Glyph", Property = "Opacity", Value = "0.5" });
+        trigger.Apply(new PartContext(host, theme: null));
+
+        var group = (Border)host.GetTemplateChild("Group");
+        var glyph = (Border)host.GetTemplateChild("Glyph");
+        Assert.That(glyph.Opacity, Is.EqualTo(1).Within(0.001), "inactive before the condition holds");
+
+        host.IsEnabled = false;
+        Assert.That(glyph.Opacity, Is.EqualTo(1).Within(0.001),
+            "the HOST's own property must not answer for a trigger that names a source");
+
+        host.IsEnabled = true;
+        group.IsEnabled = false;
+        Assert.That(glyph.Opacity, Is.EqualTo(0.5).Within(0.001), "the named part is what the trigger watches");
+
+        group.IsEnabled = true;
+        Assert.That(glyph.Opacity, Is.EqualTo(1).Within(0.001), "...and it lets go when the part goes back");
+    }
+
+    // A trigger that READS a part reaches into the template just as surely as one that writes to it: a swap discards the
+    // part it listens to, and an activator still subscribed to the old one would never hear anything again.
+    [Test]
+    public void PropertyTrigger_SourceName_FollowsATemplateSwap()
+    {
+        var button = new Button();
+
+        var style = new Style();
+        style.Selector.Types.Add(typeof(Button));
+        var trigger = new PropertyTrigger { SourceName = "Group", Property = "IsEnabled", Value = false };
+        trigger.Add(new Setter { TargetName = "Glyph", Property = "Opacity", Value = "0.5" });
+        style.Triggers.Add(trigger);
+        style.Attach(button);
+
+        button.Template = TwoPartTemplate("Group", "Glyph");
+        var groupA = (Border)button.GetTemplateChild("Group");
+
+        button.Template = TwoPartTemplate("Group", "Glyph");
+        var groupB = (Border)button.GetTemplateChild("Group");
+        var glyphB = (Border)button.GetTemplateChild("Glyph");
+        Assert.That(groupB, Is.Not.SameAs(groupA), "a genuinely new part instance");
+
+        groupA.IsEnabled = false;
+        Assert.That(glyphB.Opacity, Is.EqualTo(1).Within(0.001), "the discarded part no longer drives anything");
+
+        groupB.IsEnabled = false;
+        Assert.That(glyphB.Opacity, Is.EqualTo(0.5).Within(0.001), "re-pointed onto the new template's source");
+    }
+
+    private static ControlTemplate TwoPartTemplate(string sourceName, string targetName)
+    {
+        var source = new Border();
+        var target = new Border();
+        source.Child = target;
+        return new ControlTemplate(() =>
+        {
+            var result = new TemplateResult();
+            result.RegisterName(sourceName, source);
+            result.RegisterName(targetName, target);
+            result.RootComponent = source;
+            return result;
+        });
+    }
+
     private static ControlTemplate NamedPartTemplate(string partName)
     {
         var inner = new Border();

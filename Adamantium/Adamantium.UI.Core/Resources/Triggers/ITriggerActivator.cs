@@ -31,27 +31,40 @@ public interface ITriggerActivator
 /// <summary>Active while ONE host property equals a value (the WPF Trigger / PropertyTrigger).</summary>
 internal sealed class PropertyTriggerActivator : TriggerActivatorBase
 {
-    private readonly AdamantiumProperty _targetProperty;
-    private readonly object _typedValue;
+    private readonly PropertyTrigger _blueprint;
+    private AdamantiumProperty _targetProperty;
+    private object _typedValue;
+    private IAdamantiumComponent _source;
 
     public PropertyTriggerActivator(ITriggerExecutionContext context, PropertyTrigger blueprint) : base(context, blueprint)
     {
-        _targetProperty = context.HostComponent.GetProperty(blueprint.Property);
-        if (_targetProperty != null)
-            _typedValue = TypeCastFactory.CastFromString(blueprint.Value, _targetProperty.PropertyType);
+        _blueprint = blueprint;
     }
 
+    // Resolved HERE and not in the constructor: with a SourceName the part may not exist yet (the template is applied
+    // after the style attaches), and the template's own first build re-points every activator that reaches the parts.
     public override void Activate()
     {
-        if (_targetProperty == null) return;
-        Context.HostComponent.PropertyChanged += OnPropertyChanged;
+        _source = string.IsNullOrEmpty(_blueprint.SourceName)
+            ? Context.HostComponent
+            : Context.FindTarget(_blueprint.SourceName);
+        if (_source == null) return;
+
+        _targetProperty = _source.GetProperty(_blueprint.Property);
+        if (_targetProperty == null) { _source = null; return; }
+
+        _typedValue = TypeCastFactory.CastFromString(_blueprint.Value, _targetProperty.PropertyType);
+        _source.PropertyChanged += OnPropertyChanged;
         Evaluate();
     }
 
+    // Unsubscribes from the instance it SUBSCRIBED to, not from whatever the name resolves to now: after a template
+    // swap that is a different part, and the discarded one would keep the handler forever.
     public override void Deactivate()
     {
-        if (_targetProperty == null) return;
-        Context.HostComponent.PropertyChanged -= OnPropertyChanged;
+        if (_source == null) return;
+        _source.PropertyChanged -= OnPropertyChanged;
+        _source = null;
         TearDown();
     }
 
@@ -60,5 +73,5 @@ internal sealed class PropertyTriggerActivator : TriggerActivatorBase
         if (e.Property == _targetProperty) Evaluate();
     }
 
-    private void Evaluate() => ApplyState(Equals(Context.HostComponent.GetValue(_targetProperty), _typedValue));
+    private void Evaluate() => ApplyState(Equals(_source.GetValue(_targetProperty), _typedValue));
 }

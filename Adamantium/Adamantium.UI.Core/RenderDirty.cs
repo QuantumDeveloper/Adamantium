@@ -98,9 +98,20 @@ public sealed class RenderDirtyScope
     public void MarkPaint(IUIComponent component)
     {
         if (component == null) return;
-        lock (PaintSet) PaintSet.Add(component);
+        lock (PaintSet)
+        {
+            PaintSet.Add(component);
+            _paintMarks++;
+        }
         LoopSignal.Request();
     }
+
+    private long _paintMarks;
+
+    /// <summary>How many paint marks this scope has EVER taken. Monotonic and untouched by <see cref="Clear"/>, so a
+    /// stage that runs on the render thread can still tell whether a recolour happened since it last redrew: the set
+    /// itself is wiped once per frame by the loop thread, long before an overlay stage gets to look at it.</summary>
+    public long TotalPaintMarks { get { lock (PaintSet) return _paintMarks; } }
 
     /// <summary>Atomically snapshot the paint-dirty set (same locking discipline as <see cref="SnapshotGeometryInto"/>).</summary>
     public void SnapshotPaintInto(List<IUIComponent> buffer)

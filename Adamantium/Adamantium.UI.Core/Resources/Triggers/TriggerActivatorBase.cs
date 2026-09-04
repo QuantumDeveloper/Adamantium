@@ -45,6 +45,10 @@ public abstract class TriggerActivatorBase : ITriggerActivator
     // routinely: a class-selected look means both the base style and the class style write Template.
     private static bool ReachesTemplateParts(TriggerBase trigger)
     {
+        // A trigger that READS a part reaches the template just as surely as one that writes to it: the part it listens
+        // to is discarded by a swap, and an activator still subscribed to the old one hears nothing ever again.
+        if (trigger is PropertyTrigger { SourceName.Length: > 0 }) return true;
+
         if (trigger.Setters != null)
             foreach (var setter in trigger.Setters)
                 if (!string.IsNullOrEmpty(setter.TargetName))

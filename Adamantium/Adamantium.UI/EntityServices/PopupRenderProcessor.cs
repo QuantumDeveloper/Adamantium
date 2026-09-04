@@ -63,7 +63,7 @@ public class PopupRenderProcessor : EntityProcessor<WindowRenderService>
 
         // Rebuild (component walk + rasterization) only when the open set / geometry / a popup's position changed - or
         // when letters landed since the last build (see OverlayRebuildGate).
-        if (_gate.HasChanged(flat))
+        if (_gate.HasChanged(flat, _scope))
         {
             _cache.BuildFromComponents(flat, projection);
             _cache.ProcessCommands(projection, AssociatedService.RenderScale);
