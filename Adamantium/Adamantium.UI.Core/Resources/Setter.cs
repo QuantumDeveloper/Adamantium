@@ -63,10 +63,6 @@ public class Setter : ISetter, IEquatable<Setter>
         }
     }
 
-    /// <summary>Which slot this setter's value belongs in - the same question <c>SetStyleValue</c> answers for a plain
-    /// value, asked here because a live resource link writes to the component itself and never passes through the
-    /// per-property style stack. An inheritable property set by a selector that narrows by nothing but the type is a
-    /// default for that type (<see cref="ValuePriority.TypeDefault"/>), not an instruction about these elements.</summary>
     private ValuePriority SlotFor(IFundamentalUIComponent component, Style style)
     {
         if (style is not { IsTypeDefault: true }) return ValuePriority.Style;

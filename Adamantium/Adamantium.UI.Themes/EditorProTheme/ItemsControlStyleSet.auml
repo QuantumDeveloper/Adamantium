@@ -54,7 +54,7 @@
                             BorderThickness="{ResourceReference StrokeThin}"
                             IsHitTestVisible="False"
                             Background="{ObservableResource SkeletonPulseFill}"
-                            BorderBrush="{ResourceReference ControlStrokeColorDefault}"/>
+                            BorderBrush="{ObservableResource ControlStrokeColorDefault}"/>
                 </DataTemplate>
             </Setter.Value>
         </Setter>

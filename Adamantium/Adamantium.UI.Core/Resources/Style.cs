@@ -5,10 +5,14 @@ namespace Adamantium.UI.Core.Resources;
 
 public class Style : AdamantiumComponent
 {
-    private Dictionary<AdamantiumProperty, ISetter> settersDict;
+    internal const int ClassWeight = 1_000;
+    private const int IdWeight = 1_000_000;
+    private const int AuthoredWeight = 1_000_000_000;
 
-    // The activators THIS style created per component, so Attach/Detach stay idempotent: a theme swap re-applies
-    // WITHOUT detaching first, and each activator carries a live PropertyChanged subscription.
+    private Dictionary<AdamantiumProperty, ISetter> settersDict;
+    private int _selectorBand = -1;
+    private bool _themeOwned;
+
     private readonly ConditionalWeakTable<IFundamentalUIComponent, List<ITriggerActivator>> _activatorsByComponent = new();
 
     public Style()
@@ -171,17 +175,6 @@ public class Style : AdamantiumComponent
         return _resolvedBases = result;
     }
 
-    /// <summary>How specific this style is, read the way the web reads it: an id beats any number of classes, a class
-    /// beats any depth of type. Packed into one number so the value stack compares with one compare.
-    ///
-    /// <para>THE SELECTOR DECIDES, AND NOTHING ELSE. Not the BasedOn chain - a control spreads its rules over several
-    /// blocks and only one of them says BasedOn, so ranking by position there once put a BASE rule above the derived
-    /// rule meant to overrule it. And not the include order either - counting only the type put a class style and a
-    /// plain type style in one band, so whichever set a theme listed later won.</para>
-    ///
-    /// <para>No type facet bands at 0; several types take the SHALLOWEST, since the style speaks for all of them.
-    /// Property conditions (<c>[Prop=Value]</c>) count with the classes, as attribute selectors do in CSS.</para>
-    /// </summary>
     private int StyleBandOfSelector()
     {
         var shallowest = int.MaxValue;
@@ -193,20 +186,12 @@ public class Style : AdamantiumComponent
         }
 
         var typeDepth = shallowest == int.MaxValue ? 0 : shallowest;
-
-        // Weights, not tiers, only because the band is one int. Both are far above anything reachable: an inheritance
-        // chain is a dozen deep at most, and nobody writes a thousand classes into one selector.
-        const int IdWeight = 1_000_000;
-
         var narrowing = Selector.Classes.Count + Selector.ClassGroups.Count + Selector.Conditions.Count;
         var identity = string.IsNullOrEmpty(Selector.Id) ? 0 : 1;
 
         return identity * IdWeight + narrowing * ClassWeight + typeDepth;
     }
 
-    /// <summary>Copy this style's band onto its trigger setters, which is all a trigger setter can be asked. It does
-    /// not DECIDE the band - <see cref="Band"/> does, from the selector - so there is one answer to "how specific is
-    /// this style" rather than one per caller.</summary>
     private void StampBand()
     {
         foreach (var trigger in Triggers)
@@ -216,23 +201,17 @@ public class Style : AdamantiumComponent
         }
     }
 
-    /// <summary>The weight one class, condition or id adds to a band. Anything below it is a selector that narrows by
-    /// NOTHING but the type - see <see cref="IsTypeDefault"/>.</summary>
-    internal const int ClassWeight = 1_000;
+    internal void MarkThemeOwned() => _themeOwned = true;
 
-    /// <summary>This style says something about a TYPE and nothing else: no class, no <c>[Prop=Value]</c>, no id.
-    /// <para>Setters of INHERITABLE properties from such a style are written at <see cref="ValuePriority.TypeDefault"/>
-    /// rather than <see cref="ValuePriority.Style"/>, so they behave as what they are - a default for the type, which
-    /// anything a nearer ancestor actually says overrules. A selector that narrows at all is a statement about
-    /// particular elements and keeps its full strength.</para></summary>
-    internal bool IsTypeDefault => Band < ClassWeight;
+    internal bool IsTypeDefault => GetSelectorBand() < ClassWeight;
 
-    private int _band = -1;
+    private int GetSelectorBand()
+    {
+        if (_selectorBand < 0) _selectorBand = StyleBandOfSelector();
+        return _selectorBand;
+    }
 
-    /// <summary>How specific this style is, computed once from the selector alone (see
-    /// <see cref="StyleBandOfSelector"/>) and therefore answerable at any time - before attaching, without a BasedOn,
-    /// in any order. Read by the value stack.</summary>
-    internal int Band => _band >= 0 ? _band : _band = StyleBandOfSelector();
+    internal int Band => (_themeOwned ? 0 : AuthoredWeight) + GetSelectorBand();
 
     // Add an activator to both the component's shared list (so a template-change reevaluation sees it) and this style's
     // own per-component record (so Detach/re-Attach can remove exactly the ones it added).

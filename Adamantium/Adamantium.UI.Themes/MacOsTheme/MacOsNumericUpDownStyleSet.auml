@@ -1,0 +1,169 @@
+<?xml version="1.0" encoding="utf-8"?>
+<StyleSet xmlns="http://adamantium/ui"
+          xmlns:x="http://adamantium/ui/xaml/extensions">
+
+    <!-- The macOS stepper field. The STRUCTURE is Fluent's and stays Fluent's on purpose - a five-seat grid with the
+         number in the starred middle and four Auto seats the two buttons can take - because that structure is what the
+         control's ButtonsPlacement/AreButtonsSwapped contract is expressed in. A theme that re-drew it as a single
+         stacked unit would quietly lose Split placement, and a theme is not the place to retire a control's feature.
+
+         What is macOS here:
+
+         THE FIELD IS A WELL. Same surface as MacOsTextBoxStyleSet - SolidBackgroundFillColorSecondary, sunk into the
+         window - so a stepper and a plain field sitting in one form read as the same kind of thing. Fluent gives it a
+         ControlFill, the button material, which is what makes a Windows field look pressable.
+
+         NO HOVER. Fluent brightens the frame when the pointer crosses it; a Mac answers the press. The frame keeps its
+         hairline whatever the pointer does.
+
+         THE BUTTONS ARE GLYPHS, NOT PLATES. They carry no fill and no outline of their own: inside a framed field a
+         Mac's arrows sit directly on the field's surface, and a plate under them would build a second control inside
+         the first. Pressing tints the seat rather than lighting it - the same direction everything else in this theme
+         takes - and that tint is the only chrome they ever have.
+
+         Placement and states are restated in full rather than borrowed. That is the standing rule here: the include
+         they replace is deleted, and a set that is deleted takes its triggers with it - a trigger addresses parts BY
+         NAME, so leaving Fluent's in place would have it writing Grid.Column onto these identically-named parts. -->
+
+    <Style Selector="NumericUpDown">
+        <Setter Property="Background" Value="{ResourceReference SolidBackgroundFillColorSecondary}"/>
+        <Setter Property="Foreground" Value="{ObservableResource TextFillColorPrimary}"/>
+        <Setter Property="BorderBrush" Value="{ResourceReference ControlStrokeColorDefault}"/>
+        <Setter Property="BorderThickness" Value="{ResourceReference StrokeControl}"/>
+        <Setter Property="CornerRadius" Value="{ResourceReference CornerRadiusDefault}"/>
+        <Setter Property="Padding" Value="{ResourceReference PaddingFieldFlat}"/>
+        <Setter Property="MinWidth" Value="{ResourceReference ControlMinWidth}"/>
+        <Setter Property="MinHeight" Value="{ResourceReference ControlHeight}"/>
+        <Setter Property="FontSize" Value="{ResourceReference FontSizeBody}"/>
+    </Style>
+
+    <Style Selector="NumericUpDown">
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="NumericUpDown">
+                    <Border x:Name="PART_Border"
+                            Background="{TemplateBinding Background}"
+                            BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}"
+                            CornerRadius="{TemplateBinding CornerRadius}"
+                            ClipToBounds="True">
+                        <Grid ColumnDefinitions="Auto,Auto,*,Auto,Auto">
+                            <RepeatButton x:Name="PART_Decrease" Grid.Column="0"
+                                    Width="{TemplateBinding ButtonsWidth}"
+                                    Content="{TemplateBinding DecreaseButtonContent}"
+                                    Delay="{TemplateBinding Delay}"
+                                    Interval="{TemplateBinding RepeatInterval}"
+                                    Focusable="{TemplateBinding AreButtonsFocusable}"
+                                    FontSize="{TemplateBinding FontSize}"
+                                    Background="Transparent" BorderThickness="0" CornerRadius="0" Padding="0"
+                                    MinWidth="0" MinHeight="0"
+                                    VerticalAlignment="Stretch"/>
+                            <TextBox x:Name="PART_TextBox" Grid.Column="2"
+                                    Foreground="{TemplateBinding Foreground}"
+                                    FontSize="{TemplateBinding FontSize}"
+                                    Margin="{TemplateBinding Padding}"
+                                    MinWidth="0" MinHeight="0"
+                                    VerticalAlignment="Center">
+                                <!-- The editor is EMBEDDED and must bring no chrome: the frame around it is already this
+                                     control's. Stripping its properties is not enough - the TextBox theme's state
+                                     triggers write to its PART_Border, and a trigger outranks what a template sets, so
+                                     a focused editor would paint its own well INSIDE this one. A template with no such
+                                     part leaves those setters nothing to find. -->
+                                <TextBox.Template>
+                                    <ControlTemplate TargetType="TextBox">
+                                        <ScrollViewer x:Name="PART_ContentHost"
+                                                HorizontalScrollBarVisibility="{TemplateBinding HorizontalScrollBarVisibility}"
+                                                VerticalScrollBarVisibility="{TemplateBinding VerticalScrollBarVisibility}">
+                                            <TextPresenter x:Name="PART_TextPresenter"
+                                                    HorizontalAlignment="Stretch"
+                                                    VerticalAlignment="Stretch"/>
+                                        </ScrollViewer>
+                                    </ControlTemplate>
+                                </TextBox.Template>
+                            </TextBox>
+                            <RepeatButton x:Name="PART_Increase" Grid.Column="4"
+                                    Width="{TemplateBinding ButtonsWidth}"
+                                    Content="{TemplateBinding IncreaseButtonContent}"
+                                    Delay="{TemplateBinding Delay}"
+                                    Interval="{TemplateBinding RepeatInterval}"
+                                    Focusable="{TemplateBinding AreButtonsFocusable}"
+                                    FontSize="{TemplateBinding FontSize}"
+                                    Background="Transparent" BorderThickness="0" CornerRadius="0" Padding="0"
+                                    MinWidth="0" MinHeight="0"
+                                    VerticalAlignment="Stretch"/>
+                        </Grid>
+                    </Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- Placement: which seat each button takes. Split-unswapped is the template's own arrangement, so only the other
+         five combinations are stated. -->
+    <Style Selector="NumericUpDown">
+        <MultiTrigger>
+            <MultiTrigger.Conditions>
+                <Condition Property="ButtonsPlacement" Value="Split"/>
+                <Condition Property="AreButtonsSwapped" Value="true"/>
+            </MultiTrigger.Conditions>
+            <Setter TargetName="PART_Increase" Property="Grid.Column" Value="0"/>
+            <Setter TargetName="PART_Decrease" Property="Grid.Column" Value="4"/>
+        </MultiTrigger>
+
+        <MultiTrigger>
+            <MultiTrigger.Conditions>
+                <Condition Property="ButtonsPlacement" Value="Left"/>
+                <Condition Property="AreButtonsSwapped" Value="false"/>
+            </MultiTrigger.Conditions>
+            <Setter TargetName="PART_Decrease" Property="Grid.Column" Value="0"/>
+            <Setter TargetName="PART_Increase" Property="Grid.Column" Value="1"/>
+        </MultiTrigger>
+
+        <MultiTrigger>
+            <MultiTrigger.Conditions>
+                <Condition Property="ButtonsPlacement" Value="Left"/>
+                <Condition Property="AreButtonsSwapped" Value="true"/>
+            </MultiTrigger.Conditions>
+            <Setter TargetName="PART_Increase" Property="Grid.Column" Value="0"/>
+            <Setter TargetName="PART_Decrease" Property="Grid.Column" Value="1"/>
+        </MultiTrigger>
+
+        <MultiTrigger>
+            <MultiTrigger.Conditions>
+                <Condition Property="ButtonsPlacement" Value="Right"/>
+                <Condition Property="AreButtonsSwapped" Value="false"/>
+            </MultiTrigger.Conditions>
+            <Setter TargetName="PART_Decrease" Property="Grid.Column" Value="3"/>
+            <Setter TargetName="PART_Increase" Property="Grid.Column" Value="4"/>
+        </MultiTrigger>
+
+        <MultiTrigger>
+            <MultiTrigger.Conditions>
+                <Condition Property="ButtonsPlacement" Value="Right"/>
+                <Condition Property="AreButtonsSwapped" Value="true"/>
+            </MultiTrigger.Conditions>
+            <Setter TargetName="PART_Increase" Property="Grid.Column" Value="3"/>
+            <Setter TargetName="PART_Decrease" Property="Grid.Column" Value="4"/>
+        </MultiTrigger>
+    </Style>
+
+    <!-- States. No IsMouseOver among them, deliberately - see the head of this file. Read-only and "no typing allowed"
+         both mean the editor must refuse a keystroke, so both project onto its IsReadOnly. -->
+    <Style Selector="NumericUpDown">
+        <PropertyTrigger Property="AreButtonsVisible" Value="false">
+            <Setter TargetName="PART_Decrease" Property="Visibility" Value="Collapsed"/>
+            <Setter TargetName="PART_Increase" Property="Visibility" Value="Collapsed"/>
+        </PropertyTrigger>
+        <PropertyTrigger Property="IsReadOnly" Value="true">
+            <Setter TargetName="PART_TextBox" Property="IsReadOnly" Value="true"/>
+        </PropertyTrigger>
+        <PropertyTrigger Property="IsManualEntryEnabled" Value="false">
+            <Setter TargetName="PART_TextBox" Property="IsReadOnly" Value="true"/>
+        </PropertyTrigger>
+        <PropertyTrigger Property="IsEnabled" Value="false">
+            <Setter TargetName="PART_Border" Property="Background" Value="{ResourceReference ControlFillColorDisabled}"/>
+            <Setter TargetName="PART_TextBox" Property="Foreground" Value="{ResourceReference TextFillColorDisabled}"/>
+        </PropertyTrigger>
+    </Style>
+
+</StyleSet>

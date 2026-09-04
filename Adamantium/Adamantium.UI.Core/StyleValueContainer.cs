@@ -34,10 +34,6 @@ internal class StyleValueContainer
     public object EffectiveValue =>
         _values.Count > 0 ? _values[^1].Value : AdamantiumProperty.UnsetValue;
 
-    /// <summary>...and WHICH style it came from, which decides the slot the value is written to: a contribution from a
-    /// bare-type selector is a type default (see <see cref="Resources.Style.IsTypeDefault"/>). It has to be the WINNING
-    /// entry's style rather than the one being applied - a class style arriving after a type style must not have its
-    /// value filed as a default because the type style was the last to speak.</summary>
     public Resources.Style EffectiveStyle => _values.Count > 0 ? _values[^1].Style : null;
 
     /// <summary>Takes one style's contribution out and answers with the value in force AFTER it is gone - the most

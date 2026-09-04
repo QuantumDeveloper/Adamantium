@@ -61,7 +61,6 @@
         <!-- ZoomBox stays borrowed and is expected to: its template is a ScrollViewer around a ContentPresenter and
              carries no colour of its own, and the scroller inside it is already this theme's own. -->
         <StyleInclude Source="{x:Type fluent:ZoomBoxStyleSet}"/>
-        <StyleInclude Source="{x:Type fluent:NumericUpDownStyleSet}"/>
         <StyleInclude Source="{x:Type fluent:BusyIndicatorStyleSet}"/>
         <StyleInclude Source="{x:Type fluent:ItemsControlStyleSet}"/>
         <StyleInclude Source="{x:Type fluent:DropInsertionIndicatorStyleSet}"/>
@@ -116,6 +115,7 @@
         <StyleInclude Source="{x:Type mac:MacOsSlidePanelStyleSet}"/>
         <StyleInclude Source="{x:Type mac:MacOsRepeatButtonStyleSet}"/>
         <StyleInclude Source="{x:Type mac:MacOsToggleButtonStyleSet}"/>
+        <StyleInclude Source="{x:Type mac:MacOsNumericUpDownStyleSet}"/>
   </Theme.StyleIncludes>
 
 </Theme>
