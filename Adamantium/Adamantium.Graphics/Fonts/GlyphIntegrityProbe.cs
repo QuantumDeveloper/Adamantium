@@ -16,8 +16,12 @@ namespace Adamantium.Graphics.Fonts
         {
             public int Inside;
             public int OwnerThread;
-            public readonly ConcurrentDictionary<(uint Layer, int X, int Y, int W, int H), uint> CellOwner = new();
+            // Keyed on WHERE ONLY - layer and top-left - and deliberately not on the glyph's size. Sizes differ from
+            // glyph to glyph, so a cell overwritten by a glyph of another size never matched the old key and the trap
+            // stayed silent through the very corruption it was built for.
+            public readonly ConcurrentDictionary<(uint Layer, int X, int Y), (uint Glyph, int W, int H)> CellOwner = new();
             public readonly ConcurrentDictionary<uint, ulong> GlyphHash = new();
+            public readonly ConcurrentDictionary<uint, (uint Layer, int X, int Y, int W, int H)> GlyphCell = new();
         }
 
         private static readonly ConditionalWeakTable<object, AtlasState> States = new();
@@ -53,10 +57,25 @@ namespace Adamantium.Graphics.Fonts
                 data.BoundingRect.Left, data.BoundingRect.Top,
                 (int)data.FullGlyphSize.Width, (int)data.FullGlyphSize.Height);
 
-            var owner = state.CellOwner.GetOrAdd(cell, _ => data.GlyphIndex);
-            if (owner != data.GlyphIndex)
-                Report($"CELL COLLISION: layer {data.DepthLayer} rect {cell.Item2},{cell.Item3} " +
-                       $"{cell.Item4}x{cell.Item5} was glyph {owner}, now glyph {data.GlyphIndex} ('{data.Character}')");
+            var where = (data.DepthLayer, data.BoundingRect.Left, data.BoundingRect.Top);
+            var owner = state.CellOwner.GetOrAdd(where, (data.GlyphIndex, cell.Item4, cell.Item5));
+            if (owner.Glyph != data.GlyphIndex)
+                Report($"CELL COLLISION: layer {data.DepthLayer} at {where.Left},{where.Top} held glyph " +
+                       $"{owner.Glyph} ({owner.W}x{owner.H}), now glyph {data.GlyphIndex} ('{data.Character}') " +
+                       $"({cell.Item4}x{cell.Item5})");
+
+            // THE GLYPH MOVED. The three traps above all watch the WRITE - two writers, one cell claimed twice, one
+            // glyph written differently - and none of them fires when the atlas simply re-packs and gives a glyph a new
+            // place. That is the shape the corruption actually has: the layout stays perfect (the shaper had the right
+            // ids all along) while every letter is drawn as some other letter, because the text units already on
+            // screen still hold the rectangle the glyph used to live at. Digits survived it, which is what says the
+            // pixels are fine and only the addresses are stale.
+            var placed = state.GlyphCell.GetOrAdd(data.GlyphIndex, _ => cell);
+            if (!placed.Equals(cell))
+                Report($"GLYPH MOVED: glyph {data.GlyphIndex} ('{data.Character}') was at layer {placed.Layer} " +
+                       $"{placed.X},{placed.Y} {placed.W}x{placed.H}, now layer {data.DepthLayer} " +
+                       $"{cell.Item2},{cell.Item3} {cell.Item4}x{cell.Item5} - anything already drawn from the old " +
+                       $"rectangle now shows a different glyph");
 
             var hash = Hash(data.Pixels);
             var known = state.GlyphHash.GetOrAdd(data.GlyphIndex, _ => hash);

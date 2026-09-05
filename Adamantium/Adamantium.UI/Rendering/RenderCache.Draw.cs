@@ -493,13 +493,28 @@ public partial class RenderCache
     }
 
     /// <summary>Out-of-render-pass pass: recorded before BeginRendering (shared-surface latch copies).</summary>
+    /// <summary>The out-of-pass sweep, run once per frame. It used to walk every unit of every group to find the few
+    /// with anything to do - measured at 0.6 ms on a screen of a few thousand tiles, almost all of it spent on units
+    /// that had none. The short list is kept instead and rebuilt only when the scene's units change (a walk re-groups
+    /// them) or when a unit gains or loses its machinery (see RenderUnit.MachineryVersion).</summary>
     public void PreRender()
     {
-        foreach (var group in _groups)
-        foreach (var unit in group.Units)
+        var machinery = RenderUnits.RenderUnitMachinery.Version;
+        var membership = ControlGroup.MembershipVersion;
+        if (_preRenderWalkVersion != membership || _preRenderMachineryVersion != machinery)
         {
-            if (unit.NeedsPreRender) unit.PreRender();
+            _preRenderUnits.Clear();
+            foreach (var group in _groups)
+            foreach (var unit in group.Units)
+            {
+                if (unit.NeedsPreRender) _preRenderUnits.Add(unit);
+            }
+
+            _preRenderWalkVersion = membership;
+            _preRenderMachineryVersion = machinery;
         }
+
+        foreach (var unit in _preRenderUnits) unit.PreRender();
     }
 
     /// <summary>Renders every cached unit with no scissor management. Used by GPU-free tests (no device).</summary>
@@ -513,6 +528,7 @@ public partial class RenderCache
         // TEMP trace: one array write per frame, dumped from memory by the overlay.
         var traceStart = Core.Diagnostics.FrameTrace.Enabled ? System.Diagnostics.Stopwatch.GetTimestamp() : 0L;
         LastFrameReplayed = false;
+        DrawWalkMs = 0;
         _traceWhy = 0;
         try
         {
@@ -520,6 +536,8 @@ public partial class RenderCache
         }
         finally
         {
+            DrawReplayed = LastFrameReplayed;
+
             // The sweep belongs HERE, not inside the recording path, for two reasons the measurements made plain. It has
             // to see the arena as the FINISHED frame leaves it - mid-record the segment list describes only what has been
             // flushed so far, so the sweep scanned a dozen slots and reported success having looked at nothing. And it
@@ -551,6 +569,30 @@ public partial class RenderCache
             }
         }
     }
+
+    /// <summary>What THIS cache's last draw was made of, in the order RenderCore runs them: the transform-table copy and
+    /// clip slots (Setup), the composited animations and repaints (Paint), the movers a replay must refresh (Moved),
+    /// re-issuing the recorded stream (Ops), and the O(scene) walk taken when none of the fast paths qualified (Walk).
+    /// <para>PER CACHE, not static. A frame draws through several of these - the window, its adorner layer, its popup
+    /// layer - and while the numbers were statics each overwrote the last, so the phases reported alongside a draw could
+    /// belong to a different cache than the draw did. The sums then did not add up, which is exactly how an instrument
+    /// stops being evidence. Whoever times a cache's Render reads that cache's own numbers.</para></summary>
+    public double DrawSetupMs { get; private set; }
+    public double DrawPaintMs { get; private set; }
+    public double DrawMovedMs { get; private set; }
+    public double DrawOpsMs { get; private set; }
+    public double DrawWalkMs { get; private set; }
+
+    /// <summary>The three calls Paint is made of, so the phase names a CALL and not a group of them: the composited
+    /// animations this thread plays by itself, the arena repaint, and the brush repaints. All three run before the
+    /// frame decides between replaying and walking, so all three are paid on a scene where nothing has changed.</summary>
+    public double DrawAnimMs { get; private set; }
+    public double DrawArenaPaintMs { get; private set; }
+    public double DrawBrushRepaintMs { get; private set; }
+
+    /// <summary>Whether this cache's last draw replayed the recorded stream instead of walking - the bit that says which
+    /// of the numbers above describe it.</summary>
+    public bool DrawReplayed { get; private set; }
 
     /// <summary>Did the last frame REPLAY the recorded op stream (patching only what changed) instead of walking the tree?
     /// A walk is O(scene) and a replay is O(dirty). Tests assert it, so a regression to "one dirty element re-draws
@@ -607,6 +649,7 @@ public partial class RenderCache
         // This frame's transform-table copy, picked BEFORE anything writes a matrix or draws - the composited animations
         // below write matrices, and the replay paths below draw without ever reaching the walk's setup block.
         var setupBytes0 = System.GC.GetAllocatedBytesForCurrentThread();
+        var phase0 = System.Diagnostics.Stopwatch.GetTimestamp();
         BeginTransformFrame(device);
 
         // Rounded clips, refreshed from their owners BEFORE the clean-frame early-out - for the same reason the
@@ -614,6 +657,8 @@ public partial class RenderCache
         // reaches the screen only through its slot.
         _frameScissor = fullScissor;   // the frame's own, for anything that has to ask RoundedClipSlot outside the walk
         RefreshClipSlots(fullScissor);
+        DrawSetupMs = System.Diagnostics.Stopwatch.GetElapsedTime(phase0).TotalMilliseconds;
+        phase0 = System.Diagnostics.Stopwatch.GetTimestamp();
 
         // The animations this thread plays by itself. BEFORE the clean-frame early-out on purpose: a composited animation
         // changes what the retained op stream draws (a matrix, a re-baked colour slot), so an otherwise CLEAN frame is
@@ -621,6 +666,8 @@ public partial class RenderCache
         if (_transformTable != null) _transformTable.CompositedWrite = true;
         ApplyCompositedAnimations(device);
         if (_transformTable != null) _transformTable.CompositedWrite = false;
+        DrawAnimMs = System.Diagnostics.Stopwatch.GetElapsedTime(phase0).TotalMilliseconds;
+        var paint0 = System.Diagnostics.Stopwatch.GetTimestamp();
 
         // A recolour reaches the arena HERE, before this frame decides between replaying, patching and walking - because
         // it must reach it on ALL THREE. Every other family bakes from a payload that holds the live brush, so a re-bake
@@ -630,7 +677,12 @@ public partial class RenderCache
         // From outside: the first switch worked, the next one did not, and scrolling put it right.
         // No slot moves and no op changes, so a replay of the recorded stream now draws it in the new colour.
         ApplyPaintToArenas(device);
+        DrawArenaPaintMs = System.Diagnostics.Stopwatch.GetElapsedTime(paint0).TotalMilliseconds;
+        paint0 = System.Diagnostics.Stopwatch.GetTimestamp();
         ApplyBrushRepaints(device);
+        DrawBrushRepaintMs = System.Diagnostics.Stopwatch.GetElapsedTime(paint0).TotalMilliseconds;
+        DrawPaintMs = System.Diagnostics.Stopwatch.GetElapsedTime(phase0).TotalMilliseconds;
+        phase0 = System.Diagnostics.Stopwatch.GetTimestamp();
 
         // Clean-frame replay: re-issue the last recorded walk's op stream and skip the per-unit loop (the retained buffers
         // still hold its bytes). Only a fully-Clean build qualifies; a Partial/Full re-walks and re-records.
@@ -642,7 +694,10 @@ public partial class RenderCache
             AcceptPatchedTransforms();
             LastFrameReplayed = true;
             Core.Diagnostics.RuntimeStats.DrawSetupBytes += System.GC.GetAllocatedBytesForCurrentThread() - setupBytes0;
+            DrawMovedMs = System.Diagnostics.Stopwatch.GetElapsedTime(phase0).TotalMilliseconds;
+            phase0 = System.Diagnostics.Stopwatch.GetTimestamp();
             ExecuteOps(device, fullScissor);
+            DrawOpsMs = System.Diagnostics.Stopwatch.GetElapsedTime(phase0).TotalMilliseconds;
             return;
         }
 
@@ -673,6 +728,13 @@ public partial class RenderCache
                 : _partialSpliced ? (byte)5
                 : (byte)6;   // the patch itself refused
         }
+
+        // FROM HERE the frame WALKS: O(scene), where everything above is O(dirty). Timed as its own phase so a draw that
+        // is expensive can say which of the two it was - the replay phases above stay at their last values on a walking
+        // frame, and reading them as though they described it is how a walk reads as a cheap replay.
+        var walk0 = System.Diagnostics.Stopwatch.GetTimestamp();
+        try
+        {
 
         var scissorNarrowed = false;   // whether the active scissor is currently narrower than fullScissor
 
@@ -1601,6 +1663,11 @@ public partial class RenderCache
             _layoutChangedSinceRecord = false;
         }
 
+        }
+        finally
+        {
+            DrawWalkMs = System.Diagnostics.Stopwatch.GetElapsedTime(walk0).TotalMilliseconds;
+        }
     }
 
     // The batches flush bottom-up (rect < ellipse < gradient-rect < gradient-ellipse < pattern < fractal < textured < instanced < text), so a
@@ -1853,6 +1920,15 @@ public partial class RenderCache
         // slots this would be writing. The splice re-issues those records from the payload anyway, so the colour is not
         // lost - only this pass is.
         if (device == null || _partialSpliced || _brushPaintBaked.Count == 0) return;
+
+        // ASK ONCE BEFORE WALKING. The scan below is O(brushes in the scene) and its answer is almost always "none" - on
+        // a screen of a few thousand tiles it was measured at ~1 ms per frame, about half the whole draw, spent to
+        // discover there was nothing to do. The epoch is bumped by any brush anywhere rewriting itself, so a frame in
+        // which nothing repainted costs one comparison; a frame in which something did still pays the full scan, which
+        // is the frame that can afford it.
+        var epoch = Core.Media.Brush.PaintEpoch;
+        if (epoch == _brushEpochSeen) return;
+        _brushEpochSeen = epoch;
 
         _repaintedBrushes.Clear();
         foreach (var pair in _brushPaintBaked)

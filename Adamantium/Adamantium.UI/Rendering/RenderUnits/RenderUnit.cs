@@ -17,6 +17,20 @@ using Adamantium.UI.Rendering.Retained;
 
 namespace Adamantium.UI.Rendering.RenderUnits;
 
+/// <summary>How many times ANY unit has gained or lost a piece of out-of-pass machinery (a geometry, fringe or stroke
+/// renderer). A cache that keeps a list of the units needing a pre-render rebuilds it when this moves and iterates it
+/// otherwise - so a frame in which no unit changed shape costs the length of that list, not the size of the scene.
+/// <para>Its own non-generic type on purpose: a static on <see cref="RenderUnit{TPayload}"/> would be one counter PER
+/// PAYLOAD TYPE, and readers would each miss every change made through a different one.</para></summary>
+public static class RenderUnitMachinery
+{
+    private static long _version;
+
+    public static long Version => System.Threading.Interlocked.Read(ref _version);
+
+    internal static void Bump() => System.Threading.Interlocked.Increment(ref _version);
+}
+
 public abstract class RenderUnit<TPayload> : DeferredDisposableObject, IRenderUnit, IInstanceableFill where TPayload : class
 {
     protected RenderUnit(IDrawCommand command, RenderUnitContext context) : base(context.GraphicsDevice)
@@ -46,12 +60,40 @@ public abstract class RenderUnit<TPayload> : DeferredDisposableObject, IRenderUn
 
     protected GpuBufferManager BufferManager => Context.BufferManager;
 
-    public UIRenderComponent StrokeRenderer { get; set; }
+    // WHY THESE THREE HAVE BODIES. Together they answer NeedsPreRender, and the pre-render sweep used to find that out
+    // by walking every unit of every group, every frame - measured at 0.6 ms on a screen of a few thousand tiles, spent
+    // almost entirely on units that have none of them. A reader can keep the short list instead, but only if it is told
+    // when the list changes: these are assigned and cleared from a dozen places over a unit's life, so the notice has to
+    // live where the value does. One increment on an assignment that actually changes something; nothing on a read.
+    private UIRenderComponent _strokeRenderer, _fillFringeRenderer, _geometryRenderer;
+
+    public UIRenderComponent StrokeRenderer
+    {
+        get => _strokeRenderer;
+        set => Set(ref _strokeRenderer, value);
+    }
 
     // The analytic-AA coverage fringe around a solid fill's contour (drawn on top of the body). Null = no fill AA.
-    public UIRenderComponent FillFringeRenderer { get; set; }
+    public UIRenderComponent FillFringeRenderer
+    {
+        get => _fillFringeRenderer;
+        set => Set(ref _fillFringeRenderer, value);
+    }
 
-    public UIRenderComponent GeometryRenderer { get; set; }
+    public UIRenderComponent GeometryRenderer
+    {
+        get => _geometryRenderer;
+        set => Set(ref _geometryRenderer, value);
+    }
+
+    // Only a change from "has one" to "has none" or back moves the version: swapping one renderer for another leaves
+    // the unit in the list it was already in.
+    private static void Set(ref UIRenderComponent field, UIRenderComponent value)
+    {
+        var had = field != null;
+        field = value;
+        if (had != (value != null)) RenderUnitMachinery.Bump();
+    }
 
     /// <summary>This unit still draws something PER-UNIT once its fill has been batched - a fringe the instanced path
     /// doesn't cover, or a stroke. Those bake their transform from <c>RenderData</c> at record time, so a motion node
@@ -292,7 +334,7 @@ public abstract class RenderUnit<TPayload> : DeferredDisposableObject, IRenderUn
     /// <summary>Has this unit anything to do out of the render pass at all? The sweep below runs on EVERY frame over
     /// every unit of every group, and for a batched rect - which is most of a scene - all three of these are null, so it
     /// was three virtual calls to do nothing. Asked as a field read instead.</summary>
-    public bool NeedsPreRender => GeometryRenderer != null || FillFringeRenderer != null || StrokeRenderer != null;
+    public bool NeedsPreRender => _geometryRenderer != null || _fillFringeRenderer != null || _strokeRenderer != null;
 
     public virtual void PreRender()
     {

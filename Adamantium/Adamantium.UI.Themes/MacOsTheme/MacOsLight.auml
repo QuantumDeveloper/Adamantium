@@ -62,6 +62,12 @@
     <PaletteColor Key="SegmentedTrackFadeColor" Color="#E6E1E1E3" As="Color"/>
     <PaletteColor Key="SegmentedTrackFadeColorTransparent" Color="#00E1E1E3" As="Color"/>
 
+    <!-- The ribbon band's own fade, for the same reason and in the same pair: the row of groups scrolls on the BAND,
+         which is the well rather than the window, so a fade to the window colour would smear the wrong grey across the
+         last group. As="Color" - these sit on GradientStop.Color. -->
+    <PaletteColor Key="BandFadeColor" Color="#E6FFFFFF" As="Color"/>
+    <PaletteColor Key="BandFadeColorTransparent" Color="#00FFFFFF" As="Color"/>
+
     <!-- The overlay scroller's thumb - see MacOsDark for why it is translucent. -->
     <PaletteColor Key="ScrollThumbFillColor" Color="#66000000"/>
 
@@ -85,6 +91,9 @@
          to the byte. The knob's own fill is behind nothing and always reads. -->
     <PaletteColor Key="SliderKnobFillPressed" Color="#E6E6E8"/>
     <PaletteColor Key="SliderKnobRimColor" Color="#C7C7CC"/>
+
+    <!-- Light on both variants, like the slider knob: a handle is read against the CONTENT, not against the window. -->
+    <PaletteColor Key="SelectionHandleFill" Color="#FFFFFF"/>
     <PaletteColor Key="PinLightColor" Color="#B4B4B8"/>
 
     <PaletteColor Key="OnAccentOverlayPointerOver" Color="#1AFFFFFF"/>

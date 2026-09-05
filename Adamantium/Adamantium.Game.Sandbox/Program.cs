@@ -15,6 +15,51 @@ public class Program
         UI.Input.DragDropOptions.OfferImagesAsFiles = true;
 
         var gameApp = new AdamantiumGameApplication();
+
+        // ADAM_START_TAB=<header>: open ON that tab instead of the first one. A measurement of a particular tab starts
+        // by getting to it, and getting to it by hand is a click, a build and a settle that are part of neither the
+        // before nor the after - so two readings of "the same" tab are taken from two different places. By HEADER, not
+        // by index: the strip is reordered whenever a tab is added, and an index would then quietly measure a
+        // different tab than the one the last run measured.
+        var startTab = Environment.GetEnvironmentVariable("ADAM_START_TAB");
+        if (!string.IsNullOrEmpty(startTab)
+            || Environment.GetEnvironmentVariable("ADAM_START_MAXIMIZED") == "1"
+            || !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("ADAM_START_AT")))
+        {
+            var opener = new System.Threading.Thread(() =>
+            {
+                // The window exists before its content is templated, and the strip before its items are generated;
+                // there is no signal for "the tab control is ready", so this asks until it is - briefly, and then
+                // gives up rather than spinning for the life of the application.
+                for (var attempt = 0; attempt < 200; attempt++)
+                {
+                    System.Threading.Thread.Sleep(100);
+                    if (Adamantium.UI.UIApplication.Current?.MainWindow is not { Content: Adamantium.UI.Core.IUIComponent root })
+                        continue;
+                    if (Find<Adamantium.UI.Controls.TabControl>(root) is not { Items.Count: > 0 } tabs) continue;
+
+                    var index = -1;
+                    for (var i = 0; i < tabs.Items.Count && !string.IsNullOrEmpty(startTab); i++)
+                    {
+                        if (tabs.Items[i] is not ViewModels.TabPageViewModel page) continue;
+                        if (!string.Equals(page.Header, startTab, StringComparison.OrdinalIgnoreCase)) continue;
+                        index = i;
+                        break;
+                    }
+
+                    var wanted = index;
+                    Adamantium.UI.Threading.Dispatcher.CurrentDispatcher?.Post(() =>
+                    {
+                        if (wanted >= 0) tabs.SelectedIndex = wanted;
+                        PlaceForMeasurement();
+                    });
+                    return;   // the strip is up; a header that matches nothing leaves the selection alone
+                }
+            })
+            { IsBackground = true, Name = "start-tab" };
+            opener.Start();
+        }
+
         if (Environment.GetEnvironmentVariable("ADAM_PROBE_LOG") is { } log)
         {
             var t = new System.Threading.Thread(() =>
@@ -953,6 +998,33 @@ public class Program
     }
 
     // TEMP: the first control of a kind under a root - the harnesses need to reach a viewer or a strip by type.
+    // ADAM_START_AT=<x>,<y> and ADAM_START_MAXIMIZED=1: put the window where the measurement is taken and open it at the
+    // size it is taken at.
+    //
+    // WHY THIS IS PART OF THE INSTRUMENT and not a convenience: this tab's cost scales with the number of tiles on
+    // screen, so the window's SIZE is an input to every number the run reports - and the size a run happens to open at
+    // is not the size anybody measures. Two readings taken on two different monitors are two different experiments, and
+    // comparing them is how a shrug becomes a regression and back again. Moving the window by hand before each run makes
+    // the placement part of the protocol; stating it here makes it part of the run.
+    private static void PlaceForMeasurement()
+    {
+        if (Adamantium.UI.UIApplication.Current?.MainWindow is not Adamantium.UI.Controls.WindowBase window) return;
+
+        if (Environment.GetEnvironmentVariable("ADAM_START_AT") is { Length: > 0 } at)
+        {
+            var parts = at.Split(',');
+            if (parts.Length == 2
+                && double.TryParse(parts[0], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var x)
+                && double.TryParse(parts[1], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var y))
+            {
+                window.Left = x;
+                window.Top = y;
+            }
+        }
+
+        if (Environment.GetEnvironmentVariable("ADAM_START_MAXIMIZED") == "1") window.Maximize();
+    }
+
     private static T Find<T>(Adamantium.UI.Core.IUIComponent root) where T : class
     {
         var stack = new System.Collections.Generic.Stack<Adamantium.UI.Core.IUIComponent>();

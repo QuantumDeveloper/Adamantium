@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
+<StyleSet xmlns="http://adamantium/ui"
+          xmlns:x="http://adamantium/ui/xaml/extensions">
+
+    <!-- BarH / BarV / Frame are addressed by the triggers below. The frame's wash is its OWN layer so the outline keeps
+         full strength, and it takes the live accent rather than a fixed colour. -->
+    <Style Selector="DropInsertionIndicator">
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="DropInsertionIndicator">
+                    <Grid>
+                        <Border x:Name="BarH" Height="2" CornerRadius="1"
+                                Background="{ThemeResource AccentFillColorDefault}"
+                                VerticalAlignment="Center" HorizontalAlignment="Stretch"/>
+                        <Border x:Name="BarV" Width="2" CornerRadius="1"
+                                Background="{ThemeResource AccentFillColorDefault}"
+                                VerticalAlignment="Stretch" HorizontalAlignment="Center"
+                                Visibility="Collapsed"/>
+                        <Border x:Name="Frame"
+                                BorderThickness="{ResourceReference StrokeControl}"
+                                CornerRadius="{ResourceReference CornerRadiusDefault}"
+                                BorderBrush="{ThemeResource AccentFillColorDefault}"
+                                Visibility="Collapsed">
+                            <Border Background="{ThemeResource AccentFillColorDefault}"
+                                    CornerRadius="{ResourceReference CornerRadiusDefault}"
+                                    Opacity="0.16"/>
+                        </Border>
+                    </Grid>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style Selector="DropInsertionIndicator">
+        <PropertyTrigger Property="Orientation" Value="Vertical">
+            <Setter TargetName="BarH" Property="Visibility" Value="Collapsed"/>
+            <Setter TargetName="BarV" Property="Visibility" Value="Visible"/>
+        </PropertyTrigger>
+    </Style>
+
+    <Style Selector="DropInsertionIndicator">
+        <PropertyTrigger Property="IsFrame" Value="True">
+            <Setter TargetName="BarH" Property="Visibility" Value="Collapsed"/>
+            <Setter TargetName="BarV" Property="Visibility" Value="Collapsed"/>
+            <Setter TargetName="Frame" Property="Visibility" Value="Visible"/>
+        </PropertyTrigger>
+    </Style>
+
+</StyleSet>

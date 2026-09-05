@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<StyleSet xmlns="http://adamantium/ui"
+          xmlns:x="http://adamantium/ui/xaml/extensions">
+
+    <!-- PART_Scroll and PART_Surface are found by name: the control puts the zoom transform on the surface.
+         ClipToBounds because the surface is scaled and dragged, so there is content under every corner. -->
+    <Style Selector="ZoomBox">
+        <Setter Property="Background" Value="{ResourceReference SolidBackgroundFillColorSecondary}"/>
+    </Style>
+
+    <Style Selector="ZoomBox">
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ZoomBox">
+                    <Border Background="{TemplateBinding Background}"
+                            BorderBrush="{ResourceReference ControlStrokeColorSecondary}"
+                            BorderThickness="{ResourceReference StrokeControl}"
+                            CornerRadius="{ResourceReference CornerRadiusDefault}"
+                            ClipToBounds="True">
+                        <ScrollViewer x:Name="PART_Scroll"
+                                      HorizontalScrollBarVisibility="Auto"
+                                      VerticalScrollBarVisibility="Auto">
+                            <ContentPresenter x:Name="PART_Surface"
+                                              HorizontalAlignment="Left"
+                                              VerticalAlignment="Top"
+                                              Content="{TemplateBinding Content}"
+                                              ContentTemplate="{TemplateBinding ContentTemplate}"/>
+                        </ScrollViewer>
+                    </Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+</StyleSet>

@@ -12,6 +12,17 @@
         <!-- The PANEL ground, not a card: a board of tiles is a place in the window, and the tiles are the objects on
              it. Giving the board a card ground of its own puts a second surface between the window and the tiles. -->
         <Setter Property="Background" Value="{ResourceReference SolidBackgroundFillColorSecondary}"/>
+        <!-- The board's own panel, so a board is authored as a board - a shape and a photo - and nobody has to declare a
+             panel and then repeat the shape inside it. The counts come from the CONTROL: a UniformGrid divides whatever
+             space it is given between them, so the composition survives anything that takes a pixel off the board. -->
+        <Setter Property="ItemsPanel">
+            <Setter.Value>
+                <ItemsPanelTemplate>
+                    <UniformGrid Columns="{TemplateBinding Columns}" Rows="{TemplateBinding Rows}"
+                                 ColumnSpacing="{TemplateBinding Spacing}" RowSpacing="{TemplateBinding Spacing}"/>
+                </ItemsPanelTemplate>
+            </Setter.Value>
+        </Setter>
     </Style>
 
     <Style Selector="TilesHost">

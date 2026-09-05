@@ -13,6 +13,9 @@
     <Style Selector="TextBlock">
         <Setter Property="Foreground" Value="{ObservableResource TextFillColorPrimary}"/>
         <Setter Property="FontSize" Value="{ResourceReference FontSizeBody}"/>
+        <!-- Said once here rather than at every label - see Fluent's copy for why the property's own Bottom default
+             cannot be the thing that changes. -->
+        <Setter Property="VerticalTextAlignment" Value="Center"/>
     </Style>
 
 </StyleSet>

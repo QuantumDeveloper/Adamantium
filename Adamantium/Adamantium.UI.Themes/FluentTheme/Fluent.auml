@@ -2,6 +2,7 @@
 <Theme xmlns="http://adamantium/ui"
        xmlns:x="http://adamantium/ui/xaml/extensions"
        xmlns:fluent="clr-namespace:Adamantium.UI.Themes.FluentTheme"
+       xmlns:shared="clr-namespace:Adamantium.UI.Themes.Shared"
        Name="Fluent"
        SystemLightVariant="Light"
        SystemDarkVariant="Dark"
@@ -53,6 +54,9 @@
         <StyleInclude Source="{x:Type fluent:ProgressBarStyleSet}"/>
         <StyleInclude Source="{x:Type fluent:RingProgressBarStyleSet}"/>
         <StyleInclude Source="{x:Type fluent:BusyIndicatorStyleSet}"/>
+        <!-- The CLASSED indicators (Dots, Bar, Ripple, ...) belong to no theme: a class here names an EFFECT an
+             application asks for, not a platform's opinion, and each is built from keys every theme answers. -->
+        <StyleInclude Source="{x:Type shared:BusyEffectsStyleSet}"/>
         <StyleInclude Source="{x:Type fluent:ItemsControlStyleSet}"/>
         <StyleInclude Source="{x:Type fluent:ListBoxStyleSet}"/>
         <StyleInclude Source="{x:Type fluent:ListBoxItemStyleSet}"/>

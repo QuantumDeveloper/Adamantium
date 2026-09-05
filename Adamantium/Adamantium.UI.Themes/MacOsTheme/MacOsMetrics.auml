@@ -47,4 +47,7 @@
          seat the control on its surface rather than to outline it. -->
     <Thickness x:Key="StrokeControl">1</Thickness>
 
+    <!-- How far a row's selection plate stands in. Spent out of the row's CONTENT, so a grid of small tiles feels it. -->
+    <Thickness x:Key="ListRowPlateInset">4 1</Thickness>
+
 </ResourceDictionary>

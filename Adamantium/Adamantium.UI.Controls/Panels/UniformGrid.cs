@@ -1,4 +1,3 @@
-using Adamantium.Mathematics;
 using Adamantium.UI.Core;
 using Adamantium.UI.Controls.Base;
 using Adamantium.UI.Core.Input;
@@ -27,7 +26,6 @@ public class UniformGrid:Panel
       set => SetValue(RowsProperty, value);
    }
 
-
    public Int32 Columns
    {
       get => GetValue<Int32>(ColumnsProperty);
@@ -47,6 +45,19 @@ public class UniformGrid:Panel
       get => GetValue<Double>(ColumnSpacingProperty);
       set => SetValue(ColumnSpacingProperty, value);
    }
+
+   /// <summary>The columns this grid is actually laid out in - the authored <see cref="Columns"/>, or the count worked
+   /// out from the children when it is left at zero. The authored value alone is not the grid, so this is what a caller
+   /// that has to reason about cell positions must ask. Zero until the first arrange.</summary>
+   public Int32 EffectiveColumns { get; private set; }
+
+   /// <summary>The rows this grid is actually laid out in - see <see cref="EffectiveColumns"/>.</summary>
+   public Int32 EffectiveRows { get; private set; }
+
+   /// <summary>One cell as of the last arrange, gaps excluded. This is the grid's whole point stated as a number: the
+   /// counts are authored and the cell is DERIVED from the space, so anything that takes space away (a border, padding)
+   /// costs every cell a fraction of a pixel instead of costing the line a whole column.</summary>
+   public Size CellSize { get; private set; }
 
    public UniformGrid() { }
 
@@ -78,6 +89,9 @@ public class UniformGrid:Panel
 
       var cellWidth = (finalSize.Width - (columns - 1) * ColumnSpacing) / columns;
       var cellHeight = (finalSize.Height - (rows - 1) * RowSpacing) / rows;
+      EffectiveColumns = columns;
+      EffectiveRows = rows;
+      CellSize = new Size(cellWidth, cellHeight);
       var index = 0;
       foreach (var child in Children)
       {

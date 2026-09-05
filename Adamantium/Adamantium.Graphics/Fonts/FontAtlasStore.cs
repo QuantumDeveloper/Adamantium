@@ -19,7 +19,46 @@ namespace Adamantium.Graphics.Fonts
 
         public static FontAtlas GetOrCreateFrom(IGraphicsDevice graphicsDevice, Typeface typeface, FontParameters fontParameters)
         {
-            return _fontAtlasMap.GetOrAdd(fontParameters, _ => new FontAtlas(graphicsDevice, typeface, fontParameters));
+            var atlas = _fontAtlasMap.GetOrAdd(fontParameters, _ => new FontAtlas(graphicsDevice, typeface, fontParameters));
+            ReportSharedAtlas(typeface, fontParameters, atlas);
+            return atlas;
+        }
+
+        private static readonly System.Collections.Concurrent.ConcurrentDictionary<FontParameters, Typeface> _atlasOwner = new();
+        private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, byte> _reportedSharing = new();
+
+        // The key of the map above is the RASTERIZATION settings and nothing else - no typeface. Every font in the
+        // application asks with FontParameters.Default, so a second typeface is handed the FIRST one's atlas and then
+        // looks its glyphs up BY INDEX, where the same number means a different letter. This says so out loud, once per
+        // pair, before anything is changed: the shape of the corruption (right advances, wrong letters, and different
+        // letters between runs depending on who asked first) matches, and a matching shape is not a measurement.
+        private static void ReportSharedAtlas(Typeface typeface, FontParameters parameters, FontAtlas atlas)
+        {
+            var owner = _atlasOwner.GetOrAdd(parameters, typeface);
+            if (ReferenceEquals(owner, typeface)) return;
+
+            var key = $"{Describe(owner)} -> {Describe(typeface)}";
+            if (!_reportedSharing.TryAdd(key, 0)) return;
+
+            try
+            {
+                System.IO.File.AppendAllText(
+                    System.IO.Path.Combine(System.AppContext.BaseDirectory, "glyph-probe.log"),
+                    $"[FONT-ATLAS] {System.DateTime.Now:HH:mm:ss} SHARED ATLAS: it was created for '{Describe(owner)}' " +
+                    $"and is now being handed to '{Describe(typeface)}' - same FontParameters, and the typeface is not " +
+                    $"part of the key. Glyphs are addressed by INDEX, so this one reads the other font's pictures." +
+                    System.Environment.NewLine);
+            }
+            catch
+            {
+            }
+        }
+
+        private static string Describe(Typeface typeface)
+        {
+            if (typeface == null) return "<null>";
+            var font = typeface.Fonts is { Count: > 0 } ? typeface.Fonts[0] : null;
+            return font?.FullName ?? typeface.GetType().Name + "#" + typeface.GetHashCode().ToString("x4");
         }
 
         /// <summary>Upload every atlas's finished glyphs, on the thread that owns the device. Called once a frame by the

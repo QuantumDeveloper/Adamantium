@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<StyleSet xmlns="http://adamantium/ui"
+          xmlns:x="http://adamantium/ui/xaml/extensions">
+
+    <!-- Selection is told from hover by the HANDLES, not by a heavier line - both wear the same hairline.
+         The handles stay square: a grip says "drag this corner". -->
+    <Style Selector="SelectionAdorner">
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="SelectionAdorner">
+                    <Grid>
+                        <Border BorderThickness="{ResourceReference StrokeControl}"
+                                CornerRadius="{ResourceReference CornerRadiusDefault}"
+                                BorderBrush="{ThemeResource AccentFillColorDefault}"/>
+                        <Border Width="7" Height="7"
+                                Background="{ObservableResource SelectionHandleFill}"
+                                BorderBrush="{ThemeResource AccentFillColorDefault}"
+                                BorderThickness="{ResourceReference StrokeControl}"
+                                HorizontalAlignment="Left" VerticalAlignment="Top"/>
+                        <Border Width="7" Height="7"
+                                Background="{ObservableResource SelectionHandleFill}"
+                                BorderBrush="{ThemeResource AccentFillColorDefault}"
+                                BorderThickness="{ResourceReference StrokeControl}"
+                                HorizontalAlignment="Right" VerticalAlignment="Top"/>
+                        <Border Width="7" Height="7"
+                                Background="{ObservableResource SelectionHandleFill}"
+                                BorderBrush="{ThemeResource AccentFillColorDefault}"
+                                BorderThickness="{ResourceReference StrokeControl}"
+                                HorizontalAlignment="Left" VerticalAlignment="Bottom"/>
+                        <Border Width="7" Height="7"
+                                Background="{ObservableResource SelectionHandleFill}"
+                                BorderBrush="{ThemeResource AccentFillColorDefault}"
+                                BorderThickness="{ResourceReference StrokeControl}"
+                                HorizontalAlignment="Right" VerticalAlignment="Bottom"/>
+                    </Grid>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+</StyleSet>

@@ -1,5 +1,6 @@
 using Adamantium.Core.DependencyInjection;
 using Adamantium.Mathematics;
+using Adamantium.UI.Controls.Base;
 using Adamantium.UI.Controls.Decorators;
 using Adamantium.UI.Controls.Text;
 using Adamantium.UI.Core;
@@ -73,5 +74,29 @@ public class ForegroundInheritanceTests
 
         Assert.That(text.Foreground, Is.SameAs(ink),
             "the window is several levels above the text that takes its colour from it");
+    }
+
+    /// <summary>
+    /// An ancestor LETTING GO of its ink is not the same as an ancestor stating a new one. The push down the tree writes
+    /// into each descendant's Inherited slot, which outranks TypeDefault - where a bare-type style puts a control's own
+    /// colour. So a push that carries the ancestor's DEFAULT pins that default into the whole subtree permanently: a
+    /// later re-resolve walks up, finds no ancestor holding an explicit value, and leaves the stale slot standing.
+    /// Measured on a theme swap: every ribbon command drawn at its right size, hoverable, pressable, and transparent.
+    /// </summary>
+    [Test]
+    public void AnAncestorLettingGoOfItsInkDoesNotPinItsDefaultOnTheSubtree()
+    {
+        var themeInk = new SolidColorBrush(Color.FromRgba(237, 241, 245, 255));
+        var child = new Adamantium.UI.Controls.Buttons.Button();
+        var parent = new Border { Child = child };
+
+        child.SetValue(UIComponent.ForegroundProperty, themeInk, ValuePriority.TypeDefault);
+        parent.Foreground = new SolidColorBrush(Color.FromRgba(255, 255, 255, 255));
+        Assert.That(child.Foreground, Is.Not.SameAs(themeInk), "an explicit ancestor value outranks a type default");
+
+        parent.ClearValue(UIComponent.ForegroundProperty);
+
+        Assert.That(child.Foreground, Is.SameAs(themeInk),
+            "with no ancestor stating a colour, the control's own type default is what it wears again");
     }
 }

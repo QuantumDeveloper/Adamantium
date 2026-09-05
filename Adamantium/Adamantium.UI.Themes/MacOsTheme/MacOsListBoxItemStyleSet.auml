@@ -29,6 +29,9 @@
         <Setter Property="BorderThickness" Value="0"/>
         <Setter Property="CornerRadius" Value="{ResourceReference CornerRadiusDefault}"/>
         <Setter Property="Padding" Value="{ResourceReference PaddingRow}"/>
+        <!-- The selection plate stands in from the list's edge. On the ITEM, so a view can override it the ordinary
+             way; it costs the item that much of its content, which a grid of small tiles feels. -->
+        <Setter Property="Margin" Value="{ResourceReference ListRowPlateInset}"/>
         <!-- Stretch on both axes, as Fluent's does and for its reason: content that wants to be centred can say so
              about itself, while content that wants the whole slot cannot get back height never handed to it. -->
         <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
@@ -39,10 +42,7 @@
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="ListBoxItem">
-                    <!-- The inset that makes the plate a plate. On the CHROME, not on the row: the row still fills the
-                         list's width and still takes a press anywhere along it. -->
                     <Border x:Name="ItemBorder"
-                            Margin="4 1"
                             CornerRadius="{TemplateBinding CornerRadius}"
                             Background="{TemplateBinding Background}"
                             BorderBrush="{TemplateBinding BorderBrush}"

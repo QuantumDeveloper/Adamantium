@@ -19,6 +19,13 @@
     <Style Selector="TextBlock">
         <Setter Property="Foreground" Value="{ObservableResource TextFillColorPrimary}"/>
         <Setter Property="FontSize" Value="{ResourceReference FontSizeBody}"/>
+        <!-- The property's own default is Bottom, which sits the glyphs on the floor of the line box - a label beside
+             anything of its own height then rides about four pixels low. Every site that ever stated this stated
+             Center; nobody has ever asked for Bottom in markup. So it is said ONCE, here, rather than remembered at
+             each label. NOT changed at the property itself: the text CONTROLS lay their own runs out with Bottom on
+             purpose, and this must not reach them. Not inherited either, so it files at Style priority - a template or
+             a local attribute still overrides it. -->
+        <Setter Property="VerticalTextAlignment" Value="Center"/>
     </Style>
 
 </StyleSet>

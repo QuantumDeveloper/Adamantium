@@ -8,22 +8,10 @@ public abstract class AdamantiumComponent : IAdamantiumComponent
 {
     public UInt128 Uid { get; set; }
 
-    // The properties this component has actually been GIVEN a value for - created on first write, not one per registered
-    // property. A control registers ~65 and is given about five, so seeding a container for each cost ~172 bytes per
-    // DECLARED property per instance: a bare Border was 12.7 KB before anything was put in it, and a 4K tile grid of
-    // 60 000 components carried 533 MB of them. The collector then had to walk that graph, which is where a quarter to a
-    // half of every second went (see the server-GC note in the sandbox csproj).
-    //
-    // CONCURRENT, because it grows: growing a plain Dictionary while another thread reads it is a torn read, and reads
-    // happen on worker threads (the parallel arrange). Reads stay lock-free at any concurrency level, so ONE lock rather
-    // than one per processor cannot regress them - and the default's 16-core striping cost 1016 bytes per component to
-    // guard contention that cannot occur: this map belongs to ONE component.
-    //
-    // Keyed by the property OBJECT. Re-keying by the globally unique PropertyId to dodge the comparer's virtual calls was
-    // tried and MEASURED SLOWER (58ns a read against 46), so it stays.
-    //
-    // LAZY: a component never given an explicit value reads everything from declared defaults and needs no map at all.
-    // Built like attachedValues (one CompareExchange), so two threads racing to write the first property share one map.
+    // Only the properties actually GIVEN a value, created on first write: a control registers ~65 and is given ~5, and
+    // seeding all of them cost 533 MB on a 60 000-component grid. Concurrent because it grows while worker threads read
+    // it (parallel arrange), with concurrency 1 - the map belongs to one component. Keyed by the property OBJECT:
+    // re-keying by PropertyId measured slower (58ns against 46).
     private ConcurrentDictionary<AdamantiumProperty, ValueContainer> values;
 
     /// <summary>How many properties this component actually has slots for - the number that says whether the map's
@@ -31,16 +19,9 @@ public abstract class AdamantiumComponent : IAdamantiumComponent
     internal int ValueSlotCount => values?.Count ?? 0;
 
     // ---- Render attachments (see IRenderAttachable) --------------------------------------------------------------
-    // A value that draws this element (a Brush) keeps the element in a map of its owners AND subscribed to its Changed
-    // event, so a later mutation OF the value repaints whoever paints with it. That link was taken when the property
-    // took the value and given up only when the property took a DIFFERENT one - which never happens to an element that
-    // is simply DISCARDED. A theme swap discards a whole template's worth of them, and both themes live as long as the
-    // application (ThemeManager keeps its map), so every element ever built stayed in a live theme brush's owner map:
-    // measured on the stand, +20.1 MB per swap, dead linear over eight swaps, ~6900 elements retained each time.
-    //
-    // So the link follows the TREE, like every other thing an element holds: given up when it leaves, taken again when
-    // it comes back. Symmetric with no special case for parking - a parked subtree leaves and returns through these
-    // very calls, and special-casing it would leave the eviction path holding.
+    // A Brush keeps the elements painting with it in its owner map. That link follows the TREE - given up on leave,
+    // taken on return - because a discarded element never assigns a different brush and so never let go: +20.1 MB per
+    // theme swap, linear over eight of them.
     private bool _renderAttachmentsReleased;
 
     /// <summary>True while this component has given up its render attachments (it is out of the tree). The property
@@ -105,15 +86,9 @@ public abstract class AdamantiumComponent : IAdamantiumComponent
 
     protected AdamantiumComponent()
     {
-        // NOTHING is allocated per property here any more. A container is what holds a VALUE, and a component that has
-        // not been given one has nothing to hold: its properties read as their declared defaults, which is precisely what
-        // GetValue's cold path already returns when no container exists (see GetValue/GetDefaultValue). The defaults were
-        // also PUBLISHED into every container as the effective value - re-stating, sixty-five times per element, what the
-        // metadata already says.
-        //
-        // The default is still never COERCED at construction: coercion answers "given this object's current state, what
-        // does that request become", and asking a half-built object was how one instance's state came to decide the
-        // default for every other instance of its type. A default stands as authored until something is actually set.
+        // Nothing is allocated per property: a component given no value has nothing to hold, and GetValue's cold path
+        // already returns the declared default. The default is never COERCED here either - coercion asks about the
+        // object's current state, and a half-built one decided the default for every other instance of its type.
         ValidatedDefaults.GetOrAdd(GetType(), static type =>
         {
             foreach (var property in AdamantiumPropertyMap.GetRegisteredArray(type))
@@ -185,12 +160,9 @@ public abstract class AdamantiumComponent : IAdamantiumComponent
         return map.GetOrAdd(property, SeedFactory, this);
     }
 
-    /// <summary>A new container starts life holding the property's DECLARED DEFAULT in its Default slot, published as the
-    /// effective value - exactly as the constructor used to seed every one of them. That slot is what everything above
-    /// Default falls back TO: clearing the last real value must report the default, not the Unset sentinel, and a
-    /// changed-callback must be handed a value it can use rather than a sentinel it cannot.</summary>
-    /// <summary>Static, and taking its state as the GetOrAdd ARGUMENT: a method group over an instance method allocates a
-    /// fresh delegate on every call - and this one is on the write path of every property in the engine.</summary>
+    /// <summary>A new container holds the declared default in its Default slot: that is what everything above falls
+    /// back to when the last real value is cleared. Static and taking its state as the GetOrAdd argument - a method
+    /// group would allocate a delegate on every property write in the engine.</summary>
     private static readonly Func<AdamantiumProperty, AdamantiumComponent, ValueContainer> SeedFactory =
         static (property, self) => self.SeedContainer(property);
 
@@ -225,14 +197,9 @@ public abstract class AdamantiumComponent : IAdamantiumComponent
     {
     }
 
-    /// <summary>
-    /// Called right after a value is set at a NON-animation priority (the "base" value intended by code/binding/style),
-    /// even when a higher-priority animation currently masks the effective value. <paramref name="oldEffectiveValue"/>
-    /// is the displayed value before the set (a transition's "from"); <paramref name="newValue"/> is the value just set
-    /// (the "to"). Used by <see cref="AnimatableUIComponent"/> to drive implicit property transitions.
-    /// </summary>
-    /// <returns>True if it started a transition - i.e. it wrote another slot, so the effective value must be resolved
-    /// again. False means nothing moved and the value written a moment ago still stands.</returns>
+    /// <summary>Called right after a value is set at a non-animation priority, even when an animation masks the
+    /// effective value: <paramref name="oldEffectiveValue"/> is a transition's "from", <paramref name="newValue"/> its
+    /// "to". Returns true if it wrote another slot, so the effective value must be resolved again.</summary>
     protected virtual bool OnValueSet(AdamantiumProperty property, object oldEffectiveValue, object newValue, ValuePriority priority)
     {
         return false;
@@ -284,12 +251,11 @@ public abstract class AdamantiumComponent : IAdamantiumComponent
 
             PropertyChanged?.Invoke(this, e);
 
-            // The children that inherit FROM this one, told DIRECTLY and only about a property that can inherit. They used
-            // to ride the PropertyChanged event above, which meant every write of every property woke every child just to
-            // have it look up metadata and return - O(children) per write, on a path that runs tens of thousands of times
-            // while a tab is built. Measured on the Brushes tab: 85k writes, 1.4 s in this notification alone.
-            if (property.CanInherit) 
-                NotifyInheritanceChildren(e);
+            // Told DIRECTLY, not through PropertyChanged above: riding that woke every child on every write of every
+            // property (85k writes, 1.4 s in the notification alone). The value pushed is what the read-path WALK would
+            // resolve, not what this element reads - see InheritedPushValue.
+            if (property.CanInherit)
+                NotifyInheritanceChildren(e, InheritedPushValue(property, newValue));
 
             RaiseComponentUpdated();
         }
@@ -299,12 +265,8 @@ public abstract class AdamantiumComponent : IAdamantiumComponent
         }
     }
 
-    // The components that inherit values FROM this one. A plain list, walked only for a property that can inherit at all
-    // (AdamantiumProperty.CanInherit), which is what keeps an ordinary write from touching the children at all.
-    // A SET, not a list: membership is the only question ever asked of it, and it was asked with a linear scan. On a
-    // virtualizing panel this collection is every realized container - fifteen thousand of them on a 4K grid of small
-    // tiles - so attaching the k-th tile scanned k entries and filling the grid was quadratic: ~113 million reference
-    // comparisons, and the same again on the way out through Remove. Nothing here depends on order.
+    // The components that inherit FROM this one. A SET, not a list: membership is the only question asked, and the
+    // linear scan made filling a 15 000-tile grid quadratic (~113 million comparisons). Nothing here depends on order.
     private HashSet<AdamantiumComponent> inheritanceChildren;
 
     private void AddInheritanceChild(AdamantiumComponent child)
@@ -335,63 +297,60 @@ public abstract class AdamantiumComponent : IAdamantiumComponent
         return true;
     }
 
+    // What the read-path walk would resolve, asked by the SLOT rather than by walking the ancestors (that would make a
+    // DataContext push O(depth) per node). Animation..Style or Inherited - somebody states the value, push it.
+    // TypeDefault/Default - nobody does, so CLEAR the slot: writing this element's default instead pins it into the
+    // whole subtree above their own TypeDefault, where a re-resolve leaves it standing.
+    private object InheritedPushValue(AdamantiumProperty property, object newValue)
+    {
+        if (HasExplicitValue(property)) return newValue;
+
+        return GetBaseValuePriority(property) == ValuePriority.Inherited ? newValue : AdamantiumProperty.UnsetValue;
+    }
+
     // A child may re-parent from inside its own push (a DataContext change rebuilds bindings), so walk a snapshot: the
     // list can be modified while this runs.
-    private void NotifyInheritanceChildren(AdamantiumPropertyChangedEventArgs e)
+    private void NotifyInheritanceChildren(AdamantiumPropertyChangedEventArgs e, object pushValue)
     {
         if (!TrySnapshotInheritanceChildren(out var single, out var children)) return;
 
-        if (single != null) { single.InheritedValueChanged(e); return; }
+        if (single != null) { single.InheritedValueChanged(e, pushValue); return; }
         foreach (var child in children)
         {
-            child.InheritedValueChanged(e);
+            child.InheritedValueChanged(e, pushValue);
         }
     }
 
-    /// <summary>A descendant learns that an ancestor moved an inheriting value. The VALUE itself needs no delivery - the
-    /// epoch bump made every cached copy stale and the next read resolves it from the ancestors - so this walk exists
-    /// only for what a read cannot do by itself: run a changed-callback (a new DataContext has to re-resolve bindings)
-    /// and tell whoever subscribed to THIS element's PropertyChanged (a binding or a trigger watching an inherited
-    /// value). An element that needs neither is stepped over, and the walk carries on to its own children.</summary>
-    /// <summary>Does an inherited change of this property have to REACH this element, or may the walk step over it and
-    /// carry on to its children? Only the callback's own work can answer that, so the element that owns the callback
-    /// answers. Stepping over is safe for the VALUE by construction - the epoch bump staled every cached copy and the
-    /// next read resolves it from the ancestors; this is only about who has to be told.</summary>
+    /// <summary>Must an inherited change REACH this element, or may the walk step over it and carry on to its children?
+    /// Only the callback's own work can answer, so the element owning it answers. Stepping over is safe for the VALUE -
+    /// the next read resolves it from the ancestors; this is only about who has to be told.</summary>
     protected virtual bool NeedsInheritedCallback(AdamantiumProperty property) => true;
 
-    private void InheritedValueChanged(AdamantiumPropertyChangedEventArgs e)
+    private void InheritedValueChanged(AdamantiumPropertyChangedEventArgs e, object pushValue)
     {
         var metadata = e.Property.GetDefaultMetadata(GetType());
         // An explicit value of its own outranks the inherited one - this element and everything under it keep theirs.
         if (metadata is not { Inherits: true } || HasExplicitValue(e.Property)) return;
 
-        // A callback on the PROPERTY is not the same question as "does this ELEMENT need telling". `DataContext` carries
-        // one for every element that ever inherits it, so the cheap step-over below was unreachable for the one property
-        // that needs it most: a list rebinding its containers re-resolved the bindings of every element under each of
-        // them, and three quarters of those elements have no binding at all. Measured on the Layout tab: 125 534 refreshes
-        // over 22 822 elements - 5.5 apiece, of which only 31 259 had anything to re-resolve.
-        // ...and an element whose LOOK depends on the value has to be told too, callback or not. Stepping over is safe for
-        // the value - the next read resolves it from the ancestors - but the invalidation that a write performs is not a
-        // read: skip the write and the element keeps the value it is no longer painting with. That is what froze a tab's
-        // label at the resting colour while every probe reported the selected one: the presenter got the trigger's brush
-        // and the TextBlock under it - AffectsRender, no callback - was stepped over, so nothing ever asked for the
-        // repaint. It only looked intermittent because an element with any PropertyChanged subscriber takes the branch
-        // below anyway. DataContext, the property this step-over exists for, carries none of these flags and still skips.
+        // A callback on the PROPERTY is not the question "does this ELEMENT need telling" - DataContext carries one for
+        // everybody, and three quarters of them have no binding to re-resolve. An element whose LOOK depends on the
+        // value must be told too: the write is what invalidates, and skipping it froze a tab's label at the resting
+        // colour while every probe reported the selected one.
         if ((metadata.PropertyChangedCallback != null && NeedsInheritedCallback(e.Property)) || PropertyChanged != null
             || metadata.AffectsRender || metadata.AffectsPaint || metadata.AffectsMeasure || metadata.AffectsArrange
             || metadata.AffectsParentMeasure || metadata.AffectsParentArrange)
         {
             // The old push, for the few that need telling: it writes, notifies, and cascades to ITS children itself.
-            SetValue(e.Property, e.NewValue, ValuePriority.Inherited);
+            SetValue(e.Property, pushValue, ValuePriority.Inherited);
             return;
         }
 
         if (!TrySnapshotInheritanceChildren(out var single, out var children)) return;
 
-        if (single != null) { single.InheritedValueChanged(e); return; }
+        if (single != null) { single.InheritedValueChanged(e, pushValue); return; }
         foreach (var child in children)
         {
-            child.InheritedValueChanged(e);
+            child.InheritedValueChanged(e, pushValue);
         }
     }
 
@@ -419,13 +378,9 @@ public abstract class AdamantiumComponent : IAdamantiumComponent
             // stale by construction, and one bump says so to all of them.
             AdamantiumProperty.BumpInheritanceEpoch();
 
-            // The new parent (or null) brings a different set of inherited values. For every inherited property this
-            // component hasn't set locally, raise a change from the old inherited value to the new one so the value AND
-            // its callbacks (e.g. DataContext -> refresh bindings) apply. This makes inheritance order-independent: an
-            // element attached AFTER its parent's value was assigned still picks it up here.
-            // Only the INHERITING properties, resolved once per type - not all seventy a control registers, each asked for
-            // its merged metadata to be told "no". Re-parenting happens once per element realized, so a virtualized grid
-            // paid that whole scan per tile.
+            // A new parent brings different inherited values: raising the change here is what makes inheritance
+            // order-independent. Only the INHERITING properties, resolved once per type - a virtualized grid paid the
+            // full seventy-property scan per realized tile.
             var type = GetType();
             foreach (var property in AdamantiumPropertyMap.GetInheriting(type))
             {
@@ -509,14 +464,9 @@ public abstract class AdamantiumComponent : IAdamantiumComponent
     {
         ArgumentNullException.ThrowIfNull(property);
 
-        // NO LOCK. A read is a dictionary lookup over a map that never changes after construction plus one volatile
-        // field read inside the container - it cannot observe a half-written state, and it cannot wait for anybody.
-        // That is what makes a reader unable to take part in a deadlock at all, rather than merely unlikely to.
-        // An INHERITING property resolves from the ancestors, and it does it HERE, on the read, rather than by having
-        // every ancestor write its value into every descendant. The cached answer lives in the Inherited slot and is
-        // good while it carries the current epoch (bumped by any explicit write of an inheriting property, and by any
-        // re-parenting); a stale one costs one walk up the chain - measured at ~0.7 us against the ~180 us a pushed
-        // write cost.
+        // NO LOCK: a lookup plus one volatile read cannot observe a half-written state, so a reader can never take part
+        // in a deadlock. An inheriting property resolves from the ancestors HERE, on the read, and caches the answer in
+        // the Inherited slot for the current epoch - a stale one costs one walk (~0.7 us against ~180 us for a push).
         if (property.CanInherit) ResolveInherited(property);
 
         var result = GetOrCalculateEffectiveValue(property);
@@ -583,18 +533,9 @@ public abstract class AdamantiumComponent : IAdamantiumComponent
             break;
         }
 
-        // A value that DRAWS this element has to keep the element in its owner map, and the link is normally taken by
-        // the property system's Changed hook (see AdamantiumProperty.WireOwnerAttachment). This fill raises nothing by
-        // design - it is a cache fill, the property already READ as this value - so nothing took the link here, and an
-        // element that inherits its Foreground was left out of the brush's owner map entirely. Measured on the stand:
-        // of 1028 elements painting with a palette brush, 724 were not owners of it (268 Border, 98 Grid, 80 TextBlock,
-        // 76 Path), so a variant recolour had nobody to tell and the text stayed in the old colour until something
-        // unrelated re-recorded it - a hover, or switching tabs.
-        //
-        // Taken HERE rather than on the inheritance walk on purpose: the walk's cheap path deliberately steps over
-        // elements without resolving anything (it exists so a list rebinding its DataContext does not re-resolve
-        // 125 534 times), and resolving there to take a link would undo exactly that. This costs a reference compare,
-        // and only for the handful of properties that can carry an attachable value at all.
+        // This fill raises nothing (the property already read as this value), so the Changed hook never took the
+        // brush's owner link: 724 of 1028 elements painting with a palette brush were not owners, and a recolour had
+        // nobody to tell. Taken HERE and not on the inheritance walk, whose cheap path must keep stepping over.
         var attachable = property.CanAttachToOwner;
         var before = attachable ? container.Effective : null;
 
@@ -819,17 +760,9 @@ public abstract class AdamantiumComponent : IAdamantiumComponent
         RunSetValueSequence(property, value, priority, true);
     }
 
-    /// <summary>
-    /// Sets a property's value WITHOUT changing its value source (the WPF <c>SetCurrentValue</c> analog). Used by a
-    /// control to reflect USER INPUT into a property that may carry a two-way <see cref="ValuePriority.Binding"/> - a
-    /// Slider's thumb drag, a CheckBox toggle, a TextBox edit. A plain <see cref="SetValue(AdamantiumProperty, object,
-    /// ValuePriority)"/> defaults to <see cref="ValuePriority.Local"/>, which (1) outranks Binding (2) and would
-    /// permanently MASK the binding: the effective value freezes at the last user set and the source can never refresh
-    /// the control again (the "passive slider's fill/thumb stop tracking" bug). Instead we write into the slot the
-    /// value CURRENTLY comes from, capped at Binding: a bound property updates its Binding slot in place (so the next
-    /// source change overwrites it cleanly and the two-way write-back still fires); an unbound one lands at Binding
-    /// (above Style/Trigger, so user input still wins) without ever creating the masking Local slot.
-    /// </summary>
+    /// <summary>Sets a value WITHOUT changing its source (WPF's <c>SetCurrentValue</c>) - for user input into a
+    /// possibly two-way bound property. A plain SetValue lands at Local, which outranks Binding and would MASK it
+    /// permanently. This writes into the slot the value comes from, capped at Binding.</summary>
     public void SetCurrentValue(AdamantiumProperty property, object value)
     {
         var basePriority = GetBaseValuePriority(property);
@@ -946,14 +879,9 @@ public abstract class AdamantiumComponent : IAdamantiumComponent
         var oldReadValue = oldEffectiveValue == AdamantiumProperty.UnsetValue
             ? GetDefaultValue(property)
             : oldEffectiveValue;
-        // A write that leaves the value the property READS as where it was is not a change, so it must not run the
-        // changed-callback. Running it anyway is how two properties that assign each other close a cycle with no exit:
-        // a presenter whose Content is bound to its own DataContext writes back the object it already sits on, the
-        // callback re-assigns the same DataContext, that refreshes the bindings, which writes Content again - the app
-        // died of a stack overflow. The equal check below guards only invalidation and events, which is why the cycle
-        // ran above it.
-        // The args are built INSIDE the branch: they are read by the callback and by nothing else, so a property with no
-        // callback (most of them - ActualWidth/ActualHeight among them) was allocating one object per write for nobody.
+        // A write that leaves the READ value where it was is not a change and must not run the callback: that is how
+        // two properties assigning each other closed a cycle with no exit (stack overflow). The args are built inside
+        // the branch - a property with no callback was allocating one object per write for nobody.
         var slotsMayHaveMoved = false;
         if (metadata.PropertyChangedCallback != null && !Equals(oldReadValue, effectiveAfterWrite))
         {
@@ -962,13 +890,8 @@ public abstract class AdamantiumComponent : IAdamantiumComponent
             slotsMayHaveMoved = true;
         }
 
-        // Implicit transitions: let an animatable element turn this base-value change into a smooth animation. Skipped
-        // for animation-priority writes (those ARE the transition) so there is no recursion. May start an animation
-        // re-entrantly (it writes the Animation slot) - that resolves cleanly via the equal-effective early-return below.
-        // Skipped for a READ-ONLY property, by what read-only MEANS: a Transitions entry names a property for the element
-        // to animate, and only the declaring class writes a read-only one - so there is no transition to find, and an
-        // animation on it would be overwritten by its writer on the very next pass. The lookup is not free (it reads
-        // Transitions through the property system on every single write), so not doing it is the point.
+        // Implicit transitions. Skipped for animation-priority writes (those ARE the transition) and for read-only
+        // properties, which no Transitions entry can name - and the lookup runs on every single write.
 
         if (priority != ValuePriority.Animation && !property.ReadOnly)
         {
@@ -1060,29 +983,10 @@ public abstract class AdamantiumComponent : IAdamantiumComponent
         }
     }
 
-    // Re-render this element when a brush it draws with mutates internally (wired in the AffectsRender path above). On a
-    // non-element (a brush setting a sub-brush) the cast is null and this is a no-op.
-    //
-    // NOT for an element that isn't drawn right now. A brush can be SHARED by thousands of elements (a keyed theme brush -
-    // the loading-skeleton pulse animates ONE brush that every card paints with), so its Changed fans out to all of them,
-    // pooled/Collapsed cards included. Marking those is worse than wasted: a non-visible component that still holds
-    // retained units makes the render cache's partial pass FALL BACK to a full tree walk (RenderCache.RecordReRender), so
-    // an animated shared brush would re-walk the whole scene every frame. Nothing is lost - Visibility is AffectsRender
-    // (and structural), so a card coming back invalidates its render then.
-    // A brush MUTATED INTERNALLY (an animation moving its Opacity, a recoloured fill, a gradient stop moving). The element
-    // draws exactly what it drew before: same commands, same kinds, same geometry - the payload holds THIS SAME brush object
-    // by reference and re-reads its snapshot when the GPU data is baked (see Brush.Snapshot). So this is PAINT, not
-    // geometry: re-bake what exists, do not re-record the element.
-    //
-    // The distinction is the whole point. A brush is routinely SHARED by thousands of elements (a keyed theme brush; the
-    // loading skeletons all paint with one pulsing brush), so its Changed fans out to every one of them on every tick.
-    // Marking geometry meant each of them re-ran OnRender, rebuilt its draw commands, re-reconciled its units and
-    // re-published its frozen layout - measured on the tile fill at ~470 cards per frame, half the fill's throughput, for one
-    // number that moved.
-    //
-    // NOTE the asymmetry with an ordinary SET of a brush property (handled in the AffectsRender path above): assigning a
-    // DIFFERENT brush object leaves the recorded command pointing at the OLD one, so that genuinely needs a re-record until
-    // payloads reference brushes by identity rather than by object.
+    // A brush mutated IN PLACE: the payload holds this same brush by reference, so this is PAINT - re-bake, never
+    // re-record. Skipped for a non-visible element: one shared brush fans out to thousands, and marking a hidden one
+    // that still holds units drops the partial pass to a full walk.
+    // Assigning a DIFFERENT brush is not this path - that one does need a re-record (see the AffectsRender path above).
     internal void OnRenderValueChanged(object sender, EventArgs e)
     {
         if (this is not IUIComponent { Visibility: Visibility.Visible } element) return;

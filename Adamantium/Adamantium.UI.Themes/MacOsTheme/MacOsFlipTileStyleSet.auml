@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<StyleSet xmlns="http://adamantium/ui"
+          xmlns:x="http://adamantium/ui/xaml/extensions">
+
+    <!-- FlipTile draws itself in OnRender, so the face is all a theme can seed. TileFillColorDefault, not a control
+         fill: a tile stands on the BOARD, and the control fill is near-white on the light palette. -->
+    <Style Selector="FlipTile">
+        <Setter Property="FrontBrush" Value="{ResourceReference TileFillColorDefault}"/>
+    </Style>
+
+</StyleSet>

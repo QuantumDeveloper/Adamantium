@@ -39,6 +39,38 @@ public class TileInsetChainTests
         typeof(UIAppContext).GetProperty(nameof(UIAppContext.Current)).SetValue(null, _app);
     }
 
+    /// <summary>A view whose rows carry no chrome says so with Margin and gets the WHOLE cell for its tile. The
+    /// theme's inset is four pixels a list of text rows never notices and a third of a 24px tile - which then comes out
+    /// taller than it is wide, since the inset is not square.</summary>
+    [TestCase("Fluent")]
+    [TestCase("macOS")]
+    public void AListThatDeclaresNoRowMarginGetsTheWholeCell(string which)
+    {
+        var themes = new ThemeManager(new AdamantiumDependencyContainer());
+        _app.ThemeManager = themes;
+        ITheme theme = which == "macOS"
+            ? new Adamantium.UI.Themes.MacOsTheme.MacOs()
+            : new Fluent();
+        ((FakeContext)_app.UIContext).ThemeEngine = themes;
+        themes.AddTheme(theme.Name, theme);
+        themes.SetTheme(theme);
+
+        var list = TileList();
+        list.ItemContainerStyle.Setters.Add(new Setter(nameof(ListBoxItem.Margin), new Thickness(0)));
+
+        Lay(list);
+
+        var tile = FindTile((IUIComponent)list.ItemContainerGenerator.ContainerFromIndex(0));
+        Assert.That(tile, Is.Not.Null, "the item template produced a tile");
+        TestContext.WriteLine($"{which}: tile={tile.Bounds}");
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(tile.Bounds.Width, Is.EqualTo(Cell - 6).Within(0.5), "the cell, less the tile's OWN margin");
+            Assert.That(tile.Bounds.Height, Is.EqualTo(Cell - 6).Within(0.5), "and square, because the cell is");
+        });
+    }
+
     [TestCase("Fluent")]
     [TestCase("macOS")]
     public void WhatEatsTheCell(string which)
@@ -55,6 +87,14 @@ public class TileInsetChainTests
         themes.SetTheme(theme);
         TestContext.WriteLine($"--- theme: {theme.Name} ---");
 
+        var list = TileList();
+        Lay(list);
+
+        MeasureTheChain(list, which);
+    }
+
+    private ListBox TileList()
+    {
         // The Layout tab's own container style: no row chrome at all, content stretched.
         var containerStyle = new Style();
         containerStyle.Selector.Types.Add(typeof(ListBoxItem));
@@ -97,12 +137,20 @@ public class TileInsetChainTests
             })
         };
 
+        return list;
+    }
+
+    private static void Lay(ListBox list)
+    {
         list.ApplyCurrentTheme();
         Adamantium.UI.Extensions.WindowExtension.UpdateTree(list);
         Adamantium.UI.Core.Data.BindingUpdateQueue.Flush();
         list.Measure(new Size(800, 600));
         list.Arrange(new Rect(0, 0, 800, 600));
+    }
 
+    private static void MeasureTheChain(ListBox list, string which)
+    {
         var row = (IUIComponent)list.ItemContainerGenerator.ContainerFromIndex(0);
         Assert.That(row, Is.Not.Null, "a container was realized");
 
