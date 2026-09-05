@@ -8,13 +8,18 @@
     <Style Selector="ColorPicker">
         <Setter Property="Foreground" Value="{ObservableResource TextFillColorPrimary}"/>
         <Setter Property="FontSize" Value="{ResourceReference FontSizeChrome}"/>
+        <!-- A property rather than a fixed resource in the template, because this control lives in two places: standing
+             on a page it is a solid card, opened from a colour well it is a FLYOUT - and a flyout in this theme is
+             acrylic, like the menus and the drop-downs. The button's popup hands it the material; this is the
+             standalone value. -->
+        <Setter Property="Background" Value="{ResourceReference CardBackgroundFillColorDefault}"/>
     </Style>
 
     <Style Selector="ColorPicker">
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="ColorPicker">
-                    <Border Background="{ResourceReference CardBackgroundFillColorDefault}"
+                    <Border x:Name="PickerSurface" Background="{TemplateBinding Background}"
                                      BorderBrush="{ResourceReference ControlStrokeColorDefault}"
                                      BorderThickness="1"
                                      CornerRadius="10"

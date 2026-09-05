@@ -1,0 +1,426 @@
+<?xml version="1.0" encoding="utf-8"?>
+<StyleSet xmlns="http://adamantium/ui"
+          xmlns:x="http://adamantium/ui/xaml/extensions">
+
+    <!-- Docking, macOS. Style matching is by EXACT type, so a derived control inherits nothing by default - which is why
+         each of these says BasedOn explicitly rather than quietly relying on its base. A pane group IS a tab control and
+         a pane IS a tab item, so they take this theme's segmented tab look whole; the splitter needs its own, because a
+         Thumb has no look at all, and a control with no template renders nothing and cannot be hit.
+
+         WHAT MOVES FROM FLUENT: a tool panel's caption. Fluent fills it with the ACCENT, which is a Windows convention -
+         the accent there says "this is the active thing". On a Mac the accent belongs to a selection or a control that
+         is on, never to chrome: a panel header is part of the window's surface and is quiet. So the header takes the
+         window colour with a hairline under it, and its two buttons become the small discs this theme uses everywhere
+         else for chrome.
+
+         The accent does keep ONE job here, and it is not decoration: the border of the group being worked in. With every
+         panel bordered alike, nothing on screen says where the next keystroke or newly opened pane will go. That is the
+         focus telling you where it is - a colour change, not a heavier frame. -->
+
+    <!-- A floating panel's window looks like any other window. Stated explicitly because matching is by EXACT type:
+         without this line a DockingWindow gets no template at all. -->
+    <Style Selector="DockingWindow" BasedOn="Window"/>
+
+    <!-- A hair of space between the panels and the window's own frame: with none, a panel's border sits in the same
+         pixel as the window border and at 150% straddles the seam. -->
+    <Style Selector="DockingArea">
+        <Setter Property="Margin" Value="1"/>
+    </Style>
+
+    <Style Selector="PaneGroup" BasedOn="TabControl"/>
+
+    <Style Selector="PaneGroup">
+        <PropertyTrigger Property="IsActive" Value="true">
+            <Setter Property="BorderBrush" Value="{ThemeResource AccentFillColorDefault}"/>
+        </PropertyTrigger>
+    </Style>
+
+    <Style Selector="Pane" BasedOn="TabItem"/>
+
+    <!-- A tab whose panel has folded down against a SIDE: the label lies on its side, because the strip that is left is
+         a narrow column. BOTH sides turn the same way - top to bottom - so a glance down one edge reads the same as a
+         glance down the other. Two styles with a literal angle each rather than one with a bound angle: a Transform is
+         not a component and cannot be a binding target. -->
+    <Style Selector="Pane[LabelRotation=Left]">
+        <Setter Property="HeaderTemplate">
+            <Setter.Value>
+                <DataTemplate>
+                    <!-- LAYOUT transform, not render: the strip has to be as WIDE as the turned text is tall. A render
+                         transform would leave it measured for text lying flat and then draw outside those bounds. -->
+                    <ContentPresenter Content="{Binding}"
+                            HorizontalAlignment="Center" VerticalAlignment="Center">
+                        <ContentPresenter.LayoutTransform>
+                            <Transform RotationAngle="90"/>
+                        </ContentPresenter.LayoutTransform>
+                    </ContentPresenter>
+                </DataTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style Selector="Pane[LabelRotation=Right]">
+        <Setter Property="HeaderTemplate">
+            <Setter.Value>
+                <DataTemplate>
+                    <ContentPresenter Content="{Binding}"
+                            HorizontalAlignment="Center" VerticalAlignment="Center">
+                        <ContentPresenter.LayoutTransform>
+                            <Transform RotationAngle="90"/>
+                        </ContentPresenter.LayoutTransform>
+                    </ContentPresenter>
+                </DataTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- The header's two buttons. Their own template rather than a Classes= reference: the class this borrowed from
+         lives in Fluent's title bar set, which this theme replaced - so it matched nothing and both buttons were
+         drawing as plain default Buttons on an accent bar. A disc that lights under the pointer is what every other
+         piece of chrome in this theme does. -->
+    <Style Selector="Button.DockCaptionButton">
+        <Setter Property="Width" Value="20"/>
+        <Setter Property="Height" Value="20"/>
+        <Setter Property="MinWidth" Value="0"/>
+        <Setter Property="MinHeight" Value="0"/>
+        <Setter Property="Padding" Value="0"/>
+        <Setter Property="Focusable" Value="False"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border x:Name="Disc" CornerRadius="10" Background="Transparent">
+                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"
+                                Content="{TemplateBinding Content}"/>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <PropertyTrigger Property="IsMouseOver" Value="true">
+                            <Setter TargetName="Disc" Property="Background" Value="{ResourceReference ControlFillColorTertiary}"/>
+                        </PropertyTrigger>
+                        <PropertyTrigger Property="IsPressed" Value="true">
+                            <Setter TargetName="Disc" Property="Background" Value="{ResourceReference SubtleFillColorSecondary}"/>
+                        </PropertyTrigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- A TOOL group is dressed differently from a document one, and the difference is not decoration: a tool has a
+         HEADER carrying its name and the two things you do to a tool and never to a document - put it away and close
+         it - while its tabs sit along the BOTTOM. A document has many siblings and no caption of its own. -->
+    <Style Selector="PaneGroup[Kind=Tool]">
+        <Setter Property="TabStripPlacement" Value="Bottom"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="PaneGroup">
+                    <!-- The panel's OWN edge. A tool group states it here because it replaces the tab control's
+                         template wholesale; the divider between two panels draws nothing, so without this there is no
+                         line anywhere and the panels bleed into each other. -->
+                    <Border x:Name="Chrome"
+                            BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}">
+                    <!-- Rows AND columns, because the strip belongs on a different side in each state: along the BOTTOM
+                         while docked, and in a narrow COLUMN on the edge once folded. The middle cell is the body; the
+                         outer tracks are Auto, so the one the strip is not in costs nothing. -->
+                    <Grid RowDefinitions="Auto,*,Auto" ColumnDefinitions="Auto,*,Auto">
+                        <!-- QUIET, not accent-filled: on this platform a panel caption is part of the window's surface.
+                             The hairline under it is what separates the header from the body - it is doing the work the
+                             accent block did in the Fluent set. Its buttons are PARTS, so the group wires them once and
+                             a restyle cannot lose them silently. -->
+                        <Border x:Name="PART_Header" Grid.Row="0" Grid.Column="0" Grid.ColumnSpan="3"
+                                Background="{ResourceReference SolidBackgroundFillColorBase}"
+                                BorderBrush="{ResourceReference ControlStrokeColorDefault}"
+                                BorderThickness="0 0 0 1"
+                                Padding="8 3 6 3">
+                            <Grid ColumnDefinitions="*,Auto,Auto">
+                                <ContentPresenter Grid.Column="0"
+                                        VerticalAlignment="Center"
+                                        Content="{TemplateBinding Title}"
+                                        FontSize="{ResourceReference FontSizeChrome}"
+                                        Foreground="{ResourceReference TextFillColorSecondary}"/>
+                                <Button x:Name="PART_AutoHideButton" Grid.Column="1"
+                                        Classes="DockCaptionButton" VerticalAlignment="Center">
+                                    <!-- The same thumbtack the card window's caption uses. Drawn, never typed - a glyph
+                                         depends on a font having it, and the one this started as is missing from most
+                                         UI fonts, so the button rendered empty. -->
+                                    <Path x:Name="AutoHideGlyph"
+                                            Data="M4,1 L8,1 L8,3 L10,5 L10,6 L6.8,6 L6.8,9 L6,11 L5.2,9 L5.2,6 L2,6 L2,5 L4,3 Z"
+                                            Stroke="{ResourceReference TextFillColorSecondary}" StrokeThickness="1"
+                                            Fill="{ResourceReference TextFillColorSecondary}"
+                                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                </Button>
+                                <Button x:Name="PART_CloseButton" Grid.Column="2"
+                                        Classes="DockCaptionButton" VerticalAlignment="Center">
+                                    <Path Data="M0,0 L8,8 M8,0 L0,8"
+                                            Stroke="{ResourceReference TextFillColorSecondary}" StrokeThickness="1.1"
+                                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                </Button>
+                            </Grid>
+                        </Border>
+
+                        <Border x:Name="Body" Grid.Row="1" Grid.Column="1"
+                                Background="{TemplateBinding Background}"
+                                Padding="{TemplateBinding Padding}"
+                                ClipToBounds="True">
+                            <!-- DockedContent, not SelectedContent: while the panel is revealed its body lives in the
+                                 flyout, and one piece of content belongs to one tree. -->
+                            <ContentPresenter x:Name="PART_SelectedContentHost"
+                                    Content="{TemplateBinding DockedContent}"
+                                    ContentTemplate="{TemplateBinding SelectedContentTemplate}"
+                                    ContentTemplateSelector="{TemplateBinding SelectedContentTemplateSelector}"/>
+                        </Border>
+
+                        <!-- Tabs BELOW the content, which is where a tool window keeps them while it is docked. -->
+                        <TabStripScroller x:Name="PART_TabStrip" Grid.Row="2" Grid.Column="1" Orientation="Horizontal">
+                            <!-- Auto both ways: a Grid with no definitions stretches to whatever it is offered, and this
+                                 one sits in the Auto column of a folded strip - so it made the narrow column as wide as
+                                 the body used to be. -->
+                            <Grid x:Name="StripFill" RowDefinitions="Auto" ColumnDefinitions="Auto">
+                                <ItemsPresenter x:Name="PART_ItemsPresenter"/>
+                                <!-- Silenced like every other bar in this theme (the selection is the capsule the pane
+                                     itself wears), and kept because the control places and slides it BY NAME. -->
+                                <Rectangle x:Name="PART_SelectionIndicator"
+                                        Fill="{TemplateBinding SelectionIndicatorBrush}"
+                                        Width="1"
+                                        Height="{TemplateBinding SelectionIndicatorThickness}"
+                                        HorizontalAlignment="Left"
+                                        VerticalAlignment="Bottom"
+                                        IsHitTestVisible="False"/>
+                            </Grid>
+                        </TabStripScroller>
+
+                        <!-- The FLYOUT of a revealed panel. Only the panel's BODY travels here - its tabs stay on the
+                             edge, because that is what a revealed panel is: a strip you are glancing behind. A popup, so
+                             it draws OVER the neighbours instead of pushing them aside. Placed against the GROUP, not
+                             the tab strip inside it: the strip sits at whatever inset the chrome gives it, and a flyout
+                             lined up with the strip carried that inset along. -->
+                        <Popup x:Name="PART_RevealFlyout" Grid.Row="2" Grid.Column="1"
+                                PlacementTarget="{Binding ElementName=Chrome}"
+                                Placement="Top" KeepOpen="False">
+                            <!-- The size lives on the CONTENT, never on the popup: a popup is an element of this tree
+                                 whether it is open or not, and a 240-wide one sat in the strip's own cell and took that
+                                 room out of the layout even while shut. Rounded and carded, because a flyout is a
+                                 surface that has LEFT the window's own plane. -->
+                            <Border x:Name="FlyoutRoot"
+                                    Background="{ResourceReference SolidBackgroundFillColorBase}"
+                                    BorderBrush="{ResourceReference ControlStrokeColorDefault}"
+                                    BorderThickness="1"
+                                    CornerRadius="{ResourceReference CornerRadiusDefault}"
+                                    ClipToBounds="True">
+                                <Grid RowDefinitions="Auto,*">
+                                    <!-- A PART, because this is the caption a revealed panel is dragged by: while the
+                                         flyout is up it is the only caption the panel has on screen. -->
+                                    <Border x:Name="PART_FlyoutHeader" Grid.Row="0"
+                                            Background="{ResourceReference SolidBackgroundFillColorBase}"
+                                            BorderBrush="{ResourceReference ControlStrokeColorDefault}"
+                                            BorderThickness="0 0 0 1"
+                                            Padding="8 3 6 3">
+                                        <Grid ColumnDefinitions="*,Auto,Auto">
+                                            <ContentPresenter Grid.Column="0" VerticalAlignment="Center"
+                                                    Content="{TemplateBinding Title}"
+                                                    FontSize="{ResourceReference FontSizeChrome}"
+                                                    Foreground="{ResourceReference TextFillColorSecondary}"/>
+                                            <Button x:Name="PART_FlyoutAutoHideButton" Grid.Column="1"
+                                                    Classes="DockCaptionButton" VerticalAlignment="Center">
+                                                <!-- Hollow: this panel is NOT docked - that is the whole reason it is a
+                                                     flyout. Pressing it is what docks it, and the tack fills in. -->
+                                                <Path Data="M4,1 L8,1 L8,3 L10,5 L10,6 L6.8,6 L6.8,9 L6,11 L5.2,9 L5.2,6 L2,6 L2,5 L4,3 Z"
+                                                        Stroke="{ResourceReference TextFillColorSecondary}" StrokeThickness="1"
+                                                        Fill="Transparent"
+                                                        HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                            </Button>
+                                            <Button x:Name="PART_FlyoutCloseButton" Grid.Column="2"
+                                                    Classes="DockCaptionButton" VerticalAlignment="Center">
+                                                <Path Data="M0,0 L8,8 M8,0 L0,8"
+                                                        Stroke="{ResourceReference TextFillColorSecondary}" StrokeThickness="1.1"
+                                                        HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                            </Button>
+                                        </Grid>
+                                    </Border>
+
+                                    <!-- The body itself. The DOCKED presenter is emptied while this is open (see the
+                                         Revealed trigger): one piece of content belongs to one tree, and a presenter
+                                         goes on holding its child even when the body around it is hidden. -->
+                                    <Border Grid.Row="1" x:Name="FlyoutBody"
+                                            Background="{TemplateBinding Background}"
+                                            Padding="{TemplateBinding Padding}"
+                                            ClipToBounds="True">
+                                        <ContentPresenter x:Name="PART_FlyoutContentHost"
+                                                Content="{TemplateBinding FlyoutContent}"
+                                                ContentTemplate="{TemplateBinding SelectedContentTemplate}"
+                                                ContentTemplateSelector="{TemplateBinding SelectedContentTemplateSelector}"/>
+                                    </Border>
+                                </Grid>
+                            </Border>
+                        </Popup>
+                    </Grid>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <!-- Folded away: the thumbtack is an OUTLINE. Docked it is SOLID - that filled/hollow pair is
+                             how every editor shows the state of auto-hide, and it is the button telling you what it
+                             did. -->
+                        <PropertyTrigger Property="IsFolded" Value="true">
+                            <Setter TargetName="AutoHideGlyph" Property="Fill" Value="Transparent"/>
+                        </PropertyTrigger>
+                        <!-- Not on an EDGE: there is nowhere to fold to, so auto-hide has nothing it could do. A button
+                             that is present and does nothing is worse than one that is not there - it says the panel
+                             refused, when nothing was ever asked of it. -->
+                        <PropertyTrigger Property="Edge" Value="None">
+                            <Setter TargetName="PART_AutoHideButton" Property="Visibility" Value="Collapsed"/>
+                        </PropertyTrigger>
+                        <!-- The whole of a floating window: the window's own title bar names it and carries the close
+                             button, so a caption here would repeat the name word for word. -->
+                        <PropertyTrigger Property="IsFloatingRoot" Value="true">
+                            <Setter TargetName="PART_Header" Property="Visibility" Value="Collapsed"/>
+                        </PropertyTrigger>
+                        <!-- One tab in a window of its own is not a choice, so there is no strip to make it with. -->
+                        <PropertyTrigger Property="ShowTabStrip" Value="false">
+                            <Setter TargetName="PART_TabStrip" Property="Visibility" Value="Collapsed"/>
+                        </PropertyTrigger>
+                        <!-- REVEALED: in the tree this panel is still just its strip - the same as put away - and its
+                             body is shown in the flyout OVER the neighbours. Emptying the docked presenter is not
+                             cosmetic: one piece of content belongs to one tree, and a presenter goes on holding its
+                             child even when the body around it is hidden, so the flyout would be handed an element
+                             that already has a parent. IsOpen is driven by the control, not from here: a trigger has to
+                             be UNDONE to close the popup, and undoing it left the property Unset. -->
+                        <PropertyTrigger Property="State" Value="Revealed">
+                            <Setter TargetName="PART_Header" Property="Visibility" Value="Collapsed"/>
+                            <Setter TargetName="Body" Property="Visibility" Value="Collapsed"/>
+                            <Setter TargetName="Chrome" Property="BorderThickness" Value="0"/>
+                            <Setter TargetName="StripFill" Property="Background" Value="{ResourceReference DockFoldedStripFill}"/>
+                        </PropertyTrigger>
+                        <!-- Which way the flyout opens, and how big it is: OUT of the edge the strip is on, as far
+                             across as the panel is worth docked and as long as the strip itself. Stated per edge
+                             because "out of" is a different direction on each side. -->
+                        <PropertyTrigger Property="Edge" Value="Left">
+                            <Setter TargetName="PART_RevealFlyout" Property="Placement" Value="Relative"/>
+                            <Setter TargetName="PART_RevealFlyout" Property="HorizontalOffset" Value="{TemplateBinding RevealOffsetX}"/>
+                            <Setter TargetName="PART_RevealFlyout" Property="VerticalOffset" Value="{TemplateBinding RevealOffsetY}"/>
+                            <Setter TargetName="FlyoutRoot" Property="Width" Value="{TemplateBinding RevealExtent}"/>
+                            <Setter TargetName="FlyoutRoot" Property="Height" Value="{TemplateBinding RevealLength}"/>
+                        </PropertyTrigger>
+                        <PropertyTrigger Property="Edge" Value="Right">
+                            <Setter TargetName="PART_RevealFlyout" Property="Placement" Value="Relative"/>
+                            <Setter TargetName="PART_RevealFlyout" Property="HorizontalOffset" Value="{TemplateBinding RevealOffsetX}"/>
+                            <Setter TargetName="PART_RevealFlyout" Property="VerticalOffset" Value="{TemplateBinding RevealOffsetY}"/>
+                            <Setter TargetName="FlyoutRoot" Property="Width" Value="{TemplateBinding RevealExtent}"/>
+                            <Setter TargetName="FlyoutRoot" Property="Height" Value="{TemplateBinding RevealLength}"/>
+                        </PropertyTrigger>
+                        <PropertyTrigger Property="Edge" Value="Top">
+                            <Setter TargetName="PART_RevealFlyout" Property="Placement" Value="Relative"/>
+                            <Setter TargetName="PART_RevealFlyout" Property="HorizontalOffset" Value="{TemplateBinding RevealOffsetX}"/>
+                            <Setter TargetName="PART_RevealFlyout" Property="VerticalOffset" Value="{TemplateBinding RevealOffsetY}"/>
+                            <Setter TargetName="FlyoutRoot" Property="Height" Value="{TemplateBinding RevealExtent}"/>
+                            <Setter TargetName="FlyoutRoot" Property="Width" Value="{TemplateBinding RevealLength}"/>
+                        </PropertyTrigger>
+                        <PropertyTrigger Property="Edge" Value="Bottom">
+                            <Setter TargetName="PART_RevealFlyout" Property="Placement" Value="Relative"/>
+                            <Setter TargetName="PART_RevealFlyout" Property="HorizontalOffset" Value="{TemplateBinding RevealOffsetX}"/>
+                            <Setter TargetName="PART_RevealFlyout" Property="VerticalOffset" Value="{TemplateBinding RevealOffsetY}"/>
+                            <Setter TargetName="FlyoutRoot" Property="Height" Value="{TemplateBinding RevealExtent}"/>
+                            <Setter TargetName="FlyoutRoot" Property="Width" Value="{TemplateBinding RevealLength}"/>
+                        </PropertyTrigger>
+                        <!-- Only a PUT-AWAY strip is a row of buttons rather than a strip you rearrange in: there is no
+                             panel open here to rearrange. A REVEALED panel IS open - its body is showing in the flyout -
+                             so its tabs reorder and tear off like any other. Keyed on Collapsed rather than on IsFolded,
+                             which covers both states and so switched dragging off for a panel that was open in front of
+                             the user. -->
+                        <PropertyTrigger Property="State" Value="Collapsed">
+                            <Setter Property="AllowTabDrag" Value="false"/>
+                            <Setter TargetName="PART_Header" Property="Visibility" Value="Collapsed"/>
+                            <Setter TargetName="Body" Property="Visibility" Value="Collapsed"/>
+                            <!-- No frame around a put-away panel: a border encloses an AREA, and all that is left here
+                                 is a strip of buttons on the edge. -->
+                            <Setter TargetName="Chrome" Property="BorderThickness" Value="0"/>
+                            <!-- The strip gets a fill of its own instead, which is what makes it READ as a put-away
+                                 panel rather than as some tabs floating on the background. -->
+                            <Setter TargetName="StripFill" Property="Background" Value="{ResourceReference DockFoldedStripFill}"/>
+                        </PropertyTrigger>
+                        <!-- Folded against a SIDE, the tabs queue DOWN a narrow column on THAT edge - not along the
+                             bottom band, which belongs to a docked panel. Moving the strip between cells is what keeps
+                             it on the edge while a revealed body is showing beside it. -->
+                        <MultiTrigger>
+                            <MultiTrigger.Conditions>
+                                <Condition Property="IsFolded" Value="true"/>
+                                <Condition Property="Edge" Value="Left"/>
+                            </MultiTrigger.Conditions>
+                            <Setter TargetName="PART_TabStrip" Property="Orientation" Value="Vertical"/>
+                            <Setter TargetName="PART_TabStrip" Property="Grid.Row" Value="1"/>
+                            <Setter TargetName="PART_TabStrip" Property="Grid.Column" Value="0"/>
+                            <Setter Property="ItemsPanel">
+                                <Setter.Value>
+                                    <ItemsPanelTemplate><TabPanel Orientation="Vertical"/></ItemsPanelTemplate>
+                                </Setter.Value>
+                            </Setter>
+                        </MultiTrigger>
+                        <MultiTrigger>
+                            <MultiTrigger.Conditions>
+                                <Condition Property="IsFolded" Value="true"/>
+                                <Condition Property="Edge" Value="Right"/>
+                            </MultiTrigger.Conditions>
+                            <Setter TargetName="PART_TabStrip" Property="Orientation" Value="Vertical"/>
+                            <Setter TargetName="PART_TabStrip" Property="Grid.Row" Value="1"/>
+                            <Setter TargetName="PART_TabStrip" Property="Grid.Column" Value="2"/>
+                            <Setter Property="ItemsPanel">
+                                <Setter.Value>
+                                    <ItemsPanelTemplate><TabPanel Orientation="Vertical"/></ItemsPanelTemplate>
+                                </Setter.Value>
+                            </Setter>
+                        </MultiTrigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- The grip between two areas. INVISIBLE at rest, like every editor's: a drawn line here has nothing to say - the
+         panels already have their own edges, and a stroke laid between two of them lands right next to those edges and
+         reads as a double border. What the gap is for is GRABBING, and that is what Transparent gives: a hit-testable
+         band with nothing drawn in it. It shows itself when it matters - under the pointer, and while dragged. -->
+    <Style Selector="PaneSplitter">
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="PaneSplitter">
+                    <Border Background="{TemplateBinding Background}"/>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style Selector="PaneSplitter">
+        <PropertyTrigger Property="IsMouseOver" Value="true">
+            <Setter Property="Background" Value="{ResourceReference AccentFillColorDefault}"/>
+        </PropertyTrigger>
+        <!-- And it STAYS lit while dragging: the pointer leaves the band the moment the boundary starts moving, so
+             hover alone made the divider blink out exactly during the gesture it belongs to. -->
+        <PropertyTrigger Property="IsDragging" Value="true">
+            <Setter Property="Background" Value="{ResourceReference AccentFillColorDefault}"/>
+        </PropertyTrigger>
+    </Style>
+
+    <!-- The compass shown while a pane is being dragged. Its brushes live here rather than in the control: which of the
+         five targets is armed is said with COLOUR, and colour is the theme's business. -->
+    <Style Selector="DockCompass">
+        <Setter Property="IndicatorBrush" Value="{ResourceReference DockCompassFillColor}"/>
+        <Setter Property="IndicatorStroke" Value="{ResourceReference DockCompassStrokeColor}"/>
+        <Setter Property="ActiveBrush" Value="{ResourceReference AccentFillColorDefault}"/>
+        <Setter Property="PreviewBrush" Value="{ResourceReference DockCompassPreviewColor}"/>
+    </Style>
+
+    <!-- This window covers the WHOLE docking area, so it must have nothing of its own: no caption, no border, and a
+         background that is not there. Anything opaque here would black out the very layout the compass points at. -->
+    <Style Selector="DockCompassWindow">
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="DockCompassWindow">
+                    <!-- The Content binding is NOT optional: without it the presenter presents nothing, the window lays
+                         itself out and its content never does. -->
+                    <ContentPresenter x:Name="PART_ContentPresenter"
+                            Content="{TemplateBinding Content}"/>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+</StyleSet>

@@ -49,6 +49,19 @@
          the same problem in the other direction: #E8E8E8 on an #ECECEC window is four levels apart. -->
     <PaletteColor Key="SelectionControlFillColorOff" Color="#D2D2D6"/>
 
+    <!-- The GROOVE a segmented control's tabs sit in. Its own key rather than a reused control fill: the track is the
+         one surface that must read as RECESSED, and every existing fill in this palette is a raised one. The selected
+         segment then rises out of it wearing ControlFillColorDefault - which is white here, so the pair reads exactly
+         as a Mac's tab strip does: a sunk grey rail with one raised capsule on it. -->
+    <PaletteColor Key="SegmentedTrackColor" Color="#E1E1E3"/>
+
+    <!-- The same groove again, as a COLOUR, for the fade that dissolves tabs at the ends of a scrolling strip. Its own
+         pair rather than the one key twice: a palette key is served as a BRUSH by default, and a brush handed to
+         GradientStop.Color is an InvalidCastException on every recorded frame - the scene then records nothing at all
+         and the window comes up empty. A slot decides the serving, so a key used in both slots is two keys. -->
+    <PaletteColor Key="SegmentedTrackFadeColor" Color="#E6E1E1E3" As="Color"/>
+    <PaletteColor Key="SegmentedTrackFadeColorTransparent" Color="#00E1E1E3" As="Color"/>
+
     <!-- The overlay scroller's thumb - see MacOsDark for why it is translucent. -->
     <PaletteColor Key="ScrollThumbFillColor" Color="#66000000"/>
 

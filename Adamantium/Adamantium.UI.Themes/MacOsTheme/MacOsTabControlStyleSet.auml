@@ -1,0 +1,689 @@
+<?xml version="1.0" encoding="utf-8"?>
+<StyleSet xmlns="http://adamantium/ui"
+          xmlns:x="http://adamantium/ui/xaml/extensions">
+
+    <!-- TabControl, macOS: the strip is a SEGMENTED CONTROL - a sunk groove with one raised capsule on it - above a
+         content box, which is what a Mac has instead of paper tabs. The capsule is painted by the tab itself (see
+         MacOsTabItemStyleSet); what this set adds is the GROOVE the segments sit in, and switching the sliding accent
+         bar OFF: that bar is a 1px rectangle stretched to the tab's width by its RenderTransform, so a corner radius on
+         it would be stretched by the same factor and come out an ellipse rather than a capsule.
+
+         The bar is silenced by thickness and brush, not by deleting the part: TabControl looks
+         PART_SelectionIndicator up by name, animates it and hides one of the two rows' bars itself. A part is a
+         contract with the control, and a template that drops one takes the machinery with it.
+
+         Everything the strip can DO is unchanged and every part is still here - wheel panning, edge fades, the pinned
+         row and its own bar, the overflow chevron with its lazy flyout list, drag reorder. This is a re-drawing, not a
+         reduction. -->
+
+    <Style Selector="TabControl" BasedOn="ItemsControl">
+        <!-- The content is PAPER on the window's surface, which is this palette's whole premise - white in light
+             appearance, sunk in dark - so the box under the strip takes the well colour and not the window's. -->
+        <Setter Property="Background" Value="{ResourceReference SolidBackgroundFillColorSecondary}"/>
+        <Setter Property="BorderBrush" Value="{ResourceReference ControlStrokeColorDefault}"/>
+        <Setter Property="BorderThickness" Value="{ResourceReference StrokeControl}"/>
+        <Setter Property="CornerRadius" Value="{ResourceReference CornerRadiusDefault}"/>
+        <Setter Property="Padding" Value="{ResourceReference PaddingContent}"/>
+        <Setter Property="ReorderAnimationDuration" Value="0:0:0.18"/>
+        <!-- OFF. See the header: the selection is the capsule, and a Mac draws nothing else to say which tab is current. -->
+        <Setter Property="SelectionIndicatorBrush" Value="Transparent"/>
+        <Setter Property="SelectionIndicatorThickness" Value="0"/>
+        <Setter Property="SelectionAnimationDuration" Value="0:0:0.25"/>
+        <!-- The per-tab close button (enable via TabControl.ShowCloseButton). A standalone ControlTemplate so a host
+             swaps ONLY this to restyle the button; a click raises TabControl.TabCloseRequested. Round, because on this
+             platform a small chrome button that lights up is a disc. -->
+        <Setter Property="CloseButtonTemplate">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border x:Name="CloseBg" Width="16" Height="16" CornerRadius="8" Background="Transparent">
+                        <Path x:Name="CloseGlyph" Data="M0,0 L7,7 M7,0 L0,7"
+                              Stroke="{ResourceReference TextFillColorSecondary}" StrokeThickness="1.1"
+                              HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <PropertyTrigger Property="IsMouseOver" Value="true">
+                            <Setter TargetName="CloseBg" Property="Background" Value="{ResourceReference ControlFillColorTertiary}"/>
+                            <Setter TargetName="CloseGlyph" Property="Stroke" Value="{ResourceReference TextFillColorPrimary}"/>
+                        </PropertyTrigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+        <!-- The per-tab PIN button, same disc. The thumbtack is DRAWN and fills in solid once pinned - hollow against
+             solid is how the two states are told apart, and it is the button reporting its own state rather than a
+             second thing to read elsewhere. Inline rather than a keyed DrawingImage because its colour is changed BY
+             NAME from the triggers below, which a drawing in the icon dictionary cannot be. -->
+        <Setter Property="PinButtonTemplate">
+            <Setter.Value>
+                <ControlTemplate TargetType="ToggleButton">
+                    <Border x:Name="PinBg" Width="16" Height="16" CornerRadius="8" Background="Transparent">
+                        <Path x:Name="PinGlyph" Data="M4,1 L8,1 L8,3 L10,5 L10,6 L6.8,6 L6.8,9 L6,11 L5.2,9 L5.2,6 L2,6 L2,5 L4,3 Z"
+                              Stroke="{ResourceReference TextFillColorSecondary}" StrokeThickness="1"
+                              Fill="Transparent"
+                              HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <PropertyTrigger Property="IsMouseOver" Value="true">
+                            <Setter TargetName="PinBg" Property="Background" Value="{ResourceReference ControlFillColorTertiary}"/>
+                            <Setter TargetName="PinGlyph" Property="Stroke" Value="{ResourceReference TextFillColorPrimary}"/>
+                        </PropertyTrigger>
+                        <PropertyTrigger Property="IsChecked" Value="true">
+                            <Setter TargetName="PinGlyph" Property="Fill" Value="{ResourceReference TextFillColorPrimary}"/>
+                            <Setter TargetName="PinGlyph" Property="Stroke" Value="{ResourceReference TextFillColorPrimary}"/>
+                        </PropertyTrigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+        <Setter Property="ItemsPanel">
+            <Setter.Value>
+                <ItemsPanelTemplate>
+                    <TabPanel Orientation="Horizontal"/>
+                </ItemsPanelTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- The overflow chevron. Its own look rather than the plain ToggleButton one, and for two separate reasons.
+         FIRST, it must not read as a fourth segment: a filled, bordered button standing in the groove beside three
+         capsules is exactly what one looks like. SECOND, it has to answer the pointer - this theme's ToggleButton
+         deliberately has no hover at all (a bordered control on this platform does not light up), which is right for a
+         push button and wrong for a piece of chrome you are aiming at. Icon buttons hover here; this is one.
+         Its rounding matches a segment's, so when it does light up it reads as part of the same rail. -->
+    <Style Selector="ToggleButton.SegmentedOverflow">
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ToggleButton">
+                    <Border x:Name="ChevronBg" CornerRadius="5" Background="Transparent"
+                            Padding="{TemplateBinding Padding}">
+                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"
+                                Content="{TemplateBinding Content}"/>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <!-- The same fill every other icon button in this theme lights up with - the tab's close and
+                             pin discs, the dock caption's two. A wash of a few percent was measured here first and is
+                             the weaker answer: it is barely a step off the groove, and consistency between chrome
+                             buttons is worth more than a private nuance. -->
+                        <PropertyTrigger Property="IsMouseOver" Value="true">
+                            <Setter TargetName="ChevronBg" Property="Background" Value="{ResourceReference ControlFillColorTertiary}"/>
+                        </PropertyTrigger>
+                        <!-- Pressed and OPEN are the same picture on purpose: the flyout being up is the button still
+                             being held down, as far as what it is saying goes. Later triggers win, so open survives the
+                             pointer leaving - and it rises to a segment's own colour, because while the list is up this
+                             IS the current thing on the rail. -->
+                        <PropertyTrigger Property="IsPressed" Value="true">
+                            <Setter TargetName="ChevronBg" Property="Background" Value="{ResourceReference ControlFillColorDefault}"/>
+                        </PropertyTrigger>
+                        <PropertyTrigger Property="IsChecked" Value="true">
+                            <Setter TargetName="ChevronBg" Property="Background" Value="{ResourceReference ControlFillColorDefault}"/>
+                        </PropertyTrigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- A strip's list is JUST its items - no chrome, and above all no scroller of its own. The ordinary row is already
+         inside a TabStripScroller (that is what pans the strip on the wheel), and the ItemsControl default template
+         wraps its items in a ScrollViewer, which swallows the wheel and leaves the strip unable to pan. -->
+    <Style Selector="TabItemsControl">
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="TabItemsControl">
+                    <ItemsPresenter x:Name="PART_ItemsPresenter"/>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- The overflow flyout's list: a ScrollViewer capped by MaxHeight that scrolls the CONTENT, so the list
+         virtualizes - it may hold every tab of a session. The bar is HIDDEN rather than disabled: it would overlay the
+         rows' close button, and the wheel is how this list is scrolled anyway. Applied BY CLASS so this template lives
+         once for every placement's overflow list. -->
+    <Style Selector="ListBox.TabOverflowList">
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ListBox">
+                    <ScrollViewer MaxHeight="360"
+                                  CanContentScroll="True"
+                                  HorizontalScrollBarVisibility="Disabled"
+                                  VerticalScrollBarVisibility="Hidden">
+                        <ItemsPresenter x:Name="PART_ItemsPresenter"/>
+                    </ScrollViewer>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- A row of the flyout: icon, name, close. Its item is a TabOverflowItem - a VIEW of a tab, never the tab, which
+         is a live control and cannot be in the strip and in here at once. -->
+    <Style Selector="ListBox.TabOverflowList">
+        <Setter Property="ItemTemplate">
+            <Setter.Value>
+                <DataTemplate>
+                    <Grid ColumnDefinitions="Auto,*,Auto" MinWidth="160">
+                        <ContentPresenter Grid.Column="0"
+                                VerticalAlignment="Center" Margin="0 0 8 0"
+                                Content="{Binding Icon}"
+                                ContentTemplate="{Binding IconTemplate}"/>
+                        <ContentPresenter Grid.Column="1"
+                                VerticalAlignment="Center"
+                                Content="{Binding Header}"
+                                ContentTemplate="{Binding HeaderTemplate}"/>
+                        <!-- Closes through the tab's own path, so a TabCloseRequested handler can veto it here too. -->
+                        <Button Grid.Column="2"
+                                Margin="8 0 0 0" Width="16" Height="16" MinWidth="0" MinHeight="0" Padding="0"
+                                VerticalAlignment="Center"
+                                HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
+                                Background="Transparent" BorderThickness="0"
+                                Command="{Binding Close}"
+                                Visibility="{Binding CloseVisibility}">
+                            <Path Data="M0,0 L7,7 M7,0 L0,7"
+                                  Stroke="{ResourceReference TextFillColorSecondary}" StrokeThickness="1.1"
+                                  HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Button>
+                    </Grid>
+                </DataTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- Top (default): the groove in the Auto row, content filling below. -->
+    <Style Selector="TabControl[TabStripPlacement=Top]">
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="TabControl">
+                    <Grid RowDefinitions="Auto,*">
+                        <!-- THE GROOVE. A Border around the strip rather than a background on it, because only a Border
+                             rounds - and the rounding is most of what makes a row of tabs read as one control. It is
+                             also what ShowTabStrip now collapses: hiding the grid inside would leave the groove drawn
+                             around nothing. -->
+                        <Border x:Name="StripTrack" Grid.Row="0"
+                                Background="{ResourceReference SegmentedTrackColor}"
+                                CornerRadius="7" Padding="2" Margin="0 0 0 8">
+                            <!-- TWO lists, not one strip kept in sorted order: pinned tabs above, the ones that come and
+                                 go below. The pinned row is OUTSIDE the scroller on purpose - that is what makes a
+                                 pinned tab impossible to scroll out of sight - and it WRAPS, so many pinned tabs cost
+                                 further lines instead of squeezing the rest. The overflow button sits in the BOTTOM
+                                 row's column: it belongs to the scrolling strip. -->
+                            <Grid x:Name="StripRow" RowDefinitions="Auto,Auto" ColumnDefinitions="Auto,*,Auto">
+                                <!-- The pinned row carries a bar of its own. Only ever ONE of the two is visible - the
+                                     one in the row holding the selected tab - so a bar never points at a tab in
+                                     another row. Silenced here like the other, and kept for the same reason. -->
+                                <Grid x:Name="PinnedRow" Grid.Row="0" Grid.Column="0" Grid.ColumnSpan="3"
+                                      Visibility="Collapsed">
+                                    <TabItemsControl x:Name="PART_PinnedTabs" ItemsSource="{TemplateBinding PinnedItems}">
+                                        <TabItemsControl.ItemsPanel>
+                                            <ItemsPanelTemplate>
+                                                <WrapPanel Orientation="Horizontal"/>
+                                            </ItemsPanelTemplate>
+                                        </TabItemsControl.ItemsPanel>
+                                    </TabItemsControl>
+                                    <Rectangle x:Name="PART_PinnedSelectionIndicator"
+                                               Fill="{TemplateBinding SelectionIndicatorBrush}"
+                                               Width="1"
+                                               Height="{TemplateBinding SelectionIndicatorThickness}"
+                                               HorizontalAlignment="Left"
+                                               VerticalAlignment="Bottom"
+                                               IsHitTestVisible="False"/>
+                                </Grid>
+                                <TabStripScroller x:Name="PART_TabStrip" Grid.Row="1" Grid.Column="1" Orientation="Horizontal">
+                                    <Grid>
+                                        <TabItemsControl x:Name="PART_Tabs" ItemsSource="{TemplateBinding UnpinnedItems}">
+                                            <TabItemsControl.ItemsPanel>
+                                                <ItemsPanelTemplate>
+                                                    <TabPanel Orientation="Horizontal"/>
+                                                </ItemsPanelTemplate>
+                                            </TabItemsControl.ItemsPanel>
+                                        </TabItemsControl>
+                                        <Rectangle x:Name="PART_SelectionIndicator"
+                                                   Fill="{TemplateBinding SelectionIndicatorBrush}"
+                                                   Width="1"
+                                                   Height="{TemplateBinding SelectionIndicatorThickness}"
+                                                   HorizontalAlignment="Left"
+                                                   VerticalAlignment="Bottom"
+                                                   IsHitTestVisible="False"/>
+                                    </Grid>
+                                </TabStripScroller>
+                                <!-- The strip has no arrows (it pans on the wheel), so the fade is the ONLY thing
+                                     saying there are tabs past the edge. A SIBLING of the scroller, in its cell:
+                                     inside it, it would pan away with the tabs it is meant to be dissolving. It fades
+                                     to the GROOVE here, not to the window - that is what it now lies on. -->
+                                <Border x:Name="BackFade" Grid.Row="1" Grid.Column="1"
+                                        Width="39"
+                                        HorizontalAlignment="Left"
+                                        Visibility="Collapsed"
+                                        IsHitTestVisible="False">
+                                    <Border.Background>
+                                        <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
+                                            <GradientStop Offset="0" Color="{ObservableResource SegmentedTrackFadeColor}"/>
+                                            <GradientStop Offset="1" Color="{ObservableResource SegmentedTrackFadeColorTransparent}"/>
+                                        </LinearGradientBrush>
+                                    </Border.Background>
+                                </Border>
+                                <Border x:Name="ForwardFade" Grid.Row="1" Grid.Column="1"
+                                        Width="39"
+                                        HorizontalAlignment="Right"
+                                        Visibility="Collapsed"
+                                        IsHitTestVisible="False">
+                                    <Border.Background>
+                                        <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
+                                            <GradientStop Offset="0" Color="{ObservableResource SegmentedTrackFadeColorTransparent}"/>
+                                            <GradientStop Offset="1" Color="{ObservableResource SegmentedTrackFadeColor}"/>
+                                        </LinearGradientBrush>
+                                    </Border.Background>
+                                </Border>
+                                <!-- Focusable=False: chrome, not a keyboard destination. Transparent, because it stands
+                                     ON the groove - a filled button here would read as a fourth segment.
+                                     CENTRED, not stretched: stretching made the chevron the tallest thing in the row,
+                                     so the ROW took its height and the segments - shorter - sat against the top of the
+                                     groove with the slack all underneath (measured: 2 above, 4 below). A groove is a
+                                     rail its segments sit centred in, so nothing in it may be taller than they are. -->
+                                <ToggleButton x:Name="PART_TabOverflow" Grid.Row="1" Grid.Column="2" VerticalAlignment="Center"
+                                              Focusable="False"
+                                              Classes="SegmentedOverflow"
+                                              MinWidth="24" MinHeight="20" Padding="4 0" Visibility="Collapsed">
+                                    <Image Source="{ResourceReference ChevronDownIcon}"
+                                           Width="{ResourceReference DropDownIconSize}"
+                                           Height="{ResourceReference DropDownIconSize}"
+                                           HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                </ToggleButton>
+                                <!-- Flyout list of every tab (wired in code), opened below the chevron. The card and its
+                                     ListBox build LAZILY on first open: a list carries a scroll host and two
+                                     scrollbars, and most strips never overflow at all. -->
+                                <Popup x:Name="PART_TabOverflowPopup" Grid.Row="1" Grid.Column="2" Placement="Bottom" FlipToFit="True" VerticalOffset="2">
+                                    <Popup.ChildTemplate>
+                                        <ControlTemplate TargetType="Popup">
+                                            <Border Background="{ResourceReference CardBackgroundFillColorDefault}"
+                                                    BorderBrush="{ResourceReference ControlStrokeColorDefault}"
+                                                    BorderThickness="1" CornerRadius="{ResourceReference CornerRadiusDefault}" Padding="4">
+                                                <ListBox x:Name="PART_TabOverflowList" Classes="TabOverflowList" MinWidth="160"/>
+                                            </Border>
+                                        </ControlTemplate>
+                                    </Popup.ChildTemplate>
+                                </Popup>
+                            </Grid>
+                        </Border>
+                        <Border Grid.Row="1"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="{TemplateBinding CornerRadius}"
+                                Padding="{TemplateBinding Padding}"
+                                ClipToBounds="True">
+                            <ContentPresenter x:Name="PART_SelectedContentHost"
+                                              Content="{TemplateBinding SelectedContent}"
+                                              ContentTemplate="{TemplateBinding SelectedContentTemplate}"
+                                              ContentTemplateSelector="{TemplateBinding SelectedContentTemplateSelector}"
+                                              ContentTransition="{TemplateBinding ContentTransition}"
+                                              TransitionDuration="{TemplateBinding ContentTransitionDuration}"
+                                              DeferContent="{TemplateBinding DeferContent}"
+                                              LoadingTemplate="{TemplateBinding LoadingTemplate}"/>
+                        </Border>
+                    </Grid>
+                    <ControlTemplate.Triggers>
+                        <PropertyTrigger Property="ShowTabStrip" Value="false">
+                            <Setter TargetName="StripTrack" Property="Visibility" Value="Collapsed"/>
+                        </PropertyTrigger>
+                        <!-- One tab filling the strip is a title, not a choice, so the groove has nothing to hold: it
+                             would be a grey band the full width with one flat label on it. -->
+                        <PropertyTrigger Property="HasStretchedTab" Value="true">
+                            <Setter TargetName="StripTrack" Property="Background" Value="Transparent"/>
+                        </PropertyTrigger>
+                        <PropertyTrigger Property="HasPinnedTabs" Value="true">
+                            <Setter TargetName="PinnedRow" Property="Visibility" Value="Visible"/>
+                        </PropertyTrigger>
+                        <PropertyTrigger Property="HasUnpinnedTabs" Value="false">
+                            <Setter TargetName="PART_TabStrip" Property="Visibility" Value="Collapsed"/>
+                        </PropertyTrigger>
+                        <PropertyTrigger Property="CanScrollTabsBack" Value="true">
+                            <Setter TargetName="BackFade" Property="Visibility" Value="Visible"/>
+                        </PropertyTrigger>
+                        <PropertyTrigger Property="CanScrollTabsForward" Value="true">
+                            <Setter TargetName="ForwardFade" Property="Visibility" Value="Visible"/>
+                        </PropertyTrigger>
+                        <!-- ONE row: the pinned list moves down beside the others, in the first column, and stops
+                             spanning the width. A WRAPPING panel measured unbounded in an Auto column answers with the
+                             whole width and leaves the starred column nothing, so it becomes a plain strip here. -->
+                        <PropertyTrigger Property="PinnedTabsPlacement" Value="SameRow">
+                            <Setter TargetName="PinnedRow" Property="Grid.Row" Value="1"/>
+                            <Setter TargetName="PinnedRow" Property="Grid.ColumnSpan" Value="1"/>
+                            <Setter TargetName="PinnedRow" Property="HorizontalAlignment" Value="Left"/>
+                            <Setter TargetName="PART_PinnedTabs" Property="ItemsPanel">
+                                <Setter.Value>
+                                    <ItemsPanelTemplate>
+                                        <TabPanel Orientation="Horizontal"/>
+                                    </ItemsPanelTemplate>
+                                </Setter.Value>
+                            </Setter>
+                        </PropertyTrigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- Bottom: content above, the groove in the Auto row below. -->
+    <Style Selector="TabControl[TabStripPlacement=Bottom]">
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="TabControl">
+                    <Grid RowDefinitions="*,Auto">
+                        <Border Grid.Row="0"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="{TemplateBinding CornerRadius}"
+                                Padding="{TemplateBinding Padding}"
+                                ClipToBounds="True">
+                            <ContentPresenter x:Name="PART_SelectedContentHost"
+                                              Content="{TemplateBinding SelectedContent}"
+                                              ContentTemplate="{TemplateBinding SelectedContentTemplate}"
+                                              ContentTemplateSelector="{TemplateBinding SelectedContentTemplateSelector}"
+                                              ContentTransition="{TemplateBinding ContentTransition}"
+                                              TransitionDuration="{TemplateBinding ContentTransitionDuration}"
+                                              DeferContent="{TemplateBinding DeferContent}"
+                                              LoadingTemplate="{TemplateBinding LoadingTemplate}"/>
+                        </Border>
+                        <Border x:Name="StripTrack" Grid.Row="1"
+                                Background="{ResourceReference SegmentedTrackColor}"
+                                CornerRadius="7" Padding="2" Margin="0 8 0 0">
+                            <Grid x:Name="StripRow" ColumnDefinitions="*,Auto">
+                                <TabStripScroller x:Name="PART_TabStrip" Grid.Column="0" Orientation="Horizontal">
+                                    <Grid>
+                                        <ItemsPresenter x:Name="PART_ItemsPresenter"/>
+                                        <Rectangle x:Name="PART_SelectionIndicator"
+                                                   Fill="{TemplateBinding SelectionIndicatorBrush}"
+                                                   Width="1"
+                                                   Height="{TemplateBinding SelectionIndicatorThickness}"
+                                                   HorizontalAlignment="Left"
+                                                   VerticalAlignment="Top"
+                                                   IsHitTestVisible="False"/>
+                                    </Grid>
+                                </TabStripScroller>
+                                <Border x:Name="BackFade" Grid.Column="0"
+                                        Width="39"
+                                        HorizontalAlignment="Left"
+                                        Visibility="Collapsed"
+                                        IsHitTestVisible="False">
+                                    <Border.Background>
+                                        <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
+                                            <GradientStop Offset="0" Color="{ObservableResource SegmentedTrackFadeColor}"/>
+                                            <GradientStop Offset="1" Color="{ObservableResource SegmentedTrackFadeColorTransparent}"/>
+                                        </LinearGradientBrush>
+                                    </Border.Background>
+                                </Border>
+                                <Border x:Name="ForwardFade" Grid.Column="0"
+                                        Width="39"
+                                        HorizontalAlignment="Right"
+                                        Visibility="Collapsed"
+                                        IsHitTestVisible="False">
+                                    <Border.Background>
+                                        <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
+                                            <GradientStop Offset="0" Color="{ObservableResource SegmentedTrackFadeColorTransparent}"/>
+                                            <GradientStop Offset="1" Color="{ObservableResource SegmentedTrackFadeColor}"/>
+                                        </LinearGradientBrush>
+                                    </Border.Background>
+                                </Border>
+                                <ToggleButton x:Name="PART_TabOverflow" Grid.Column="1" VerticalAlignment="Center"
+                                              Focusable="False"
+                                              Classes="SegmentedOverflow"
+                                              MinWidth="24" MinHeight="20" Padding="4 0" Visibility="Collapsed">
+                                    <Image Source="{ResourceReference ChevronDownIcon}"
+                                           Width="{ResourceReference DropDownIconSize}"
+                                           Height="{ResourceReference DropDownIconSize}"
+                                           HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                </ToggleButton>
+                                <Popup x:Name="PART_TabOverflowPopup" Grid.Column="1" Placement="Bottom" FlipToFit="True" VerticalOffset="2">
+                                    <Popup.ChildTemplate>
+                                        <ControlTemplate TargetType="Popup">
+                                            <Border Background="{ResourceReference CardBackgroundFillColorDefault}"
+                                                    BorderBrush="{ResourceReference ControlStrokeColorDefault}"
+                                                    BorderThickness="1" CornerRadius="{ResourceReference CornerRadiusDefault}" Padding="4">
+                                                <ListBox x:Name="PART_TabOverflowList" Classes="TabOverflowList" MinWidth="160"/>
+                                            </Border>
+                                        </ControlTemplate>
+                                    </Popup.ChildTemplate>
+                                </Popup>
+                            </Grid>
+                        </Border>
+                    </Grid>
+                    <ControlTemplate.Triggers>
+                        <PropertyTrigger Property="ShowTabStrip" Value="false">
+                            <Setter TargetName="StripTrack" Property="Visibility" Value="Collapsed"/>
+                        </PropertyTrigger>
+                        <PropertyTrigger Property="HasStretchedTab" Value="true">
+                            <Setter TargetName="StripTrack" Property="Background" Value="Transparent"/>
+                        </PropertyTrigger>
+                        <PropertyTrigger Property="CanScrollTabsBack" Value="true">
+                            <Setter TargetName="BackFade" Property="Visibility" Value="Visible"/>
+                        </PropertyTrigger>
+                        <PropertyTrigger Property="CanScrollTabsForward" Value="true">
+                            <Setter TargetName="ForwardFade" Property="Visibility" Value="Visible"/>
+                        </PropertyTrigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- Left: the strip stands on its side in the Auto column, content fills right. This is the SOURCE LIST - a Mac's
+         sidebar - rather than a segmented control: the same raised capsule, stacked, which is exactly what a Finder
+         sidebar row looks like when it is the current one. It has no groove: a sidebar's rows lie on the window. -->
+    <Style Selector="TabControl[TabStripPlacement=Left]">
+        <Setter Property="ItemsPanel">
+            <Setter.Value>
+                <ItemsPanelTemplate>
+                    <TabPanel Orientation="Vertical"/>
+                </ItemsPanelTemplate>
+            </Setter.Value>
+        </Setter>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="TabControl">
+                    <Grid ColumnDefinitions="Auto,*">
+                        <!-- The chevron sits in an Auto ROW below the * scroller: a vertical strip overflows DOWNWARD. -->
+                        <Border x:Name="StripTrack" Grid.Column="0"
+                                Background="Transparent"
+                                CornerRadius="7" Padding="2" Margin="0 0 8 0">
+                            <Grid x:Name="StripRow" RowDefinitions="*,Auto">
+                                <TabStripScroller x:Name="PART_TabStrip" Grid.Row="0" Orientation="Vertical">
+                                    <Grid>
+                                        <ItemsPresenter x:Name="PART_ItemsPresenter"/>
+                                        <Rectangle x:Name="PART_SelectionIndicator"
+                                                   Fill="{TemplateBinding SelectionIndicatorBrush}"
+                                                   Width="{TemplateBinding SelectionIndicatorThickness}"
+                                                   Height="1"
+                                                   HorizontalAlignment="Right"
+                                                   VerticalAlignment="Top"
+                                                   IsHitTestVisible="False"/>
+                                    </Grid>
+                                </TabStripScroller>
+                                <Border x:Name="BackFade" Grid.Row="0"
+                                        Height="39"
+                                        VerticalAlignment="Top"
+                                        Visibility="Collapsed"
+                                        IsHitTestVisible="False">
+                                    <Border.Background>
+                                        <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                                            <GradientStop Offset="0" Color="{ObservableResource EdgeFadeColor}"/>
+                                            <GradientStop Offset="1" Color="{ObservableResource EdgeFadeColorTransparent}"/>
+                                        </LinearGradientBrush>
+                                    </Border.Background>
+                                </Border>
+                                <Border x:Name="ForwardFade" Grid.Row="0"
+                                        Height="39"
+                                        VerticalAlignment="Bottom"
+                                        Visibility="Collapsed"
+                                        IsHitTestVisible="False">
+                                    <Border.Background>
+                                        <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                                            <GradientStop Offset="0" Color="{ObservableResource EdgeFadeColorTransparent}"/>
+                                            <GradientStop Offset="1" Color="{ObservableResource EdgeFadeColor}"/>
+                                        </LinearGradientBrush>
+                                    </Border.Background>
+                                </Border>
+                                <ToggleButton x:Name="PART_TabOverflow" Grid.Row="1" HorizontalAlignment="Center"
+                                              Focusable="False"
+                                              Classes="SegmentedOverflow"
+                                              MinWidth="20" MinHeight="22" Padding="0 4" Visibility="Collapsed">
+                                    <Image Source="{ResourceReference ChevronDownIcon}"
+                                           Width="{ResourceReference DropDownIconSize}"
+                                           Height="{ResourceReference DropDownIconSize}"
+                                           HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                </ToggleButton>
+                                <Popup x:Name="PART_TabOverflowPopup" Grid.Row="1" Placement="Bottom" FlipToFit="True" VerticalOffset="2">
+                                    <Popup.ChildTemplate>
+                                        <ControlTemplate TargetType="Popup">
+                                            <Border Background="{ResourceReference CardBackgroundFillColorDefault}"
+                                                    BorderBrush="{ResourceReference ControlStrokeColorDefault}"
+                                                    BorderThickness="1" CornerRadius="{ResourceReference CornerRadiusDefault}" Padding="4">
+                                                <ListBox x:Name="PART_TabOverflowList" Classes="TabOverflowList" MinWidth="160"/>
+                                            </Border>
+                                        </ControlTemplate>
+                                    </Popup.ChildTemplate>
+                                </Popup>
+                            </Grid>
+                        </Border>
+                        <Border Grid.Column="1"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="{TemplateBinding CornerRadius}"
+                                Padding="{TemplateBinding Padding}"
+                                ClipToBounds="True">
+                            <ContentPresenter x:Name="PART_SelectedContentHost"
+                                              Content="{TemplateBinding SelectedContent}"
+                                              ContentTemplate="{TemplateBinding SelectedContentTemplate}"
+                                              ContentTemplateSelector="{TemplateBinding SelectedContentTemplateSelector}"
+                                              ContentTransition="{TemplateBinding ContentTransition}"
+                                              TransitionDuration="{TemplateBinding ContentTransitionDuration}"
+                                              DeferContent="{TemplateBinding DeferContent}"
+                                              LoadingTemplate="{TemplateBinding LoadingTemplate}"/>
+                        </Border>
+                    </Grid>
+                    <ControlTemplate.Triggers>
+                        <PropertyTrigger Property="ShowTabStrip" Value="false">
+                            <Setter TargetName="StripTrack" Property="Visibility" Value="Collapsed"/>
+                        </PropertyTrigger>
+                        <PropertyTrigger Property="CanScrollTabsBack" Value="true">
+                            <Setter TargetName="BackFade" Property="Visibility" Value="Visible"/>
+                        </PropertyTrigger>
+                        <PropertyTrigger Property="CanScrollTabsForward" Value="true">
+                            <Setter TargetName="ForwardFade" Property="Visibility" Value="Visible"/>
+                        </PropertyTrigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- Right: the mirror of Left - content fills left, the sidebar stands on the right. -->
+    <Style Selector="TabControl[TabStripPlacement=Right]">
+        <Setter Property="ItemsPanel">
+            <Setter.Value>
+                <ItemsPanelTemplate>
+                    <TabPanel Orientation="Vertical"/>
+                </ItemsPanelTemplate>
+            </Setter.Value>
+        </Setter>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="TabControl">
+                    <Grid ColumnDefinitions="*,Auto">
+                        <Border Grid.Column="0"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="{TemplateBinding CornerRadius}"
+                                Padding="{TemplateBinding Padding}"
+                                ClipToBounds="True">
+                            <ContentPresenter x:Name="PART_SelectedContentHost"
+                                              Content="{TemplateBinding SelectedContent}"
+                                              ContentTemplate="{TemplateBinding SelectedContentTemplate}"
+                                              ContentTemplateSelector="{TemplateBinding SelectedContentTemplateSelector}"
+                                              ContentTransition="{TemplateBinding ContentTransition}"
+                                              TransitionDuration="{TemplateBinding ContentTransitionDuration}"
+                                              DeferContent="{TemplateBinding DeferContent}"
+                                              LoadingTemplate="{TemplateBinding LoadingTemplate}"/>
+                        </Border>
+                        <Border x:Name="StripTrack" Grid.Column="1"
+                                Background="Transparent"
+                                CornerRadius="7" Padding="2" Margin="8 0 0 0">
+                            <Grid x:Name="StripRow" RowDefinitions="*,Auto">
+                                <TabStripScroller x:Name="PART_TabStrip" Grid.Row="0" Orientation="Vertical">
+                                    <Grid>
+                                        <ItemsPresenter x:Name="PART_ItemsPresenter"/>
+                                        <Rectangle x:Name="PART_SelectionIndicator"
+                                                   Fill="{TemplateBinding SelectionIndicatorBrush}"
+                                                   Width="{TemplateBinding SelectionIndicatorThickness}"
+                                                   Height="1"
+                                                   HorizontalAlignment="Left"
+                                                   VerticalAlignment="Top"
+                                                   IsHitTestVisible="False"/>
+                                    </Grid>
+                                </TabStripScroller>
+                                <Border x:Name="BackFade" Grid.Row="0"
+                                        Height="39"
+                                        VerticalAlignment="Top"
+                                        Visibility="Collapsed"
+                                        IsHitTestVisible="False">
+                                    <Border.Background>
+                                        <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                                            <GradientStop Offset="0" Color="{ObservableResource EdgeFadeColor}"/>
+                                            <GradientStop Offset="1" Color="{ObservableResource EdgeFadeColorTransparent}"/>
+                                        </LinearGradientBrush>
+                                    </Border.Background>
+                                </Border>
+                                <Border x:Name="ForwardFade" Grid.Row="0"
+                                        Height="39"
+                                        VerticalAlignment="Bottom"
+                                        Visibility="Collapsed"
+                                        IsHitTestVisible="False">
+                                    <Border.Background>
+                                        <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                                            <GradientStop Offset="0" Color="{ObservableResource EdgeFadeColorTransparent}"/>
+                                            <GradientStop Offset="1" Color="{ObservableResource EdgeFadeColor}"/>
+                                        </LinearGradientBrush>
+                                    </Border.Background>
+                                </Border>
+                                <ToggleButton x:Name="PART_TabOverflow" Grid.Row="1" HorizontalAlignment="Center"
+                                              Focusable="False"
+                                              Classes="SegmentedOverflow"
+                                              MinWidth="20" MinHeight="22" Padding="0 4" Visibility="Collapsed">
+                                    <Image Source="{ResourceReference ChevronDownIcon}"
+                                           Width="{ResourceReference DropDownIconSize}"
+                                           Height="{ResourceReference DropDownIconSize}"
+                                           HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                </ToggleButton>
+                                <Popup x:Name="PART_TabOverflowPopup" Grid.Row="1" Placement="Bottom" FlipToFit="True" VerticalOffset="2">
+                                    <Popup.ChildTemplate>
+                                        <ControlTemplate TargetType="Popup">
+                                            <Border Background="{ResourceReference CardBackgroundFillColorDefault}"
+                                                    BorderBrush="{ResourceReference ControlStrokeColorDefault}"
+                                                    BorderThickness="1" CornerRadius="{ResourceReference CornerRadiusDefault}" Padding="4">
+                                                <ListBox x:Name="PART_TabOverflowList" Classes="TabOverflowList" MinWidth="160"/>
+                                            </Border>
+                                        </ControlTemplate>
+                                    </Popup.ChildTemplate>
+                                </Popup>
+                            </Grid>
+                        </Border>
+                    </Grid>
+                    <ControlTemplate.Triggers>
+                        <PropertyTrigger Property="ShowTabStrip" Value="false">
+                            <Setter TargetName="StripTrack" Property="Visibility" Value="Collapsed"/>
+                        </PropertyTrigger>
+                        <PropertyTrigger Property="CanScrollTabsBack" Value="true">
+                            <Setter TargetName="BackFade" Property="Visibility" Value="Visible"/>
+                        </PropertyTrigger>
+                        <PropertyTrigger Property="CanScrollTabsForward" Value="true">
+                            <Setter TargetName="ForwardFade" Property="Visibility" Value="Visible"/>
+                        </PropertyTrigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+</StyleSet>

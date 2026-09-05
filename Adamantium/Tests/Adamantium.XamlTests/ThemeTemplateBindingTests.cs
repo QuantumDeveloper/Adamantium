@@ -31,6 +31,7 @@ public class ThemeTemplateBindingTests
 
     [TestCase("EditorProTheme")]
     [TestCase("FluentTheme")]
+    [TestCase("MacOsTheme")]
     public void EveryTemplateBindingNamesARealProperty(string themeFolder)
     {
         var root = ThemesRoot();

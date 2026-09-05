@@ -556,10 +556,44 @@ public class UIComponent : FundamentalUIComponent, IUIComponent
     {
         if (IsGeometryValid) return;
 
-        OnRender(context);
+        try
+        {
+            OnRender(context);
+        }
+        catch (Exception e)
+        {
+            ReportRenderFailure(e);
+        }
+
         IsGeometryValid = true;
         GeometryStaleByContent = false;
         OnRenderCompleted();
+    }
+
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, byte> ReportedRenderFailures = new();
+
+    // The same boundary the theming seam has (FundamentalUIComponent.ApplyCurrentTheme), for the same reason and with
+    // the same two halves.
+    //
+    // WHY A BOUNDARY: the record walk visits every component of the scene in ONE pass, so a single component throwing
+    // out of OnRender abandoned the pass - nothing after it was recorded, and nothing BEFORE it was published either.
+    // The whole window came up empty, which reads as "the layout is broken" rather than as "one brush is the wrong
+    // type". Measured: a palette key served as a Brush landed in GradientStop.Color, and a window with a title bar, a
+    // tab strip and eleven pages showed a bare frame.
+    //
+    // WHY IT MUST NOT RETRY: the loop records EVERY frame, and a failure that leaves IsGeometryValid false is a failure
+    // repeated at frame rate - one bad attribute wrote 15MB of identical stack traces in under a minute and spent the
+    // whole loop thread doing it. So the component is marked recorded, exactly as a control that fails to theme is
+    // marked applied: it stays visibly wrong, and it stops costing anything. Whatever next invalidates it gets a fresh
+    // attempt, so a fix at runtime still takes effect.
+    private void ReportRenderFailure(Exception e)
+    {
+        var key = $"{GetType().FullName}:{e.GetType().FullName}:{e.Message}";
+        if (!ReportedRenderFailures.TryAdd(key, 0)) return;
+
+        Serilog.Log.Logger.Error(e,
+            "Rendering {ControlType} failed; it draws nothing this frame. The rest of the scene is unaffected.",
+            GetType().FullName);
     }
 
     // Emit this element's draw commands into a context WITHOUT touching IsGeometryValid (so no RenderDirty mark, no loop
