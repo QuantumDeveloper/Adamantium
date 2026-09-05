@@ -27,9 +27,14 @@
                                  template - a whole ColorPicker per swatch is far too much to build for a flyout most of
                                  them never open. DataContext is set to the ColorPickerButton in code (Popup.Open
                                  propagates it to the child), so this plain {Binding} resolves to our SelectedColor two-way. -->
+                            <!-- ACRYLIC here, solid where the picker stands on a page: what decides it is not the
+                                 control but where it is, and this is the one place that knows. A panel that appears
+                                 over the document for the length of a choice is a flyout like a menu is, and every
+                                 other transient surface in this theme is already FlyoutSurfaceFill. -->
                             <Popup.ChildTemplate>
                                 <ControlTemplate TargetType="Popup">
-                                    <ColorPicker SelectedColor="{Binding SelectedColor, Mode=TwoWay}"/>
+                                    <ColorPicker SelectedColor="{Binding SelectedColor, Mode=TwoWay}"
+                                                 Background="{ResourceReference FlyoutSurfaceFill}"/>
                                 </ControlTemplate>
                             </Popup.ChildTemplate>
                         </Popup>

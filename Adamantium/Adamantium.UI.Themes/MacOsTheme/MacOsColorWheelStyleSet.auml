@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="utf-8"?>
+<StyleSet xmlns="http://adamantium/ui"
+          xmlns:x="http://adamantium/ui/xaml/extensions">
+
+    <!-- ColorWheel: a hue wheel (conic full spectrum) under a radial white->transparent overlay (saturation), a black
+         value-dimming overlay whose opacity the control drives, and a dragged grip. Angle = hue (0 at top, clockwise, to
+         match the conic gradient); radius = saturation.
+
+         The wheel itself is the same picture on every platform - it is a colour space, not chrome. What is this theme's
+         is the GRIP: the ring gains the shadow the rest of this theme's knobs have, so it is still findable over a pale
+         yellow rim, where a plain white ring on white simply is not. -->
+    <Style Selector="ColorWheel">
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ColorWheel">
+                    <Border x:Name="PART_Wheel"
+                            Width="220"
+                            Height="220">
+                        <Grid>
+                            <!-- Hue ring: a full-spectrum conic sweep, red at the top going clockwise. -->
+                            <Ellipse>
+                                <Ellipse.Fill>
+                                    <ConicGradientBrush Center="0.5,0.5">
+                                        <GradientStop Color="#FFFF0000" Offset="0"/>
+                                        <GradientStop Color="#FFFFFF00" Offset="0.1667"/>
+                                        <GradientStop Color="#FF00FF00" Offset="0.3333"/>
+                                        <GradientStop Color="#FF00FFFF" Offset="0.5"/>
+                                        <GradientStop Color="#FF0000FF" Offset="0.6667"/>
+                                        <GradientStop Color="#FFFF00FF" Offset="0.8333"/>
+                                        <GradientStop Color="#FFFF0000" Offset="1"/>
+                                    </ConicGradientBrush>
+                                </Ellipse.Fill>
+                            </Ellipse>
+
+                            <!-- Saturation: white at the centre fading to transparent at the rim. -->
+                            <Ellipse>
+                                <Ellipse.Fill>
+                                    <RadialGradientBrush Center="0.5,0.5" GradientOrigin="0.5,0.5" RadiusX="0.5" RadiusY="0.5">
+                                        <GradientStop Color="#FFFFFFFF" Offset="0"/>
+                                        <GradientStop Color="#00FFFFFF" Offset="1"/>
+                                    </RadialGradientBrush>
+                                </Ellipse.Fill>
+                            </Ellipse>
+
+                            <!-- Value dimming: a black circle whose Opacity the control sets to (1 - Value). -->
+                            <Border x:Name="PART_ValueOverlay"
+                                    Background="Black"
+                                    CornerRadius="110"
+                                    Opacity="0"/>
+
+                            <!-- Selector grip, positioned by the control via Margin. -->
+                            <Border x:Name="PART_Thumb"
+                                    Width="16"
+                                    Height="16"
+                                    CornerRadius="8"
+                                    BorderThickness="3"
+                                    BorderBrush="White"
+                                    HorizontalAlignment="Left"
+                                    VerticalAlignment="Top">
+                                <Border.Shadow>
+                                    <Shadow OffsetY="1" BlurRadius="3" Opacity="1"
+                                            Color="{ObservableResource SliderKnobShadowColor}"/>
+                                </Border.Shadow>
+                            </Border>
+                        </Grid>
+                    </Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+</StyleSet>

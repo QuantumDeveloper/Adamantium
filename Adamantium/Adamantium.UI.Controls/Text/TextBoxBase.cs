@@ -894,7 +894,15 @@ public abstract class TextBoxBase : Control
         if (IsFocused && _caretVisible && !_caretSuppressed)
         {
             var c = CaretRect(CaretIndex);
-            session.DrawRectangle(CaretBrush, new Rect(ox + c.X, oy + c.Y, CaretWidth, c.Height));
+            // WHO CENTRED THE TEXT decides this. When the surface has slack, vOffset already centred the line inside it
+            // and the caret rides along correctly. When it has none - the surface is exactly the content and the FIELD
+            // centres it from outside - the line's internal leading is still in there, sitting above the ink, and the
+            // caret placed on it hangs that much below the letters. Half of the leading is what puts the band back on
+            // the text; the other half is the space the ink already leaves above itself.
+            // HALF of the LEADING, never half of c.Y: that value is the line's offset plus the leading, and halving it
+            // whole would halve the line offset too and put every caret past the first line on the wrong row.
+            var leading = vOffset > 0 ? 0 : _inkTopInLine / 2;
+            session.DrawRectangle(CaretBrush, new Rect(ox + c.X, oy + c.Y - leading, CaretWidth, c.Height));
         }
     }
 

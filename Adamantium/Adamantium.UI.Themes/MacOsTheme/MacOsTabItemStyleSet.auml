@@ -1,0 +1,152 @@
+<?xml version="1.0" encoding="utf-8"?>
+<StyleSet xmlns="http://adamantium/ui"
+          xmlns:x="http://adamantium/ui/xaml/extensions">
+
+    <!-- TabItem, macOS: a SEGMENT of a segmented control, not a paper tab. The whole difference is where the selection
+         is drawn. Fluent slides an accent bar along the strip and leaves the tab itself nearly flat; a Mac raises the
+         selected segment out of the groove as a capsule and says nothing else - no accent, no bar, no border on the
+         others. So the tab paints its own selected state here, and the strip's sliding indicator is switched off in
+         MacOsTabControlStyleSet rather than restyled: a bar is scaled to the tab's width by its RenderTransform, and a
+         corner radius scaled by the same transform is not a capsule, it is an ellipse. -->
+
+    <Style Selector="TabItem">
+        <Setter Property="Foreground" Value="{ObservableResource TextFillColorSecondary}"/>
+        <!-- Faint, and a wash rather than a fill: the unselected segments have no surface of their own, so anything
+             solid on hover would read as a second selection. -->
+        <Setter Property="BackgroundPointerOver" Value="{ResourceReference SubtleFillColorSecondary}"/>
+        <Setter Property="BackgroundSelected" Value="{ResourceReference ControlFillColorDefault}"/>
+        <Setter Property="ForegroundSelected" Value="{ResourceReference TextFillColorPrimary}"/>
+        <Setter Property="BorderBrush" Value="{ResourceReference ControlStrokeColorDefault}"/>
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="CornerRadius" Value="5"/>
+        <Setter Property="Padding" Value="12 3 12 4"/>
+        <Setter Property="FontSize" Value="{ResourceReference FontSizeChrome}"/>
+        <!-- CENTRED, unlike Fluent's left-aligned label: a segment's name sits in the middle of its capsule, and that is
+             what makes a row of them read as one control rather than as a list of headings. -->
+        <Setter Property="HorizontalContentAlignment" Value="Center"/>
+        <Setter Property="VerticalContentAlignment" Value="Center"/>
+    </Style>
+
+    <Style Selector="TabItem">
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="TabItem">
+                    <Border x:Name="TabBorder"
+                            CornerRadius="{TemplateBinding CornerRadius}"
+                            Background="{TemplateBinding Background}"
+                            BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}"
+                            Padding="{TemplateBinding Padding}">
+                        <!-- A GRID, not a stack: the middle track is starred, so a tab given MORE room than its content
+                             needs - a lone document filling its strip - hands the extra to the header and keeps the
+                             close button against the right edge. -->
+                        <Grid ColumnDefinitions="Auto,*,Auto,Auto" VerticalAlignment="Center">
+                            <!-- Collapsed by default and revealed by HasIcon: an empty presenter measures to nothing,
+                                 but its MARGIN is reserved regardless, and that gap pushes a centred label off-centre. -->
+                            <ContentPresenter x:Name="PART_Icon" Grid.Column="0"
+                                    VerticalAlignment="Center"
+                                    Visibility="Collapsed"
+                                    Margin="0 0 6 0"
+                                    Content="{TemplateBinding Icon}"
+                                    ContentTemplate="{TemplateBinding IconTemplate}"/>
+                            <ContentPresenter
+                                    x:Name="PART_ContentPresenter" Grid.Column="1"
+                                    HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                    VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
+                                    Foreground="{TemplateBinding Foreground}"
+                                    FontSize="{TemplateBinding FontSize}"
+                                    Content="{TemplateBinding Header}"
+                                    ContentTemplate="{TemplateBinding HeaderTemplate}"
+                                    ContentTemplateSelector="{TemplateBinding HeaderTemplateSelector}"/>
+                            <!-- Pin BEFORE close: pinning keeps the tab and closing loses it, and the more destructive
+                                 of the two belongs at the very edge. Its look is PinButtonTemplate. -->
+                            <ToggleButton x:Name="PART_PinButton" Grid.Column="2"
+                                    Template="{TemplateBinding PinButtonTemplate}"
+                                    Margin="6 0 0 0"
+                                    MinWidth="0" MinHeight="0" Padding="0"
+                                    VerticalAlignment="Center"
+                                    Visibility="Collapsed"/>
+                            <Button x:Name="PART_CloseButton" Grid.Column="3"
+                                    Template="{TemplateBinding CloseButtonTemplate}"
+                                    Margin="6 0 0 0"
+                                    MinWidth="0" MinHeight="0" Padding="0"
+                                    VerticalAlignment="Center"
+                                    Visibility="Collapsed"/>
+                        </Grid>
+                    </Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- The ONLY tab, filling its strip. It is the title of what is open, not one choice among several, so it does NOT
+         become a capsule: a capsule that spans the whole groove is just the groove repainted. It sits flat and takes
+         the primary text colour, which is the whole of what a Mac says here. -->
+    <Style Selector="TabItem[IsStretched=true]">
+        <Setter Property="BackgroundSelected" Value="Transparent"/>
+        <Setter Property="BackgroundPointerOver" Value="Transparent"/>
+        <Setter Property="CornerRadius" Value="0"/>
+        <Setter Property="HorizontalContentAlignment" Value="Left"/>
+    </Style>
+
+    <Style Selector="TabItem">
+        <PropertyTrigger Property="IsMouseOver" Value="true">
+            <Setter TargetName="TabBorder" Property="Background" Value="{TemplateBinding BackgroundPointerOver}"/>
+        </PropertyTrigger>
+        <PropertyTrigger Property="HasIcon" Value="true">
+            <Setter TargetName="PART_Icon" Property="Visibility" Value="Visible"/>
+        </PropertyTrigger>
+        <!-- AFTER the hover trigger on purpose: a selected segment stays a capsule while the pointer is over it, and the
+             later trigger is the one that wins the value stack. -->
+        <PropertyTrigger Property="IsSelected" Value="true">
+            <Setter TargetName="TabBorder" Property="Background" Value="{TemplateBinding BackgroundSelected}"/>
+            <Setter TargetName="PART_ContentPresenter" Property="Foreground" Value="{TemplateBinding ForegroundSelected}"/>
+        </PropertyTrigger>
+        <!-- Close reveals on hover and stays on the selected tab, but only where the owner enabled it. Off = Collapsed
+             (no space); on-but-idle = Hidden (RESERVES space so the tab does not jump when it reveals); on + hover or
+             selected = Visible. Later triggers win, so those two override the reserved Hidden. -->
+        <PropertyTrigger Property="ShowCloseButton" Value="true">
+            <Setter TargetName="PART_CloseButton" Property="Visibility" Value="Hidden"/>
+        </PropertyTrigger>
+        <MultiTrigger>
+            <MultiTrigger.Conditions>
+                <Condition Property="ShowCloseButton" Value="true"/>
+                <Condition Property="IsMouseOver" Value="true"/>
+            </MultiTrigger.Conditions>
+            <Setter TargetName="PART_CloseButton" Property="Visibility" Value="Visible"/>
+        </MultiTrigger>
+        <MultiTrigger>
+            <MultiTrigger.Conditions>
+                <Condition Property="ShowCloseButton" Value="true"/>
+                <Condition Property="IsSelected" Value="true"/>
+            </MultiTrigger.Conditions>
+            <Setter TargetName="PART_CloseButton" Property="Visibility" Value="Visible"/>
+        </MultiTrigger>
+        <PropertyTrigger Property="ShowPinButton" Value="true">
+            <Setter TargetName="PART_PinButton" Property="Visibility" Value="Hidden"/>
+        </PropertyTrigger>
+        <MultiTrigger>
+            <MultiTrigger.Conditions>
+                <Condition Property="ShowPinButton" Value="true"/>
+                <Condition Property="IsMouseOver" Value="true"/>
+            </MultiTrigger.Conditions>
+            <Setter TargetName="PART_PinButton" Property="Visibility" Value="Visible"/>
+        </MultiTrigger>
+        <MultiTrigger>
+            <MultiTrigger.Conditions>
+                <Condition Property="ShowPinButton" Value="true"/>
+                <Condition Property="IsSelected" Value="true"/>
+            </MultiTrigger.Conditions>
+            <Setter TargetName="PART_PinButton" Property="Visibility" Value="Visible"/>
+        </MultiTrigger>
+        <!-- A PINNED tab shows its tack always: it is the only way back, and a button you have to hunt for is not one. -->
+        <MultiTrigger>
+            <MultiTrigger.Conditions>
+                <Condition Property="ShowPinButton" Value="true"/>
+                <Condition Property="IsPinned" Value="true"/>
+            </MultiTrigger.Conditions>
+            <Setter TargetName="PART_PinButton" Property="Visibility" Value="Visible"/>
+        </MultiTrigger>
+    </Style>
+
+</StyleSet>

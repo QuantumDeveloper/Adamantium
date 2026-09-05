@@ -14,10 +14,6 @@
        sliders; then the LIST family (list, its row, and the menu row that shares its shape), the two progress
        indicators, the help tag, the divider and the resize corner.
 
-       STILL BORROWED, and the one worth naming: the TAB STRIP. A Mac's tabs are a segmented control rather than paper
-       tabs, so this is a re-drawing and not a re-colouring, and the Fluent set that does it is 683 lines of strip
-       machinery - scrolling, pinning, drag and drop. Not a thing to rewrite without watching it.
-
        SCAFFOLDING, SAID OUT LOUD: the STYLE SETS below, bar the macOS ones, are still Fluent's. That is not the
        finished shape - a theme owns its own sets, as Editor Pro does - it is what lets the chrome be looked at today
        instead of after fifty files. Each gets replaced by a macOS one as the work goes on, and this comment shrinks
@@ -75,8 +71,6 @@
         <StyleInclude Source="{x:Type fluent:KeyTipAdornerStyleSet}"/>
         <StyleInclude Source="{x:Type fluent:TilesHostStyleSet}"/>
         <StyleInclude Source="{x:Type fluent:FlipTileStyleSet}"/>
-        <StyleInclude Source="{x:Type fluent:TabControlStyleSet}"/>
-        <StyleInclude Source="{x:Type fluent:TabItemStyleSet}"/>
         <StyleInclude Source="{x:Type fluent:RibbonStyleSet}"/>
         
         <!-- The resize grip stays Fluent's, and that is a CORRECTION rather than a leftover. A macOS one was written -
@@ -85,10 +79,6 @@
              window with no resize borders at all: there the grip is the ONLY way to resize, and hiding it leaves no
              affordance and no other edge to try. -->
         <StyleInclude Source="{x:Type fluent:ResizeGripperStyleSet}"/>
-        <StyleInclude Source="{x:Type fluent:DockingStyleSet}"/>
-        <StyleInclude Source="{x:Type fluent:ColorPickerStyleSet}"/>
-        <StyleInclude Source="{x:Type fluent:ColorPickerButtonStyleSet}"/>
-        <StyleInclude Source="{x:Type fluent:ColorWheelStyleSet}"/>
 
         <!-- macOS's own. The ORDER of these is deliberately the one that used to break: the plain Button style set is
              LAST, after the caption that specialises Button into traffic lights. It stays that way as a standing check
@@ -123,6 +113,12 @@
         <StyleInclude Source="{x:Type mac:MacOsMenuStyleSet}"/>
         <StyleInclude Source="{x:Type mac:MacOsOverlayWindowStyleSet}"/>
         <StyleInclude Source="{x:Type mac:MacOsTreeViewStyleSet}"/>
+        <StyleInclude Source="{x:Type mac:MacOsTabControlStyleSet}"/>
+        <StyleInclude Source="{x:Type mac:MacOsTabItemStyleSet}"/>
+        <StyleInclude Source="{x:Type mac:MacOsDockingStyleSet}"/>
+        <StyleInclude Source="{x:Type mac:MacOsColorPickerStyleSet}"/>
+        <StyleInclude Source="{x:Type mac:MacOsColorPickerButtonStyleSet}"/>
+        <StyleInclude Source="{x:Type mac:MacOsColorWheelStyleSet}"/>
   </Theme.StyleIncludes>
 
 </Theme>

@@ -79,6 +79,15 @@
          body and was still being lost - this is another step and a half again. -->
     <PaletteColor Key="SelectionControlFillColorOff" Color="#5E5E61"/>
 
+    <!-- The GROOVE a segmented control's tabs sit in - see MacOsLight. Recessed means BELOW the window here, so it
+         goes darker than #323232 while the selected capsule rises to ControlFillColorDefault (#545456) above it. -->
+    <PaletteColor Key="SegmentedTrackColor" Color="#2A2A2C"/>
+
+    <!-- The same groove as a COLOUR, for the strip's edge fade - see MacOsLight for why one key cannot serve both
+         slots. -->
+    <PaletteColor Key="SegmentedTrackFadeColor" Color="#E62A2A2C" As="Color"/>
+    <PaletteColor Key="SegmentedTrackFadeColorTransparent" Color="#002A2A2C" As="Color"/>
+
     <!-- The overlay scroller's thumb. TRANSLUCENT, because an overlay scroller lies ON the content rather than in a
          gutter beside it: it has to be readable over a white paragraph and over a dark image, and only a colour that
          lets both through does that. -->
