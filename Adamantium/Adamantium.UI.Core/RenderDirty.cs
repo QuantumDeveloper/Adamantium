@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 
 namespace Adamantium.UI.Core;
 
@@ -313,4 +313,7 @@ public sealed class RenderDirtyScope
         _structuralUnknown = false;
         _finalForcedBuild = false;   // the post-settle walk ran; forcing ends (_forceUntilSettled survives Clear by design)
     }
+
 }
+
+

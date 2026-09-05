@@ -36,6 +36,13 @@ public class DiagnosticsOverlayBehavior : Behavior<TextBlock>
     private long _lastMeasure, _lastArrange, _lastBindings, _lastPresented;
     private double _windowElapsed, _windowMaxLayoutMs;
     private double _sumLayout, _sumBuild, _sumProc, _sumDraw, _sumProcs;   // per-frame sums -> averages over the window
+
+    // WHAT "other" WAS MADE OF. It used to be one residual with a comment naming three things at once - the GPU fence
+    // wait, the swapchain blit and Present - so a frame that got slower said only "something outside the renderer".
+    // Both halves were already measured and neither was shown; the third, the GC, was not measured at all and is the
+    // one that decides an FPS figure most often (a loop that never stalls still loses frames to a collection).
+    private double _sumWait, _sumPresent;
+    private TimeSpan _lastGcPause;
     private int _windowFrames;
     private bool _windowDeferred;
     private bool _running;
@@ -44,6 +51,26 @@ public class DiagnosticsOverlayBehavior : Behavior<TextBlock>
     private long _peakUnits, _lastCreated, _lastUpdated, _lastCommands;   // TEMP: busiest build second
     private int _second;   // TEMP: index in the appended history
     private double _windowMaxRecord, _windowMaxApply;
+
+    // The same three the plate now names, kept for the FILE as well: a dump that says the build cost nothing and stops
+    // there leaves the frame unaccounted for, which is exactly where this measurement kept ending up. Maxima for the
+    // two waits (a spike is one frame and an average hides it) and the SUM for the collector, because what a second
+    // lost to it is the whole question.
+    private double _windowMaxWait, _windowMaxPresent, _windowGcMs;
+
+    // The rest of the RENDER frame, which the loop's budget says nothing about: a presented frame is draw plus these,
+    // and while only the fence wait and Present were shown, a draw that halved without the frame rate moving had
+    // nowhere to be explained from.
+    private double _windowMaxBegin, _windowMaxEnd, _windowMaxSubmit, _windowMaxPre;
+
+    // ...and the two that CLOSE the accounting: what a loop frame cost, and what the entity processors took out of it.
+    // Without them the file lists a handful of tenths and stops, while the frame it is describing is eight
+    // milliseconds - and a reader is left to assume the rest is the part that was named.
+    private double _windowMaxFrame, _windowMaxProcs, _secMaxFrame, _secMaxProcs, _windowMaxDraw;
+
+    // The worst draw's own phases, so the four numbers describe ONE frame - see where they are taken.
+    private double _drawSetup, _drawPaint, _drawMoved, _drawOps, _drawWalk, _drawAnim, _drawArena, _drawBrush;
+    private bool _drawReplayed;
 
     // TEMP: WHO entered or left the drawn set over the last second. Every one of these is a structural change, and a
     // structural change is the one thing that can still cost a walk of the whole window - so when a spike is reproduced
@@ -127,8 +154,35 @@ public class DiagnosticsOverlayBehavior : Behavior<TextBlock>
         _sumProc   += RuntimeStats.LastRenderProcMs;
         _sumDraw   += RuntimeStats.LastRenderDrawMs;
         _sumProcs  += RuntimeStats.LastProcessorsMs;
+        _sumWait   += Adamantium.Graphics.GraphicsDevice.LastFenceWaitMs;
+        _sumPresent += RuntimeStats.LastPresentMs;
         if (RuntimeStats.LastRecordMs > _windowMaxRecord) _windowMaxRecord = RuntimeStats.LastRecordMs;
         if (RuntimeStats.LastApplyMs > _windowMaxApply) _windowMaxApply = RuntimeStats.LastApplyMs;
+        if (Adamantium.Graphics.GraphicsDevice.LastFenceWaitMs > _windowMaxWait)
+            _windowMaxWait = Adamantium.Graphics.GraphicsDevice.LastFenceWaitMs;
+        if (RuntimeStats.LastPresentMs > _windowMaxPresent) _windowMaxPresent = RuntimeStats.LastPresentMs;
+        if (RuntimeStats.LastProcessorsMs > _windowMaxProcs) _windowMaxProcs = RuntimeStats.LastProcessorsMs;
+        if (RuntimeStats.LastBeginDrawMs > _windowMaxBegin) _windowMaxBegin = RuntimeStats.LastBeginDrawMs;
+        if (RuntimeStats.LastEndDrawMs > _windowMaxEnd) _windowMaxEnd = RuntimeStats.LastEndDrawMs;
+        if (RuntimeStats.LastSubmitMs > _windowMaxSubmit) _windowMaxSubmit = RuntimeStats.LastSubmitMs;
+        if (RuntimeStats.LastPreRenderMs > _windowMaxPre) _windowMaxPre = RuntimeStats.LastPreRenderMs;
+        if (RuntimeStats.LastRenderDrawMs > _windowMaxDraw) _windowMaxDraw = RuntimeStats.LastRenderDrawMs;
+
+        // Taken from the SAME frame as the draw they explain: sampling each phase's own maximum would report four
+        // different frames' worst moments as though they were one frame, and their sum would then exceed any draw that
+        // ever happened.
+        if (RuntimeStats.LastRenderDrawMs >= _windowMaxDraw)
+        {
+            _drawSetup = RuntimeStats.LastDrawSetupMs;
+            _drawPaint = RuntimeStats.LastDrawPaintMs;
+            _drawMoved = RuntimeStats.LastDrawMovedMs;
+            _drawOps = RuntimeStats.LastDrawOpsMs;
+            _drawWalk = RuntimeStats.LastDrawWalkMs;
+            _drawReplayed = RuntimeStats.LastDrawReplayed;
+            _drawAnim = RuntimeStats.LastDrawAnimMs;
+            _drawArena = RuntimeStats.LastDrawArenaPaintMs;
+            _drawBrush = RuntimeStats.LastDrawBrushRepaintMs;
+        }
         if (_windowElapsed < RefreshSeconds) return false;
 
         var measure = MeasurableUIComponent.TotalMeasureCalls;
@@ -150,12 +204,27 @@ public class DiagnosticsOverlayBehavior : Behavior<TextBlock>
         var frameMs = _windowElapsed * 1000.0 * f;
         var avgLayout = _sumLayout * f;
         var avgBuild = _sumBuild * f; var avgProc = _sumProc * f; var avgDraw = _sumDraw * f; var avgProcs = _sumProcs * f;
-        var other = Math.Max(0, frameMs - avgLayout - avgBuild - avgProc - avgDraw - avgProcs);
+        var avgWait = _sumWait * f; var avgPresent = _sumPresent * f;
+
+        // The collector's OWN stall, which no per-frame stopwatch in the loop can see: the runtime reports the total
+        // time the managed threads were paused, so the delta over this window divided by its frames is what a collection
+        // cost each of them. A loop whose every measured part is fast and whose frame rate is still half of what it was
+        // is the case this exists for.
+        var gcPause = GC.GetTotalPauseDuration();
+        var gcWindowMs = (gcPause - _lastGcPause).TotalMilliseconds;
+        var avgGc = gcWindowMs * f;
+        _lastGcPause = gcPause;
+        _windowGcMs += gcWindowMs;
+        if (frameMs > _secMaxFrame) _secMaxFrame = frameMs;
+        if (_windowMaxProcs > _secMaxProcs) _secMaxProcs = _windowMaxProcs;
+
+        var other = Math.Max(0, frameMs - avgLayout - avgBuild - avgProc - avgDraw - avgProcs - avgWait - avgPresent - avgGc);
 
         target.Text =
             $"render {renderFps,5:F0} fps     loop {fps,5:F0} fps\n" +
             $"frame {frameMs,5:F1} ms   layout {avgLayout,5:F2} (max {_windowMaxLayoutMs,4:F1}){(_windowDeferred ? " [DEFERRED]" : "")}\n" +
             $"build/proc/draw  {avgBuild,4:F1} / {avgProc,4:F1} / {avgDraw,4:F1} ms\n" +
+            $"gpuWait {avgWait,5:F2}  present {avgPresent,5:F2}  gc {avgGc,5:F2} ms\n" +
             $"processors {avgProcs,4:F1}    other {other,4:F1} ms\n" +
             $"measure/arrange  {measure - _lastMeasure} / {arrange - _lastArrange}\n" +
             $"bindings {bindings - _lastBindings}    anim {AnimationManager.ActiveCount}";
@@ -206,9 +275,31 @@ public class DiagnosticsOverlayBehavior : Behavior<TextBlock>
 
             // MAXIMA over the window, not the value that happened to be current at the dump - a spike lasts one frame and
             // the dump reads a quiet one.
+            // Everything the loop actually DID this second, at its worst. Compared against the pacing budget below.
+            var work = _windowMaxRecord + _windowMaxApply + _windowMaxLayoutMs + _windowMaxWait
+                       + _windowMaxPresent + _secMaxProcs;
+
             var build = $"record max {_windowMaxRecord:F2} ms   apply max {_windowMaxApply:F2} ms\n" +
                         $"units created {created}   updated {updated}   commands {commands}\n" +
-                        $"measure {measure - _lastMeasure}   arrange {arrange - _lastArrange}   maxLayout {_windowMaxLayoutMs:F1} ms\n";
+                        $"measure {measure - _lastMeasure}   arrange {arrange - _lastArrange}   maxLayout {_windowMaxLayoutMs:F1} ms\n" +
+                        $"gpuWait max {_windowMaxWait:F2} ms   present max {_windowMaxPresent:F2} ms   " +
+                        $"gc {_windowGcMs:F2} ms this second\n" +
+                        $"draw max {_windowMaxDraw:F2} ms   presented {renderFps:F0} fps\n" +
+                        $"  of that draw ({(_drawReplayed ? "REPLAY" : "WALK")}): setup {_drawSetup:F2}  paint {_drawPaint:F2}  " +
+                        $"moved {_drawMoved:F2}  ops {_drawOps:F2}  walk {_drawWalk:F2} ms\n" +
+                        $"    paint = anim {_drawAnim:F2} + arena {_drawArena:F2} + brushes {_drawBrush:F2} ms\n" +
+                        $"render frame rest: preRender {_windowMaxPre:F2}  beginDraw {_windowMaxBegin:F2}  " +
+                        $"overlays {_windowMaxProcs:F2}  endDraw {_windowMaxEnd:F2}  submit {_windowMaxSubmit:F2}  " +
+                        $"present {_windowMaxPresent:F2} ms\n" +
+                        $"loop frame max {_secMaxFrame:F2} ms (paced to {Adamantium.UI.UIApplication.UpdateRateHz} Hz " +
+                        $"= {1000.0 / Math.Max(1, Adamantium.UI.UIApplication.UpdateRateHz):F2} ms)   " +
+                        $"processors max {_secMaxProcs:F2} ms\n" +
+                        // The remainder against the PACING BUDGET, not against the frame. The update thread is capped, so
+                        // a frame that fits inside its budget spends the rest ASLEEP - and subtracting the parts from the
+                        // whole frame reports that sleep as eight unexplained milliseconds, which is the wrong thing to
+                        // go looking for. What is worth naming is the work that fits nowhere: only if this grows past
+                        // the budget is the loop actually behind.
+                        $"work {work:F2} ms of budget   over budget {Math.Max(0, work - 1000.0 / Math.Max(1, Adamantium.UI.UIApplication.UpdateRateHz)):F2} ms\n";
             System.IO.File.WriteAllText(@"C:\AdamantiumEngine\build.log", build);
             if (created + updated > _peakUnits)
             {
@@ -257,7 +348,10 @@ public class DiagnosticsOverlayBehavior : Behavior<TextBlock>
         _secondLoopFrames += _windowFrames;
         _windowElapsed = 0; _windowFrames = 0; _windowMaxLayoutMs = 0; _windowDeferred = false;
         _windowMaxRecord = 0; _windowMaxApply = 0;
-        _sumLayout = _sumBuild = _sumProc = _sumDraw = _sumProcs = 0;
+        _windowMaxWait = 0; _windowMaxPresent = 0; _windowGcMs = 0;
+        _secMaxFrame = 0; _secMaxProcs = 0; _windowMaxProcs = 0; _windowMaxFrame = 0; _windowMaxDraw = 0;
+        _windowMaxBegin = 0; _windowMaxEnd = 0; _windowMaxSubmit = 0; _windowMaxPre = 0;
+        _sumLayout = _sumBuild = _sumProc = _sumDraw = _sumProcs = _sumWait = _sumPresent = 0;
         return false;   // keep ticking
     }
 }

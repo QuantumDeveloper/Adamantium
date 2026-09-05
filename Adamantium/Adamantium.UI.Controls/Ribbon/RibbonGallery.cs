@@ -89,6 +89,33 @@ public class RibbonGallery : Selector
             Clamp();
             RefreshDropDown();
         };
+
+        MouseWheel += OnMouseWheel;
+    }
+
+    // The band shows a WINDOW onto the rows - two of however many the items make - and the arrows beside it were the
+    // only way to move it. A wheel over a grid of choices is what a person reaches for first, and one that does nothing
+    // reads as a gallery with nothing more in it.
+    // At the end of the run the event is LEFT UNHANDLED, the same chaining rule ScrollViewer follows: a gallery that
+    // has stopped must hand the wheel back so the strip around it still scrolls, rather than dead-ending under the
+    // pointer. A tilt wheel is not this control's axis and is passed straight through.
+    private void OnMouseWheel(object sender, Core.Input.MouseWheelEventArgs e)
+    {
+        if (e.IsHorizontal) return;
+
+        var rows = Math.Max(1, Math.Abs(e.Delta) / 120);
+        if (e.Delta > 0)
+        {
+            if (!CanScrollUp) return;
+            FirstRow -= rows;
+        }
+        else
+        {
+            if (!CanScrollDown) return;
+            FirstRow += rows;
+        }
+
+        e.Handled = true;
     }
 
     static RibbonGallery()

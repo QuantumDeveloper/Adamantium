@@ -185,7 +185,10 @@ public class MergedFluentThemeTests
         // The styles are the expensive half - the half a theme swap rebuilds and a variant switch must not touch. The
         // pair this replaced listed 49 style sets each (identical lists); losing one would leave a control unstyled in
         // a way no colour test would notice.
-        Assert.That(merged.StyleIncludes.Count, Is.EqualTo(49));
+        // 50 rather than 49 since the busy indicator was SPLIT: the plain one stayed Fluent's, and the nine classed
+        // effects moved to Shared/BusyEffectsStyleSet, which belongs to no theme. Nothing was lost - one entry became
+        // two - and the count is raised deliberately rather than the guarantee relaxed.
+        Assert.That(merged.StyleIncludes.Count, Is.EqualTo(50));
     }
 
     [Test]

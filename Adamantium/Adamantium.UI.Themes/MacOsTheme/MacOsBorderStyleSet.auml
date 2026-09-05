@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<StyleSet xmlns="http://adamantium/ui">
+
+    <!-- Transparent, not filled: a Border is as often a hit region as a surface. -->
+    <Style Selector="Border">
+        <Setter Property="BorderBrush" Value="{ResourceReference ControlStrokeColorDefault}"/>
+        <Setter Property="Background" Value="Transparent"/>
+    </Style>
+
+</StyleSet>

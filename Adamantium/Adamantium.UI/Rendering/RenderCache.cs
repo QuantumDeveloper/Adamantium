@@ -45,7 +45,28 @@ public partial class RenderCache
         // RectBatchCollector.TryAdd. Small and dense (an int per group, never reused within a frame).
         public int Tag;
 
+        // WRITTEN THROUGH THE TWO METHODS BELOW, not directly. A reader that keeps a derived list of these units (the
+        // pre-render sweep does) has to know when the membership moved, and the walk's own version does not say so:
+        // units enter a group from the instanced-fill flush and leave when the apply path empties one, neither of which
+        // is a walk. Reading the list stays a plain field access; only the two writes announce themselves.
         public readonly List<IRenderUnit> Units = new();
+
+        private static long _membership;
+
+        /// <summary>How many times ANY group's unit list has been rebuilt or emptied.</summary>
+        public static long MembershipVersion => System.Threading.Interlocked.Read(ref _membership);
+
+        /// <summary>Say that some group's units have changed. Called where the list is REBUILT (BuildUnitsFor, which
+        /// adds, replaces and drops in one pass through a local alias) rather than per element - the readers only need
+        /// to know that their derived lists are stale, and a component re-records far less often than a frame runs.</summary>
+        public static void BumpMembership() => System.Threading.Interlocked.Increment(ref _membership);
+
+        public void ClearUnits()
+        {
+            if (Units.Count == 0) return;
+            Units.Clear();
+            BumpMembership();
+        }
 
         // Per-group batch slot runs + the ARENA they live in, for the spliced-patch draw path. One arena per group: a
         // group whose units land in two different families has no single segment to repair and falls back to the walk,
@@ -188,6 +209,16 @@ public partial class RenderCache
     // The brushes found stale this frame. Collected first and patched after, so the map above is not written while it
     // is being read; reused between frames so the check allocates nothing.
     private readonly List<Core.Media.Brush> _repaintedBrushes = new();
+
+    // The application-wide paint epoch this cache last scanned its brush map at - see ApplyBrushRepaints. Starts at -1
+    // so the first frame scans: a cache built while brushes were already being baked has a map to reconcile.
+    private long _brushEpochSeen = -1;
+
+    // The units with anything to do out of the render pass, and the two versions that say when that list is stale: the
+    // walk that (re)grouped the units, and the application-wide count of units gaining or losing machinery.
+    private readonly List<IRenderUnit> _preRenderUnits = new();
+    private long _preRenderWalkVersion = -1;         // the group MEMBERSHIP version this list was built at
+    private long _preRenderMachineryVersion = -1;
 
     private void IndexUnitBrush(IUIComponent _, IRenderUnit unit, Core.Media.Brush liveBrush)
     {

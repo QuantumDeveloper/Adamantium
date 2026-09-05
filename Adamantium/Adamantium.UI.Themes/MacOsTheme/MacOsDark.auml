@@ -88,6 +88,10 @@
     <PaletteColor Key="SegmentedTrackFadeColor" Color="#E62A2A2C" As="Color"/>
     <PaletteColor Key="SegmentedTrackFadeColorTransparent" Color="#002A2A2C" As="Color"/>
 
+    <!-- The ribbon band's own fade - see MacOsLight. The band is the well, so the fade is the well's colour. -->
+    <PaletteColor Key="BandFadeColor" Color="#E6232325" As="Color"/>
+    <PaletteColor Key="BandFadeColorTransparent" Color="#00232325" As="Color"/>
+
     <!-- The overlay scroller's thumb. TRANSLUCENT, because an overlay scroller lies ON the content rather than in a
          gutter beside it: it has to be readable over a white paragraph and over a dark image, and only a colour that
          lets both through does that. -->
@@ -105,6 +109,9 @@
     <!-- The knob while it is HELD - see MacOsLight for why the glow cannot carry this on its own. -->
     <PaletteColor Key="SliderKnobFillPressed" Color="#D6D6D8"/>
     <PaletteColor Key="SliderKnobRimColor" Color="#BFBFC4"/>
+
+    <!-- Stays light here too - see MacOsLight. -->
+    <PaletteColor Key="SelectionHandleFill" Color="#FFFFFF"/>
     <PaletteColor Key="PinLightColor" Color="#8E8E93"/>
 
     <!-- On the accent: a Mac presses a control by DARKENING it rather than by veiling it in white. -->

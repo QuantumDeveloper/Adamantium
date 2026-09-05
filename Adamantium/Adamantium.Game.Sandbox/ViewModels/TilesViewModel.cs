@@ -9,8 +9,15 @@ namespace Adamantium.Game.Sandbox.ViewModels;
 [ViewModel]
 public partial class TilesViewModel : TabPageViewModel
 {
-    public const int Columns = 12;
-    public const int Rows = 7;
+    private const int ColumnCount = 12;
+    private const int RowCount = 7;
+
+    /// <summary>The board's shape. Exposed so the view BINDS to it instead of restating it: the tile count and the grid
+    /// the photo is cut into are one fact, and the view used to spell it out again in pixels.</summary>
+    public int Columns => ColumnCount;
+
+    /// <summary>The board's rows - see <see cref="Columns"/>.</summary>
+    public int Rows => RowCount;
 
     private static readonly string[] Palette =
         ["#3B82F6", "#22C55E", "#F59E0B", "#EF4444", "#8B5CF6", "#14B8A6", "#EC4899", "#EAB308"];
@@ -23,9 +30,9 @@ public partial class TilesViewModel : TabPageViewModel
 
     public TilesViewModel() : base("Tiles 3D")
     {
-        var tiles = new List<TileItem>(Columns * Rows);
-        for (var row = 0; row < Rows; row++)
-        for (var col = 0; col < Columns; col++)
+        var tiles = new List<TileItem>(ColumnCount * RowCount);
+        for (var row = 0; row < RowCount; row++)
+        for (var col = 0; col < ColumnCount; col++)
         {
             tiles.Add(new TileItem(Palette[(row + col) % Palette.Length]));
         }

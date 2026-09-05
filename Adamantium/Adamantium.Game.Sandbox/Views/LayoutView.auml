@@ -25,12 +25,16 @@
     <Grid RowDefinitions="Auto,*" Margin="24">
         <StackPanel Grid.Row="0" Orientation="Horizontal">
             <TextBlock Text="Width:" VerticalAlignment="Center"/>
-            <Slider Width="180" Minimum="24" Maximum="240" Value="{Binding CellWidth, Mode=TwoWay}" Margin="8,0,0,0"
+            <!-- The range comes from the view-model, which also decides the size the tab opens at - the same number in
+                 markup and in code is how the two drift apart. -->
+            <Slider Width="180" Minimum="{Binding MinCell}" Maximum="{Binding MaxCell}"
+                    Value="{Binding CellWidth, Mode=TwoWay}" Margin="8,0,0,0"
                     TickFrequency="1" IsSnapToTickEnabled="true"/>
             <TextBlock Text="{Binding CellWidth}" VerticalAlignment="Center" FontSize="16" Margin="8,0,0,0"/>
 
             <TextBlock Text="Height:" VerticalAlignment="Center" Margin="20,0,0,0"/>
-            <Slider Width="180" Minimum="24" Maximum="240" Value="{Binding CellHeight, Mode=TwoWay}" Margin="8,0,0,0"
+            <Slider Width="180" Minimum="{Binding MinCell}" Maximum="{Binding MaxCell}"
+                    Value="{Binding CellHeight, Mode=TwoWay}" Margin="8,0,0,0"
                     TickFrequency="1" IsSnapToTickEnabled="true"/>
             <TextBlock Text="{Binding CellHeight}" VerticalAlignment="Center" FontSize="16" Margin="8,0,0,0"/>
 
@@ -75,11 +79,19 @@
                     </DataTrigger>
                 </Style>
             </ListBox.Styles>
+            <!-- These rows carry NO chrome: a tile is the whole row, and the cell is the demo's number. A theme whose
+                 rows inset their selection plate (macOS puts it in 4 and down 1) spends that out of the tile, which at
+                 the minimum cell of 24 is a third of the width and none of the height - so the tiles come out narrow.
+                 The inset is a keyed value, so saying it here is how a view opts out of it. -->
             <ListBox.ItemContainerStyle>
                 <Style Selector="ListBoxItem">
                     <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
                     <Setter Property="VerticalContentAlignment" Value="Stretch"/>
                     <Setter Property="Padding" Value="0"/>
+                    <!-- ...and no inset either: the tile IS the row. A theme that insets its selection plate spends
+                         that out of the tile, and at the minimum cell of 24 macOS's 4-across-1-down is a third of the
+                         width and none of the height - so the tiles come out narrow while both sliders read 24. -->
+                    <Setter Property="Margin" Value="0"/>
                 </Style>
             </ListBox.ItemContainerStyle>
             <ListBox.ItemsPanel>

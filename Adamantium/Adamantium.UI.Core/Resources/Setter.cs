@@ -34,11 +34,15 @@ public class Setter : ISetter, IEquatable<Setter>
             case ResourceReference resourceReference:
                 ApplyResourceReference(component, style, theme, resourceReference);
                 break;
+            // The STYLE is the token: a live resource connection belongs to the style that made it. Without that, two
+            // styles writing the same property at the same priority - which is exactly what a theme swap has, for the
+            // few frames both are attached - share one slot, and whichever leaves last tears down the connection the
+            // other established.
             case ThemeResource themeResource:
-                themeResource.Apply(component, Property, SlotFor(component, style));
+                themeResource.Apply(component, Property, SlotFor(component, style), style);
                 break;
             case ObservableResource observableResource:
-                observableResource.Apply(component, Property, SlotFor(component, style));
+                observableResource.Apply(component, Property, SlotFor(component, style), style);
                 break;
             case Ancestor ancestor:
                 ancestor.Apply(component, Property);
@@ -116,10 +120,10 @@ public class Setter : ISetter, IEquatable<Setter>
                 component.RemoveBinding(Property);
                 break;
             case ThemeResource:
-                ThemeResource.Remove(component, Property, SlotFor(component, style));
+                ThemeResource.Remove(component, Property, SlotFor(component, style), style);
                 break;
             case ObservableResource:
-                ObservableResource.Remove(component, Property, SlotFor(component, style));
+                ObservableResource.Remove(component, Property, SlotFor(component, style), style);
                 break;
             case Ancestor:
             case Self:

@@ -16,6 +16,8 @@
     <Style Selector="TextBlock">
         <Setter Property="Foreground" Value="{ObservableResource TextFillColorPrimary}"/>
         <Setter Property="FontSize" Value="{ResourceReference FontSizeBody}"/>
+        <!-- The property's own default is Bottom - see Fluent's copy for why that is not what changes. -->
+        <Setter Property="VerticalTextAlignment" Value="Center"/>
     </Style>
 
 </StyleSet>

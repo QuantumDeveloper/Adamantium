@@ -53,14 +53,26 @@ public class ThemeResource : MarkupExtension
     public static void Remove(IFundamentalUIComponent target, string propertyName, ValuePriority priority, object token = null)
     {
         if (!_applied.TryGetValue(target, out var map)) return;
-        if (map.Remove((propertyName + "@" + priority, token), out var expression))
+        if (!map.Remove((propertyName + "@" + priority, token), out var expression)) return;
+
+        expression.CloseConnection();
+
+        // The same rule as ObservableResource.Remove, and for the same reason: while a theme swap has both styles
+        // attached, two of them own this property at this priority, and the one that leaves must not take the other's
+        // connection - or its value - with it.
+        var slot = propertyName + "@" + priority;
+        foreach (var pair in map)
         {
-            expression.CloseConnection();
-            if (priority == ValuePriority.Trigger && token != null)
-                target.ClearTriggerValue(target.GetProperty(propertyName), token);
-            else
-                target.ClearValue(propertyName, priority);
+            if (pair.Key.Slot != slot) continue;
+
+            pair.Value.UpdateTarget();
+            return;
         }
+
+        if (priority == ValuePriority.Trigger && token != null)
+            target.ClearTriggerValue(target.GetProperty(propertyName), token);
+        else
+            target.ClearValue(propertyName, priority);
     }
 
     public override object ProvideObject(MarkupContext context)

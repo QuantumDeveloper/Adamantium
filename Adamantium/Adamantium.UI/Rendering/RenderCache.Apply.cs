@@ -640,7 +640,7 @@ public partial class RenderCache
                 if (!draw.WasGeometryValid && _groupById.TryGetValue(draw.Component.RenderId, out var emptied))
                 {
                     foreach (var unit in emptied.Units) unit?.DeferDispose();
-                    emptied.Units.Clear();
+                    emptied.ClearUnits();
                 }
                 continue;
             }

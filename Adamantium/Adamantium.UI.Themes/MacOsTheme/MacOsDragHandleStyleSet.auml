@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<StyleSet xmlns="http://adamantium/ui"
+          xmlns:x="http://adamantium/ui/xaml/extensions">
+
+    <!-- Three horizontal lines - the reorder grip this platform uses. The Transparent background is load-bearing: the
+         drag engine tests the control's BOUNDS, so without it the grip is three two-pixel targets. -->
+    <Style Selector="DragHandle">
+        <Setter Property="Width" Value="{ResourceReference DragHandleWidth}"/>
+        <Setter Property="Height" Value="{ResourceReference DragHandleHeight}"/>
+        <Setter Property="Foreground" Value="{ObservableResource TextFillColorTertiary}"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="DragHandle">
+                    <Border Background="Transparent">
+                        <StackPanel Orientation="Vertical" Spacing="3"
+                                    HorizontalAlignment="Center" VerticalAlignment="Center">
+                            <Border Width="12" Height="2" CornerRadius="1" Background="{TemplateBinding Foreground}"/>
+                            <Border Width="12" Height="2" CornerRadius="1" Background="{TemplateBinding Foreground}"/>
+                            <Border Width="12" Height="2" CornerRadius="1" Background="{TemplateBinding Foreground}"/>
+                        </StackPanel>
+                    </Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style Selector="DragHandle">
+        <PropertyTrigger Property="IsMouseOver" Value="true">
+            <Setter Property="Foreground" Value="{ObservableResource TextFillColorPrimary}"/>
+        </PropertyTrigger>
+    </Style>
+
+</StyleSet>

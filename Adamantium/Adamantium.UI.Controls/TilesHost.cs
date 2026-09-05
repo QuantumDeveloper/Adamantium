@@ -1,11 +1,6 @@
-using System;
-using System.Collections.Generic;
-using Adamantium.Mathematics;
 using Adamantium.UI.Controls.Generators;
-using Adamantium.UI.Controls.Panels;
 using Adamantium.UI.Core;
 using Adamantium.UI.Core.Input;
-using Adamantium.UI.Core.Media;
 using Adamantium.UI.Core.Media.Imaging;
 using Adamantium.UI.Core.RoutedEvents;
 
@@ -25,6 +20,23 @@ public class TilesHost : ItemsControl
     public static readonly AdamantiumProperty PhotoProperty = AdamantiumProperty.Register(nameof(Photo),
         typeof(ImageSource), typeof(TilesHost), new PropertyMetadata(null, OnPhotoChanged));
 
+    /// <summary>How many tiles stand in a row. The board's SHAPE belongs to the board, not to whatever panel happens to
+    /// lay it out: a tile's slice of the photo is a function of its item index AND this number, so a control that had to
+    /// read the shape back off its panel would answer differently - or not at all - the moment somebody templated a
+    /// different one in. The theme's ItemsPanel is handed these; see the TilesHost style sets.</summary>
+    public static readonly AdamantiumProperty ColumnsProperty = AdamantiumProperty.Register(nameof(Columns),
+        typeof(int), typeof(TilesHost), new PropertyMetadata(0, PropertyMetadataOptions.AffectsMeasure));
+
+    /// <summary>How many rows the board stands in. Left at zero it follows from <see cref="Columns"/> and the item
+    /// count, which is the usual case - a board is authored as "twelve across".</summary>
+    public static readonly AdamantiumProperty RowsProperty = AdamantiumProperty.Register(nameof(Rows),
+        typeof(int), typeof(TilesHost), new PropertyMetadata(0, PropertyMetadataOptions.AffectsMeasure));
+
+    /// <summary>The gap between tiles, stated once for the board rather than as a margin on every tile - so a tile is
+    /// exactly its cell, which is what lets the photo's lines run straight across the gaps.</summary>
+    public static readonly AdamantiumProperty SpacingProperty = AdamantiumProperty.Register(nameof(Spacing),
+        typeof(double), typeof(TilesHost), new PropertyMetadata(0.0, PropertyMetadataOptions.AffectsMeasure));
+
     /// <summary>Board state: setting it flips every tile as a diagonal wave (see <see cref="WaveDuration"/>).</summary>
     public static readonly AdamantiumProperty IsFlippedProperty = AdamantiumProperty.Register(nameof(IsFlipped),
         typeof(bool), typeof(TilesHost), new PropertyMetadata(false, OnIsFlippedChanged));
@@ -43,6 +55,9 @@ public class TilesHost : ItemsControl
         typeof(double), typeof(TilesHost), new PropertyMetadata(0.6));
 
     public ImageSource Photo { get => GetValue<ImageSource>(PhotoProperty); set => SetValue(PhotoProperty, value); }
+    public int Columns { get => GetValue<int>(ColumnsProperty); set => SetValue(ColumnsProperty, value); }
+    public int Rows { get => GetValue<int>(RowsProperty); set => SetValue(RowsProperty, value); }
+    public double Spacing { get => GetValue<double>(SpacingProperty); set => SetValue(SpacingProperty, value); }
     public bool IsFlipped { get => GetValue<bool>(IsFlippedProperty); set => SetValue(IsFlippedProperty, value); }
     public double TiltMaxAngle { get => GetValue<double>(TiltMaxAngleProperty); set => SetValue(TiltMaxAngleProperty, value); }
     public double TiltAnglePerPixel { get => GetValue<double>(TiltAnglePerPixelProperty); set => SetValue(TiltAnglePerPixelProperty, value); }
@@ -106,36 +121,53 @@ public class TilesHost : ItemsControl
         if (_tiles.Count == 0) return;
         var photo = Photo;
 
-        // Prefer INDEX-BASED UVs on a uniform grid (WrapPanel): each tile's photo slice is a function of its ABSOLUTE item
-        // index + the grid metrics, NOT of the realized-tile bounds union. So virtualization can realize only the visible
-        // window and every realized tile still samples its correct slice of the ONE shared photo. The union approach below
-        // only sees the realized tiles, so with virtualization it would map the whole photo over each visible page (the
-        // image tiling per screenful). Falls back to the union when the panel isn't a uniform horizontal grid.
-        if (FindWrapPanel() is { Orientation: Orientation.Horizontal } wrap
-            && wrap.Columns > 0 && wrap.CellFlow > 0 && wrap.CellScroll > 0)
-            AssignFragmentsByIndex(photo, wrap);
+        // Prefer INDEX-BASED UVs on a uniform grid: each tile's photo slice is a function of its ABSOLUTE item index +
+        // the grid metrics, NOT of the realized-tile bounds union. So virtualization can realize only the visible window
+        // and every realized tile still samples its correct slice of the ONE shared photo. The union approach below only
+        // sees the realized tiles, so with virtualization it would map the whole photo over each visible page (the image
+        // tiling per screenful). Falls back to the union when the panel is not a uniform grid at all.
+        if (DescribeGrid() is { } grid)
+            AssignFragmentsByIndex(photo, grid);
         else
             AssignFragmentsByUnion(photo);
     }
 
+    /// <summary>The grid the photo is mapped over: how many columns, the cell PITCH on each axis (cell + gap), and the
+    /// TILE inside that cell. Null when the board was never told its shape.</summary>
+    /// <remarks>Built from THIS control's <see cref="Columns"/>/<see cref="Rows"/>/<see cref="Spacing"/> and the space
+    /// the items panel was given - never from the panel's own type or settings. Reading the shape back off the panel
+    /// worked exactly as long as the panel stayed the one this was written against; the moment a different one is
+    /// templated in, the same question has no answer and every tile falls back to a slice cut from the realized ones.
+    /// The SIZE still has to come from the panel, because only the panel knows what was left after the template's
+    /// chrome and scrollbars - but a size is a size whatever lays it out.</remarks>
+    private TileGrid? DescribeGrid()
+    {
+        var count = Items.Count;
+        if (count == 0) return null;
+
+        var cols = Columns > 0 ? Columns : Rows > 0 ? (count + Rows - 1) / Rows : 0;
+        if (cols <= 0) return null;
+
+        var rows = Rows > 0 ? Rows : (count + cols - 1) / cols;
+        var box = ItemsHostPanel?.RenderSize ?? default;
+        var tileW = (box.Width - (cols - 1) * Spacing) / cols;
+        var tileH = (box.Height - (rows - 1) * Spacing) / rows;
+        if (tileW <= 0 || tileH <= 0) return null;
+
+        return new TileGrid(cols, tileW + Spacing, tileH + Spacing, tileW, tileH);
+    }
+
+    private readonly record struct TileGrid(int Columns, double CellW, double CellH, double TileW, double TileH);
+
     // Photo maps over the full grid: cell PITCH (incl. gap) spaces the columns/rows, each tile samples the tile-sized slot
     // inside its cell, so image lines run straight across the inter-tile gaps - exactly the union result, reconstructed
     // from the item index instead of measured bounds (so off-screen/virtualized tiles don't distort it).
-    private void AssignFragmentsByIndex(ImageSource photo, WrapPanel wrap)
+    private void AssignFragmentsByIndex(ImageSource photo, TileGrid grid)
     {
-        var cols = wrap.Columns;
-        var cellW = wrap.CellFlow;
-        var cellH = wrap.CellScroll;
+        var (cols, cellW, cellH, tileW, tileH) = grid;
         var count = Items.Count;
         var rows = (count + cols - 1) / cols;
 
-        // Tile size from the item template's MARGIN, not the arranged Bounds: a tile realized THIS frame is not arranged
-        // yet (Bounds.Width == 0), and reading that gave SourceUW = 0 -> a zero-width slice -> no texture (the "flipped but
-        // blank" / "flip did nothing" symptom, and why the re-assign hook seemed to do nothing - it re-assigned zeros).
-        // The cell minus the per-tile margin IS the tile, known the moment the tile is created - no layout needed.
-        var margin = _tiles[0].EffectiveMargin;
-        var tileW = cellW - margin.Left - margin.Right;
-        var tileH = cellH - margin.Top - margin.Bottom;
         var unionW = (cols - 1) * cellW + tileW;   // grid union: col 0 .. last col
         var unionH = (rows - 1) * cellH + tileH;   // row 0 .. last row
         if (tileW <= 0 || tileH <= 0 || unionW <= 0 || unionH <= 0) { AssignFragmentsByUnion(photo); return; }
@@ -192,19 +224,6 @@ public class TilesHost : ItemsControl
             if (index >= 0) return index;
         }
         return -1;
-    }
-
-    private WrapPanel FindWrapPanel()
-    {
-        return Find(this);
-
-        static WrapPanel Find(IUIComponent node)
-        {
-            if (node is WrapPanel wrap) return wrap;
-            foreach (var child in node.VisualChildren)
-                if (Find(child) is { } found) return found;
-            return null;
-        }
     }
 
     // --- Flip wave ------------------------------------------------------------------------------------------------

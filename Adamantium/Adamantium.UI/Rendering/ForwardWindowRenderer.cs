@@ -105,6 +105,18 @@ public class ForwardWindowRenderer : WindowRendererBase
         var t0 = Stopwatch.GetTimestamp();
         _renderCache.Render(GraphicsDevice, Scissor);
         RuntimeStats.LastRenderDrawMs = Stopwatch.GetElapsedTime(t0).TotalMilliseconds;
+
+        // The phases of the draw just timed, taken from the cache that was just drawn - the overlay stages have their own
+        // caches and their own numbers, and mixing them is what made the parts stop summing to the whole.
+        RuntimeStats.LastDrawSetupMs = _renderCache.DrawSetupMs;
+        RuntimeStats.LastDrawPaintMs = _renderCache.DrawPaintMs;
+        RuntimeStats.LastDrawMovedMs = _renderCache.DrawMovedMs;
+        RuntimeStats.LastDrawOpsMs = _renderCache.DrawOpsMs;
+        RuntimeStats.LastDrawWalkMs = _renderCache.DrawWalkMs;
+        RuntimeStats.LastDrawReplayed = _renderCache.DrawReplayed;
+        RuntimeStats.LastDrawAnimMs = _renderCache.DrawAnimMs;
+        RuntimeStats.LastDrawArenaPaintMs = _renderCache.DrawArenaPaintMs;
+        RuntimeStats.LastDrawBrushRepaintMs = _renderCache.DrawBrushRepaintMs;
         RuntimeStats.DrawBytes += GC.GetAllocatedBytesForCurrentThread() - drawBytes0;
     }
 

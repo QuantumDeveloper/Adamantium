@@ -291,6 +291,32 @@ public static class RuntimeStats
     /// <summary>TEMP: the out-of-pass PreRender sweep - it visits every unit of every group on EVERY frame, so whether
     /// that matters is a question a number answers, not a guess.</summary>
     public static double LastPreRenderMs;
+
+    /// <summary>WHAT THE DRAW IS MADE OF, in the order RenderCore runs them. A REPLAYED frame re-issues the recorded op
+    /// stream and touches nothing else, so its cost should be proportional to the ops it issues - measured at 77 ops of
+    /// which 3 were units, in a draw of over three milliseconds. Something in the pass is therefore proportional to the
+    /// SCENE and not to what changed, and only a split says which of the five it is.
+    /// <para>Setup = the frame's transform-table copy + the rounded clip slots. Paint = composited animations, the
+    /// arena repaint and the brush repaints. Moved = the motion nodes and movers whose matrices a replay must refresh.
+    /// Ops = re-issuing the recorded stream. The four sum to the draw, less the walk when a frame takes one.</para></summary>
+    public static double LastDrawSetupMs;
+    public static double LastDrawPaintMs;
+    public static double LastDrawMovedMs;
+    public static double LastDrawOpsMs;
+
+    /// <summary>...and the fifth: the WALK, taken when none of the replay/patch paths qualified. O(scene) where they are
+    /// O(dirty). Its own number because the four above keep their previous frame's values on a walking frame, and
+    /// reading them then reports an expensive walk as a cheap replay.</summary>
+    public static double LastDrawWalkMs;
+
+    /// <summary>Whether the last draw replayed the recorded stream instead of walking - the one bit that says which of
+    /// the numbers above describe it.</summary>
+    public static bool LastDrawReplayed;
+
+    /// <summary>Paint, split into the three calls it is made of - see RenderCache's copies.</summary>
+    public static double LastDrawAnimMs;
+    public static double LastDrawArenaPaintMs;
+    public static double LastDrawBrushRepaintMs;
     /// <summary>Overlay stages (adorner + popup) draw.</summary>
     public static double LastProcessorsMs;
 

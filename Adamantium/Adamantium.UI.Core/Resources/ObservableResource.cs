@@ -56,14 +56,28 @@ public class ObservableResource : MarkupExtension
     public static void Remove(IAdamantiumComponent target, string propertyName, ValuePriority priority, object token = null)
     {
         if (!_applied.TryGetValue(target, out var map)) return;
-        if (map.Remove((propertyName + "@" + priority, token), out var expression))
+        if (!map.Remove((propertyName + "@" + priority, token), out var expression)) return;
+
+        expression.CloseConnection();
+
+        // SOMEBODY ELSE MAY STILL OWN THIS PROPERTY. A theme swap applies the incoming style before removing the
+        // outgoing one, and both write the same property at the same priority - so without this the departing style
+        // closes the connection the ARRIVING one just made and clears the value with it. The property then falls to
+        // its own default, which for a brush is transparent: measured on a ribbon after a swap, every command icon
+        // stroked with a fully transparent brush at its correct size, hoverable and invisible.
+        var slot = propertyName + "@" + priority;
+        foreach (var pair in map)
         {
-            expression.CloseConnection();
-            if (priority == ValuePriority.Trigger && token != null)
-                target.ClearTriggerValue(target.GetProperty(propertyName), token);
-            else
-                target.ClearValue(propertyName, priority);
+            if (pair.Key.Slot != slot) continue;
+
+            pair.Value.UpdateTarget();   // the surviving owner re-states its value; nothing is cleared
+            return;
         }
+
+        if (priority == ValuePriority.Trigger && token != null)
+            target.ClearTriggerValue(target.GetProperty(propertyName), token);
+        else
+            target.ClearValue(propertyName, priority);
     }
 
     public override object ProvideObject(MarkupContext context)

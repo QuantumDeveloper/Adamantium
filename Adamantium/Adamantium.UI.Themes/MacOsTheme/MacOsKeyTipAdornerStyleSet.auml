@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<StyleSet xmlns="http://adamantium/ui"
+          xmlns:x="http://adamantium/ui/xaml/extensions">
+
+    <!-- The key-tip badge, drawn as a keycap. Opaque on purpose: it is read over whatever it lands on. -->
+    <Style Selector="KeyTipAdorner">
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="KeyTipAdorner">
+                    <Border Background="{ResourceReference KeyTipPlateFill}"
+                            BorderBrush="{ResourceReference KeyTipPlateStroke}"
+                            BorderThickness="{ResourceReference StrokeControl}"
+                            CornerRadius="{ResourceReference CornerRadiusDefault}"
+                            MinWidth="20"
+                            MinHeight="20"
+                            Padding="4 0 4 0">
+                        <!-- VerticalTextAlignment defaults to Bottom. -->
+                        <TextBlock Text="{TemplateBinding Keys}"
+                                   FontSize="{ResourceReference FontSizeCaption}"
+                                   Foreground="{ObservableResource KeyTipForeground}"
+                                   HorizontalTextAlignment="Center"
+                                   VerticalTextAlignment="Center"
+                                   HorizontalAlignment="Center"
+                                   VerticalAlignment="Center"/>
+                    </Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+</StyleSet>

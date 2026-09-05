@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<StyleSet xmlns="http://adamantium/ui"
+          xmlns:x="http://adamantium/ui/xaml/extensions">
+
+    <!-- The fallback grip - every one this theme actually draws states its own. Translucent, because an undressed grip
+         lies on whatever is under it. -->
+    <Style Selector="Thumb">
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Thumb">
+                    <Border CornerRadius="4"
+                            Background="{ResourceReference ScrollThumbFillColor}"/>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+</StyleSet>

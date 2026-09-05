@@ -640,6 +640,10 @@
     <!-- One choice. No background at rest, like a list row: a gallery of forty cells would otherwise be forty fills. -->
     <Style Selector="RibbonGalleryItem">
         <Setter Property="Background" Value="Transparent"/>
+        <!-- STATED, not left to inheritance. A ContentPresenter STAMPS its Foreground onto the content it builds, so a
+             cell with none stamps nothing onto every label inside it - and a gallery whose cells are a swatch over a
+             name showed the swatches and no names at all, in this theme as much as in any other. -->
+        <Setter Property="Foreground" Value="{ObservableResource TextFillColorPrimary}"/>
         <Setter Property="BackgroundPointerOver" Value="{ResourceReference SubtleFillColorSecondary}"/>
         <Setter Property="BackgroundSelected" Value="{ResourceReference ControlFillColorSecondary}"/>
         <Setter Property="BorderBrushSelected" Value="{ThemeResource AccentFillColorDefault}"/>
@@ -1427,6 +1431,12 @@
 
     <!-- A plain row of small buttons; no chrome of its own - it sits inside the caption's. -->
     <Style Selector="RibbonQuickAccess">
+        <!-- The ink its icons are drawn with, STATED. Every command in the bar strokes itself with
+             {Ancestor RibbonQuickAccess, Foreground}, so a bar nobody dressed draws a row of buttons in nothing at
+             all - present, sized, and invisible. The caption's instance still overrides this with the title bar's own
+             colour; the instance UNDER the ribbon has no title bar to ask and had no colour of any kind, which is why
+             moving the bar down made it vanish. -->
+        <Setter Property="Foreground" Value="{ObservableResource TextFillColorPrimary}"/>
         <!-- Stretched, its row of buttons would sit against the TOP of the caption: the slot centres what it is given,
              and something that fills the slot has nothing left to centre. -->
         <Setter Property="VerticalAlignment" Value="Center"/>

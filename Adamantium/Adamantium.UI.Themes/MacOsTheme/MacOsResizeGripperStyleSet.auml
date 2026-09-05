@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<StyleSet xmlns="http://adamantium/ui"
+          xmlns:x="http://adamantium/ui/xaml/extensions">
+
+    <!-- DRAWN, not invisible: this control appears only under CanResizeWithGrip, where the window has no resize
+         borders and the grip is the only way to resize. The box behind it stays transparent and hit-testable. -->
+    <Style Selector="ResizeGripper">
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ResizeGripper">
+                    <Border Background="Transparent">
+                        <Path HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,4,4"
+                                Stroke="{ResourceReference TextFillColorSecondary}" StrokeThickness="1.2"
+                                Data="M2,14 L14,2 M6,14 L14,6 M10,14 L14,10"/>
+                    </Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+</StyleSet>

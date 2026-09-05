@@ -99,6 +99,16 @@
                                 </Grid>
                             </StackPanel>
 
+                        <!-- The application's own slot - a quick-access bar, a search box, whatever it puts there.
+                             AFTER the lights, for the same reason the left commands are: on this platform the window's
+                             own controls come first and anything the application adds follows them, which is exactly
+                             where a Mac toolbar starts. Missing it does not fail loudly: the window hands the content
+                             over and the caption simply drops it, so a ribbon's quick-access bar was passed in and
+                             never appeared. -->
+                        <ContentPresenter x:Name="PART_LeadingContent"
+                                Content="{TemplateBinding LeadingContent}"
+                                VerticalAlignment="Center" MarginLeft="12"/>
+
                         <!-- LEFT commands, after the lights - on a Mac what the application puts on this side follows
                              the window's own controls rather than preceding them. -->
                         <ItemsControl x:Name="PART_LeftCommands"
@@ -130,7 +140,9 @@
                                 ItemsSource="{TemplateBinding RightWindowCommands}"
                                 VerticalAlignment="Center" MarginRight="8">
                             <ItemsControl.ItemsPanel>
-                                <ItemsPanelTemplate><StackPanel Orientation="Horizontal"/></ItemsPanelTemplate>
+                                <!-- These are rounded chips with their own hover plate: packed edge to edge the plates
+                                     touch and the row reads as one block. -->
+                                <ItemsPanelTemplate><StackPanel Orientation="Horizontal" Spacing="2"/></ItemsPanelTemplate>
                             </ItemsControl.ItemsPanel>
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate>
@@ -247,6 +259,14 @@
         <Setter Property="Padding" Value="0"/>
         <Setter Property="CornerRadius" Value="4"/>
         <Setter Property="Focusable" Value="False"/>
+    </Style>
+
+    <!-- Hover is opt-in per class here (the plain button has none, on purpose). Its own style rather than the Icon
+         class: the two disagree on BackgroundPressed, and equal specificity settles that by order. -->
+    <Style Selector="Button.CaptionCommand">
+        <PropertyTrigger Property="IsMouseOver" Value="true">
+            <Setter TargetName="InnerBorder" Property="Background" Value="{TemplateBinding BackgroundPointerOver}"/>
+        </PropertyTrigger>
     </Style>
 
 </StyleSet>

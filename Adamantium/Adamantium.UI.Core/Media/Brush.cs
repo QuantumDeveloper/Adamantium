@@ -78,6 +78,17 @@ public abstract class Brush: AdamantiumComponent, IRenderAttachable
    /// (see <see cref="ForRendering"/>), so a brush that can be drawn always has one.</summary>
    public Brush Snapshot => _isFrozen ? this : _snapshot;
 
+   private static long _paintEpoch;
+
+   /// <summary>How many times ANY brush has been rewritten in place. One number for the whole application, so a reader
+   /// that keeps a per-brush record can ask "has anything at all repainted since I last looked" before walking its
+   /// record - which is the difference between O(1) and O(brushes in the scene) on a frame where nothing changed.
+   /// <para>That frame is almost every frame. The render cache polled its whole brush map once per frame to find the
+   /// handful that had changed, and on a screen of a few thousand tiles that scan was measured at ~1 ms - about half
+   /// the draw, spent to discover that there was nothing to do. A poll is the wrong shape for a question whose answer
+   /// is almost always no; this is what lets it be asked once.</para></summary>
+   public static long PaintEpoch => System.Threading.Interlocked.Read(ref _paintEpoch);
+
    /// <summary>How many times this brush's appearance has been REWRITTEN IN PLACE (see <see cref="RaiseChanged"/>). The
    /// render side keeps, per brush, the version it last baked into its retained slots; the two differing is the whole
    /// question "does anything on screen still show the old colour", asked in O(brushes in the scene) rather than by
@@ -115,6 +126,7 @@ public abstract class Brush: AdamantiumComponent, IRenderAttachable
       // this from its own initializer, and snapshotting THAT would recurse forever.
       if (_snapshot != null) _snapshot = CreateFrozenCore();
       PaintVersion++;
+      System.Threading.Interlocked.Increment(ref _paintEpoch);
       _baseChanged = true;   // a real change to the brush's own values - the compositor re-captures its paint base on it
 
       // A wholesale discard happened since this brush last looked (see SweepGeneration). This is the moment it is worth

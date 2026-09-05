@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<StyleSet xmlns="http://adamantium/ui"
+          xmlns:x="http://adamantium/ui/xaml/extensions">
+
+    <!-- NO BorderThickness: a board is sized to a whole number of tiles, and a border deflates what it frames - one
+         pixel a side took a 12-wide row down to 11 and re-cut the photo around a grid nobody asked for. -->
+    <Style Selector="TilesHost" BasedOn="ItemsControl">
+        <Setter Property="Background" Value="{ResourceReference SolidBackgroundFillColorSecondary}"/>
+        <!-- The board brings its own panel and hands it the control's counts. -->
+        <Setter Property="ItemsPanel">
+            <Setter.Value>
+                <ItemsPanelTemplate>
+                    <UniformGrid Columns="{TemplateBinding Columns}" Rows="{TemplateBinding Rows}"
+                                 ColumnSpacing="{TemplateBinding Spacing}" RowSpacing="{TemplateBinding Spacing}"/>
+                </ItemsPanelTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style Selector="TilesHost">
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="TilesHost">
+                    <Border Background="{TemplateBinding Background}"
+                            CornerRadius="{ResourceReference CornerRadiusDefault}"
+                            ClipToBounds="True">
+                        <ScrollViewer CanContentScroll="True"
+                                      HorizontalScrollBarVisibility="Auto"
+                                      VerticalScrollBarVisibility="Auto">
+                            <ItemsPresenter x:Name="PART_ItemsPresenter"/>
+                        </ScrollViewer>
+                    </Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+</StyleSet>

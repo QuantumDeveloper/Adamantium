@@ -34,6 +34,7 @@ public class ListBoxItem : ContentControl, ISelectable
     public static readonly AdamantiumProperty ForegroundSelectedProperty = AdamantiumProperty.Register(
         nameof(ForegroundSelected), typeof(Brush), typeof(ListBoxItem), new PropertyMetadata(default(Brush)));
 
+
     static ListBoxItem()
     {
         // A list item has NO background by default - only the hover/pressed/selected states paint one (via the theme

@@ -27,10 +27,19 @@ public partial class LayoutViewModel : TabPageViewModel
     // tab switch (the view is recreated, this view-model persists), same idea as the tree's node-side selection.
     [Bindable] private ColorRect _selectedRect;
 
+    /// <summary>The smallest cell the sliders offer, and the size the tab OPENS at. The smallest cell is the heaviest
+    /// one - it is what fills a window with the most tiles - so it is the configuration a measurement wants, and having
+    /// to drag two sliders to reach it makes every reading start from somewhere else. The sliders take their Minimum
+    /// from here rather than restating it: the same number twice, in markup and in code, is how the two drift.</summary>
+    public double MinCell => 24;
+
+    /// <summary>The largest cell the sliders offer.</summary>
+    public double MaxCell => 240;
+
     // Cell width/height are independent so the aspect ratio (width/height) is adjustable - a non-square cell shows a real
-    // ellipse (rx != ry) / a stretched rounded rect. Defaults are non-square so the aspect is visible immediately.
-    [Bindable] private double _cellWidth = 120;
-    [Bindable] private double _cellHeight = 72;
+    // ellipse (rx != ry) / a stretched rounded rect.
+    [Bindable] private double _cellWidth = 24;
+    [Bindable] private double _cellHeight = 24;
 
     // False = rounded rectangles (RectBatch SDF), true = ellipses (EllipseBatch SDF). A DataTrigger in LayoutView.auml
     // swaps ItemTemplate between the two AUML templates (LayoutResources) off this flag.

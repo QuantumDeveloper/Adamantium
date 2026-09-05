@@ -8,6 +8,17 @@
          (a vertical virtualizing StackPanel) is usually replaced with a WrapPanel for the tiled layout. -->
     <Style Selector="TilesHost" BasedOn="ItemsControl">
         <Setter Property="Background" Value="{ResourceReference CardBackgroundFillColorDefault}"/>
+        <!-- The board's own panel, so a board is authored as a board - a shape and a photo - and nobody has to declare a
+             panel and then repeat the shape inside it. The counts come from the CONTROL: a UniformGrid divides whatever
+             space it is given between them, so the composition survives anything that takes a pixel off the board. -->
+        <Setter Property="ItemsPanel">
+            <Setter.Value>
+                <ItemsPanelTemplate>
+                    <UniformGrid Columns="{TemplateBinding Columns}" Rows="{TemplateBinding Rows}"
+                                 ColumnSpacing="{TemplateBinding Spacing}" RowSpacing="{TemplateBinding Spacing}"/>
+                </ItemsPanelTemplate>
+            </Setter.Value>
+        </Setter>
     </Style>
 
     <Style Selector="TilesHost">
