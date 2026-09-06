@@ -82,6 +82,24 @@ float4 ClipShapeRadii(float slotIndex)
     return clip.World[1];
 }
 
+// Both halves of the clip shape in ONE table read, for a vertex stage that wants to hand them to its pixel shader.
+// Calling ClipShapeBox and ClipShapeRadii instead costs TWO reads, and a stage that already read the table for its own
+// matrix is then on its third - which is where this driver stops coping. Measured on the pattern vertex shader: the two
+// calls fault the GPU with a read the device-fault probe reports as ReadInvalid, and this one does not.
+void ClipShapeBoxAndRadii(float slotIndex, out float4 box, out float4 radii)
+{
+    box = float4(0.0, 0.0, 0.0, 0.0);
+    radii = float4(0.0, 0.0, 0.0, 0.0);
+    if (slotIndex < 0.0) return;
+
+    NodeSlot* nodes = (NodeSlot*)TransformsAddress;
+    NodeSlot clip = nodes[(uint)slotIndex];
+    if (clip.Params.x < 0.5) return;
+
+    box = clip.World[0];
+    radii = clip.World[1];
+}
+
 // The whole thing in ONE table read, for a pass that cannot do the fetch in its vertex stage. TEXT is that pass: the
 // glyph vertex shader already reads the table for its matrix, and this driver AVs inside vkCreateShadersEXT on a SECOND
 // read from that shader - measured again here, 4 starts of 4, exactly as the note on GlyphItem.Params said. Its PIXEL

@@ -254,7 +254,7 @@ internal sealed class PatternRectCollector : BrushSdfCollector<PatternRectItem>
             Radii = radii,
             Color1 = c1,
             Color2 = c2,
-            StrokeColor = strokeColor,
+            StrokeColor = new Color(strokeColor),
             Stroke0 = stroke0,
             Stroke1 = stroke1,
             Dash = dash,

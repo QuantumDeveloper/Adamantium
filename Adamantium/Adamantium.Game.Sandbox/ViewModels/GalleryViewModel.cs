@@ -30,7 +30,6 @@ public partial class GalleryViewModel
         new ShapesViewModel(),
         new LoadersViewModel(),
         new AnimationsViewModel(),
-        new BrushesViewModel(),
         new TextViewModel(),
         new SlidePanelViewModel(),
         new ImageViewModel(),
@@ -70,6 +69,9 @@ public partial class GalleryViewModel
         // Docking owns a navigation region too (its area IS a region), so it comes from DI as well - put back where it
         // stands in the list above, ahead of Tiles.
         Tabs.Insert(Tabs.IndexOf(Tabs.First(t => t is TilesViewModel)), resolver.Resolve<DockingViewModel>());
+        // Brushes owns a region too - its stands are separate views navigated into it - so it comes from DI, and back
+        // into the place it held in the list above, just ahead of Text.
+        Tabs.Insert(Tabs.IndexOf(Tabs.First(t => t is TextViewModel)), resolver.Resolve<BrushesViewModel>());
         SelectedTab = Environment.GetEnvironmentVariable("ADAM_PROBE_TAB") is { } probe
             ? Tabs.First(t => t.GetType().Name.StartsWith(probe))
             : Tabs[2];

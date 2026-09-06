@@ -1,0 +1,131 @@
+<View xmlns="http://adamantium/ui"
+      xmlns:x="http://adamantium/ui/xaml/extensions"
+      xmlns:conv="clr-namespace:Adamantium.Game.Sandbox.Converters">
+    <!-- Navigated into the brushes tab's region under the key "Noise"; the DataContext is the tab's own view-model. -->
+    <StackPanel Orientation="Vertical">
+        <TextBlock Text="Noise — live (drag to re-bake; tick “Mid colour” for a 3-colour gradient-map ramp)" FontSize="18" Margin="0,0,0,10"/>
+        <StackPanel Orientation="Horizontal">
+            <Grid Width="{Binding PreviewWidth}" Height="{Binding PreviewHeight}" Margin="10">
+                <Rectangle Width="{Binding PreviewWidth}" Height="{Binding PreviewHeight}" Fill="{Binding LiveNoise}"
+                           CornerRadius="{Binding NoiseRadius, Converter={conv:DoubleToCornerRadiusConverter}}"
+                           Visibility="{Binding PreviewShape, Converter={conv:EnumVisibilityConverter}, ConverterParameter=Rectangle}"/>
+                <Ellipse Width="{Binding PreviewWidth}" Height="{Binding PreviewHeight}" Fill="{Binding LiveNoise}"
+                         Visibility="{Binding PreviewShape, Converter={conv:EnumVisibilityConverter}, ConverterParameter=Ellipse}"/>
+                <RegularPolygon Width="{Binding PreviewSquare}" Height="{Binding PreviewSquare}" Corners="{Binding ShapeCornerCount}"
+                                StartAngle="{Binding ShapeStartAngle}" Fill="{Binding LiveNoise}"
+                                HorizontalAlignment="Center" VerticalAlignment="Center"
+                                Visibility="{Binding PreviewShape, Converter={conv:EnumVisibilityConverter}, ConverterParameter=Polygon}"/>
+                <Polygon Points="{Binding FixedStar}" Fill="{Binding LiveNoise}"
+                         HorizontalAlignment="Center" VerticalAlignment="Center"
+                         Visibility="{Binding PreviewShape, Converter={conv:EnumVisibilityConverter}, ConverterParameter=Star}"/>
+            </Grid>
+            <StackPanel Orientation="Vertical" Width="300" MarginLeft="16" VerticalAlignment="Center">
+                <!-- Only for the polygon: on a rect or an ellipse these two numbers mean nothing. -->
+                <StackPanel Orientation="Vertical" Visibility="{Binding PreviewShape, Converter={conv:EnumVisibilityConverter}, ConverterParameter=Polygon}">
+                    <TextBlock Text="Corners — 3 is a triangle, enough of them a circle" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
+                    <StackPanel Orientation="Horizontal" MarginBottom="6">
+                        <Slider Value="{Binding ShapeCorners, Mode=TwoWay}" IsValueToolTipEnabled="True" Minimum="3" Maximum="24"
+                                TickFrequency="1" IsSnapToTickEnabled="true" Width="180"/>
+                        <NumericUpDown Width="88" Minimum="3" Maximum="24" SmallChange="1" SnapsToSmallChange="true" StringFormat="N0"
+                                       IsDragScrubEnabled="true" TracksMouseWheelWhenOver="true"
+                                       Value="{Binding ShapeCorners, Mode=TwoWay}" VerticalAlignment="Center" MarginLeft="6"/>
+                    </StackPanel>
+                    <TextBlock Text="Start angle — where corner 0 sits" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
+                    <StackPanel Orientation="Horizontal" MarginBottom="10">
+                        <Slider Value="{Binding ShapeStartAngle, Mode=TwoWay}" IsValueToolTipEnabled="True" Minimum="0" Maximum="360"
+                                TickFrequency="1" IsSnapToTickEnabled="true" Width="180"/>
+                        <NumericUpDown Width="88" Minimum="0" Maximum="360" SmallChange="1" SnapsToSmallChange="true" StringFormat="N0"
+                                       IsDragScrubEnabled="true" TracksMouseWheelWhenOver="true"
+                                       Value="{Binding ShapeStartAngle, Mode=TwoWay}" VerticalAlignment="Center" MarginLeft="6"/>
+                    </StackPanel>
+                </StackPanel>
+                <TextBlock Text="Noise type" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
+                <DropDown ItemsSource="{Binding NoiseTypes}" SelectedItem="{Binding NoiseKind, Mode=TwoWay}" Width="280" MarginBottom="10"/>
+                <CheckBox Content="Animate (flow — best with Worley)" IsChecked="{Binding NoiseAnimate, Mode=TwoWay}" MarginBottom="6"/>
+                <TextBlock Text="Flow speed" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
+                <StackPanel Orientation="Horizontal" MarginBottom="10">
+                    <Slider Value="{Binding NoiseFlowSpeed, Mode=TwoWay}" Minimum="0.1" Maximum="3" Width="186"/>
+                    <NumericUpDown Width="88" Minimum="0.1" Maximum="3" SmallChange="0.05"
+                                   SnapsToSmallChange="true" StringFormat="N2"
+                                   IsDragScrubEnabled="true" TracksMouseWheelWhenOver="true"
+                                   Value="{Binding NoiseFlowSpeed, Mode=TwoWay}" VerticalAlignment="Center" MarginLeft="6"/>
+                </StackPanel>
+                <StackPanel Orientation="Vertical" Visibility="{Binding PreviewShape, Converter={conv:EnumVisibilityConverter}, ConverterParameter=Rectangle}">
+                    <TextBlock Text="Corner radius" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
+                    <StackPanel Orientation="Horizontal" MarginBottom="10">
+                        <Slider Value="{Binding NoiseRadius, Mode=TwoWay}" Minimum="0" Maximum="100" Width="186"/>
+                        <NumericUpDown Width="88" Minimum="0" Maximum="100" SmallChange="1"
+                                       SnapsToSmallChange="true" StringFormat="N0"
+                                       IsDragScrubEnabled="true" TracksMouseWheelWhenOver="true"
+                                       Value="{Binding NoiseRadius, Mode=TwoWay}" VerticalAlignment="Center" MarginLeft="6"/>
+                    </StackPanel>
+                </StackPanel>
+                <StackPanel Orientation="Vertical" Visibility="{Binding NoiseKind, Converter={conv:NoiseParamVisibilityConverter}, ConverterParameter=Scale}">
+                    <TextBlock Text="Scale" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
+                    <StackPanel Orientation="Horizontal" MarginBottom="10">
+                        <Slider Value="{Binding NoiseScale, Mode=TwoWay}" Minimum="6" Maximum="120" Width="186"/>
+                        <NumericUpDown Width="88" Minimum="6" Maximum="120" SmallChange="1"
+                                       SnapsToSmallChange="true" StringFormat="N0"
+                                       IsDragScrubEnabled="true" TracksMouseWheelWhenOver="true"
+                                       Value="{Binding NoiseScale, Mode=TwoWay}" VerticalAlignment="Center" MarginLeft="6"/>
+                    </StackPanel>
+                </StackPanel>
+                <StackPanel Orientation="Vertical" Visibility="{Binding NoiseKind, Converter={conv:NoiseParamVisibilityConverter}, ConverterParameter=Fbm}">
+                    <TextBlock Text="Octaves" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
+                    <StackPanel Orientation="Horizontal" MarginBottom="10">
+                        <Slider Value="{Binding NoiseOctaves, Mode=TwoWay}" Minimum="1" Maximum="8" Width="186"/>
+                        <NumericUpDown Width="88" Minimum="1" Maximum="8" SmallChange="1"
+                                       SnapsToSmallChange="true" StringFormat="N0"
+                                       IsDragScrubEnabled="true" TracksMouseWheelWhenOver="true"
+                                       Value="{Binding NoiseOctaves, Mode=TwoWay}" VerticalAlignment="Center" MarginLeft="6"/>
+                    </StackPanel>
+                </StackPanel>
+                <StackPanel Orientation="Vertical" Visibility="{Binding NoiseKind, Converter={conv:NoiseParamVisibilityConverter}, ConverterParameter=Seed}">
+                    <TextBlock Text="Seed" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
+                    <StackPanel Orientation="Horizontal" MarginBottom="10">
+                        <Slider Value="{Binding NoiseSeed, Mode=TwoWay}" Minimum="0" Maximum="50" Width="186"/>
+                        <NumericUpDown Width="88" Minimum="0" Maximum="50" SmallChange="1"
+                                       SnapsToSmallChange="true" StringFormat="N0"
+                                       IsDragScrubEnabled="true" TracksMouseWheelWhenOver="true"
+                                       Value="{Binding NoiseSeed, Mode=TwoWay}" VerticalAlignment="Center" MarginLeft="6"/>
+                    </StackPanel>
+                </StackPanel>
+                <StackPanel Orientation="Vertical" Visibility="{Binding NoiseKind, Converter={conv:NoiseParamVisibilityConverter}, ConverterParameter=Fbm}">
+                    <TextBlock Text="Lacunarity" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
+                    <StackPanel Orientation="Horizontal" MarginBottom="10">
+                        <Slider Value="{Binding NoiseLacunarity, Mode=TwoWay}" Minimum="1.5" Maximum="3.5" Width="186"/>
+                        <NumericUpDown Width="88" Minimum="1.5" Maximum="3.5" SmallChange="0.05"
+                                       SnapsToSmallChange="true" StringFormat="N2"
+                                       IsDragScrubEnabled="true" TracksMouseWheelWhenOver="true"
+                                       Value="{Binding NoiseLacunarity, Mode=TwoWay}" VerticalAlignment="Center" MarginLeft="6"/>
+                    </StackPanel>
+                    <TextBlock Text="Gain" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
+                    <StackPanel Orientation="Horizontal" MarginBottom="10">
+                        <Slider Value="{Binding NoiseGain, Mode=TwoWay}" Minimum="0.2" Maximum="0.8" Width="186"/>
+                        <NumericUpDown Width="88" Minimum="0.2" Maximum="0.8" SmallChange="0.05"
+                                       SnapsToSmallChange="true" StringFormat="N2"
+                                       IsDragScrubEnabled="true" TracksMouseWheelWhenOver="true"
+                                       Value="{Binding NoiseGain, Mode=TwoWay}" VerticalAlignment="Center" MarginLeft="6"/>
+                    </StackPanel>
+                </StackPanel>
+                <CheckBox Content="Fire palette (off = use colours below)" IsChecked="{Binding NoiseFirePalette, Mode=TwoWay}" MarginBottom="6"
+                          Visibility="{Binding NoiseKind, Converter={conv:NoiseParamVisibilityConverter}, ConverterParameter=FirePalette}"/>
+                <StackPanel Orientation="Vertical">
+                    <StackPanel.Visibility>
+                        <MultiBinding Converter="{conv:CombustibleColorsVisibilityConverter}">
+                            <Binding Path="NoiseKind"/>
+                            <Binding Path="NoiseFirePalette"/>
+                        </MultiBinding>
+                    </StackPanel.Visibility>
+                    <CheckBox Content="Mid colour (3-colour gradient-map ramp)" IsChecked="{Binding NoiseUseMid, Mode=TwoWay}" MarginBottom="6"/>
+                    <TextBlock Text="Colours (low / mid / high — mid used only when ticked)" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
+                    <StackPanel Orientation="Horizontal">
+                        <ColorPickerButton Width="48" Height="32" SelectedColor="{Binding NoiseColor1, Mode=TwoWay}" MarginRight="8"/>
+                        <ColorPickerButton Width="48" Height="32" SelectedColor="{Binding NoiseMid, Mode=TwoWay}" MarginRight="8"/>
+                        <ColorPickerButton Width="48" Height="32" SelectedColor="{Binding NoiseColor2, Mode=TwoWay}"/>
+                    </StackPanel>
+                </StackPanel>
+            </StackPanel>
+        </StackPanel>
+    </StackPanel>
+</View>

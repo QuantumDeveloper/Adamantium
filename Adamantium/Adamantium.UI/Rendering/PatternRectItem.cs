@@ -29,8 +29,8 @@ public struct PatternRectItem
     /// <summary>Secondary (feature) colour, straight RGBA, opacity folded into .w.</summary>
     public Vector4F Color2;
 
-    /// <summary>Straight stroke colour (opacity folded into .w); .w == 0 = no stroke.</summary>
-    public Vector4F StrokeColor;
+    /// <summary>Straight stroke colour in four bytes (opacity folded into the alpha); alpha 0 = no stroke.</summary>
+    public Color StrokeColor;
 
     /// <summary>Stroke geometry: x = width px, y = align (-1/0/+1), z = dash ON, w = dash GAP.</summary>
     public Vector4F Stroke0;

@@ -442,9 +442,9 @@ struct PatternRectData
     float4 Bounds;       // NODE-local x, y, w, h (world for slot-0 legacy bakes - identity matrix)
     float4 Params;       // .x corner radius, .y pattern type (0 checker/1 stripes/2 dots/3 grid/4 FBM noise), .z cell (px), .w slot
     float4 Radii;        // corner radii: x = TL, y = TR, z = BR, w = BL
-    float4 Color1;       // straight RGBA, opacity folded
-    float4 Color2;       // straight RGBA, opacity folded
-    float4 StrokeColor;  // straight stroke RGBA (.w == 0 -> no stroke)
+    float4 Color1;        // straight RGBA, opacity folded
+    float4 Color2;        // straight RGBA, opacity folded
+    uint8_t4 StrokeColor; // straight stroke RGBA in four bytes (alpha 0 -> no stroke)
     float4 Stroke0;      // width_px, align, dashOn, dashGap
     float4 Stroke1;      // dashOffset, trimStart, trimEnd, flags
     float4 Dash;         // dash runs 2..5 (device px); runs 0 and 1 ride in Stroke0.zw, the count in Stroke1.w
@@ -498,8 +498,7 @@ PatternPSInput PatternRectInstancedVS(uint vertexId : SV_VertexID, uint instance
     o.Radii = ScaleShapeNumbers(it.Radii, iso, step(it.Params.x, -1.5));   // Params.x: -2 = regular polygon
     o.InstId = instanceId;
     o.Scale  = iso;
-    o.ClipBox   = ClipShapeBox(it.Anim.w);     // the clip slot rides in Anim.w - see PatternRectData
-    o.ClipRadii = ClipShapeRadii(it.Anim.w);
+    ClipShapeBoxAndRadii(it.Anim.w, o.ClipBox, o.ClipRadii);   // the clip slot rides in Anim.w - see PatternRectData
     // ...and the opacity slot in Anim.z. An INT test and a branch, NOT the `nodes[max(slot, 0)]` + lerp/step the
     // sibling passes still use: that form takes this driver to device-lost from a freshly changed shader - measured
     // here and on the polygon VS in BatchEffect, where the same swap cured it.
@@ -877,7 +876,21 @@ float3 FirePalette(float i)
 // pattern-fill PS, so the two paths colour identically. `pTopLeft` = fragment from the shape's top-left (the pattern origin,
 // fed to PatternMix); `centerRel`/`halfY` = fragment relative to the shape centre + half-height (the Combustible fireball).
 // Single return (no early return - NVVM dislikes those in .fx helpers).
-float4 PatternFillColor(PatternRectData it, int ptype, float2 pTopLeft, float2 centerRel, float halfY)
+// Exactly what evaluating a pattern needs, and nothing else. It used to take the whole PatternRectData, which made both
+// callers put a copy of that record on the STACK - the SDF pass to scale one field, the mesh pass by reconstructing a
+// record it has no business owning. Once the record's pen became four bytes that stack copy was what the driver refused,
+// and the refusal is fair: neither caller was passing a record because the evaluator wanted one.
+struct PatternFill
+{
+    float4 Params;
+    float4 Color1;
+    float4 Color2;
+    float4 Color3;
+    float4 Noise;
+    float4 Anim;
+};
+
+float4 PatternFillColor(PatternFill it, int ptype, float2 pTopLeft, float2 centerRel, float halfY)
 {
     // ptype comes in as a compile-time CONSTANT from the pass entry point, not out of the record: that is what lets the
     // optimiser drop every branch but one and leave each pass with a small pixel shader instead of the fourteen-way
@@ -940,8 +953,13 @@ float4 PatternSdfShade(PatternPSInput input, int kind)
     // NoiseBrush.Scale share this field) converts too, or the pattern's cell / the noise's grain would change size with
     // the slot's scale. The noise's own knobs (octaves, seed, lacunarity, gain) are unitless and stay put.
     float sc = input.Scale;
-    PatternRectData itPx = it;
-    itPx.Params.z = it.Params.z * sc;
+    PatternFill itPx;
+    itPx.Params = float4(it.Params.x, it.Params.y, it.Params.z * sc, it.Params.w);
+    itPx.Color1 = it.Color1;
+    itPx.Color2 = it.Color2;
+    itPx.Color3 = it.Color3;
+    itPx.Noise = it.Noise;
+    itPx.Anim = it.Anim;
 
     float2 p = input.Local + input.Half;   // fragment from the shape's TOP-LEFT (stable pattern origin at the corner)
     float4 fill = PatternFillColor(itPx, kind, p, input.Local, input.Half.y);
@@ -962,7 +980,7 @@ float4 PatternSdfShade(PatternPSInput input, int kind)
                             it.Stroke1.z, dPerp * capScl, halfW * capScl, it.Stroke1.w, it.Dash * sc);
     }
     // The shape's own edge is the SDF above; this is the ANCESTOR's rounding, as coverage - and its FADE beside it.
-    float4 patOut = CompositeFillStroke(d, fill, it.StrokeColor, widthPx, it.Stroke0.y, mask, 0.0);
+    float4 patOut = CompositeFillStroke(d, fill, float4(it.StrokeColor) * (1.0 / 255.0), widthPx, it.Stroke0.y, mask, 0.0);
     return float4(patOut.rgb, patOut.a * input.Fade * ClipCoverage(input.Position.xy, input.ClipBox, input.ClipRadii));
 }
 
@@ -1009,17 +1027,12 @@ float4 PatternMeshShade(PatFillPSInput input, int kind)
     PatternGeomData* items = (PatternGeomData*)InstancesAddress;
     PatternGeomData it = items[input.InstId];
 
-    // Reconstruct a PatternRectData for the shared PatternFillColor (Bounds/stroke fields unused by the fill eval).
-    PatternRectData pd;
-    pd.Bounds = float4(0.0, 0.0, 0.0, 0.0);
+    PatternFill pd;
     pd.Params = it.Params;
     pd.Color1 = it.Color1;
     pd.Color2 = it.Color2;
-    pd.StrokeColor = float4(0.0, 0.0, 0.0, 0.0);
-    pd.Stroke0 = float4(0.0, 0.0, 0.0, 0.0);
-    pd.Stroke1 = float4(0.0, 0.0, 0.0, 0.0);
-    pd.Noise = it.Noise;
     pd.Color3 = it.Color3;
+    pd.Noise = it.Noise;
     pd.Anim = it.Anim;
 
     float2 pTopLeft = input.Local - it.LocalBounds.xy;                                   // fragment from the shape top-left

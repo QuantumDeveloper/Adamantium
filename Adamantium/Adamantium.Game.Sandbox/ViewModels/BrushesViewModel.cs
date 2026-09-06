@@ -1,5 +1,6 @@
 using System;
 using Adamantium.Mathematics;
+using Adamantium.Navigation;
 using Adamantium.ProceduralGeometry;
 using Adamantium.MVVM;
 using Adamantium.UI.Core;
@@ -16,8 +17,22 @@ namespace Adamantium.Game.Sandbox.ViewModels;
 [ViewModel]
 public partial class BrushesViewModel : TabPageViewModel
 {
-    public BrushesViewModel() : base("Brushes")
+    /// <summary>The region the stands are navigated into. One view at a time, and the previous one is dropped rather
+    /// than left hidden - which is the whole reason the stands are separate views instead of collapsed panels.</summary>
+    public IRegion Region { get; }
+
+    public BrushesViewModel(INavigationService navigation) : base("Brushes")
     {
+        Region = navigation.Regions.CreateRegion();
+        ShowStand(_liveStand);
+
+        // The three gradients start from the same field values the controls show, so the stand opens describing itself
+        // rather than whatever the brushes' own defaults happen to be.
+        ApplyGradientStops();
+        ApplyGradientGeometry();
+        OnGradientSpreadChanged(_gradientSpread);
+        OnGradientInterpolationChanged(_gradientInterpolation);
+
         LiveImage.TileMode = _imageTileMode;
         PushImageViewport();
 
@@ -60,6 +75,110 @@ public partial class BrushesViewModel : TabPageViewModel
         Color1 = new Color(11, 18, 32, 255),
         Color2 = new Color(125, 211, 252, 255)
     };
+
+    // --- Gradient stand ------------------------------------------------------------------------------------------
+    // Three brushes rather than one, because the three geometries are three types - but ONE set of stops, spread and
+    // interpolation driving all of them, so switching the kind changes the geometry and nothing else. That is the
+    // comparison the stand exists to make; rows of fixed swatches could never show it.
+
+    /// <summary>The linear gradient the stand drives. Its direction comes from an angle - two points are how the brush
+    /// stores it, not how anyone thinks about it.</summary>
+    public LinearGradientBrush LiveLinear { get; } = new LinearGradientBrush();
+
+    /// <summary>The radial gradient the stand drives.</summary>
+    public RadialGradientBrush LiveRadial { get; } = new RadialGradientBrush();
+
+    /// <summary>The conic gradient the stand drives.</summary>
+    public ConicGradientBrush LiveConic { get; } = new ConicGradientBrush();
+
+    /// <summary>Whichever of the three the preview is filled with.</summary>
+    public Brush LiveGradient => _gradientKind switch
+    {
+        GradientKind.Radial => LiveRadial,
+        GradientKind.Conic => LiveConic,
+        _ => LiveLinear
+    };
+
+    /// <summary>Every gradient geometry - the source for the kind dropdown.</summary>
+    public GradientKind[] GradientKinds { get; } = Enum.GetValues<GradientKind>();
+
+    /// <summary>Every spread method - what happens OUTSIDE the stops' span.</summary>
+    public GradientSpreadMethod[] GradientSpreads { get; } = Enum.GetValues<GradientSpreadMethod>();
+
+    /// <summary>Both interpolation spaces - sRGB muddies the midpoint between complementary colours, OKLab does not.</summary>
+    public ColorInterpolationMode[] GradientInterpolations { get; } = Enum.GetValues<ColorInterpolationMode>();
+
+    [Bindable] private GradientKind _gradientKind = GradientKind.Linear;
+    [Bindable] private Color _gradientColor1 = new Color(56, 189, 248, 255);
+    [Bindable] private Color _gradientColor2 = new Color(167, 139, 250, 255);
+    [Bindable] private Color _gradientColor3 = new Color(244, 114, 182, 255);
+    [Bindable] private bool _gradientMidStop = true;
+    [Bindable] private double _gradientMidOffset = 0.5;
+    [Bindable] private double _gradientAngle = 45;
+    [Bindable] private double _gradientSpan = 1.0;
+    [Bindable] private double _gradientRadius = 0.5;
+    [Bindable] private double _gradientCorner = 16;
+    [Bindable] private double _gradientStartAngle;
+    [Bindable] private GradientSpreadMethod _gradientSpread = GradientSpreadMethod.Pad;
+    [Bindable] private ColorInterpolationMode _gradientInterpolation = ColorInterpolationMode.Oklab;
+
+    partial void OnGradientKindChanged(GradientKind value) => RaisePropertyChanged(nameof(LiveGradient));
+    partial void OnGradientColor1Changed(Color value) => ApplyGradientStops();
+    partial void OnGradientColor2Changed(Color value) => ApplyGradientStops();
+    partial void OnGradientColor3Changed(Color value) => ApplyGradientStops();
+    partial void OnGradientMidStopChanged(bool value) => ApplyGradientStops();
+    partial void OnGradientMidOffsetChanged(double value) => ApplyGradientStops();
+    partial void OnGradientAngleChanged(double value) => ApplyGradientGeometry();
+    partial void OnGradientSpanChanged(double value) => ApplyGradientGeometry();
+    partial void OnGradientRadiusChanged(double value) => ApplyGradientGeometry();
+    partial void OnGradientStartAngleChanged(double value) => ApplyGradientGeometry();
+
+    partial void OnGradientSpreadChanged(GradientSpreadMethod value)
+    {
+        LiveLinear.SpreadMethod = value;
+        LiveRadial.SpreadMethod = value;
+        LiveConic.SpreadMethod = value;
+    }
+
+    partial void OnGradientInterpolationChanged(ColorInterpolationMode value)
+    {
+        LiveLinear.ColorInterpolationMode = value;
+        LiveRadial.ColorInterpolationMode = value;
+        LiveConic.ColorInterpolationMode = value;
+    }
+
+    // Rebuilt rather than mutated in place: the middle stop comes and goes, so the COUNT changes, and a collection that
+    // is edited stop by stop ends up describing a ramp nobody asked for while it is halfway through.
+    private void ApplyGradientStops()
+    {
+        foreach (var brush in new GradientBrush[] { LiveLinear, LiveRadial, LiveConic })
+        {
+            brush.GradientStops.Clear();
+            brush.GradientStops.Add(new GradientStop(_gradientColor1, 0.0));
+            if (_gradientMidStop) brush.GradientStops.Add(new GradientStop(_gradientColor3, _gradientMidOffset));
+            brush.GradientStops.Add(new GradientStop(_gradientColor2, 1.0));
+        }
+    }
+
+    // The angle is what a person means by "which way does it run"; the two points are how the brush stores it. Span
+    // shortens the ramp about the centre, which is what makes Reflect and Repeat show anything at all.
+    private void ApplyGradientGeometry()
+    {
+        var radians = _gradientAngle * Math.PI / 180.0;
+        var half = Math.Max(_gradientSpan, 0.01) * 0.5;
+        var dx = Math.Cos(radians) * half;
+        var dy = Math.Sin(radians) * half;
+        LiveLinear.StartPoint = new Vector2(0.5 - dx, 0.5 - dy);
+        LiveLinear.EndPoint = new Vector2(0.5 + dx, 0.5 + dy);
+
+        LiveRadial.Center = new Vector2(0.5, 0.5);
+        LiveRadial.GradientOrigin = new Vector2(0.5, 0.5);
+        LiveRadial.RadiusX = _gradientRadius;
+        LiveRadial.RadiusY = _gradientRadius;
+
+        LiveConic.Center = new Vector2(0.5, 0.5);
+        LiveConic.StartAngle = _gradientStartAngle;
+    }
 
     /// <summary>The brush the "live pattern" rectangle fills with; the controls below drive its type/cell/colours - one
     /// configurable PatternBrush that replaces the static per-pattern swatch row.</summary>
@@ -166,7 +285,6 @@ public partial class BrushesViewModel : TabPageViewModel
 
     // The brush itself is declared in MARKUP (its source is named there with ElementName - a view-model never holds a
     // UI element), so these drive it through bindings on the brush rather than by mutating an object here.
-    [Bindable] private PreviewShape _visualShape = PreviewShape.Rectangle;
     [Bindable] private TileMode _visualTileMode = TileMode.None;
     [Bindable] private Stretch _visualStretch = Stretch.Uniform;
     [Bindable] private AlignmentX _visualAlignmentX = AlignmentX.Center;
@@ -204,7 +322,6 @@ public partial class BrushesViewModel : TabPageViewModel
 
     public AlignmentY[] AlignmentsY { get; } = Enum.GetValues<AlignmentY>();
 
-    [Bindable] private PreviewShape _drawingShape = PreviewShape.Rectangle;
     [Bindable] private TileMode _drawingTileMode = TileMode.Tile;
     [Bindable] private Stretch _drawingStretch = Stretch.Uniform;
     [Bindable] private AlignmentX _drawingAlignmentX = AlignmentX.Center;
@@ -359,10 +476,26 @@ public partial class BrushesViewModel : TabPageViewModel
     /// the triangle is tessellated geometry, so the choice is also which render path the brush is riding.</summary>
     public PreviewShape[] PreviewShapes { get; } = Enum.GetValues<PreviewShape>();
 
-    [Bindable] private PreviewShape _patternShape = PreviewShape.Rectangle;
-    [Bindable] private PreviewShape _noiseShape = PreviewShape.Rectangle;
-    [Bindable] private PreviewShape _meshShape = PreviewShape.Rectangle;
-    [Bindable] private PreviewShape _imageShape = PreviewShape.Rectangle;
+    /// <summary>The figure the live stand paints on - ONE for the whole tab. Every family used to carry its own copy of
+    /// this choice, so switching between two of them reset the figure and the comparison was never like for like.</summary>
+    [Bindable] private PreviewShape _previewShape = PreviewShape.Rectangle;
+
+    /// <summary>Which stand this tab is showing.</summary>
+    [Bindable] private LiveStand _liveStand = LiveStand.Gradients;
+
+    // The buttons drive the property; the property drives the region. Navigating to a VIEW of this very object - not to
+    // a view-model of its own - is what keeps the shared figure, slot and colours alive across the switch.
+    partial void OnLiveStandChanged(LiveStand value) => ShowStand(value);
+
+    // THIS object, shown through the stand's view. Navigating by TYPE would send the region to the container for a
+    // BrushesViewModel - and the first of these runs inside this very constructor, where asking for it either recurses
+    // or hands back a second copy. That is why the first stand never appeared until a button was pressed.
+    private void ShowStand(LiveStand stand)
+        => _ = Region?.NavigateToInstanceAsync(this, stand.ToString());
+
+    /// <summary>Every stand, in declaration order - the source for the selector row.</summary>
+    public LiveStand[] LiveStands { get; } = Enum.GetValues<LiveStand>();
+
 
     // --- Backdrop material stand ---------------------------------------------------------------------------------
     // ONE live brush the controls drive in place, exactly as the aura below: the element holds this object and each
@@ -385,7 +518,6 @@ public partial class BrushesViewModel : TabPageViewModel
     public MaterialType[] MaterialTypes { get; } = Enum.GetValues<MaterialType>();
 
     [Bindable] private MaterialType _materialKind = MaterialType.Acrylic;
-    [Bindable] private PreviewShape _materialShape = PreviewShape.Rectangle;
     [Bindable] private double _materialRadius = 24;
     [Bindable] private Color _materialTint = new Color(32, 36, 46, 255);
     [Bindable] private double _materialTintOpacity = 0.55;
@@ -658,9 +790,22 @@ public partial class BrushesViewModel : TabPageViewModel
     partial void OnShadowOpacityChanged(double value) => LiveShadow.Opacity = value;
     partial void OnShadowInnerChanged(bool value) => LiveShadow.Inner = value;
 
-    /// <summary>The five-pointed star every stand can wear: the concave one of the four, so a fill has to survive
-    /// reflex corners and a tessellation that is nothing like a quad.</summary>
-    public PointsCollection FixedStar { get; } = Star(440, 300);
+    /// <summary>The preview slot every "paint it on a shape" stand draws into. One number, in one place: the stands were
+    /// 500x280 and 300x200 by hand, and the star - a Polygon, which carries authored coordinates and does NOT stretch to
+    /// its slot - was cut for the big one and reused in the small ones, where it drew past the edge onto the neighbour
+    /// (a Grid does not clip). Bound rather than repeated, so the four stands cannot drift apart again.</summary>
+    public double PreviewWidth => 500;
+
+    /// <summary>The preview slot's height - see <see cref="PreviewWidth"/>.</summary>
+    public double PreviewHeight => 280;
+
+    /// <summary>The side for the stands' SQUARE figure, the regular polygon: the slot's shorter axis, so it fills the
+    /// slot without reaching past it.</summary>
+    public double PreviewSquare => 280;
+
+    /// <summary>The five-pointed star every stand can wear, cut to the shared preview slot: the concave one of the four,
+    /// so a fill has to survive reflex corners and a tessellation that is nothing like a quad.</summary>
+    public PointsCollection FixedStar { get; } = Star(500, 280);
 
     /// <summary>The image stand's star, sized by the same Width/Height sliders the other figures follow - a Polygon
     /// holds authored coordinates rather than stretching to a slot, so the points are computed here.</summary>

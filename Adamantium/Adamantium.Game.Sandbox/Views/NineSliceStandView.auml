@@ -1,0 +1,61 @@
+<View xmlns="http://adamantium/ui"
+      xmlns:x="http://adamantium/ui/xaml/extensions"
+      xmlns:conv="clr-namespace:Adamantium.Game.Sandbox.Converters">
+    <!-- Navigated into the brushes tab's region under the key "NineSlice"; the DataContext is the tab's own view-model.
+         This stand does NOT use the shared figure: the whole subject is the frame's own size, so it drives its own box. -->
+    <StackPanel Orientation="Vertical">
+        <TextBlock Text="Nine-slice — live (drag the size: the corners keep theirs, the edges give)" FontSize="18" Margin="0,0,0,10"/>
+        <StackPanel Orientation="Horizontal">
+            <Border Width="360" Height="240" Margin="10" Background="#101418">
+                <Border Width="{Binding SliceWidth}"
+                        Height="{Binding SliceHeight}"
+                        HorizontalAlignment="Center"
+                        VerticalAlignment="Center"
+                        Background="{Binding LiveNineSlice}"/>
+            </Border>
+            <StackPanel Orientation="Vertical" Width="300" MarginLeft="16" VerticalAlignment="Center">
+                <TextBlock Text="Skin" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
+                <DropDown ItemsSource="{Binding Skins}" SelectedItem="{Binding Skin, Mode=TwoWay}" Width="280" MarginBottom="10"/>
+                <TextBlock Text="Width" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
+                <StackPanel Orientation="Horizontal" MarginBottom="10">
+                    <Slider Value="{Binding SliceWidth, Mode=TwoWay}" IsValueToolTipEnabled="True" Minimum="40" Maximum="340" Width="186"/>
+                    <NumericUpDown Width="88" Minimum="40" Maximum="340" SmallChange="1"
+                                   SnapsToSmallChange="true" StringFormat="N0"
+                                   IsDragScrubEnabled="true" TracksMouseWheelWhenOver="true"
+                                   Value="{Binding SliceWidth, Mode=TwoWay}" VerticalAlignment="Center" MarginLeft="6"/>
+                </StackPanel>
+                <TextBlock Text="Height" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
+                <StackPanel Orientation="Horizontal" MarginBottom="10">
+                    <Slider Value="{Binding SliceHeight, Mode=TwoWay}" IsValueToolTipEnabled="True" Minimum="40" Maximum="220" Width="186"/>
+                    <NumericUpDown Width="88" Minimum="40" Maximum="220" SmallChange="1"
+                                   SnapsToSmallChange="true" StringFormat="N0"
+                                   IsDragScrubEnabled="true" TracksMouseWheelWhenOver="true"
+                                   Value="{Binding SliceHeight, Mode=TwoWay}" VerticalAlignment="Center" MarginLeft="6"/>
+                </StackPanel>
+                <TextBlock Text="Cut — where the SOURCE is cut (0.25 = these skins&apos; own 16px frame; move it and the pieces take each other&apos;s pixels)"
+                           TextWrapping="WrapByWords" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
+                <StackPanel Orientation="Horizontal" MarginBottom="10">
+                    <Slider Value="{Binding SliceCut, Mode=TwoWay}" IsValueToolTipEnabled="True" Minimum="0.05" Maximum="0.45" Width="186"/>
+                    <NumericUpDown Width="88" Minimum="0.05" Maximum="0.45" SmallChange="0.05"
+                                   SnapsToSmallChange="true" StringFormat="N2"
+                                   IsDragScrubEnabled="true" TracksMouseWheelWhenOver="true"
+                                   Value="{Binding SliceCut, Mode=TwoWay}" VerticalAlignment="Center" MarginLeft="6"/>
+                </StackPanel>
+                <TextBlock Text="Border (0 = the source's own pixels)" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
+                <StackPanel Orientation="Horizontal" MarginBottom="10">
+                    <Slider Value="{Binding SliceBorder, Mode=TwoWay}" IsValueToolTipEnabled="True" Minimum="0" Maximum="48" Width="186"/>
+                    <NumericUpDown Width="88" Minimum="0" Maximum="48" SmallChange="1"
+                                   SnapsToSmallChange="true" StringFormat="N0"
+                                   IsDragScrubEnabled="true" TracksMouseWheelWhenOver="true"
+                                   Value="{Binding SliceBorder, Mode=TwoWay}" VerticalAlignment="Center" MarginLeft="6"/>
+                </StackPanel>
+                <TextBlock Text="Edge mode" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
+                <DropDown ItemsSource="{Binding EdgeModes}" SelectedItem="{Binding SliceEdgeMode, Mode=TwoWay}" Width="280" MarginBottom="10"/>
+                <CheckBox Content="Draw the centre" IsChecked="{Binding SliceDrawCenter, Mode=TwoWay}" MarginBottom="6"/>
+                <CheckBox Content="Tile the centre too (off = stretched, as CSS border-image does)" IsChecked="{Binding SliceTileCenter, Mode=TwoWay}" MarginBottom="10"/>
+                <TextBlock Text="Tint" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
+                <ColorPickerButton Width="48" Height="32" SelectedColor="{Binding SliceTint, Mode=TwoWay}"/>
+            </StackPanel>
+        </StackPanel>
+    </StackPanel>
+</View>

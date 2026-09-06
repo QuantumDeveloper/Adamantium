@@ -14,6 +14,10 @@ public sealed class ContentControlRegionAdapter : IRegionAdapter
     // not finished swapping would hand back the wrong one.
     private object _currentViewModel;
 
+    // ...and WHICH VIEW of it. One view-model can be read through several views, and then this is the only thing that
+    // changes between two navigations - comparing the model alone would call every one of them "already shown".
+    private string _currentViewKey;
+
     public ContentControlRegionAdapter(IViewLocator viewLocator)
     {
         _viewLocator = viewLocator;
@@ -25,7 +29,7 @@ public sealed class ContentControlRegionAdapter : IRegionAdapter
         region.SingleActiveView = true;
         region.PropertyChanged += (sender, e) =>
         {
-            if (e.PropertyName == nameof(IRegion.CurrentViewModel)) Render(region, content);
+            if (e.PropertyName is nameof(IRegion.CurrentViewModel) or nameof(IRegion.CurrentViewKey)) Render(region, content);
         };
         Render(region, content);
     }
@@ -33,7 +37,8 @@ public sealed class ContentControlRegionAdapter : IRegionAdapter
     private void Render(IRegion region, ContentControl content)
     {
         var viewModel = region.CurrentViewModel;
-        if (ReferenceEquals(viewModel, _currentViewModel)) return;
+        var viewKey = region.CurrentViewKey;
+        if (ReferenceEquals(viewModel, _currentViewModel) && string.Equals(viewKey, _currentViewKey, StringComparison.Ordinal)) return;
 
         // Leaving: a view that asked to be kept is handed to the framework's store, which parks it - so the detach that
         // follows reads as "coming back" and the renderer keeps what it built. Anything else is dropped, as before. The
@@ -41,10 +46,11 @@ public sealed class ContentControlRegionAdapter : IRegionAdapter
         // supplied it has to.
         if (_currentViewModel != null && content.Content is IUIComponent leaving && ParkedVisuals.ShouldKeep(leaving))
         {
-            ParkedVisuals.Keep(content, _currentViewModel, leaving);
+            ParkedVisuals.Keep(content, ParkKey(_currentViewModel, _currentViewKey), leaving);
         }
 
         _currentViewModel = viewModel;
+        _currentViewKey = viewKey;
         if (viewModel == null)
         {
             content.Content = null;
@@ -52,13 +58,18 @@ public sealed class ContentControlRegionAdapter : IRegionAdapter
         }
 
         // Returning: the parked view goes back in as it was - the rebuild it avoids is the pause this exists for.
-        if (ParkedVisuals.TryTake(content, viewModel, content, out var parked, out _, out _, out _))
+        if (ParkedVisuals.TryTake(content, ParkKey(viewModel, viewKey), content, out var parked, out _, out _, out _))
         {
             content.Content = parked;
             ParkedSubtree.Unpark(parked);
             return;
         }
 
-        content.Content = _viewLocator.ResolveView(viewModel);
+        content.Content = _viewLocator.ResolveView(viewModel, viewKey);
     }
+
+    // Without a key the view-model IS the key, exactly as before - so nothing changes for a region that never names one.
+    // With a key the pair is, or two views of the same model would park over each other and come back as the wrong face.
+    private static object ParkKey(object viewModel, string viewKey)
+        => string.IsNullOrEmpty(viewKey) ? viewModel : (viewModel, viewKey);
 }
