@@ -176,6 +176,11 @@ public partial class RenderCache
     // and takes the same path.
     private readonly Dictionary<IRenderUnit, (int First, int Count)> _texRunByUnit = new();
 
+    // ...and, for a FRACTAL fill, the KIND its segment was recorded with. Each formula is its own pass now, and so is
+    // the deep-zoom path - which a zoom animation crosses on its own. A patch only rewrites the record, never the pass
+    // the segment already bound, so a kind that no longer matches has to refuse and let the walk own it.
+    private readonly Dictionary<IRenderUnit, int> _fractalKindByUnit = new();
+
     // ...and the same for a GEOMETRY unit whose fill rides the instanced collector: which key-arena holds it and at
     // which slot. The arena could already re-bake one record in place (TryStage + UpdateSlotFromStage - the splice uses
     // exactly that); what was missing was the paint path knowing WHERE a given unit sits, so IsSlotPatchable answered

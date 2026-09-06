@@ -749,6 +749,7 @@ public partial class RenderCache
             _sdfSlotByUnit.Clear();
             _textRunByUnit.Clear();
             _texRunByUnit.Clear();
+            _fractalKindByUnit.Clear();
             _fillSlotByUnit.Clear();
             _haloRunsByUnit.Clear();
             _unitsByBrush.Clear();
@@ -1306,7 +1307,8 @@ public partial class RenderCache
                 // iterates z=z²+c per fragment. Shares the clip group with the other batches; auto-morph is a shader-side
                 // Time drift, so this batch is not paint/slot-patchable (no _sdfSlotByUnit entry) - a full walk re-records it.
                 var fractalBounds = LogicalBounds(unit.Component, wt);
-                if ((_batchOpen && !ScissorEquals(_batchScissor, scissor)) || OverlapsHigherLayer(5, fractalBounds, unit.Component))   // 5 = fractal layer
+                if ((_batchOpen && !ScissorEquals(_batchScissor, scissor)) || !_fractalBatch.SameKind(FractalRectCollector.KindOf(fru.RectPayload.Brush))
+                    || OverlapsHigherLayer(5, fractalBounds, unit.Component))   // 5 = fractal layer
                 {
                     FlushBatches(device, fullScissor, ref scissorNarrowed);
                 }
@@ -1318,6 +1320,7 @@ public partial class RenderCache
                     if (_recording)
                     {
                         _sdfSlotByUnit[unit] = (SdfSlotKind.Fractal, _fractalBatch.LastSlot);   // see the pattern branch
+                        _fractalKindByUnit[unit] = FractalRectCollector.KindOf(fru.RectPayload.Brush);   // the pass this slot was recorded under
                         group.NotBatchable("fractal");
                     }
                     _batchScissor = scissor;
@@ -2170,7 +2173,13 @@ public partial class RenderCache
                 // (or the other way round) is a change of record COUNT, which only the walk can express.
                 SdfSlotKind.Texture => _texRectBatch != null && _texRectBatch.CanBatch(rru.RectPayload)
                                        && TextureBatchCollector.RecordCount(rru.RectPayload.Brush) == TexRunLength(u),
-                SdfSlotKind.Fractal => _fractalBatch != null && _fractalBatch.CanBatch(rru.RectPayload),
+                // ...and the FORMULA (deep zoom included) must still be the one the segment bound its pass for: the patch
+                // rewrites the record, not the pass. A DEEP one refuses outright - its record indexes the reference
+                // ORBIT, and only the walk builds that, so a patched deep record would point at nothing and draw black.
+                SdfSlotKind.Fractal => _fractalBatch != null && _fractalBatch.CanBatch(rru.RectPayload)
+                                       && _fractalKindByUnit.TryGetValue(u, out var fracKind)
+                                       && fracKind == FractalRectCollector.KindOf(rru.RectPayload.Brush)
+                                       && !FractalRectCollector.IsDeep(fracKind),
                 SdfSlotKind.Material => _materialBatch != null && _materialBatch.CanBatch(rru.RectPayload),
                 _ => false
             };
