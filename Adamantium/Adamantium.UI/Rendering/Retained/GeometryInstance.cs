@@ -25,8 +25,9 @@ public struct GeometryInstance
     /// stored here and moving the slot's node does not touch this record.</summary>
     public Matrix4x4F Local;
 
-    /// <summary>Straight-alpha RGBA (opacity already folded into A by the producer).</summary>
-    public Vector4F Color;
+    /// <summary>Straight-alpha RGBA (opacity already folded into the alpha by the producer). Four BYTES - the form the
+    /// colour arrived in - read by the shader as a <c>uint8_t4</c>.</summary>
+    public Color Color;
 
     /// <summary>.x = transform-table slot; .y = OPACITY SLOT, sent but NOT YET READ; .zw spare.
     /// <para>Reading it in InstancedFillVS drew the fills wrong and reading it in the FRINGE VS blanked the window
@@ -44,7 +45,7 @@ public struct GeometryInstance
         // bytes are already the right layout. Transposing here mis-places the translation into the 4th column, so mul()
         // dumps it into .w and every triangle collapses toward clip origin (the diagonal-streak-from-corner artifact).
         Local = local,
-        Color = color,
+        Color = new Color(color),
         // .z is the ROUNDED CLIP slot: a mesh cannot get an ancestor's rounded corners from its own geometry, and a
         // scissor cannot express them, so the shape comes from the table (-1 = no rounded clip).
         Params = new Vector4F(transformSlot, fadeSlot, clipSlot, 0)

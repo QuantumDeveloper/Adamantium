@@ -24,11 +24,12 @@ public struct RectItem
     /// own corner.</summary>
     public Vector4F Radii;
 
-    /// <summary>Straight (non-premultiplied) fill colour, element/brush opacity already folded into .w.</summary>
-    public Vector4F Color;
+    /// <summary>Straight (non-premultiplied) fill colour, element/brush opacity already folded into the alpha. Four
+    /// BYTES, read by the shader as a <c>uint8_t4</c>.</summary>
+    public Color Color;
 
-    /// <summary>Straight stroke colour (opacity folded into .w); .w == 0 = no stroke.</summary>
-    public Vector4F StrokeColor;
+    /// <summary>Straight stroke colour (opacity folded into the alpha); alpha 0 = no stroke.</summary>
+    public Color StrokeColor;
 
     /// <summary>Stroke geometry: x = width in device px, y = alignment (-1 inside, 0 center, +1 outside),
     /// z = dash ON length (device px, 0 = solid), w = dash GAP length (device px).</summary>

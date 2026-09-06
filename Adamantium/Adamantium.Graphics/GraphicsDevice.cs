@@ -423,6 +423,7 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
     public void ClearDepthInRect(Rect2D rect)
     {
         if (depthBuffer == null || rect.Extent.Width == 0 || rect.Extent.Height == 0) return;
+        if (!ClampToRenderArea(ref rect)) return;
 
         var attachment = new ClearAttachment
         {
@@ -431,6 +432,32 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
         };
         var clearRect = new ClearRect { Rect = rect, BaseArrayLayer = 0, LayerCount = 1 };
         CurrentCommandBuffer.ClearAttachments(1, new[] { attachment }, 1, new[] { clearRect });
+    }
+
+    // A clear rect that leaves the RENDER AREA is invalid use, not a no-op - and this driver answers it with a lost
+    // device rather than an error, so it is cut here rather than trusted from the caller. The caller has only the
+    // VIEWPORT to clamp against, which is not the same rectangle: an off-screen pass (a captured backdrop, a baked
+    // brush) renders into a smaller target while the viewport still describes the window. The render area is what
+    // BeginRendering hands the driver - the first target's full extent - so it is known HERE and nowhere else.
+    // False = nothing of the rectangle survives the cut, so there is nothing to clear.
+    private bool ClampToRenderArea(ref Rect2D rect)
+    {
+        if (renderTargets is not { Length: > 0 }) return false;
+
+        var limitX = (int)renderTargets[0].Width;
+        var limitY = (int)renderTargets[0].Height;
+        var left = Math.Clamp(rect.Offset.X, 0, limitX);
+        var top = Math.Clamp(rect.Offset.Y, 0, limitY);
+        var right = Math.Clamp(rect.Offset.X + (int)rect.Extent.Width, left, limitX);
+        var bottom = Math.Clamp(rect.Offset.Y + (int)rect.Extent.Height, top, limitY);
+        if (right == left || bottom == top) return false;
+
+        rect = new Rect2D
+        {
+            Offset = new Offset2D { X = left, Y = top },
+            Extent = new Extent2D { Width = (uint)(right - left), Height = (uint)(bottom - top) }
+        };
+        return true;
     }
 
     public bool LogicOperationsEnabled { get; set; } = false;

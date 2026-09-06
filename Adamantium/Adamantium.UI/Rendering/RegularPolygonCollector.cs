@@ -70,12 +70,7 @@ internal sealed class RegularPolygonCollector : ShapeSdfCollector<PolygonItem>
         const float eps = 1e-4f;
         if (Math.Abs(world.M12) > eps || Math.Abs(world.M21) > eps) return false;   // rotation/shear -> per-unit
 
-        var color = Vector4F.Zero;
-        if (p.Brush is SolidColorBrush solid)
-        {
-            color = solid.Color.ToVector4();
-            color.W *= (float)(opacity * solid.Opacity);
-        }
+        var color = RectBatchCollector.FillColour(p.Brush, opacity);
 
         var sx = world.M11; var sy = world.M22; var tx = world.M41; var ty = world.M42;
         var r = p.DestinationRect;
@@ -85,7 +80,7 @@ internal sealed class RegularPolygonCollector : ShapeSdfCollector<PolygonItem>
             Bounds = new Vector4F((float)(r.X * sx + tx), (float)(r.Y * sy + ty), (float)(r.Width * sx), (float)(r.Height * sy)),
             Params = new Vector4F(transformSlot, p.Corners, (float)(p.RingThickness * sx), (float)MathHelper.DegreesToRadians(p.StartAngle)),
             Color = color,
-            StrokeColor = strokeColor,
+            StrokeColor = new Color(strokeColor),
             Stroke0 = stroke0,
             Stroke1 = stroke1,
             Dash = dash,

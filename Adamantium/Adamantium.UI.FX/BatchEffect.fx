@@ -102,7 +102,7 @@ float4 RectBatchPS(PSInput input) : SV_Target
 struct GeometryInstance
 {
     float4x4 Local;   // element local -> SLOT space. Matches Matrix4x4F Local.
-    float4 Color;     // straight-alpha RGBA (element/brush opacity folded into .w by the producer)
+    uint8_t4 Color;   // straight-alpha RGBA in four bytes (opacity folded in by the producer)
     float4 Params;    // .x = transform-table slot; .y = opacity slot; .z = ROUNDED CLIP slot (-1 = none); .w spare
 };
 
@@ -127,7 +127,8 @@ FillPSInput InstancedFillVS(UI_VERTEX v, uint instanceId : SV_InstanceID)
     o.Position = mul(world, Projection);
     int fillFadeSlot = int(inst.Params.y);
     float fillFade = lerp(1.0, nodes[max(fillFadeSlot, 0)].Params.x, step(0.0, float(fillFadeSlot)));
-    o.Color = float4(inst.Color.rgb, inst.Color.a * fillFade);
+    float4 instColour = float4(inst.Color) * (1.0 / 255.0);
+    o.Color = float4(instColour.rgb, instColour.a * fillFade);
     o.ClipBox   = ClipShapeBox(inst.Params.z);
     o.ClipRadii = ClipShapeRadii(inst.Params.z);
     return o;
@@ -156,7 +157,8 @@ FringePSInput InstancedFringeVS(FringeVertex v, uint instanceId : SV_InstanceID)
     o.Position = ExpandFringe(v, m, coverage);
     int fillFadeSlot = int(inst.Params.y);
     float fillFade = lerp(1.0, nodes[max(fillFadeSlot, 0)].Params.x, step(0.0, float(fillFadeSlot)));
-    o.Color = float4(inst.Color.rgb, inst.Color.a * fillFade);
+    float4 instColour = float4(inst.Color) * (1.0 / 255.0);
+    o.Color = float4(instColour.rgb, instColour.a * fillFade);
     o.Coverage = coverage;
     o.ClipBox   = ClipShapeBox(inst.Params.z);
     o.ClipRadii = ClipShapeRadii(inst.Params.z);
@@ -212,8 +214,8 @@ struct RectData
     float4 Bounds;       // NODE-local x, y, w, h (world for slot-0 legacy bakes - identity matrix)
     float4 Params;       // .x = LARGEST corner radius; .y = transform-table slot; .z = no-fringe flag; .w = fade slot
     float4 Radii;        // corner radii: x = TL, y = TR, z = BR, w = BL
-    float4 Color;        // straight RGBA, opacity folded in
-    float4 StrokeColor;  // straight stroke RGBA (.w == 0 -> no stroke); the BORDER's colour when Inset is non-zero
+    uint8_t4 Color;       // straight RGBA in four bytes
+    uint8_t4 StrokeColor; // straight stroke RGBA in four bytes (alpha 0 -> no stroke); the BORDER's colour when Inset is non-zero
     float4 Stroke0;      // width_px, align, dashOn, dashGap
     float4 Stroke1;      // dashOffset, trimStart, trimEnd, flags
     float4 Dash;         // dash runs 2..5 (device px); runs 0 and 1 ride in Stroke0.zw, the count in Stroke1.w
@@ -257,8 +259,10 @@ PSInput RectBatchInstancedVS(uint vertexId : SV_VertexID, uint instanceId : SV_I
     // .w < 0 means nothing above this element fades, and the select keeps that branch-free.
     float slotAlpha = nodes[(uint)max(item.Params.w, 0.0)].Params.x;
     slotAlpha = lerp(1.0, slotAlpha, step(0.0, item.Params.w));
-    o.Color  = float4(item.Color.rgb, item.Color.a * slotAlpha);
-    o.StrokeColor = float4(item.StrokeColor.rgb, item.StrokeColor.a * slotAlpha);
+    float4 rectFill = float4(item.Color) * (1.0 / 255.0);
+    float4 rectPen = float4(item.StrokeColor) * (1.0 / 255.0);
+    o.Color  = float4(rectFill.rgb, rectFill.a * slotAlpha);
+    o.StrokeColor = float4(rectPen.rgb, rectPen.a * slotAlpha);
     o.Stroke0 = float4(widthPx, item.Stroke0.y, item.Stroke0.z * iso, item.Stroke0.w * iso);
     o.Stroke1 = float4(item.Stroke1.x * iso, item.Stroke1.y, item.Stroke1.z, item.Stroke1.w);
     o.Dash = item.Dash * iso;
@@ -391,8 +395,8 @@ struct EllipseData
 {
     float4 Bounds;       // NODE-local x, y, w, h (world for slot-0 legacy bakes - identity matrix)
     float4 Params;       // .x = transform-table slot; .y = fade slot (-1 = none); .zw reserved (mirrors EllipseItem)
-    float4 Color;        // straight RGBA, opacity folded in
-    float4 StrokeColor;  // straight stroke RGBA (.w == 0 -> no stroke)
+    uint8_t4 Color;       // straight RGBA in four bytes
+    uint8_t4 StrokeColor; // straight stroke RGBA in four bytes (alpha 0 -> no stroke)
     float4 Stroke0;      // width_px, align, dashOn, dashGap
     float4 Stroke1;      // dashOffset, trimStart, trimEnd, flags
     float4 Dash;         // dash runs 2..5 (device px); runs 0 and 1 ride in Stroke0.zw, the count in Stroke1.w
@@ -424,8 +428,10 @@ EllipsePSInput EllipseBatchInstancedVS(uint vertexId : SV_VertexID, uint instanc
     // The element's fade, read inline with an unsigned index - see the rect pass for why this is not a helper.
     float fade = nodes[(uint)max(item.Params.y, 0.0)].Params.x;
     fade = lerp(1.0, fade, step(0.0, item.Params.y));
-    o.Color  = float4(item.Color.rgb, item.Color.a * fade);
-    o.StrokeColor = float4(item.StrokeColor.rgb, item.StrokeColor.a * fade);
+    float4 fill = float4(item.Color) * (1.0 / 255.0);
+    float4 pen = float4(item.StrokeColor) * (1.0 / 255.0);
+    o.Color  = float4(fill.rgb, fill.a * fade);
+    o.StrokeColor = float4(pen.rgb, pen.a * fade);
     o.Stroke0 = float4(widthPx, item.Stroke0.y, item.Stroke0.z * iso, item.Stroke0.w * iso);
     o.Stroke1 = float4(item.Stroke1.x * iso, item.Stroke1.y, item.Stroke1.z, item.Stroke1.w);
     o.Dash = item.Dash * iso;
@@ -443,8 +449,8 @@ struct PolygonData
 {
     float4 Bounds;       // NODE-local x, y, w, h (world for slot-0 bakes)
     float4 Params;       // .x = transform-table slot; .y = CORNERS (3 and up); .z = ring thickness in device px; .w = start angle (RADIANS)
-    float4 Color;        // straight RGBA, opacity folded in
-    float4 StrokeColor;  // straight stroke RGBA (.w == 0 -> no stroke)
+    uint8_t4 Color;       // straight RGBA in four bytes
+    uint8_t4 StrokeColor; // straight stroke RGBA in four bytes (alpha 0 -> no stroke)
     float4 Stroke0;      // width_px, align, dashOn, dashGap
     float4 Stroke1;      // dashOffset, trimStart, trimEnd, flags
     float4 Dash;         // dash runs 2..5 (device px)
@@ -495,8 +501,10 @@ PolygonPSInput PolygonBatchInstancedVS(uint vertexId : SV_VertexID, uint instanc
     // cured it, and was rejected: the bound would be an invented constant, and this form needs none.
     int polyFadeSlot = (int)item.Clip.y;
     float polyFade = polyFadeSlot < 0 ? 1.0 : nodes[(uint)polyFadeSlot].Params.x;
-    o.Color  = float4(item.Color.rgb, item.Color.a * polyFade);
-    o.StrokeColor = float4(item.StrokeColor.rgb, item.StrokeColor.a * polyFade);
+    float4 polyFill = float4(item.Color) * (1.0 / 255.0);
+    float4 polyPen = float4(item.StrokeColor) * (1.0 / 255.0);
+    o.Color  = float4(polyFill.rgb, polyFill.a * polyFade);
+    o.StrokeColor = float4(polyPen.rgb, polyPen.a * polyFade);
     o.Stroke0 = float4(widthPx, item.Stroke0.y, item.Stroke0.z * iso, item.Stroke0.w * iso);
     o.Stroke1 = float4(item.Stroke1.x * iso, item.Stroke1.y, item.Stroke1.z, item.Stroke1.w);
     o.Dash = item.Dash * iso;
@@ -532,7 +540,7 @@ struct HaloRectData
     float4 Params;   // .x corner radius, .y transform slot, .z shape (0 rect, 1 ellipse), .w inner flag
     float4 Radii;        // corner radii: x = TL, y = TR, z = BR, w = BL
     float4 Band;     // .xy offset, .z spread, .w softness - slot units
-    float4 Color;
+    uint8_t4 Color;  // straight RGBA in four bytes, the same four Adamantium.Mathematics.Color holds on the CPU side
     float4 Field;    // .x = the distance range a SAMPLED field encodes, slot units (0 for an analytic shape);
                      // .y = the ROUNDED CLIP's slot, .z = the OPACITY slot (-1 = none for either); .w spare
 };
@@ -662,7 +670,7 @@ float4 HaloRectPS(HaloPSInput input) : SV_Target
     // A sampled band also fades out as the field runs out of range - see HaloFieldDistance.
     a *= lerp(1.0, bandFade, sampled);
 
-    float4 color = it.Color;
+    float4 color = float4(it.Color) * (1.0 / 255.0);
     color.a *= saturate(a) * input.Fade * ClipCoverage(input.Position.xy, input.ClipBox, input.ClipRadii);
     return color;
 }

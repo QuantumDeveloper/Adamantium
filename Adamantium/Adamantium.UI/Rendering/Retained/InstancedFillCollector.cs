@@ -48,7 +48,7 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
     private static readonly int InstanceStride = Marshal.SizeOf<GeometryInstance>();
     private static readonly int GradInstanceStride = Marshal.SizeOf<GradientGeometryInstance>();
     private static readonly int PatInstanceStride = Marshal.SizeOf<PatternGeometryInstance>();
-    private static readonly int TexInstanceStride = Marshal.SizeOf<TexGeometryInstance>();
+    private static readonly int TexInstanceStride = Marshal.SizeOf<TextureGeometryInstance>();
 
     // Per-key GPU + per-frame accumulation state. The mesh buffers are immutable once uploaded; the instance buffer is
     // rewritten each frame (grown only at BeginFrame).
@@ -99,7 +99,7 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
 
         // Parallel TEXTURED instance state for this key's shared mesh (an ImageBrush fill on the same geometry). The
         // texture is NOT part of the key: one is bound per DRAW, so a texture change splits the run, not the segment.
-        public TexGeometryInstance[] TexItems = new TexGeometryInstance[16];
+        public TextureGeometryInstance[] TexItems = new TextureGeometryInstance[16];
         public int TexCount;
         public int TexFlushed;
         public Buffer[] TexGpuRing;
@@ -166,10 +166,20 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
         public readonly List<IRenderUnit> Units = new();
         public Rect2D Scissor;
 
-        // This group's COVERAGE mark. Fills stamp it; the fringes then draw only where the stencil is LOWER, i.e. over
-        // earlier groups (which belong underneath) but never over a fill of their own group. Replayed frames reuse the
-        // recorded value, so a replay marks the buffer exactly as the recording did.
+        // This group's first COVERAGE mark; key N stamps StencilRef + N, in paint order. Fills stamp it; the fringes
+        // then draw only where the stencil is LOWER, i.e. over what belongs underneath them and never over their own
+        // fill or a LATER one. Replayed frames reuse the recorded value, so a replay marks the buffer exactly as the
+        // recording did.
+        // <para>One mark for the whole group is what this used to be, and it could not tell "a fill of my group that I
+        // am on top of" from "one that is on top of ME": every fill stamped the same number, so a fringe was cut
+        // wherever ANY fill of its group had landed, including the one underneath it. A drawing is exactly that case -
+        // a card with shapes on it - and its shapes came out with no anti-aliasing at all while the card kept its
+        // own.</para>
         public uint StencilRef;
+
+        /// <summary>The mark key <paramref name="index"/> stamps - its place in the group's paint order, clamped to the
+        /// field so a long group cannot wrap back onto an earlier key's mark.</summary>
+        public uint MarkFor(int index) => Math.Min(StencilRef + (uint)index, CoverageMarkBits);
 
         public void Reset() { Keys.Clear(); GradKeys.Clear(); PatKeys.Clear(); TexKeys.Clear(); MatKeys.Clear(); Units.Clear(); }
     }
@@ -338,7 +348,7 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
                 seg.TexGpuRing = new Buffer[copies];
                 for (var i = 0; i < copies; i++)
                 {
-                    seg.TexGpuRing[i] = Buffer.New<TexGeometryInstance>(_device, (uint)seg.TexItems.Length,
+                    seg.TexGpuRing[i] = Buffer.New<TextureGeometryInstance>(_device, (uint)seg.TexItems.Length,
                         BufferUsageFlags.StorageBuffer | BufferUsageFlags.ShaderDeviceAddress, Mem);
                 }
                 seg.TexGpuCapacity = seg.TexItems.Length;
@@ -554,7 +564,7 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
             seg.TexGpuRing = new Buffer[copies];
             for (var i = 0; i < copies; i++)
             {
-                seg.TexGpuRing[i] = Buffer.New<TexGeometryInstance>(_device, (uint)seg.TexItems.Length,
+                seg.TexGpuRing[i] = Buffer.New<TextureGeometryInstance>(_device, (uint)seg.TexItems.Length,
                     BufferUsageFlags.StorageBuffer | BufferUsageFlags.ShaderDeviceAddress, Mem);
             }
             seg.TexGpu = seg.TexGpuRing[_writeCursor % copies];
@@ -584,16 +594,15 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
     // Pack an ImageBrush + world + local bounds into one textured instance. The tiling arithmetic is the SAME one the
     // SDF textured batch uses (ImageTiling), fed the shape's LOCAL box - the geometry PS works in local mesh coords, so
     // the drawn rect is expressed as a fraction of that box rather than in device pixels.
-    private static TexGeometryInstance BuildTexturedInstance(TileBrush brush, Matrix4x4F local, Rect localBounds,
+    private static TextureGeometryInstance BuildTexturedInstance(TileBrush brush, Matrix4x4F local, Rect localBounds,
         double opacity, int transformSlot, int fadeSlot, int clipSlot)
     {
         var box = localBounds.Width > 0 && localBounds.Height > 0 ? localBounds : new Rect(0, 0, 1, 1);
         var layout = ImageTiling.Layout(brush, box, local.M11, local.M22, TextureBatchCollector.SourceIsSlice(brush));
 
-        var tint = brush.Tint.ToVector4();
-        tint.W *= (float)(opacity * brush.Opacity);
+        var tint = RectBatchCollector.WithOpacity(brush.Tint, opacity * brush.Opacity);
 
-        return new TexGeometryInstance
+        return new TextureGeometryInstance
         {
             Local = local,
             Params = new Vector4F(layout.Repeats ? 1f : 0f, layout.Mirror, fadeSlot, transformSlot),   // .z was unused
@@ -848,6 +857,8 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
         rec.Scissor = _scissor;
         // Clamped to the field, NOT left to wrap: a mark past it writes back as 0 through the write mask, and a fringe
         // testing Greater against 0 draws nowhere. Past exhaustion the caller has already stopped relying on marks.
+        // The group takes a RANGE of marks - one per key, handed out in paint order by MarkFor - so the counter is
+        // advanced by however many keys the group ends up with, below.
         rec.StencilRef = Math.Min(++_groupRef, CoverageMarkBits);
 
         foreach (var seg in _pendingKeys)
@@ -912,6 +923,10 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
             seg.InPending = false;
         }
         foreach (var u in _pendingUnits) rec.Units.Add(u);
+
+        // The group has taken one mark per key, so the NEXT group starts past all of them - two groups sharing a mark
+        // would put the later one's fringes under the earlier one's fills.
+        if (rec.Keys.Count > 1) _groupRef += (uint)(rec.Keys.Count - 1);
 
         _pendingKeys.Clear();
         _pendingUnits.Clear();
@@ -1000,8 +1015,12 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
             _device.StencilReference = rec.StencilRef;
 
             _device.SetScissors(rec.Scissor);
-            foreach (var (seg, first, count) in rec.Keys)
+            for (var i = 0; i < rec.Keys.Count; i++)
             {
+                var (seg, first, count) = rec.Keys[i];
+                // Its own mark, not the group's: a key stamps where it sits in the paint order, so the fringes below
+                // can tell what is under them from what is over them.
+                _device.StencilReference = rec.MarkFor(i);
                 _effect.InstancesAddress.SetValue(seg.Gpu.GetDeviceAddress() + (ulong)(first * InstanceStride));
                 _device.SetVertexBuffer(seg.VtxBuffer);
                 _device.PrimitiveTopology = seg.Topology;
@@ -1028,15 +1047,19 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
             // true paint order - and with that, two overlapping shapes no longer have to be split into separate groups.
             // Earlier groups carry a LOWER mark and lie underneath, so the fringe still draws over them.
             _device.StencilTestEnabled = true;
-            _device.StencilCompareOp = CompareOp.Greater;   // draw where THIS group's mark is greater than what is there
+            _device.StencilCompareOp = CompareOp.Greater;   // draw where THIS key's mark is greater than what is there
             _device.StencilPassOp = StencilOp.Keep;
             _device.StencilWriteMask = 0;
-            _device.StencilReference = rec.StencilRef;
 
             _device.SetScissors(rec.Scissor);
-            foreach (var (seg, first, count) in rec.Keys)
+            for (var i = 0; i < rec.Keys.Count; i++)
             {
+                var (seg, first, count) = rec.Keys[i];
                 if (seg.RingBuffer == null) continue;   // a mesh with no closed boundary has no fringe
+                // Tested against the key's OWN mark: lower marks are what this key was drawn on top of, so its fringe
+                // belongs there; its own fill and every later key of the group carry a mark at least this high and cut
+                // it, which is what keeps [all fills][all fringes] indistinguishable from true paint order.
+                _device.StencilReference = rec.MarkFor(i);
                 _effect.InstancesAddress.SetValue(seg.Gpu.GetDeviceAddress() + (ulong)(first * InstanceStride));
                 _device.SetVertexBuffer(seg.RingBuffer);
                 _effect.BatchFringePass.Apply();

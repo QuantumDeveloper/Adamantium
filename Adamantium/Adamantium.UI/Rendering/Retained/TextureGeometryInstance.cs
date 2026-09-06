@@ -5,13 +5,13 @@ namespace Adamantium.UI.Rendering.Retained;
 
 /// <summary>
 /// One instance of a TEXTURED fill on a shared tessellated mesh - the textured sibling of
-/// <see cref="PatternGeometryInstance"/>. Matches <c>TexGeomData</c> in BatchEffect.fx field for field; read by the
+/// <see cref="PatternGeometryInstance"/>. Matches <c>TextureGeomData</c> in BrushEffect.fx field for field; read by the
 /// vertex/pixel shader through a buffer device address, indexed by SV_InstanceID.
 /// <para>The TEXTURE is not in the record: one is bound per draw, the way the SDF textured batch binds one per segment.
 /// The engine has no bindless path, so a texture change simply splits the draw.</para>
 /// </summary>
 [StructLayout(LayoutKind.Sequential)]
-public struct TexGeometryInstance
+public struct TextureGeometryInstance
 {
     /// <summary>Per-instance transform RELATIVE to the transform-table slot in <see cref="Params"/>.w (element local ->
     /// slot space). The vertex shader applies the slot matrix on top, so moving the slot's node never touches this.</summary>
@@ -37,7 +37,9 @@ public struct TexGeometryInstance
     /// <summary>The sub-rectangle of the source one copy samples.</summary>
     public Vector4F UvRect;
 
-    public Vector4F Tint;
+    /// <summary>Multiplied into the sample, straight RGBA. Four BYTES - the form the colour arrived in - read by the
+    /// shader as a <c>uint8_t4</c>.</summary>
+    public Color Tint;
 
     /// <summary>.x = the ROUNDED CLIP's slot, or -1; .yzw spare. Its own field: Params is full (repeat, mirror,
     /// opacity slot, transform slot) and the rest describe the picture.</summary>

@@ -336,8 +336,7 @@ internal sealed class TextureBatchCollector : BrushSdfCollector<TextureItem>
     private static TextureItem Single(TileBrush brush, Rect bounds, float radius, Vector4F radii, double opacity, int transformSlot, int fadeSlot,
         double scaleX, double scaleY)
     {
-        var tint = brush.Tint.ToVector4();
-        tint.W *= (float)(opacity * brush.Opacity);
+        var tint = RectBatchCollector.WithOpacity(brush.Tint, opacity * brush.Opacity);
 
         var layout = ImageTiling.Layout(brush, bounds, scaleX, scaleY, SourceIsSlice(brush));
 

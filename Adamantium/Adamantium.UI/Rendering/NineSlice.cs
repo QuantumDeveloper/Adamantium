@@ -125,8 +125,7 @@ internal static class NineSlice
         top *= vScale;
         bottom *= vScale;
 
-        var tint = brush.Tint.ToVector4();
-        tint.W *= (float)(opacity * brush.Opacity);
+        var tint = RectBatchCollector.WithOpacity(brush.Tint, opacity * brush.Opacity);
 
         // Columns and rows, in both spaces at once: x/w on the shape, u/du on the source.
         var xs = new[] { bounds.X, bounds.X + left, bounds.Right - right };
