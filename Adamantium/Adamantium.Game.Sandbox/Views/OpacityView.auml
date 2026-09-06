@@ -180,6 +180,22 @@
                 <TextBlock Text="shadow" Width="94" Foreground="{ResourceReference TextFillColorSecondary}"/>
                 <TextBlock Text="stroke" Width="94" Foreground="{ResourceReference TextFillColorSecondary}"/>
             </StackPanel>
+
+            <!-- The other half of the subject, and it belongs HERE rather than on the brushes tab where it used to sit:
+                 Opacity fades the element AND everything inside it, SelfOpacity fades only the element, so the text on
+                 the third card stays at full strength while its background goes. -->
+            <TextBlock Text="Opacity (whole subtree) vs SelfOpacity (this element only)" FontSize="18" Margin="0,24,0,10"/>
+            <WrapPanel Orientation="Horizontal">
+                <Border Width="150" Height="96" CornerRadius="14" Margin="10" Background="#3B82F6">
+                    <TextBlock Text="baseline" Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                </Border>
+                <Border Width="150" Height="96" CornerRadius="14" Margin="10" Background="#3B82F6" Opacity="0.35">
+                    <TextBlock Text="Opacity 0.35" Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                </Border>
+                <Border Width="150" Height="96" CornerRadius="14" Margin="10" Background="#3B82F6" SelfOpacity="0.35">
+                    <TextBlock Text="SelfOpacity 0.35" Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                </Border>
+            </WrapPanel>
         </StackPanel>
     </ScrollViewer>
 </View>

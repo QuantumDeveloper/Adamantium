@@ -968,8 +968,14 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
     {
         try
         {
-            if (MainDevice is not { DeviceFaultSupported: true }) return string.Empty;
-            if (LogicalDevice.GetDeviceFaultInfoEXT(out var fault) != Result.Success || fault == null) return string.Empty;
+            // Each of these used to return "" - indistinguishable from "the driver reported no fault", which is the one
+            // answer that would let a reader stop looking. Say which it was.
+            if (MainDevice is not { DeviceFaultSupported: true }) return "\nGPU device fault: VK_EXT_device_fault was NOT enabled on this device";
+            // Incomplete means the driver filled what we asked for and held back the vendor blob we opted out of.
+            var faultResult = LogicalDevice.GetDeviceFaultInfoEXT(out var fault);
+            if (faultResult != Result.Success && faultResult != Result.Incomplete)
+                return $"\nGPU device fault: GetDeviceFaultInfoEXT returned {faultResult}";
+            if (fault == null) return "\nGPU device fault: GetDeviceFaultInfoEXT succeeded but reported nothing";
 
             var sb = new System.Text.StringBuilder($"\nGPU device fault (VK_EXT_device_fault): \"{fault.Description}\"");
             var addresses = fault.PAddressInfos.Span;
@@ -986,7 +992,7 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
             }
             return sb.ToString();
         }
-        catch { return string.Empty; }
+        catch (Exception e) { return $"\nGPU device fault: querying it threw {e.GetType().Name}: {e.Message}"; }
     }
 
     public bool BeginDraw(float depth = 1.0f, uint stencil = 0, Action<CommandBuffer> beforeRenderPass = null)

@@ -1,0 +1,102 @@
+<View xmlns="http://adamantium/ui"
+      xmlns:x="http://adamantium/ui/xaml/extensions"
+      xmlns:conv="clr-namespace:Adamantium.Game.Sandbox.Converters">
+    <!-- One of the brushes tab's stands, navigated into its region under the key "Gradients". The DataContext is the
+         tab's own view-model - the locator sets it - so every binding here reads exactly as it did when this markup
+         lived on the tab, and leaving the stand drops this view instead of leaving it hidden. -->
+    <StackPanel Orientation="Vertical">
+
+        <!-- THE LIVE ONE. The rows on the tab are fixed samples; this is the same three brushes with one set of stops
+             driving all of them, so switching the kind changes the GEOMETRY and nothing else. -->
+        <TextBlock Text="Gradient — live (one set of stops, three geometries)" FontSize="18" Margin="0,0,0,10"/>
+        <StackPanel Orientation="Horizontal" MarginBottom="24">
+            <Grid Width="{Binding PreviewWidth}" Height="{Binding PreviewHeight}" Margin="10">
+                <Rectangle Width="{Binding PreviewWidth}" Height="{Binding PreviewHeight}" Fill="{Binding LiveGradient}"
+                           CornerRadius="{Binding GradientCorner, Converter={conv:DoubleToCornerRadiusConverter}}"
+                           Visibility="{Binding PreviewShape, Converter={conv:EnumVisibilityConverter}, ConverterParameter=Rectangle}"/>
+                <Ellipse Width="{Binding PreviewWidth}" Height="{Binding PreviewHeight}" Fill="{Binding LiveGradient}"
+                         Visibility="{Binding PreviewShape, Converter={conv:EnumVisibilityConverter}, ConverterParameter=Ellipse}"/>
+                <RegularPolygon Width="{Binding PreviewSquare}" Height="{Binding PreviewSquare}" Corners="{Binding ShapeCornerCount}"
+                                StartAngle="{Binding ShapeStartAngle}" Fill="{Binding LiveGradient}"
+                                HorizontalAlignment="Center" VerticalAlignment="Center"
+                                Visibility="{Binding PreviewShape, Converter={conv:EnumVisibilityConverter}, ConverterParameter=Polygon}"/>
+                <Polygon Points="{Binding FixedStar}" Fill="{Binding LiveGradient}"
+                         HorizontalAlignment="Center" VerticalAlignment="Center"
+                         Visibility="{Binding PreviewShape, Converter={conv:EnumVisibilityConverter}, ConverterParameter=Star}"/>
+            </Grid>
+            <StackPanel Orientation="Vertical" Width="330" MarginLeft="16" VerticalAlignment="Center">
+                <TextBlock Text="Geometry" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
+                <DropDown ItemsSource="{Binding GradientKinds}" SelectedItem="{Binding GradientKind, Mode=TwoWay}" Width="300" MarginBottom="10"/>
+
+                <!-- Only the linear one runs along a direction; on the other two an angle would mean nothing. -->
+                <StackPanel Orientation="Vertical" Visibility="{Binding GradientKind, Converter={conv:EnumVisibilityConverter}, ConverterParameter=Linear}">
+                    <TextBlock Text="Direction — degrees" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
+                    <StackPanel Orientation="Horizontal" MarginBottom="8">
+                        <Slider Value="{Binding GradientAngle, Mode=TwoWay}" Minimum="0" Maximum="360" IsMoveToPointEnabled="true" Width="190"/>
+                        <NumericUpDown Width="96" Minimum="0" Maximum="360" SmallChange="1" StringFormat="N0"
+                                       IsDragScrubEnabled="true" TracksMouseWheelWhenOver="true"
+                                       Value="{Binding GradientAngle, Mode=TwoWay}" VerticalAlignment="Center" MarginLeft="8"/>
+                    </StackPanel>
+                    <TextBlock Text="Span — shorten it to see Reflect and Repeat" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
+                    <StackPanel Orientation="Horizontal" MarginBottom="8">
+                        <Slider Value="{Binding GradientSpan, Mode=TwoWay}" Minimum="0.1" Maximum="1" IsMoveToPointEnabled="true" Width="190"/>
+                        <NumericUpDown Width="96" Minimum="0.1" Maximum="1" SmallChange="0.05" StringFormat="N2"
+                                       IsDragScrubEnabled="true" TracksMouseWheelWhenOver="true"
+                                       Value="{Binding GradientSpan, Mode=TwoWay}" VerticalAlignment="Center" MarginLeft="8"/>
+                    </StackPanel>
+                </StackPanel>
+
+                <StackPanel Orientation="Vertical" Visibility="{Binding GradientKind, Converter={conv:EnumVisibilityConverter}, ConverterParameter=Radial}">
+                    <TextBlock Text="Radius" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
+                    <StackPanel Orientation="Horizontal" MarginBottom="8">
+                        <Slider Value="{Binding GradientRadius, Mode=TwoWay}" Minimum="0.05" Maximum="1" IsMoveToPointEnabled="true" Width="190"/>
+                        <NumericUpDown Width="96" Minimum="0.05" Maximum="1" SmallChange="0.05" StringFormat="N2"
+                                       IsDragScrubEnabled="true" TracksMouseWheelWhenOver="true"
+                                       Value="{Binding GradientRadius, Mode=TwoWay}" VerticalAlignment="Center" MarginLeft="8"/>
+                    </StackPanel>
+                </StackPanel>
+
+                <StackPanel Orientation="Vertical" Visibility="{Binding GradientKind, Converter={conv:EnumVisibilityConverter}, ConverterParameter=Conic}">
+                    <TextBlock Text="Start angle — where the sweep begins" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
+                    <StackPanel Orientation="Horizontal" MarginBottom="8">
+                        <Slider Value="{Binding GradientStartAngle, Mode=TwoWay}" Minimum="0" Maximum="360" IsMoveToPointEnabled="true" Width="190"/>
+                        <NumericUpDown Width="96" Minimum="0" Maximum="360" SmallChange="1" StringFormat="N0"
+                                       IsDragScrubEnabled="true" TracksMouseWheelWhenOver="true"
+                                       Value="{Binding GradientStartAngle, Mode=TwoWay}" VerticalAlignment="Center" MarginLeft="8"/>
+                    </StackPanel>
+                </StackPanel>
+
+                <!-- Only the rectangle has corners to round; on the other figures the number would drive nothing. -->
+                <StackPanel Orientation="Vertical" Visibility="{Binding PreviewShape, Converter={conv:EnumVisibilityConverter}, ConverterParameter=Rectangle}">
+                    <TextBlock Text="Corner radius" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
+                    <StackPanel Orientation="Horizontal" MarginBottom="8">
+                        <Slider Value="{Binding GradientCorner, Mode=TwoWay}" Minimum="0" Maximum="120" IsMoveToPointEnabled="true" Width="190"/>
+                        <NumericUpDown Width="96" Minimum="0" Maximum="120" SmallChange="1" StringFormat="N0"
+                                       IsDragScrubEnabled="true" TracksMouseWheelWhenOver="true"
+                                       Value="{Binding GradientCorner, Mode=TwoWay}" VerticalAlignment="Center" MarginLeft="8"/>
+                    </StackPanel>
+                </StackPanel>
+
+                <TextBlock Text="Outside the stops" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
+                <DropDown ItemsSource="{Binding GradientSpreads}" SelectedItem="{Binding GradientSpread, Mode=TwoWay}" Width="300" MarginBottom="10"/>
+
+                <TextBlock Text="Interpolated in" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
+                <DropDown ItemsSource="{Binding GradientInterpolations}" SelectedItem="{Binding GradientInterpolation, Mode=TwoWay}" Width="300" MarginBottom="10"/>
+
+                <TextBlock Text="Stops — start / end, and an optional middle" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
+                <StackPanel Orientation="Horizontal" MarginBottom="8">
+                    <ColorPickerButton Width="48" Height="32" SelectedColor="{Binding GradientColor1, Mode=TwoWay}" MarginRight="8"/>
+                    <ColorPickerButton Width="48" Height="32" SelectedColor="{Binding GradientColor3, Mode=TwoWay}" MarginRight="8"/>
+                    <ColorPickerButton Width="48" Height="32" SelectedColor="{Binding GradientColor2, Mode=TwoWay}"/>
+                </StackPanel>
+                <CheckBox Content="Middle stop" IsChecked="{Binding GradientMidStop, Mode=TwoWay}" MarginBottom="6"/>
+                <StackPanel Orientation="Horizontal">
+                    <Slider Value="{Binding GradientMidOffset, Mode=TwoWay}" Minimum="0.05" Maximum="0.95" IsMoveToPointEnabled="true" Width="190"/>
+                    <NumericUpDown Width="96" Minimum="0.05" Maximum="0.95" SmallChange="0.05" StringFormat="N2"
+                                   IsDragScrubEnabled="true" TracksMouseWheelWhenOver="true"
+                                   Value="{Binding GradientMidOffset, Mode=TwoWay}" VerticalAlignment="Center" MarginLeft="8"/>
+                </StackPanel>
+            </StackPanel>
+        </StackPanel>
+    </StackPanel>
+</View>

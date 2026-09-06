@@ -1,0 +1,141 @@
+<View xmlns="http://adamantium/ui"
+      xmlns:x="http://adamantium/ui/xaml/extensions"
+      xmlns:conv="clr-namespace:Adamantium.Game.Sandbox.Converters">
+    <!-- Navigated into the brushes tab's region under the key "Fractal"; the DataContext is the tab's own view-model.
+         The live stand comes first and the fixed samples follow it - reference belongs to the stand it is about. -->
+    <StackPanel Orientation="Vertical">
+        <TextBlock Text="Fractal — live (toggle auto-morph, drag every parameter)" FontSize="18" Margin="0,0,0,10"/>
+        <StackPanel Orientation="Horizontal">
+            <FractalView Width="720" Height="580" CornerRadius="12" Margin="10"
+                         Fill="{Binding LiveFractal}"
+                         CenterX="{Binding FractalCenterX, Mode=TwoWay}"
+                         CenterY="{Binding FractalCenterY, Mode=TwoWay}"
+                         CenterXFine="{Binding FractalCenterFineX, Mode=TwoWay}"
+                         CenterYFine="{Binding FractalCenterFineY, Mode=TwoWay}"
+                         ZoomExp="{Binding FractalZoomExp, Mode=TwoWay}"/>
+            <StackPanel Orientation="Vertical" Width="300" MarginLeft="16" VerticalAlignment="Center">
+                <TextBlock Text="Formula" Foreground="{ResourceReference TextFillColorSecondary}"/>
+                <DropDown ItemsSource="{Binding FractalFormulas}"
+                          SelectedItem="{Binding Formula, Mode=TwoWay}"
+                          Width="290" Margin="0 10 0 10"/>
+                <CheckBox Content="Auto-morph (real-time)"
+                          IsChecked="{Binding FractalAnimate, Mode=TwoWay}"
+                          MarginBottom="6"/>
+                <CheckBox Content="Mandelbrot mode (C = pixel; off = Julia)"
+                          IsChecked="{Binding FractalMandelbrot, Mode=TwoWay}"
+                          MarginBottom="12"/>
+                <TextBlock Text="Power — Multibrot exponent d" Foreground="{ResourceReference TextFillColorSecondary}"/>
+                <StackPanel Orientation="Horizontal" MarginBottom="8">
+                    <Slider Value="{Binding FractalPower, Mode=TwoWay}" Minimum="2" Maximum="8" IsMoveToPointEnabled="true" Width="176"/>
+                    <NumericUpDown Width="88" Minimum="2" Maximum="8" SmallChange="0.1"
+                                   SnapsToSmallChange="true" StringFormat="N2"
+                                   IsDragScrubEnabled="true" TracksMouseWheelWhenOver="true"
+                                   Value="{Binding FractalPower, Mode=TwoWay}" VerticalAlignment="Center" MarginLeft="8"/>
+                </StackPanel>
+                <TextBlock Text="Zoom (log, ×)" Foreground="{ResourceReference TextFillColorSecondary}"/>
+                <StackPanel Orientation="Horizontal" MarginBottom="8">
+                    <Slider Value="{Binding FractalZoomExp, Mode=TwoWay}" Minimum="-0.52" Maximum="15" IsMoveToPointEnabled="true" Width="120"/>
+                    <NumericUpDown Width="88" Minimum="-0.52" Maximum="15" SmallChange="0.1"
+                                   SnapsToSmallChange="true" StringFormat="N2"
+                                   IsDragScrubEnabled="true" TracksMouseWheelWhenOver="true"
+                                   Value="{Binding FractalZoomExp, Mode=TwoWay}" VerticalAlignment="Center" MarginLeft="8"/>
+                    <TextBlock Text="{Binding ZoomText}" MarginLeft="8" VerticalAlignment="Center" Foreground="{ResourceReference TextFillColorSecondary}"/>
+                </StackPanel>
+                <TextBlock Text="Iterations" Foreground="{ResourceReference TextFillColorSecondary}"/>
+                <StackPanel Orientation="Horizontal" MarginBottom="8">
+                    <Slider Value="{Binding FractalIterations, Mode=TwoWay}" Minimum="20" Maximum="2000" IsMoveToPointEnabled="true" Width="176"/>
+                    <NumericUpDown Width="88" Minimum="20" Maximum="2000" SmallChange="1"
+                                   SnapsToSmallChange="true" StringFormat="N0"
+                                   IsDragScrubEnabled="true" TracksMouseWheelWhenOver="true"
+                                   Value="{Binding FractalIterations, Mode=TwoWay}" VerticalAlignment="Center" MarginLeft="8"/>
+                </StackPanel>
+                <TextBlock Text="Morph speed" Foreground="{ResourceReference TextFillColorSecondary}"/>
+                <StackPanel Orientation="Horizontal" MarginBottom="8">
+                    <Slider Value="{Binding FractalMorphSpeed, Mode=TwoWay}" Minimum="0" Maximum="4" IsMoveToPointEnabled="true" Width="176"/>
+                    <NumericUpDown Width="88" Minimum="0" Maximum="4" SmallChange="0.1"
+                                   SnapsToSmallChange="true" StringFormat="N2"
+                                   IsDragScrubEnabled="true" TracksMouseWheelWhenOver="true"
+                                   Value="{Binding FractalMorphSpeed, Mode=TwoWay}" VerticalAlignment="Center" MarginLeft="8"/>
+                </StackPanel>
+                <TextBlock Text="C.x (Julia constant)" Foreground="{ResourceReference TextFillColorSecondary}"/>
+                <StackPanel Orientation="Horizontal" MarginBottom="8">
+                    <Slider Value="{Binding FractalCx, Mode=TwoWay}" Minimum="-1" Maximum="1" IsMoveToPointEnabled="true" Width="176"/>
+                    <NumericUpDown Width="88" Minimum="-1" Maximum="1" SmallChange="0.01"
+                                   SnapsToSmallChange="true" StringFormat="N3"
+                                   IsDragScrubEnabled="true" TracksMouseWheelWhenOver="true"
+                                   Value="{Binding FractalCx, Mode=TwoWay}" VerticalAlignment="Center" MarginLeft="8"/>
+                </StackPanel>
+                <TextBlock Text="C.y (Julia constant)" Foreground="{ResourceReference TextFillColorSecondary}"/>
+                <StackPanel Orientation="Horizontal" MarginBottom="8">
+                    <Slider Value="{Binding FractalCy, Mode=TwoWay}" Minimum="-1" Maximum="1" IsMoveToPointEnabled="true" Width="176"/>
+                    <NumericUpDown Width="88" Minimum="-1" Maximum="1" SmallChange="0.01"
+                                   SnapsToSmallChange="true" StringFormat="N3"
+                                   IsDragScrubEnabled="true" TracksMouseWheelWhenOver="true"
+                                   Value="{Binding FractalCy, Mode=TwoWay}" VerticalAlignment="Center" MarginLeft="8"/>
+                </StackPanel>
+                <TextBlock Text="Pan X — fine, ×(1/zoom), stays precise deep (drag the fractal for coarse)" Foreground="{ResourceReference TextFillColorSecondary}"/>
+                <StackPanel Orientation="Horizontal" MarginBottom="8">
+                    <Slider Value="{Binding FractalFineX, Mode=TwoWay}" Minimum="-1" Maximum="1" IsMoveToPointEnabled="true" Width="176"/>
+                    <NumericUpDown Width="88" Minimum="-1" Maximum="1" SmallChange="0.01"
+                                   SnapsToSmallChange="true" StringFormat="N3"
+                                   IsDragScrubEnabled="true" TracksMouseWheelWhenOver="true"
+                                   Value="{Binding FractalFineX, Mode=TwoWay}" VerticalAlignment="Center" MarginLeft="8"/>
+                </StackPanel>
+                <TextBlock Text="Fine pan Y — ×(1/zoom)" Foreground="{ResourceReference TextFillColorSecondary}"/>
+                <StackPanel Orientation="Horizontal">
+                    <Slider Value="{Binding FractalFineY, Mode=TwoWay}" Minimum="-1" Maximum="1" IsMoveToPointEnabled="true" Width="176"/>
+                    <NumericUpDown Width="88" Minimum="-1" Maximum="1" SmallChange="0.01"
+                                   SnapsToSmallChange="true" StringFormat="N3"
+                                   IsDragScrubEnabled="true" TracksMouseWheelWhenOver="true"
+                                   Value="{Binding FractalFineY, Mode=TwoWay}" VerticalAlignment="Center" MarginLeft="8"/>
+                </StackPanel>
+            </StackPanel>
+            <!-- Colours: right of the controls, in the free zone. Cohesive ColorPickerButton controls - a swatch that
+                 reveals the ColorPicker inline (compact when closed), so the editors don't scatter the panel. -->
+            <StackPanel Orientation="Vertical" MarginLeft="24" VerticalAlignment="Top">
+                <TextBlock Text="Colours — click a swatch to edit" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="8"/>
+                <TextBlock Text="Color 1 (inside / edge)" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
+                <ColorPickerButton SelectedColor="{Binding FractalColor1, Mode=TwoWay}" Width="200" Height="30" MarginBottom="12"/>
+                <TextBlock Text="Color 2 (escaping outside)" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
+                <ColorPickerButton SelectedColor="{Binding FractalColor2, Mode=TwoWay}" Width="200" Height="30"/>
+            </StackPanel>
+        </StackPanel>
+        <TextBlock Text="Drag the fractal to pan, wheel to zoom toward the cursor (built into FractalView)."
+                   Foreground="{ResourceReference TextFillColorSecondary}" Margin="10,6,0,0"/>
+
+        <TextBlock Text="Fractal brush — fixed samples" FontSize="18" Margin="0,24,0,10"/>
+        <WrapPanel Orientation="Horizontal">
+            <Rectangle Width="200" Height="160" CornerRadius="12" Margin="10">
+                <Rectangle.Fill>
+                    <FractalBrush Fractal="Julia" C="-0.8,0.156" Zoom="1.1" Iterations="150" Color1="#0B122B" Color2="#22D3EE"/>
+                </Rectangle.Fill>
+            </Rectangle>
+            <Rectangle Width="200" Height="160" CornerRadius="12" Margin="10">
+                <Rectangle.Fill>
+                    <FractalBrush Fractal="Julia" C="0.285,0.01" Zoom="1.1" Iterations="150" Color1="#1E1B4B" Color2="#F472B6"/>
+                </Rectangle.Fill>
+            </Rectangle>
+            <Rectangle Width="200" Height="160" CornerRadius="12" Margin="10">
+                <Rectangle.Fill>
+                    <FractalBrush Fractal="Mandelbrot" Center="-0.5,0" Zoom="0.85" Iterations="200" Color1="#0B1220" Color2="#FDE68A"/>
+                </Rectangle.Fill>
+            </Rectangle>
+            <!-- New formulas (orthogonal to the Julia/Mandelbrot C-mode above): Burning Ship, Multibrot d=5, Newton. -->
+            <Rectangle Width="200" Height="160" CornerRadius="12" Margin="10">
+                <Rectangle.Fill>
+                    <FractalBrush Formula="BurningShip" Fractal="Mandelbrot" Center="-0.4,-0.5" Zoom="0.85" Iterations="200" Color1="#0B1220" Color2="#FB7185"/>
+                </Rectangle.Fill>
+            </Rectangle>
+            <Rectangle Width="200" Height="160" CornerRadius="12" Margin="10">
+                <Rectangle.Fill>
+                    <FractalBrush Formula="Multibrot" Power="5" Fractal="Mandelbrot" Zoom="0.9" Iterations="180" Color1="#0B1220" Color2="#A78BFA"/>
+                </Rectangle.Fill>
+            </Rectangle>
+            <Rectangle Width="200" Height="160" CornerRadius="12" Margin="10">
+                <Rectangle.Fill>
+                    <FractalBrush Formula="Newton" Zoom="0.8" Iterations="60" Color1="#22D3EE" Color2="#F472B6"/>
+                </Rectangle.Fill>
+            </Rectangle>
+        </WrapPanel>
+    </StackPanel>
+</View>
