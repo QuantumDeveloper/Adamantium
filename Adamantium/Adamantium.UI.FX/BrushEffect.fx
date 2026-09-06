@@ -1346,9 +1346,9 @@ struct FractalRectData
     float4 Radii;        // corner radii: x = TL, y = TR, z = BR, w = BL
     float4 Geom;         // .x/.y complex-plane centre, .z zoom, .w morph speed
     float4 Julia;        // .x/.y Julia constant C, .z animate flag, .w reserved
-    float4 Color1;       // straight RGBA, opacity folded
-    float4 Color2;       // straight RGBA, opacity folded
-    float4 StrokeColor;  // straight stroke RGBA (.w == 0 -> no stroke)
+    uint8_t4 Color1;      // straight RGBA in four bytes
+    uint8_t4 Color2;      // straight RGBA in four bytes
+    uint8_t4 StrokeColor; // straight stroke RGBA in four bytes (alpha 0 -> no stroke)
     float4 Stroke0;      // width_px, align, dashOn, dashGap
     float4 Stroke1;      // dashOffset, trimStart, trimEnd, flags
     float4 Dash;         // dash runs 2..5 (device px); runs 0 and 1 ride in Stroke0.zw, the count in Stroke1.w
@@ -1436,8 +1436,15 @@ float4 NewtonColor(float2 z, int maxIt, bool animate, float4 c1, float4 c2)
     return float4(baseCol.rgb * shade, baseCol.w);
 }
 
-[shader("fragment")]
-float4 FractalPS(FractalPSInput input) : SV_Target
+// ONE shading body, and a pass per FORMULA that calls it with a literal - the shape the pattern family already has.
+// Both selectors arrive as compile-time constants, so each pass keeps only its own arithmetic: an escape pass loses the
+// other four formulas AND the whole perturbation block, the deep pass loses the plain loop, and Newton - which is not
+// escape-time at all - shares none of it. The per-iteration formula test leaves the hot loop with them.
+//
+// That is not tidiness. One shader carrying all of it was the longest in this effect, and it sat at the edge of what
+// this driver's compiler will take: three unpacked colours hoisted into locals across it was enough to lose the device
+// on every tab that drew a fractal. Short passes are what buys that margin back.
+float4 FractalShade(FractalPSInput input, int formula, bool deep)
 {
     FractalRectData* items = (FractalRectData*)InstancesAddress;
     FractalRectData it = items[input.InstId];
@@ -1451,14 +1458,14 @@ float4 FractalPS(FractalPSInput input) : SV_Target
     float minHalf = max(min(input.Half.x, input.Half.y), 1e-4);
     float2 cp = it.Geom.xy + (input.Local / minHalf) * (1.5 / max(it.Geom.z, 1e-4));
 
-    int formula = int(it.Julia.w);   // 0 Quadratic, 1 BurningShip, 2 Tricorn, 3 Celtic, 4 Multibrot, 5 Newton
     bool animate = it.Julia.z > 0.5;
     int maxIt = min(int(it.Params.w), 400);
 
     float4 fill;
     if (formula == 5)   // Newton: convergence basins, not escape-time (C-mode does not apply, so map the raw fragment)
     {
-        fill = NewtonColor(cp, maxIt, animate, it.Color1, it.Color2);
+        fill = NewtonColor(cp, maxIt, animate,
+                           float4(it.Color1) * (1.0 / 255.0), float4(it.Color2) * (1.0 / 255.0));
     }
     else
     {
@@ -1473,7 +1480,7 @@ float4 FractalPS(FractalPSInput input) : SV_Target
         // PERTURBATION deep-zoom path (armed only for Quadratic z2+c past the deep threshold): iterate the SMALL delta
         // from a high-precision reference orbit (Z_n from OrbitAddress) so the whole shader stays float32 - no fp64, no wall.
         // NOTE: the .fx parser does NOT accept unary '!', so bail flags are tested as (escaped) / (escaped == false).
-        if (it.Ref.y > 0.5)   // Ref.y = reference-orbit length; > 0 means the deep path is armed for this instance
+        if (deep)   // the DEEP pass; the collector batches those instances apart, so Ref carries a reference orbit here
         {
             float2* orbit = (float2*)OrbitAddress;
             uint ofs = (uint)it.Ref.x;
@@ -1520,11 +1527,11 @@ float4 FractalPS(FractalPSInput input) : SV_Target
                 float sm = float(pi) + 1.0 - log2(max(0.5 * log2(dot(pz, pz)), 1.0));   // smooth continuous escape count
                 float ramp = sqrt(saturate(sm / float(maxIt)));
                 if (animate && mandelbrot) ramp = frac(ramp + Time * 0.06);   // Mandelbrot-mode: flow the colour ramp
-                fill = lerp(it.Color1, it.Color2, ramp);
+                fill = lerp(float4(it.Color1), float4(it.Color2), ramp) * (1.0 / 255.0);
             }
             else
             {
-                fill = float4(0.0, 0.0, 0.0, it.Color1.w);   // inside the set / glitch / ran out of reference: black
+                fill = float4(0.0, 0.0, 0.0, float(it.Color1.w) * (1.0 / 255.0));   // inside the set / glitch / ran out of reference: black
             }
         }
         else
@@ -1582,7 +1589,7 @@ float4 FractalPS(FractalPSInput input) : SV_Target
 
         if (i >= maxIt)
         {
-            fill = float4(0.0, 0.0, 0.0, it.Color1.w);   // inside the set: black (keep the fill alpha)
+            fill = float4(0.0, 0.0, 0.0, float(it.Color1.w) * (1.0 / 255.0));   // inside the set: black (keep the fill alpha)
         }
         else
         {
@@ -1592,7 +1599,7 @@ float4 FractalPS(FractalPSInput input) : SV_Target
             {
                 ramp = frac(ramp + Time * 0.06);
             }
-            fill = lerp(it.Color1, it.Color2, ramp);
+            fill = lerp(float4(it.Color1), float4(it.Color2), ramp) * (1.0 / 255.0);
         }
         }   // end float-path else (perturbation deep path handled above)
     }
@@ -1611,9 +1618,35 @@ float4 FractalPS(FractalPSInput input) : SV_Target
         mask = DashTrimMask(s, s, perim, it.Stroke0.z * sc, it.Stroke0.w * sc, it.Stroke1.x * sc, it.Stroke1.y,
                             it.Stroke1.z, dPerp * capScl, halfW * capScl, it.Stroke1.w, it.Dash * sc);
     }
-    float4 fracOut = CompositeFillStroke(d, fill, it.StrokeColor, widthPx, it.Stroke0.y, mask, 0.0);
+    float4 fracOut = CompositeFillStroke(d, fill, float4(it.StrokeColor) * (1.0 / 255.0),
+                                         widthPx, it.Stroke0.y, mask, 0.0);
     return float4(fracOut.rgb, fracOut.a * input.Fade * ClipCoverage(input.Position.xy, input.ClipBox, input.ClipRadii));
 }
+
+// The literals are what makes the split real: each of these specialises the body above down to one formula. Keep them
+// literal - reading the selector back out of the record here would put every formula into every pass again.
+[shader("fragment")]
+float4 FractalQuadraticPS(FractalPSInput input) : SV_Target { return FractalShade(input, 0, false); }
+
+[shader("fragment")]
+float4 FractalBurningShipPS(FractalPSInput input) : SV_Target { return FractalShade(input, 1, false); }
+
+[shader("fragment")]
+float4 FractalTricornPS(FractalPSInput input) : SV_Target { return FractalShade(input, 2, false); }
+
+[shader("fragment")]
+float4 FractalCelticPS(FractalPSInput input) : SV_Target { return FractalShade(input, 3, false); }
+
+[shader("fragment")]
+float4 FractalMultibrotPS(FractalPSInput input) : SV_Target { return FractalShade(input, 4, false); }
+
+[shader("fragment")]
+float4 FractalNewtonPS(FractalPSInput input) : SV_Target { return FractalShade(input, 5, false); }
+
+// Deep zoom is Quadratic only - the perturbation reference orbit is iterated as z2+c on the CPU side too.
+[shader("fragment")]
+float4 FractalDeepPS(FractalPSInput input) : SV_Target { return FractalShade(input, 0, true); }
+
 
 
 // =====================================================================================================================
@@ -1922,10 +1955,52 @@ technique Texture
 // deep zoom (see OrbitAddress). No Fill/Fringe - a fractal fills a rect, and its edge is the rect's own SDF.
 technique Fractal
 {
-    pass Sdf
+    pass QuadraticSdf
     {
         Profile = 6.6;
         VertexShader = FractalRectInstancedVS;
-        PixelShader = FractalPS;
+        PixelShader = FractalQuadraticPS;
+    }
+
+    pass BurningShipSdf
+    {
+        Profile = 6.6;
+        VertexShader = FractalRectInstancedVS;
+        PixelShader = FractalBurningShipPS;
+    }
+
+    pass TricornSdf
+    {
+        Profile = 6.6;
+        VertexShader = FractalRectInstancedVS;
+        PixelShader = FractalTricornPS;
+    }
+
+    pass CelticSdf
+    {
+        Profile = 6.6;
+        VertexShader = FractalRectInstancedVS;
+        PixelShader = FractalCelticPS;
+    }
+
+    pass MultibrotSdf
+    {
+        Profile = 6.6;
+        VertexShader = FractalRectInstancedVS;
+        PixelShader = FractalMultibrotPS;
+    }
+
+    pass NewtonSdf
+    {
+        Profile = 6.6;
+        VertexShader = FractalRectInstancedVS;
+        PixelShader = FractalNewtonPS;
+    }
+
+    pass DeepSdf
+    {
+        Profile = 6.6;
+        VertexShader = FractalRectInstancedVS;
+        PixelShader = FractalDeepPS;
     }
 }

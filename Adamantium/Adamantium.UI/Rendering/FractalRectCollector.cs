@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using Adamantium.Graphics;
 using Adamantium.Graphics.Core;
 using Adamantium.Graphics.Core.EffectsFramework;
@@ -30,13 +31,63 @@ internal sealed class FractalRectCollector : BrushSdfCollector<FractalRectItem>
     private Buffer<Vector2F> _orbitGpu;
     private int _orbitGpuCapacity;
 
+    // Deep zoom is a KIND of its own, not a flag inside one: it is the only path that reads the reference orbit, and
+    // the pass that has it must not carry the plain loop as well.
+    private const int DeepKind = 6;
+
+    /// <summary>Does this kind draw through the perturbation deep path? Its record points into the REFERENCE ORBIT, which
+    /// only a walk rebuilds, so a caller holding a slot must not patch one in place.</summary>
+    public static bool IsDeep(int kind) => kind == DeepKind;
+
+    // ONE KIND PER SEGMENT, exactly as the pattern batch does it - each formula is its own pass now, so a segment has to
+    // be uniform in kind and the caller flushes on a change. The whole point is that no pass carries the other five
+    // formulas plus the perturbation block; putting the selector back into the record would undo it.
+    private int _kind;
+    private readonly List<int> _segKinds = new();
+
     public FractalRectCollector() : base(256) { }
 
-    protected override IEffectPass DrawPass => Effect.FractalSdfPass;
+    protected override IEffectPass DrawPass => _kind switch
+    {
+        1 => Effect.FractalBurningShipSdfPass,
+        2 => Effect.FractalTricornSdfPass,
+        3 => Effect.FractalCelticSdfPass,
+        4 => Effect.FractalMultibrotSdfPass,
+        5 => Effect.FractalNewtonSdfPass,
+        DeepKind => Effect.FractalDeepSdfPass,
+        _ => Effect.FractalQuadraticSdfPass
+    };
+
+    protected override void OnSegmentRecorded(int index)
+    {
+        while (_segKinds.Count <= index) _segKinds.Add(0);
+        _segKinds[index] = _kind;
+    }
+
+    protected override void OnSegmentInserted(int index)
+    {
+        while (_segKinds.Count < index) _segKinds.Add(0);
+        _segKinds.Insert(index, index > 0 ? _segKinds[index - 1] : 0);
+    }
+
+    protected override void BindSegment(int index) => _kind = _segKinds[index];
+
+    /// <summary>Still the pending segment's kind? A change flushes the batch - the caller asks this before adding,
+    /// mirroring PatternRectCollector.SameKind.</summary>
+    public bool SameKind(int kind) => !Active || _kind == kind;
+
+    /// <summary>The kind this brush bakes as, for the caller's SameKind check. -1 = not a fractal brush at all.</summary>
+    public static int KindOf(Brush brush)
+    {
+        if (brush is not FractalBrush f) return -1;
+        int formula = (int)f.Formula;
+        return formula == 0 && f.Zoom > DeepZoomThreshold ? DeepKind : formula;
+    }
 
     protected override void OnBeginFrame(IGraphicsDevice device)
     {
         base.OnBeginFrame(device);
+        _segKinds.Clear();
         _orbitCount = 0;
         _orbitUploaded = false;
     }
@@ -109,6 +160,7 @@ internal sealed class FractalRectCollector : BrushSdfCollector<FractalRectItem>
             return false;
         }
         AppendOrbit(p, ref item);
+        _kind = KindOf(p.Brush);   // the pass this segment draws with; the caller has already flushed on a change
         Items[Count++] = item;
         MarkPending(scissor, logicalBounds);
         return true;
@@ -183,10 +235,8 @@ internal sealed class FractalRectCollector : BrushSdfCollector<FractalRectItem>
         var sx = world.M11; var sy = world.M22; var tx = world.M41; var ty = world.M42;
         var alpha = (float)(opacity * f.Opacity);
 
-        var c1 = f.Color1.ToVector4();
-        c1.W *= alpha;
-        var c2 = f.Color2.ToVector4();
-        c2.W *= alpha;
+        var c1 = RectBatchCollector.WithOpacity(f.Color1, alpha);
+        var c2 = RectBatchCollector.WithOpacity(f.Color2, alpha);
 
         RectBatchCollector.BakeStroke(p.Pen, opacity, (float)sx, out var strokeColor, out var stroke0, out var stroke1, out var dash);
 
@@ -201,7 +251,7 @@ internal sealed class FractalRectCollector : BrushSdfCollector<FractalRectItem>
             Julia = new Vector4F((float)f.C.X, (float)f.C.Y, f.Animate ? 1f : 0f, (int)f.Formula),
             Color1 = c1,
             Color2 = c2,
-            StrokeColor = strokeColor,
+            StrokeColor = new Color(strokeColor),
             Stroke0 = stroke0,
             Stroke1 = stroke1,
             Dash = dash,

@@ -28,14 +28,15 @@ public struct FractalRectItem
     /// <summary>.x/.y = Julia constant C; .z = animate flag (0/1 - auto-morph C over time); .w = reserved.</summary>
     public Vector4F Julia;
 
-    /// <summary>Escape-ramp colour at LOW escape counts (straight RGBA, opacity folded into .w).</summary>
-    public Vector4F Color1;
+    /// <summary>Escape-ramp colour at LOW escape counts (straight RGBA, opacity folded into the alpha). Four BYTES,
+    /// read by the shader as a <c>uint8_t4</c>.</summary>
+    public Color Color1;
 
-    /// <summary>Escape-ramp colour at HIGH escape counts (straight RGBA, opacity folded into .w).</summary>
-    public Vector4F Color2;
+    /// <summary>Escape-ramp colour at HIGH escape counts (straight RGBA, opacity folded into the alpha).</summary>
+    public Color Color2;
 
-    /// <summary>Straight stroke colour (opacity folded into .w); .w == 0 = no stroke.</summary>
-    public Vector4F StrokeColor;
+    /// <summary>Straight stroke colour (opacity folded into the alpha); alpha 0 = no stroke.</summary>
+    public Color StrokeColor;
 
     /// <summary>Stroke geometry: x = width px, y = align (-1/0/+1), z = dash ON, w = dash GAP.</summary>
     public Vector4F Stroke0;
