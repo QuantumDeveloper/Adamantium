@@ -1635,6 +1635,8 @@
                              Fill="{Binding LiveFractal}"
                              CenterX="{Binding FractalCenterX, Mode=TwoWay}"
                              CenterY="{Binding FractalCenterY, Mode=TwoWay}"
+                             CenterXFine="{Binding FractalCenterFineX, Mode=TwoWay}"
+                             CenterYFine="{Binding FractalCenterFineY, Mode=TwoWay}"
                              ZoomExp="{Binding FractalZoomExp, Mode=TwoWay}"/>
                 <StackPanel Orientation="Vertical" Width="300" MarginLeft="16" VerticalAlignment="Center">
                     <TextBlock Text="Formula" Foreground="{ResourceReference TextFillColorSecondary}"/>
@@ -1666,8 +1668,8 @@
                     </StackPanel>
                     <TextBlock Text="Iterations" Foreground="{ResourceReference TextFillColorSecondary}"/>
                     <StackPanel Orientation="Horizontal" MarginBottom="8">
-                        <Slider Value="{Binding FractalIterations, Mode=TwoWay}" Minimum="20" Maximum="400" IsMoveToPointEnabled="true" Width="176"/>
-                        <NumericUpDown Width="88" Minimum="20" Maximum="400" SmallChange="1"
+                        <Slider Value="{Binding FractalIterations, Mode=TwoWay}" Minimum="20" Maximum="2000" IsMoveToPointEnabled="true" Width="176"/>
+                        <NumericUpDown Width="88" Minimum="20" Maximum="2000" SmallChange="1"
                                        SnapsToSmallChange="true" StringFormat="N0"
                                        IsDragScrubEnabled="true" TracksMouseWheelWhenOver="true"
                                        Value="{Binding FractalIterations, Mode=TwoWay}" VerticalAlignment="Center" MarginLeft="8"/>
