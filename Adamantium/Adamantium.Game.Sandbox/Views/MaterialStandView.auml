@@ -1,0 +1,289 @@
+<View xmlns="http://adamantium/ui"
+      xmlns:x="http://adamantium/ui/xaml/extensions"
+      xmlns:conv="clr-namespace:Adamantium.Game.Sandbox.Converters">
+    <!-- Navigated into the brushes tab's region under the key "Material"; the DataContext is the tab's own view-model.
+         Unlike every other brush here these have nothing of their own to show: they are made of what is BEHIND them. So
+         the stand is built the other way round - the controls change not only the material but WHAT IT SITS OVER,
+         because a backdrop over a flat colour proves nothing at all. -->
+    <StackPanel Orientation="Vertical">
+        <TextBlock Text="Material brush — the fill is what is behind it" FontSize="18" Margin="0,0,0,10"/>
+        <StackPanel Orientation="Horizontal" MarginBottom="24">
+            <!-- BIG on purpose, and its own box rather than the shared slot: the drag wobble is a shift of a pixel or
+                 two, and on a small pane there is not enough backdrop on screen to see it against.
+                 A BORDER with a child, like every other stand's box - not a bare Grid holding siblings. The plate then
+                 owns the area and the figure sits INSIDE it by construction, instead of both being laid out as peers
+                 and left to agree by accident. -->
+            <Border Width="660" Height="440" Margin="10" CornerRadius="12">
+                <Grid>
+                <!-- WHAT IT SITS OVER. All four are here and one is revealed, the same way the figure is chosen. -->
+                <Rectangle CornerRadius="12"
+                           Visibility="{Binding MaterialUnderlay, Converter={conv:MaterialUnderlayVisibilityConverter}, ConverterParameter=LivingNoise}">
+                    <Rectangle.Fill>
+                        <NoiseBrush NoiseType="Worley" Scale="46" Octaves="2" Animate="true" FlowSpeed="0.5"
+                                    Color1="#0B1220" Color2="#F0ABFC"/>
+                    </Rectangle.Fill>
+                </Rectangle>
+
+                <Rectangle CornerRadius="12"
+                           Visibility="{Binding MaterialUnderlay, Converter={conv:MaterialUnderlayVisibilityConverter}, ConverterParameter=Checkerboard}">
+                    <Rectangle.Fill>
+                        <PatternBrush Pattern="Checkerboard" CellSize="26"
+                                      Color1="#0B1220" Color2="#E9D5FF"/>
+                    </Rectangle.Fill>
+                </Rectangle>
+
+                <Rectangle CornerRadius="12"
+                           Visibility="{Binding MaterialUnderlay, Converter={conv:MaterialUnderlayVisibilityConverter}, ConverterParameter=Gradient}">
+                    <Rectangle.Fill>
+                        <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                            <GradientStop Offset="0" Color="#0B1220"/>
+                            <GradientStop Offset="1" Color="#7DD3FC"/>
+                        </LinearGradientBrush>
+                    </Rectangle.Fill>
+                </Rectangle>
+
+                <Rectangle CornerRadius="12" Fill="{Binding MaterialPicture}"
+                           Visibility="{Binding MaterialUnderlay, Converter={conv:MaterialUnderlayVisibilityConverter}, ConverterParameter=Picture}"/>
+
+                <!-- THE MATERIAL, on whichever figure is selected. One live brush drives all of them. -->
+                <!-- The pen rides the same pass as the fill (CompositeFillStroke), so a framed material is still one
+                     draw. Solid and whole only - dashes and trims go to the per-unit path. -->
+                <Rectangle Width="{Binding PreviewWidth}" Height="{Binding PreviewHeight}" Fill="{Binding LiveMaterial}"
+                           Stroke="#66FFFFFF" StrokeThickness="{Binding MaterialStroke}" Opacity="{Binding MaterialOpacity}"
+                           CornerRadius="{Binding MaterialRadius, Converter={conv:DoubleToCornerRadiusConverter}}"
+                           HorizontalAlignment="Center" VerticalAlignment="Center"
+                           Visibility="{Binding PreviewShape, Converter={conv:EnumVisibilityConverter}, ConverterParameter=Rectangle}"/>
+                <Ellipse Width="{Binding PreviewWidth}" Height="{Binding PreviewHeight}" Fill="{Binding LiveMaterial}"
+                         Stroke="#66FFFFFF" StrokeThickness="{Binding MaterialStroke}" Opacity="{Binding MaterialOpacity}"
+                         HorizontalAlignment="Center" VerticalAlignment="Center"
+                         Visibility="{Binding PreviewShape, Converter={conv:EnumVisibilityConverter}, ConverterParameter=Ellipse}"/>
+                <RegularPolygon Width="{Binding PreviewSquare}" Height="{Binding PreviewSquare}" Corners="{Binding ShapeCornerCount}"
+                                StartAngle="{Binding ShapeStartAngle}" Fill="{Binding LiveMaterial}"
+                                Stroke="#66FFFFFF" StrokeThickness="{Binding MaterialStroke}" Opacity="{Binding MaterialOpacity}"
+                                HorizontalAlignment="Center" VerticalAlignment="Center"
+                                Visibility="{Binding PreviewShape, Converter={conv:EnumVisibilityConverter}, ConverterParameter=Polygon}"/>
+                <Polygon Points="{Binding FixedStar}" Fill="{Binding LiveMaterial}"
+                         Stroke="#66FFFFFF" StrokeThickness="{Binding MaterialStroke}" Opacity="{Binding MaterialOpacity}"
+                         HorizontalAlignment="Center" VerticalAlignment="Center"
+                         Visibility="{Binding PreviewShape, Converter={conv:EnumVisibilityConverter}, ConverterParameter=Star}"/>
+                </Grid>
+            </Border>
+
+            <StackPanel Orientation="Vertical" Width="320" MarginLeft="16" VerticalAlignment="Center">
+                <TextBlock Text="Material — acrylic and glass share a capture and differ in treatment; mica differs in source"
+                           Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2" TextWrapping="WrapByWords"/>
+                <DropDown ItemsSource="{Binding MaterialTypes}" SelectedItem="{Binding MaterialKind, Mode=TwoWay}"
+                          Width="300" MarginBottom="10"/>
+
+                <TextBlock Text="Sitting over" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
+                <DropDown ItemsSource="{Binding MaterialUnderlays}" SelectedItem="{Binding MaterialUnderlay, Mode=TwoWay}"
+                          Width="300" MarginBottom="10"/>
+
+                <!-- MICA ONLY. Acrylic and glass ARE what is directly beneath them - that is the whole of what they
+                     are - so they have no source to choose. Mica is the one reading a picture from elsewhere. -->
+                <StackPanel Orientation="Vertical"
+                            Visibility="{Binding MaterialKind, Converter={conv:MaterialKnobVisibilityConverter}, ConverterParameter=Source}">
+                    <TextBlock Text="Source — the desktop's own wallpaper, or one of ours. They differ in DETAIL: the tile hides the drag wobble, texture.jpg shows it at its worst"
+                               Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2" TextWrapping="WrapByWords"/>
+                    <DropDown ItemsSource="{Binding MaterialSources}" SelectedItem="{Binding MaterialSource, Mode=TwoWay}"
+                              Width="300" MarginBottom="10"/>
+                </StackPanel>
+
+                <!-- Only with a picture of one's own - the real wallpaper is pinned to the desktop by nature. Drag the
+                     window to tell them apart: Desktop stays put while the window moves over it, Window travels with
+                     it, Element travels AND turns with the shape. -->
+                <StackPanel Orientation="Vertical" Visibility="{Binding HasOwnSource, Converter={conv:BoolToVisibilityConverter}}">
+                    <TextBlock Text="Anchor — what the picture is pinned to"
+                               Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
+                    <DropDown ItemsSource="{Binding MaterialAnchors}" SelectedItem="{Binding MaterialAnchor, Mode=TwoWay}"
+                              Width="300" MarginBottom="10"/>
+                </StackPanel>
+
+                <!-- Every knob below appears only where it CHANGES something - the shape decides the first two, the
+                     material the next two. A slider that moves and does nothing is worse than one that is not there:
+                     it teaches the wrong thing about the feature. -->
+                <StackPanel Orientation="Vertical"
+                            Visibility="{Binding PreviewShape, Converter={conv:EnumVisibilityConverter}, ConverterParameter=Rectangle}">
+                    <TextBlock Text="Corner radius" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
+                    <StackPanel Orientation="Horizontal" MarginBottom="10">
+                        <Slider Minimum="0" Maximum="75" Value="{Binding MaterialRadius, Mode=TwoWay}" Width="240"/>
+                        <TextBlock Text="{Binding MaterialRadius}" MarginLeft="8" Width="48"/>
+                    </StackPanel>
+                </StackPanel>
+
+                <StackPanel Orientation="Vertical"
+                            Visibility="{Binding PreviewShape, Converter={conv:EnumVisibilityConverter}, ConverterParameter=Polygon}">
+                    <TextBlock Text="Corners — 3 is a triangle, enough of them a circle" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
+                    <StackPanel Orientation="Horizontal" MarginBottom="6">
+                        <Slider Value="{Binding ShapeCorners, Mode=TwoWay}" IsValueToolTipEnabled="True" Minimum="3" Maximum="24"
+                                TickFrequency="1" IsSnapToTickEnabled="true" Width="200"/>
+                        <NumericUpDown Width="88" Minimum="3" Maximum="24" SmallChange="1" SnapsToSmallChange="true" StringFormat="N0"
+                                       IsDragScrubEnabled="true" TracksMouseWheelWhenOver="true"
+                                       Value="{Binding ShapeCorners, Mode=TwoWay}" VerticalAlignment="Center" MarginLeft="6"/>
+                    </StackPanel>
+                    <TextBlock Text="Start angle — where corner 0 sits" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
+                    <StackPanel Orientation="Horizontal" MarginBottom="10">
+                        <Slider Value="{Binding ShapeStartAngle, Mode=TwoWay}" IsValueToolTipEnabled="True" Minimum="0" Maximum="360"
+                                TickFrequency="1" IsSnapToTickEnabled="true" Width="200"/>
+                        <NumericUpDown Width="88" Minimum="0" Maximum="360" SmallChange="1" SnapsToSmallChange="true" StringFormat="N0"
+                                       IsDragScrubEnabled="true" TracksMouseWheelWhenOver="true"
+                                       Value="{Binding ShapeStartAngle, Mode=TwoWay}" VerticalAlignment="Center" MarginLeft="6"/>
+                    </StackPanel>
+                </StackPanel>
+
+                <TextBlock Text="Element opacity — the whole thing fades, tint and pen together"
+                           Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2" TextWrapping="WrapByWords"/>
+                <StackPanel Orientation="Horizontal" MarginBottom="10">
+                    <Slider Minimum="0" Maximum="1" Value="{Binding MaterialOpacity, Mode=TwoWay}" Width="240"/>
+                    <TextBlock Text="{Binding MaterialOpacity}" MarginLeft="8" Width="48"/>
+                </StackPanel>
+
+                <TextBlock Text="Stroke — the pen rides the SAME pass as the fill, so a framed material is one draw"
+                           Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2" TextWrapping="WrapByWords"/>
+                <StackPanel Orientation="Horizontal" MarginBottom="10">
+                    <Slider Minimum="0" Maximum="20" Value="{Binding MaterialStroke, Mode=TwoWay}" Width="240"/>
+                    <TextBlock Text="{Binding MaterialStroke}" MarginLeft="8" Width="48"/>
+                </StackPanel>
+
+                <StackPanel Orientation="Vertical"
+                            Visibility="{Binding MaterialKind, Converter={conv:MaterialKnobVisibilityConverter}, ConverterParameter=Tint}">
+                    <TextBlock Text="Tint strength — glass takes its colour from behind, so keep it low there"
+                               Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2" TextWrapping="WrapByWords"/>
+                    <StackPanel Orientation="Horizontal" MarginBottom="10">
+                        <Slider Minimum="0" Maximum="1" Value="{Binding MaterialTintOpacity, Mode=TwoWay}" Width="240"/>
+                        <TextBlock Text="{Binding MaterialTintOpacity}" MarginLeft="8" Width="48"/>
+                    </StackPanel>
+                </StackPanel>
+
+                <!-- THE SURFACE BRANCH. Velvet and metal share the grain and the light - they describe one lit surface
+                     and differ only in the BRDF that reads it - so those knobs are shown for both. The light ones are
+                     what the branch is proved on: a flat rectangle has one normal, so if the relief is not really
+                     there, turning the light changes nothing. -->
+                <StackPanel Orientation="Vertical"
+                            Visibility="{Binding MaterialKind, Converter={conv:MaterialKnobVisibilityConverter}, ConverterParameter=Surface}">
+                    <TextBlock Text="Grain scale — px per fibre clump, per scratch of the grinding, or per annual ring"
+                               Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2" TextWrapping="WrapByWords"/>
+                    <StackPanel Orientation="Horizontal" MarginBottom="10">
+                        <Slider Minimum="1" Maximum="40" Value="{Binding MaterialGrainScale, Mode=TwoWay}" Width="240"/>
+                        <TextBlock Text="{Binding MaterialGrainScale}" MarginLeft="8" Width="48"/>
+                    </StackPanel>
+
+                    <TextBlock Text="Grain direction — which way the pile is combed, the grinding runs, or the trunk lay"
+                               Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2" TextWrapping="WrapByWords"/>
+                    <StackPanel Orientation="Horizontal" MarginBottom="10">
+                        <Slider Minimum="0" Maximum="360" Value="{Binding MaterialGrainDirection, Mode=TwoWay}" Width="240"/>
+                        <TextBlock Text="{Binding MaterialGrainDirection}" MarginLeft="8" Width="48"/>
+                    </StackPanel>
+
+                    <TextBlock Text="Roughness — 0 is a mirror; on cloth how far the sheen spreads, on wood the varnish"
+                               Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2" TextWrapping="WrapByWords"/>
+                    <StackPanel Orientation="Horizontal" MarginBottom="10">
+                        <Slider Minimum="0" Maximum="1" Value="{Binding MaterialRoughness, Mode=TwoWay}" Width="240"/>
+                        <TextBlock Text="{Binding MaterialRoughness}" MarginLeft="8" Width="48"/>
+                    </StackPanel>
+
+                    <TextBlock Text="Light angle — where the light comes from"
+                               Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2" TextWrapping="WrapByWords"/>
+                    <StackPanel Orientation="Horizontal" MarginBottom="10">
+                        <Slider Minimum="0" Maximum="360" Value="{Binding MaterialLightAngle, Mode=TwoWay}" Width="240"/>
+                        <TextBlock Text="{Binding MaterialLightAngle}" MarginLeft="8" Width="48"/>
+                    </StackPanel>
+
+                    <TextBlock Text="Light elevation — 0 grazes the nap, 1 flattens it"
+                               Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2" TextWrapping="WrapByWords"/>
+                    <StackPanel Orientation="Horizontal" MarginBottom="10">
+                        <Slider Minimum="0" Maximum="1" Value="{Binding MaterialLightElevation, Mode=TwoWay}" Width="240"/>
+                        <TextBlock Text="{Binding MaterialLightElevation}" MarginLeft="8" Width="48"/>
+                    </StackPanel>
+
+                </StackPanel>
+
+                <StackPanel Orientation="Vertical"
+                            Visibility="{Binding MaterialKind, Converter={conv:MaterialKnobVisibilityConverter}, ConverterParameter=Nap}">
+                    <TextBlock Text="Cloth colour" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
+                    <ColorPickerButton Width="48" Height="32" SelectedColor="{Binding MaterialNapColor, Mode=TwoWay}" MarginBottom="10"/>
+
+                    <TextBlock Text="Sheen colour — the light caught on the tips of the fibres"
+                               Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2" TextWrapping="WrapByWords"/>
+                    <ColorPickerButton Width="48" Height="32" SelectedColor="{Binding MaterialSheenColor, Mode=TwoWay}" MarginBottom="10"/>
+                </StackPanel>
+
+                <!-- METAL. Steel, gold and chrome are THIS material with other numbers - that is what separates them,
+                     so they are knobs rather than six entries in the dropdown. -->
+                <StackPanel Orientation="Vertical"
+                            Visibility="{Binding MaterialKind, Converter={conv:MaterialKnobVisibilityConverter}, ConverterParameter=Metal}">
+                    <TextBlock Text="Metal — a starting point; every knob below stays free"
+                               Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2" TextWrapping="WrapByWords"/>
+                    <DropDown ItemsSource="{Binding MetalPresets}" SelectedItem="{Binding MetalPreset, Mode=TwoWay}"
+                              Width="270" MarginBottom="10"/>
+
+                    <TextBlock Text="Metal colour — grey is steel, yellow is gold, pink is copper"
+                               Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2" TextWrapping="WrapByWords"/>
+                    <ColorPickerButton Width="48" Height="32" SelectedColor="{Binding MaterialMetalColor, Mode=TwoWay}" MarginBottom="10"/>
+
+                    <TextBlock Text="Environment — what it reflects. Procedural: behind a UI there is no room"
+                               Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2" TextWrapping="WrapByWords"/>
+                    <ColorPickerButton Width="48" Height="32" SelectedColor="{Binding MaterialEnvironmentColor, Mode=TwoWay}" MarginBottom="10"/>
+                </StackPanel>
+
+                <!-- WOOD. Two colours rather than one: a ring is a broad pale band closed by a narrow dark one, and the
+                     contrast between them is what tells oak from walnut. -->
+                <StackPanel Orientation="Vertical"
+                            Visibility="{Binding MaterialKind, Converter={conv:MaterialKnobVisibilityConverter}, ConverterParameter=Wood}">
+                    <TextBlock Text="Timber — a starting point; every knob above stays free"
+                               Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2" TextWrapping="WrapByWords"/>
+                    <DropDown ItemsSource="{Binding WoodPresets}" SelectedItem="{Binding WoodPreset, Mode=TwoWay}"
+                              Width="270" MarginBottom="10"/>
+
+                    <TextBlock Text="Cut — where the saw crossed the rings. Same tree, four figures"
+                               Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2" TextWrapping="WrapByWords"/>
+                    <DropDown ItemsSource="{Binding WoodCuts}" SelectedItem="{Binding MaterialWoodCut, Mode=TwoWay}"
+                              Width="270" MarginBottom="10"/>
+
+                    <CheckBox Content="Varnished — a clear coat that shows the room and glares along the edge"
+                              IsChecked="{Binding MaterialVarnished, Mode=TwoWay}" MarginBottom="10"/>
+
+                    <TextBlock Text="Early wood — the broad pale band grown in spring"
+                               Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2" TextWrapping="WrapByWords"/>
+                    <ColorPickerButton Width="48" Height="32" SelectedColor="{Binding MaterialEarlyWoodColor, Mode=TwoWay}" MarginBottom="10"/>
+
+                    <TextBlock Text="Late wood — the narrow dark band that closes each ring"
+                               Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2" TextWrapping="WrapByWords"/>
+                    <ColorPickerButton Width="48" Height="32" SelectedColor="{Binding MaterialLateWoodColor, Mode=TwoWay}" MarginBottom="10"/>
+                </StackPanel>
+
+                <StackPanel Orientation="Vertical"
+                            Visibility="{Binding MaterialKind, Converter={conv:MaterialKnobVisibilityConverter}, ConverterParameter=Blur}">
+                    <TextBlock Text="Blur — how wide the frosting scatters" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
+                    <StackPanel Orientation="Horizontal" MarginBottom="10">
+                        <Slider Minimum="0" Maximum="40" Value="{Binding MaterialBlur, Mode=TwoWay}" Width="240"/>
+                        <TextBlock Text="{Binding MaterialBlur}" MarginLeft="8" Width="48"/>
+                    </StackPanel>
+                </StackPanel>
+
+                <StackPanel Orientation="Vertical"
+                            Visibility="{Binding MaterialKind, Converter={conv:MaterialKnobVisibilityConverter}, ConverterParameter=Refraction}">
+                    <TextBlock Text="Refraction — how hard the rim bends what is behind"
+                               Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2" TextWrapping="WrapByWords"/>
+                    <StackPanel Orientation="Horizontal" MarginBottom="10">
+                        <Slider Minimum="0" Maximum="60" Value="{Binding MaterialRefraction, Mode=TwoWay}" Width="240"/>
+                        <TextBlock Text="{Binding MaterialRefraction}" MarginLeft="8" Width="48"/>
+                    </StackPanel>
+                </StackPanel>
+
+                <StackPanel Orientation="Vertical"
+                            Visibility="{Binding MaterialKind, Converter={conv:MaterialKnobVisibilityConverter}, ConverterParameter=FilmGrain}">
+                    <TextBlock Text="Grain — hides the banding an 8-bit capture brings"
+                               Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2" TextWrapping="WrapByWords"/>
+                    <StackPanel Orientation="Horizontal" MarginBottom="10">
+                        <Slider Minimum="0" Maximum="0.2" Value="{Binding MaterialGrain, Mode=TwoWay}" Width="240"/>
+                        <TextBlock Text="{Binding MaterialGrain}" MarginLeft="8" Width="48"/>
+                    </StackPanel>
+                </StackPanel>
+
+                <TextBlock Text="Tint colour" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
+                <ColorPickerButton Width="48" Height="32" SelectedColor="{Binding MaterialTint, Mode=TwoWay}"/>
+            </StackPanel>
+        </StackPanel>
+    </StackPanel>
+</View>

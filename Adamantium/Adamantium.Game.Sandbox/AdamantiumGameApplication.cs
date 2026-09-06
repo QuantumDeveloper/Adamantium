@@ -35,5 +35,9 @@ public class AdamantiumGameApplication : GameApplication
         views.RegisterView<ViewModels.BrushesViewModel, Views.NoiseStandView>(nameof(ViewModels.LiveStand.Noise));
         views.RegisterView<ViewModels.BrushesViewModel, Views.FractalStandView>(nameof(ViewModels.LiveStand.Fractal));
         views.RegisterView<ViewModels.BrushesViewModel, Views.ImageStandView>(nameof(ViewModels.LiveStand.Image));
+        views.RegisterView<ViewModels.BrushesViewModel, Views.DrawingStandView>(nameof(ViewModels.LiveStand.Drawing));
+        views.RegisterView<ViewModels.BrushesViewModel, Views.VisualStandView>(nameof(ViewModels.LiveStand.Visual));
+        views.RegisterView<ViewModels.BrushesViewModel, Views.MaterialStandView>(nameof(ViewModels.LiveStand.Material));
+        views.RegisterView<ViewModels.BrushesViewModel, Views.AuraStandView>(nameof(ViewModels.LiveStand.Aura));
     }
 }

@@ -1,0 +1,218 @@
+<View xmlns="http://adamantium/ui"
+      xmlns:x="http://adamantium/ui/xaml/extensions"
+      xmlns:conv="clr-namespace:Adamantium.Game.Sandbox.Converters">
+    <!-- Navigated into the brushes tab's region under the key "Aura"; the DataContext is the tab's own view-model.
+         Not a fill at all: the soft band around a shape. Two properties rather than one with the offset zeroed - a
+         shadow has a DIRECTION and an aura does not. Both are the shape's own signed distance read further out, so they
+         batch with everything else: no offscreen target, no blur pass.
+         This stand keeps its OWN figure and box: the subject is the band and the room left for it, not the fill. -->
+    <StackPanel Orientation="Vertical">
+        <TextBlock Text="Aura / Shadow — live (the band is drawn OUTSIDE the element; the margin is yours to leave)" FontSize="18" Margin="0,0,0,10"/>
+        <StackPanel Orientation="Horizontal" MarginBottom="20">
+            <!-- A MID-TONE backdrop on purpose: the other stands sit on near-black, but a dark shadow is invisible
+                 there and a bright aura blows out. This one has to show both at once. -->
+            <Border Width="420" Height="300" Margin="10" Background="#485061">
+                <!-- The clip goes HERE when it is asked for, not on the panel: this box is exactly the figure plus its
+                     margin, so the margin then decides how much of the band survives. On the panel it would never
+                     bite - the panel is far bigger than any band - and the rule would stay invisible. -->
+                <Grid HorizontalAlignment="Center" VerticalAlignment="Center" ClipToBounds="{Binding HaloClip}">
+                    <Rectangle Width="180" Height="120"
+                               Fill="#E2E8F0"
+                               Margin="{Binding HaloMargin, Converter={conv:DoubleToThicknessConverter}}"
+                               CornerRadius="{Binding HaloRadius, Converter={conv:DoubleToCornerRadiusConverter}}"
+                               Aura="{Binding LiveAura}"
+                               Shadow="{Binding LiveShadow}"
+                               Visibility="{Binding HaloShape, Converter={conv:EnumVisibilityConverter}, ConverterParameter=Rectangle}"/>
+                    <Ellipse Width="180" Height="120"
+                             Fill="#E2E8F0"
+                             Margin="{Binding HaloMargin, Converter={conv:DoubleToThicknessConverter}}"
+                             Aura="{Binding LiveAura}"
+                             Shadow="{Binding LiveShadow}"
+                             Visibility="{Binding HaloShape, Converter={conv:EnumVisibilityConverter}, ConverterParameter=Ellipse}"/>
+                    <!-- Tessellated shapes: their band reads a distance field baked per mesh, so it follows a
+                         concave outline - the star's notches keep their own glow instead of being bridged over. -->
+                    <RegularPolygon Width="120" Height="120"
+                             Corners="{Binding ShapeCornerCount}"
+                             StartAngle="{Binding ShapeStartAngle}"
+                             Fill="#E2E8F0"
+                             HorizontalAlignment="Center"
+                             VerticalAlignment="Center"
+                             Margin="{Binding HaloMargin, Converter={conv:DoubleToThicknessConverter}}"
+                             Aura="{Binding LiveAura}"
+                             Shadow="{Binding LiveShadow}"
+                             Visibility="{Binding HaloShape, Converter={conv:EnumVisibilityConverter}, ConverterParameter=Polygon}"/>
+                    <Polygon Points="{Binding HaloStar}"
+                             Fill="#E2E8F0"
+                             HorizontalAlignment="Center"
+                             VerticalAlignment="Center"
+                             Margin="{Binding HaloMargin, Converter={conv:DoubleToThicknessConverter}}"
+                             Aura="{Binding LiveAura}"
+                             Shadow="{Binding LiveShadow}"
+                             Visibility="{Binding HaloShape, Converter={conv:EnumVisibilityConverter}, ConverterParameter=Star}"/>
+                </Grid>
+            </Border>
+            <StackPanel Orientation="Vertical" Width="300" MarginLeft="16" VerticalAlignment="Center">
+                <TextBlock Text="Paint it on" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
+                <DropDown ItemsSource="{Binding HaloShapes}" SelectedItem="{Binding HaloShape, Mode=TwoWay}" Width="280" MarginBottom="10"/>
+                <!-- Only for the polygon: on a rect or an ellipse these two numbers mean nothing. -->
+                <StackPanel Orientation="Vertical" Visibility="{Binding HaloShape, Converter={conv:EnumVisibilityConverter}, ConverterParameter=Polygon}">
+                    <TextBlock Text="Corners — 3 is a triangle, enough of them a circle" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
+                    <StackPanel Orientation="Horizontal" MarginBottom="6">
+                        <Slider Value="{Binding ShapeCorners, Mode=TwoWay}" IsValueToolTipEnabled="True" Minimum="3" Maximum="24"
+                                TickFrequency="1" IsSnapToTickEnabled="true" Width="180"/>
+                        <NumericUpDown Width="88" Minimum="3" Maximum="24" SmallChange="1" SnapsToSmallChange="true" StringFormat="N0"
+                                       IsDragScrubEnabled="true" TracksMouseWheelWhenOver="true"
+                                       Value="{Binding ShapeCorners, Mode=TwoWay}" VerticalAlignment="Center" MarginLeft="6"/>
+                    </StackPanel>
+                    <TextBlock Text="Start angle — where corner 0 sits" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
+                    <StackPanel Orientation="Horizontal" MarginBottom="10">
+                        <Slider Value="{Binding ShapeStartAngle, Mode=TwoWay}" IsValueToolTipEnabled="True" Minimum="0" Maximum="360"
+                                TickFrequency="1" IsSnapToTickEnabled="true" Width="180"/>
+                        <NumericUpDown Width="88" Minimum="0" Maximum="360" SmallChange="1" SnapsToSmallChange="true" StringFormat="N0"
+                                       IsDragScrubEnabled="true" TracksMouseWheelWhenOver="true"
+                                       Value="{Binding ShapeStartAngle, Mode=TwoWay}" VerticalAlignment="Center" MarginLeft="6"/>
+                    </StackPanel>
+                </StackPanel>
+                <StackPanel Orientation="Vertical" Visibility="{Binding HaloShape, Converter={conv:EnumVisibilityConverter}, ConverterParameter=Rectangle}">
+                    <TextBlock Text="Corner radius" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
+                    <StackPanel Orientation="Horizontal" MarginBottom="10">
+                        <Slider Value="{Binding HaloRadius, Mode=TwoWay}" IsValueToolTipEnabled="True" Minimum="0" Maximum="60" Width="186"/>
+                        <NumericUpDown Width="88" Minimum="0" Maximum="60" SmallChange="1"
+                                       SnapsToSmallChange="true" StringFormat="N0"
+                                       IsDragScrubEnabled="true" TracksMouseWheelWhenOver="true"
+                                       Value="{Binding HaloRadius, Mode=TwoWay}" VerticalAlignment="Center" MarginLeft="6"/>
+                    </StackPanel>
+                </StackPanel>
+                <!-- Margin is LAYOUT, not a band parameter - it does nothing to the glow itself. It is here only to
+                     show the one rule the engine will not keep for you: bounds are never grown to fit a band, so a
+                     clipping ancestor cuts whatever the author left no room for. Hence it lives with the clip. -->
+                <CheckBox Content="Clip to the element's box" IsChecked="{Binding HaloClip, Mode=TwoWay}" MarginBottom="4"/>
+                <TextBlock Text="Margin — layout, not a band setting. With the clip on, drop it below the radius and the band is cut: bounds are never grown to fit a glow."
+                           TextWrapping="WrapByWords" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
+                <StackPanel Orientation="Horizontal" MarginBottom="14">
+                    <Slider Value="{Binding HaloMargin, Mode=TwoWay}" IsValueToolTipEnabled="True" Minimum="0" Maximum="70" Width="186"/>
+                    <NumericUpDown Width="88" Minimum="0" Maximum="70" SmallChange="1"
+                                   SnapsToSmallChange="true" StringFormat="N0"
+                                   IsDragScrubEnabled="true" TracksMouseWheelWhenOver="true"
+                                   Value="{Binding HaloMargin, Mode=TwoWay}" VerticalAlignment="Center" MarginLeft="6"/>
+                </StackPanel>
+
+                <CheckBox Content="AURA — no direction" IsChecked="{Binding AuraOn, Mode=TwoWay}" FontSize="14" MarginBottom="6"/>
+                <TextBlock Text="Radius — how far it reaches" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
+                <StackPanel Orientation="Horizontal" MarginBottom="10">
+                    <Slider Value="{Binding AuraRadius, Mode=TwoWay}" IsValueToolTipEnabled="True" Minimum="0" Maximum="60" Width="186"/>
+                    <NumericUpDown Width="88" Minimum="0" Maximum="60" SmallChange="1"
+                                   SnapsToSmallChange="true" StringFormat="N0"
+                                   IsDragScrubEnabled="true" TracksMouseWheelWhenOver="true"
+                                   Value="{Binding AuraRadius, Mode=TwoWay}" VerticalAlignment="Center" MarginLeft="6"/>
+                </StackPanel>
+                <TextBlock Text="Spread — solid rim before the fade" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
+                <StackPanel Orientation="Horizontal" MarginBottom="10">
+                    <Slider Value="{Binding AuraSpread, Mode=TwoWay}" IsValueToolTipEnabled="True" Minimum="0" Maximum="30" Width="186"/>
+                    <NumericUpDown Width="88" Minimum="0" Maximum="30" SmallChange="1"
+                                   SnapsToSmallChange="true" StringFormat="N0"
+                                   IsDragScrubEnabled="true" TracksMouseWheelWhenOver="true"
+                                   Value="{Binding AuraSpread, Mode=TwoWay}" VerticalAlignment="Center" MarginLeft="6"/>
+                </StackPanel>
+                <TextBlock Text="Opacity" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
+                <StackPanel Orientation="Horizontal" MarginBottom="10">
+                    <Slider Value="{Binding AuraOpacity, Mode=TwoWay}" IsValueToolTipEnabled="True" Minimum="0" Maximum="1" Width="186"/>
+                    <NumericUpDown Width="88" Minimum="0" Maximum="1" SmallChange="0.05"
+                                   SnapsToSmallChange="true" StringFormat="N2"
+                                   IsDragScrubEnabled="true" TracksMouseWheelWhenOver="true"
+                                   Value="{Binding AuraOpacity, Mode=TwoWay}" VerticalAlignment="Center" MarginLeft="6"/>
+                </StackPanel>
+                <CheckBox Content="Inner (glow inward — needs no margin at all)" IsChecked="{Binding AuraInner, Mode=TwoWay}" MarginBottom="6"/>
+                <TextBlock Text="Colour" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
+                <ColorPickerButton Width="48" Height="32" SelectedColor="{Binding AuraColor, Mode=TwoWay}" MarginBottom="14"/>
+
+                <!-- LIVING: at Turbulence 0 this is the still band above and the living pass is never reached, so a
+                     plain glow pays nothing for the noise. -->
+                <TextBlock Text="ALIVE — the reach breathes" FontSize="14" MarginBottom="6"/>
+                <TextBlock Text="Turbulence — how far the reach wanders (0 = still)"
+                           TextWrapping="WrapByWords" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
+                <StackPanel Orientation="Horizontal" MarginBottom="10">
+                    <Slider Value="{Binding AuraTurbulence, Mode=TwoWay}" IsValueToolTipEnabled="True" Minimum="0" Maximum="2" Width="186"/>
+                    <NumericUpDown Width="88" Minimum="0" Maximum="2" SmallChange="0.05"
+                                   SnapsToSmallChange="true" StringFormat="N2"
+                                   IsDragScrubEnabled="true" TracksMouseWheelWhenOver="true"
+                                   Value="{Binding AuraTurbulence, Mode=TwoWay}" VerticalAlignment="Center" MarginLeft="6"/>
+                </StackPanel>
+                <TextBlock Text="Flow — how fast it drifts" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
+                <StackPanel Orientation="Horizontal" MarginBottom="10">
+                    <Slider Value="{Binding AuraFlow, Mode=TwoWay}" IsValueToolTipEnabled="True" Minimum="0" Maximum="3" Width="186"/>
+                    <NumericUpDown Width="88" Minimum="0" Maximum="3" SmallChange="0.05"
+                                   SnapsToSmallChange="true" StringFormat="N2"
+                                   IsDragScrubEnabled="true" TracksMouseWheelWhenOver="true"
+                                   Value="{Binding AuraFlow, Mode=TwoWay}" VerticalAlignment="Center" MarginLeft="6"/>
+                </StackPanel>
+                <TextBlock Text="Detail — how many tongues run around it" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
+                <StackPanel Orientation="Horizontal" MarginBottom="10">
+                    <Slider Value="{Binding AuraDetail, Mode=TwoWay}" IsValueToolTipEnabled="True" Minimum="0.5" Maximum="12" Width="186"/>
+                    <NumericUpDown Width="88" Minimum="0.5" Maximum="12" SmallChange="1"
+                                   SnapsToSmallChange="true" StringFormat="N0"
+                                   IsDragScrubEnabled="true" TracksMouseWheelWhenOver="true"
+                                   Value="{Binding AuraDetail, Mode=TwoWay}" VerticalAlignment="Center" MarginLeft="6"/>
+                </StackPanel>
+                <CheckBox Content="Palette — travel four colours instead of one" IsChecked="{Binding AuraPalette, Mode=TwoWay}" MarginBottom="6"/>
+                <StackPanel Orientation="Vertical" Visibility="{Binding AuraPalette, Converter={conv:BoolToVisibilityConverter}}">
+                    <TextBlock Text="The four it travels through" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
+                    <StackPanel Orientation="Horizontal">
+                        <ColorPickerButton Width="48" Height="32" SelectedColor="{Binding AuraColor1, Mode=TwoWay}" MarginRight="8"/>
+                        <ColorPickerButton Width="48" Height="32" SelectedColor="{Binding AuraColor2, Mode=TwoWay}" MarginRight="8"/>
+                        <ColorPickerButton Width="48" Height="32" SelectedColor="{Binding AuraColor3, Mode=TwoWay}" MarginRight="8"/>
+                        <ColorPickerButton Width="48" Height="32" SelectedColor="{Binding AuraColor4, Mode=TwoWay}"/>
+                    </StackPanel>
+                </StackPanel>
+            </StackPanel>
+            <!-- The shadow's own column: the two sets are independent, and stacking them made one tall strip nobody
+                 could take in at a glance. -->
+            <StackPanel Orientation="Vertical" Width="300" MarginLeft="24" VerticalAlignment="Center">
+                <CheckBox Content="SHADOW — thrown where the light is not" IsChecked="{Binding ShadowOn, Mode=TwoWay}" FontSize="14" MarginBottom="6"/>
+                <TextBlock Text="Offset X / Y" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
+                <StackPanel Orientation="Horizontal" MarginBottom="6">
+                    <Slider Value="{Binding ShadowOffsetX, Mode=TwoWay}" IsValueToolTipEnabled="True" Minimum="-40" Maximum="40" Width="186"/>
+                    <NumericUpDown Width="88" Minimum="-40" Maximum="40" SmallChange="1"
+                                   SnapsToSmallChange="true" StringFormat="N0"
+                                   IsDragScrubEnabled="true" TracksMouseWheelWhenOver="true"
+                                   Value="{Binding ShadowOffsetX, Mode=TwoWay}" VerticalAlignment="Center" MarginLeft="6"/>
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" MarginBottom="10">
+                    <Slider Value="{Binding ShadowOffsetY, Mode=TwoWay}" IsValueToolTipEnabled="True" Minimum="-40" Maximum="40" Width="186"/>
+                    <NumericUpDown Width="88" Minimum="-40" Maximum="40" SmallChange="1"
+                                   SnapsToSmallChange="true" StringFormat="N0"
+                                   IsDragScrubEnabled="true" TracksMouseWheelWhenOver="true"
+                                   Value="{Binding ShadowOffsetY, Mode=TwoWay}" VerticalAlignment="Center" MarginLeft="6"/>
+                </StackPanel>
+                <TextBlock Text="Blur radius — how soft the edge is" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
+                <StackPanel Orientation="Horizontal" MarginBottom="10">
+                    <Slider Value="{Binding ShadowBlur, Mode=TwoWay}" IsValueToolTipEnabled="True" Minimum="0" Maximum="60" Width="186"/>
+                    <NumericUpDown Width="88" Minimum="0" Maximum="60" SmallChange="1"
+                                   SnapsToSmallChange="true" StringFormat="N0"
+                                   IsDragScrubEnabled="true" TracksMouseWheelWhenOver="true"
+                                   Value="{Binding ShadowBlur, Mode=TwoWay}" VerticalAlignment="Center" MarginLeft="6"/>
+                </StackPanel>
+                <TextBlock Text="Spread — how HIGH it floats (negative peeks out from one edge)"
+                           TextWrapping="WrapByWords" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
+                <StackPanel Orientation="Horizontal" MarginBottom="10">
+                    <Slider Value="{Binding ShadowSpread, Mode=TwoWay}" IsValueToolTipEnabled="True" Minimum="-20" Maximum="30" Width="186"/>
+                    <NumericUpDown Width="88" Minimum="-20" Maximum="30" SmallChange="1"
+                                   SnapsToSmallChange="true" StringFormat="N0"
+                                   IsDragScrubEnabled="true" TracksMouseWheelWhenOver="true"
+                                   Value="{Binding ShadowSpread, Mode=TwoWay}" VerticalAlignment="Center" MarginLeft="6"/>
+                </StackPanel>
+                <TextBlock Text="Opacity" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
+                <StackPanel Orientation="Horizontal" MarginBottom="10">
+                    <Slider Value="{Binding ShadowOpacity, Mode=TwoWay}" IsValueToolTipEnabled="True" Minimum="0" Maximum="1" Width="186"/>
+                    <NumericUpDown Width="88" Minimum="0" Maximum="1" SmallChange="0.05"
+                                   SnapsToSmallChange="true" StringFormat="N2"
+                                   IsDragScrubEnabled="true" TracksMouseWheelWhenOver="true"
+                                   Value="{Binding ShadowOpacity, Mode=TwoWay}" VerticalAlignment="Center" MarginLeft="6"/>
+                </StackPanel>
+                <CheckBox Content="Inner (inset — the pressed look)" IsChecked="{Binding ShadowInner, Mode=TwoWay}" MarginBottom="6"/>
+                <TextBlock Text="Colour" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
+                <ColorPickerButton Width="48" Height="32" SelectedColor="{Binding ShadowColor, Mode=TwoWay}"/>
+            </StackPanel>
+        </StackPanel>
+    </StackPanel>
+</View>
