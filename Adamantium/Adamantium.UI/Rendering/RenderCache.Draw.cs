@@ -2174,12 +2174,11 @@ public partial class RenderCache
                 SdfSlotKind.Texture => _texRectBatch != null && _texRectBatch.CanBatch(rru.RectPayload)
                                        && TextureBatchCollector.RecordCount(rru.RectPayload.Brush) == TexRunLength(u),
                 // ...and the FORMULA (deep zoom included) must still be the one the segment bound its pass for: the patch
-                // rewrites the record, not the pass. A DEEP one refuses outright - its record indexes the reference
-                // ORBIT, and only the walk builds that, so a patched deep record would point at nothing and draw black.
+                // rewrites the record, not the pass. A deep one also has to still fit the reference orbit its slot owns -
+                // that is decided at the patch itself, where the baked record can be measured against the slice.
                 SdfSlotKind.Fractal => _fractalBatch != null && _fractalBatch.CanBatch(rru.RectPayload)
                                        && _fractalKindByUnit.TryGetValue(u, out var fracKind)
-                                       && fracKind == FractalRectCollector.KindOf(rru.RectPayload.Brush)
-                                       && !FractalRectCollector.IsDeep(fracKind),
+                                       && fracKind == FractalRectCollector.KindOf(rru.RectPayload.Brush),
                 SdfSlotKind.Material => _materialBatch != null && _materialBatch.CanBatch(rru.RectPayload),
                 _ => false
             };
@@ -2296,6 +2295,9 @@ public partial class RenderCache
             if (rectEntry.Kind == SdfSlotKind.Fractal)
             {
                 if (!FractalRectCollector.BakeItem(rru.RectPayload, bakeWorld, rru.FillOpacity, transformSlot, rectClip, rru.FadeSlot, out var fracItem)) return false;
+                // BakeItem does not compute Ref - only a walk builds an orbit. A deep record therefore takes the one its
+                // slot already owns, and refuses when that orbit no longer describes it.
+                if (!_fractalBatch.TryStampOrbit(rectEntry.Slot, rru.RectPayload, ref fracItem)) return false;
                 _fractalBatch.UpdateSlot(device, rectEntry.Slot, fracItem);
                 return true;
             }

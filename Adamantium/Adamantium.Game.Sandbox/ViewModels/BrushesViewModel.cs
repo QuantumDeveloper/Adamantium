@@ -806,6 +806,10 @@ public partial class BrushesViewModel : TabPageViewModel
     [Bindable] private double _fractalCenterY = 0;
     [Bindable] private double _fractalFineX = 0;   // fine pan, scaled by 1/zoom in ApplyCenter so it stays precise when zoomed in
     [Bindable] private double _fractalFineY = 0;
+    // The view's own residue: mouse pan and zoom re-anchoring write here rather than into the coarse centre, which past
+    // zoom ~1e13 can no longer represent a one-pixel step at all.
+    [Bindable] private double _fractalCenterFineX = 0;
+    [Bindable] private double _fractalCenterFineY = 0;
     [Bindable] private Color _fractalColor1 = new Color(11, 18, 43, 255);
     [Bindable] private Color _fractalColor2 = new Color(34, 211, 238, 255);
 
@@ -846,6 +850,8 @@ public partial class BrushesViewModel : TabPageViewModel
 
     partial void OnFractalCenterXChanged(double value) => ApplyCenter();   // base centre, driven by mouse pan/zoom (FractalView)
     partial void OnFractalCenterYChanged(double value) => ApplyCenter();
+    partial void OnFractalCenterFineXChanged(double value) => ApplyCenter();
+    partial void OnFractalCenterFineYChanged(double value) => ApplyCenter();
 
     partial void OnFractalFineXChanged(double value)
     {
@@ -864,10 +870,17 @@ public partial class BrushesViewModel : TabPageViewModel
     // stays precise at any depth. Mouse pan/zoom writes the base CenterX/Y and ZoomExp (two-way from FractalView).
     private void ApplyCenter()
     {
+        // DOUBLE all the way in. Vector2 holds doubles, and rounding the centre through a float first gave an O(1) value
+        // a ~1e-7 step - wider than the whole view past zoom 1e7. Since this runs on every zoom change, each step then
+        // snapped the centre to the nearest float and shifted the picture sideways.
+        //
+        // And the two parts stay APART. Adding the small one into the coarse centre here would throw away exactly what
+        // it exists to carry: a value of order 1 steps by ~1e-16, and past zoom ~1e13 that is wider than the whole view.
         var span = 1.5 / Math.Max(Math.Pow(10, _fractalZoomExp), 1e-4);
-        LiveFractal.Center = new Vector2(
-            (float)(_fractalCenterX + _fractalFineX * span),
-            (float)(_fractalCenterY + _fractalFineY * span));
+        LiveFractal.Center = new Vector2(_fractalCenterX, _fractalCenterY);
+        LiveFractal.CenterFine = new Vector2(
+            _fractalCenterFineX + _fractalFineX * span,
+            _fractalCenterFineY + _fractalFineY * span);
     }
 
     // Read-outs to the right of each slider - the sliders emit continuous doubles, so format them to stay legible.

@@ -23,6 +23,9 @@ public sealed class FractalBrush : Brush
     public static readonly AdamantiumProperty CenterProperty = AdamantiumProperty.Register(nameof(Center),
         typeof(Vector2), typeof(FractalBrush), new PropertyMetadata(new Vector2(0, 0), PropertyMetadataOptions.AffectsPaint));
 
+    public static readonly AdamantiumProperty CenterFineProperty = AdamantiumProperty.Register(nameof(CenterFine),
+        typeof(Vector2), typeof(FractalBrush), new PropertyMetadata(new Vector2(0, 0), PropertyMetadataOptions.AffectsPaint));
+
     public static readonly AdamantiumProperty ZoomProperty = AdamantiumProperty.Register(nameof(Zoom),
         typeof(double), typeof(FractalBrush), new PropertyMetadata(1.0, PropertyMetadataOptions.AffectsPaint));
 
@@ -95,6 +98,22 @@ public sealed class FractalBrush : Brush
         {
             if (IsFrozen) return;
             SetValue(CenterProperty, value);
+        }
+    }
+
+    /// <summary>The rest of the centre, carried apart from <see cref="Center"/> so it survives a deep zoom. The centre a
+    /// view actually shows is <see cref="Center"/> + this, and past zoom ~1e13 that sum cannot be held by one double at
+    /// all: the centre is a value of order 1, its step is ~1e-16, and by then the whole visible span is narrower than
+    /// that - a pan step lands below the step of the number carrying it and changes nothing. Keeping the small part
+    /// separate gives it its own full precision, which is the same trick the reference orbit uses one level down.
+    /// <para>Default zero, so a brush that never pans deep reads exactly as it always did.</para></summary>
+    public Vector2 CenterFine
+    {
+        get => GetValue<Vector2>(CenterFineProperty);
+        set
+        {
+            if (IsFrozen) return;
+            SetValue(CenterFineProperty, value);
         }
     }
 
@@ -197,6 +216,7 @@ public sealed class FractalBrush : Brush
             Formula = Formula,
             Power = Power,
             Center = Center,
+            CenterFine = CenterFine,
             Zoom = Zoom,
             Iterations = Iterations,
             C = C,

@@ -29,6 +29,8 @@ public class FractalView : Rectangle
     private bool _zoomTicker;
     private double _anchorCx;
     private double _anchorCy;
+    private double _anchorFineX;
+    private double _anchorFineY;
     private double _anchorOffX;
     private double _anchorOffY;
 
@@ -41,6 +43,12 @@ public class FractalView : Rectangle
         typeof(double), typeof(FractalView), new PropertyMetadata(0.0, PropertyMetadataOptions.BindsTwoWayByDefault));
 
     public static readonly AdamantiumProperty CenterYProperty = AdamantiumProperty.Register(nameof(CenterY),
+        typeof(double), typeof(FractalView), new PropertyMetadata(0.0, PropertyMetadataOptions.BindsTwoWayByDefault));
+
+    public static readonly AdamantiumProperty CenterXFineProperty = AdamantiumProperty.Register(nameof(CenterXFine),
+        typeof(double), typeof(FractalView), new PropertyMetadata(0.0, PropertyMetadataOptions.BindsTwoWayByDefault));
+
+    public static readonly AdamantiumProperty CenterYFineProperty = AdamantiumProperty.Register(nameof(CenterYFine),
         typeof(double), typeof(FractalView), new PropertyMetadata(0.0, PropertyMetadataOptions.BindsTwoWayByDefault));
 
     public static readonly AdamantiumProperty ZoomExpProperty = AdamantiumProperty.Register(nameof(ZoomExp),
@@ -60,11 +68,43 @@ public class FractalView : Rectangle
         set => SetValue(CenterYProperty, value);
     }
 
+    /// <summary>The rest of the centre's X, carried apart from <see cref="CenterX"/> so panning survives a deep zoom: the
+    /// point shown is CenterX + this. A centre of order 1 steps by ~1e-16, and past zoom ~1e13 the whole visible span is
+    /// narrower than that - a one-pixel drag then lands below the step of the number holding it and moves nothing at all.
+    /// Mouse pan and the zoom's re-anchoring both write HERE, leaving the coarse part alone (two-way, so a bound slider
+    /// still tracks the coarse centre).</summary>
+    public double CenterXFine
+    {
+        get => GetValue<double>(CenterXFineProperty);
+        set => SetValue(CenterXFineProperty, value);
+    }
+
+    /// <summary>The rest of the centre's Y - see <see cref="CenterXFine"/>.</summary>
+    public double CenterYFine
+    {
+        get => GetValue<double>(CenterYFineProperty);
+        set => SetValue(CenterYFineProperty, value);
+    }
+
     /// <summary>log10 of the zoom (two-way). Working in log-zoom keeps wheel steps multiplicative.</summary>
     public double ZoomExp
     {
         get => GetValue<double>(ZoomExpProperty);
         set => SetValue(ZoomExpProperty, value);
+    }
+
+    // Re-split a coarse/fine pair so the coarse part carries the bulk and the fine part is only what the coarse one could
+    // not hold. EXACT - Knuth's two-sum: s is the rounded sum and the residue is recovered from it, so nothing is lost.
+    //
+    // Without this the pair is pointless: every pan lands in the fine part and never leaves, so the fine part grows to
+    // order 1 and its own step grows with it, until a deep pan step falls under that - which is the very failure the
+    // split exists to remove, moved one field sideways.
+    private static void Renormalise(ref double hi, ref double lo)
+    {
+        var s = hi + lo;
+        var b = s - hi;
+        lo = (hi - (s - b)) + (lo - b);
+        hi = s;
     }
 
     // Complex-plane units per pixel at the current size and zoom (the smaller half-axis spans Span/zoom).
@@ -93,8 +133,15 @@ public class FractalView : Rectangle
         var k = UnitsPerPixel();
         if (k > 0.0)
         {
-            CenterX -= (p.X - _lastX) * k;   // grab the content: the point under the cursor stays put as you drag
-            CenterY -= (p.Y - _lastY) * k;
+            // Into the FINE part: the step is tiny deep down, and adding it to a centre of order 1 would round straight
+            // back to where it started. The fine part is what the coarse one could not hold, so its own step is far
+            // smaller and the drag lands - then the pair is re-split so it stays that way.
+            var hiX = CenterX; var loX = CenterXFine - (p.X - _lastX) * k;   // grab the content: the point under the cursor stays put
+            var hiY = CenterY; var loY = CenterYFine - (p.Y - _lastY) * k;
+            Renormalise(ref hiX, ref loX);
+            Renormalise(ref hiY, ref loY);
+            CenterX = hiX; CenterXFine = loX;
+            CenterY = hiY; CenterYFine = loY;
         }
         _lastX = p.X;
         _lastY = p.Y;
@@ -122,8 +169,12 @@ public class FractalView : Rectangle
         _anchorOffX = p.X - ActualWidth * 0.5;
         _anchorOffY = p.Y - ActualHeight * 0.5;
         var k = (Span / Math.Pow(10, ZoomExp)) / minHalf;   // live units/pixel
-        _anchorCx = CenterX + _anchorOffX * k;              // the complex point under the cursor right now
-        _anchorCy = CenterY + _anchorOffY * k;
+        // The anchor is held as the SAME pair the centre is: the coarse part is simply carried over untouched, and the
+        // cursor offset - a small quantity - goes into the fine one, where it keeps its digits.
+        _anchorCx = CenterX;                                // the complex point under the cursor right now...
+        _anchorCy = CenterY;
+        _anchorFineX = CenterXFine + _anchorOffX * k;       // ...its small part
+        _anchorFineY = CenterYFine + _anchorOffY * k;
 
         var basis = _zoomActive ? _targetExp : ZoomExp;     // accumulate into the target so quick spins add up
         _targetExp = Math.Clamp(basis + (e.Delta / 120.0) * ZoomStep, MinExp, MaxExp);
@@ -152,8 +203,14 @@ public class FractalView : Rectangle
         if (Math.Abs(_targetExp - next) < 1e-4) next = _targetExp;
 
         var k = (Span / Math.Pow(10, next)) / minHalf;
-        CenterX = _anchorCx - _anchorOffX * k;   // keep the anchor point under its pixel offset as the zoom eases
-        CenterY = _anchorCy - _anchorOffY * k;
+        // The cursor offset goes into the SMALL part, where it keeps its digits, and the pair is re-split afterwards so
+        // the coarse part keeps carrying the bulk.
+        var hiX = _anchorCx; var loX = _anchorFineX - _anchorOffX * k;
+        var hiY = _anchorCy; var loY = _anchorFineY - _anchorOffY * k;
+        Renormalise(ref hiX, ref loX);
+        Renormalise(ref hiY, ref loY);
+        CenterX = hiX; CenterXFine = loX;
+        CenterY = hiY; CenterYFine = loY;
         ZoomExp = next;
 
         var done = next == _targetExp;

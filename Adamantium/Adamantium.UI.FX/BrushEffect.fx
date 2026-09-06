@@ -1459,7 +1459,7 @@ float4 FractalShade(FractalPSInput input, int formula, bool deep)
     float2 cp = it.Geom.xy + (input.Local / minHalf) * (1.5 / max(it.Geom.z, 1e-4));
 
     bool animate = it.Julia.z > 0.5;
-    int maxIt = min(int(it.Params.w), 400);
+    int maxIt = min(int(it.Params.w), 2000);   // mirrors FractalRectCollector.MaxIterations - a deep zoom spends its detail here
 
     float4 fill;
     if (formula == 5)   // Newton: convergence basins, not escape-time (C-mode does not apply, so map the raw fragment)
@@ -1482,7 +1482,10 @@ float4 FractalShade(FractalPSInput input, int formula, bool deep)
         // NOTE: the .fx parser does NOT accept unary '!', so bail flags are tested as (escaped) / (escaped == false).
         if (deep)   // the DEEP pass; the collector batches those instances apart, so Ref carries a reference orbit here
         {
-            float2* orbit = (float2*)OrbitAddress;
+            // One orbit step is a HI/LO pair: .xy the float that holds most of Z_n, .zw the residue it could not. A single
+            // float carries an O(1) reference to ~1e-7 ABSOLUTE, and at zoom 1e8 the whole view is 1.5e-8 across - the
+            // reference missed by more than the picture. The pair carries ~1e-14.
+            float4* orbit = (float4*)OrbitAddress;
             uint ofs = (uint)it.Ref.x;
             int rlen = (int)it.Ref.y;
             // pixel offset from the REFERENCE point: (pixel - view centre) + (view centre - C_ref). The second term
@@ -1493,7 +1496,11 @@ float4 FractalShade(FractalPSInput input, int formula, bool deep)
             // reference index is the INNER loop COUNTER j (monotonic, like the plain perturbation loop the driver accepts);
             // a rebase just breaks the inner loop and the OUTER loop starts a fresh segment from j=0. One orbit serves any
             // depth: no glitch blobs (reference near zero) and no short-orbit truncation.
-            float2 Ref0 = orbit[ofs];
+            // The rebase target needs its residue as much as the orbit steps do: a rebase assigns Ref0 straight into the
+            // delta, so dropping the lo term here injects the ~1e-7 error back into dz on every single rebase.
+            float4 Ref0p = orbit[ofs];
+            float2 Ref0 = Ref0p.xy;
+            float2 Ref0l = Ref0p.zw;
             float2 dz = mandelbrot ? float2(0.0, 0.0) : delta;   // Delta = z - Ref[j]. Julia: z0 offset. Mandelbrot: 0.
             float2 dc = mandelbrot ? delta : float2(0.0, 0.0);   // per-iteration additive. Mandelbrot: dc. Julia: 0.
             int pi = 0;                 // true iteration count (drives the smooth colour)
@@ -1506,21 +1513,35 @@ float4 FractalShade(FractalPSInput input, int formula, bool deep)
                 int j = 0;
                 for (j = 0; j + 1 < rlen; j++)
                 {
-                    float2 Z = orbit[ofs + (uint)j];                  // MONOTONIC reference index
-                    pz = Z + dz;                                      // full z at this true iteration
+                    float4 Zp = orbit[ofs + (uint)j];                 // MONOTONIC reference index
+                    float2 Z = Zp.xy;
+                    float2 Zl = Zp.zw;
+                    // (Z + dz) + Zl, in that order: near a rebase Z and dz nearly cancel, and adding two close floats is
+                    // EXACT - so the residue survives instead of being rounded away by an O(1) sum.
+                    pz = (Z + dz) + Zl;                               // full z at this true iteration
                     if (dot(pz, pz) > 256.0) { escaped = true; break; }
                     if (pi + 1 >= maxIt) { done = true; break; }
-                    float2 zdz = float2(Z.x * dz.x - Z.y * dz.y, Z.x * dz.y + Z.y * dz.x);
+                    // Z*dz with the residue kept as its own product. Each product needs only RELATIVE precision, which a
+                    // float has; what a single float could not do is REPRESENT Z closely enough in the first place.
+                    float2 zdz = float2(Z.x * dz.x - Z.y * dz.y, Z.x * dz.y + Z.y * dz.x)
+                               + float2(Zl.x * dz.x - Zl.y * dz.y, Zl.x * dz.y + Zl.y * dz.x);
                     float2 dz2 = float2(dz.x * dz.x - dz.y * dz.y, 2.0 * dz.x * dz.y);
                     dz = 2.0 * zdz + dz2 + dc;                        // advance the perturbation
                     pi = pi + 1;
-                    float2 Zn = orbit[ofs + (uint)(j + 1)];           // MONOTONIC (j+1)
-                    pz = Zn + dz;                                     // full z after the advance
-                    if (dot(pz, pz) < dot(dz, dz)) { dz = pz - Ref0; rebased = true; break; }   // rebase now
+                    float4 Znp = orbit[ofs + (uint)(j + 1)];          // MONOTONIC (j+1)
+                    pz = (Znp.xy + dz) + Znp.zw;                      // full z after the advance
+                    // Rebase when the delta measured FROM Ref0 is the smaller one - not when |pz| is. The two agree for
+                    // Mandelbrot, whose Ref0 is the origin, and differ for Julia, whose reference starts at z0: testing
+                    // |pz| there rebased on the wrong iterations and showed as shimmer.
+                    // Rebase when the delta measured FROM Ref0 is the smaller one - not when |pz| is. The two agree for
+                    // Mandelbrot, whose Ref0 is the origin, and differ for Julia, whose reference starts at z0: testing
+                    // |pz| there rebased on the wrong iterations, and a Julia shimmered hard from ~1e6 up.
+                    float2 rel = (pz - Ref0) - Ref0l;
+                    if (dot(rel, rel) < dot(dz, dz)) { dz = rel; rebased = true; break; }
                 }
                 if (escaped) break;
                 if (done) break;
-                if (rebased == false) dz = pz - Ref0;   // inner ran out of reference -> rebase, restart the segment at j=0
+                if (rebased == false) dz = (pz - Ref0) - Ref0l;   // inner ran out of reference -> rebase, restart at j=0
             }
             if (escaped)
             {
