@@ -401,6 +401,15 @@ namespace Adamantium.Graphics.Core
                 BufferDeviceAddress = true,
                 BufferDeviceAddressCaptureReplay = true,
                 SamplerMirrorClampToEdge = true,
+                // Only when reported - it is a FEATURE of 1.2, not a guarantee, and asking for one the device does not
+                // have fails vkCreateDevice. See GraphicsAdapter.SupportsScalarBlockLayout for what it buys.
+                ScalarBlockLayout = GraphicsAdapter.SupportsScalarBlockLayout,
+                // 8-bit colour in the instance records: every batch stores its colours as four BYTES, so these two are
+                // as unconditional as BufferDeviceAddress beside them - a shader that declares uint8_t4 is invalid
+                // without them, and there is no second record layout to fall back to. Reported by every adapter this
+                // engine has run on; a device that lacks them fails creation LOUDLY rather than drawing wrong colours.
+                StorageBuffer8BitAccess = true,
+                ShaderInt8 = true,
             };
 
             var vulkan13Features = new PhysicalDeviceVulkan13Features

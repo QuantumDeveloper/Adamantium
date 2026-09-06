@@ -44,9 +44,10 @@ public struct TextureItem
     /// slice of a nine-slice is its own ninth.</summary>
     public Vector4F UvRect;
 
-    /// <summary>Multiplied into the sampled colour, straight RGBA, opacity folded into .w. White = the image as it is;
-    /// a colour tints it, which is how one greyscale skin serves several themes.</summary>
-    public Vector4F Tint;
+    /// <summary>Multiplied into the sampled colour, straight RGBA, opacity folded into the alpha. White = the image as
+    /// it is; a colour tints it, which is how one greyscale skin serves several themes. Four BYTES, read by the shader
+    /// as a <c>uint8_t4</c>.</summary>
+    public Color Tint;
 
     /// <summary>.x = the ROUNDED CLIP's slot this instance is cut by, .y = the OPACITY slot its alpha is read from
     /// (-1 for either = none); .zw spare. A field of its own because every component of every other field is spoken

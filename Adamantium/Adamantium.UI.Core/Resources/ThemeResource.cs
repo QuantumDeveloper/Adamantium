@@ -57,9 +57,19 @@ public class ThemeResource : MarkupExtension
 
         expression.CloseConnection();
 
-        // The same rule as ObservableResource.Remove, and for the same reason: while a theme swap has both styles
-        // attached, two of them own this property at this priority, and the one that leaves must not take the other's
-        // connection - or its value - with it.
+        // A TOKEN owns one contribution on the trigger stack and nothing else, so it always takes that contribution
+        // with it - a survivor on the same slot keeps its own. Standing aside here is what left a colour on a part
+        // with no owner: two accent triggers share a checkbox's box, and whichever left first refreshed the other and
+        // returned, so its own value stayed on the stack for good (an unticked box keeping the accent fill).
+        if (priority == ValuePriority.Trigger && token != null)
+        {
+            target.ClearTriggerValue(target.GetProperty(propertyName), token);
+            return;
+        }
+
+        // The token-LESS form clears the whole priority slot, and that one must stand aside: while a theme swap has
+        // both styles attached, two of them own this property at this priority, and the one that leaves would take the
+        // other's value with it.
         var slot = propertyName + "@" + priority;
         foreach (var pair in map)
         {
@@ -69,10 +79,7 @@ public class ThemeResource : MarkupExtension
             return;
         }
 
-        if (priority == ValuePriority.Trigger && token != null)
-            target.ClearTriggerValue(target.GetProperty(propertyName), token);
-        else
-            target.ClearValue(propertyName, priority);
+        target.ClearValue(propertyName, priority);
     }
 
     public override object ProvideObject(MarkupContext context)

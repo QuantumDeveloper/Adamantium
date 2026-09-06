@@ -91,12 +91,7 @@ internal sealed class EllipseBatchCollector : ShapeSdfCollector<EllipseItem>
         const float eps = 1e-4f;
         if (Math.Abs(world.M12) > eps || Math.Abs(world.M21) > eps) return false;   // rotation/shear -> per-unit
 
-        var color = Vector4F.Zero;
-        if (p.Brush is SolidColorBrush solid)
-        {
-            color = solid.Color.ToVector4();
-            color.W *= (float)(opacity * solid.Opacity);
-        }
+        var color = RectBatchCollector.FillColour(p.Brush, opacity);
 
         // Stroke (optional): the full pen baked to the instance (colour + device-px width, dash on/gap, offset, trim),
         // CENTRE-aligned. Solid/dashed/trimmed all draw analytically in the SDF shader, so a stroked ellipse stays in the
@@ -114,7 +109,7 @@ internal sealed class EllipseBatchCollector : ShapeSdfCollector<EllipseItem>
             // somebody else, so a record that forgot to set it would be cut by a stranger's shape.
             Params = new Vector4F(transformSlot, fadeSlot, -1, 0),
             Color = color,
-            StrokeColor = strokeColor,
+            StrokeColor = new Color(strokeColor),
             Stroke0 = stroke0,
             Stroke1 = stroke1,
             Dash = dash,

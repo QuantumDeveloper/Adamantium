@@ -26,8 +26,10 @@ public struct HaloRectItem
     /// fades over). All in SLOT units; the vertex shader converts to device pixels the way every SDF batch does.</summary>
     public Vector4F Band;
 
-    /// <summary>Straight-alpha RGBA, the author's Opacity already folded into .w.</summary>
-    public Vector4F Color;
+    /// <summary>Straight-alpha RGBA, the author's Opacity already folded into the alpha. Four BYTES - the form the
+    /// colour arrived in before <c>ToVector4</c> divided it by 255 - and twelve bytes an instance smaller than the
+    /// float4 it replaces. The shader reads the same four as a <c>uint8_t4</c>.</summary>
+    public Color Color;
 
     /// <summary>.x = the distance range the sampled field encodes, in SLOT units (0 for an analytic shape). The shader
     /// needs it to turn a texel back into a distance.</summary>

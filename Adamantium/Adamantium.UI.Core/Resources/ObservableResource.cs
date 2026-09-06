@@ -60,11 +60,21 @@ public class ObservableResource : MarkupExtension
 
         expression.CloseConnection();
 
-        // SOMEBODY ELSE MAY STILL OWN THIS PROPERTY. A theme swap applies the incoming style before removing the
-        // outgoing one, and both write the same property at the same priority - so without this the departing style
-        // closes the connection the ARRIVING one just made and clears the value with it. The property then falls to
-        // its own default, which for a brush is transparent: measured on a ribbon after a swap, every command icon
-        // stroked with a fully transparent brush at its correct size, hoverable and invisible.
+        // A TOKEN owns one contribution on the trigger stack and nothing else, so it always takes that contribution
+        // with it - a survivor on the same slot keeps its own. See ThemeResource.Remove: standing aside here is what
+        // left an unticked checkbox wearing the accent fill.
+        if (priority == ValuePriority.Trigger && token != null)
+        {
+            target.ClearTriggerValue(target.GetProperty(propertyName), token);
+            return;
+        }
+
+        // SOMEBODY ELSE MAY STILL OWN THIS PROPERTY, and the token-LESS form below clears the whole priority slot. A
+        // theme swap applies the incoming style before removing the outgoing one, and both write the same property at
+        // the same priority - so without this the departing style closes the connection the ARRIVING one just made and
+        // clears the value with it. The property then falls to its own default, which for a brush is transparent:
+        // measured on a ribbon after a swap, every command icon stroked with a fully transparent brush at its correct
+        // size, hoverable and invisible.
         var slot = propertyName + "@" + priority;
         foreach (var pair in map)
         {
@@ -74,10 +84,7 @@ public class ObservableResource : MarkupExtension
             return;
         }
 
-        if (priority == ValuePriority.Trigger && token != null)
-            target.ClearTriggerValue(target.GetProperty(propertyName), token);
-        else
-            target.ClearValue(propertyName, priority);
+        target.ClearValue(propertyName, priority);
     }
 
     public override object ProvideObject(MarkupContext context)

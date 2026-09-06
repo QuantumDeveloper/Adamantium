@@ -1086,7 +1086,7 @@ struct TexRectData
     float4 Rotation;   // 2x2 mapping a fragment back into the unturned grid, row-major (identity = 1,0,0,1)
     float4 Drawn;      // the content's rect inside ONE tile: offsetXY, scaleXY, both in 0..1 of the tile
     float4 UvRect;     // sub-rectangle of the source: x, y, w, h (normalised)
-    float4 Tint;       // multiplied into the sample, straight RGBA
+    uint8_t4 Tint;     // multiplied into the sample, straight RGBA in four bytes
     float4 Clip;       // .x = the ROUNDED CLIP's slot, or -1; .yzw spare
 };
 
@@ -1169,7 +1169,7 @@ float4 TexRectPS(TexPSInput input) : SV_Target
     // SampleLevel, not Sample: frac() above makes uv DISCONTINUOUS at every tile seam, so the hardware's derivative -
     // which is what Sample picks a mip level by - spikes there and that one column of pixels is drawn from the smallest
     // mip. That is the thin line down each seam. The level is explicit here because the footprint is ours to state.
-    float4 fill = SourceTexture.SampleLevel(SourceSampler, uv, 0.0) * it.Tint;
+    float4 fill = SourceTexture.SampleLevel(SourceSampler, uv, 0.0) * (float4(it.Tint) * (1.0 / 255.0));
 
     // A SQUARE piece is drawn CRISP, not feathered. Nine-slice cuts a picture into nine quads that share edges, and a
     // coverage ramp puts 0.5 on both sides of every shared edge - alpha-composited that is ~0.75, a dark hairline down
@@ -1195,7 +1195,7 @@ float4 TexRectPS(TexPSInput input) : SV_Target
 // N such shapes cost ONE draw instead of N. A tessellated mesh carries neither an SDF nor a usable uv0, so the picture
 // is mapped across the shape's own LOCAL bounding box, with the same tiling arithmetic the SDF textured batch uses.
 // WHICH texture is not in the record: one texture is bound per DRAW, exactly as TextureBatchCollector does per segment.
-struct TexGeomData
+struct TextureGeomData
 {
     float4x4 Local;      // element local -> SLOT space (the slot's matrix is applied on top, from the transform table)
     float4 Params;       // .x repeat flag, .y mirror flags (1 = X, 2 = Y, 3 = both), .w transform slot
@@ -1204,7 +1204,7 @@ struct TexGeomData
     float4 Rotation;     // 2x2 mapping a fragment back into the unturned grid, row-major (identity = 1,0,0,1)
     float4 Drawn;        // the content's rect inside ONE tile: offsetXY, scaleXY, both in 0..1 of the tile
     float4 UvRect;       // the sub-rectangle of the source one copy samples
-    float4 Tint;
+    uint8_t4 Tint;       // multiplied into the sample, straight RGBA in four bytes
     float4 Clip;         // .x = the ROUNDED CLIP's slot, or -1; .yzw spare
 };
 
@@ -1212,7 +1212,7 @@ struct TexFillPSInput
 {
     float4 Position : SV_Position;
     float2 Local : TEXCOORD0;                   // varying: fragment's local mesh xy
-    nointerpolation uint InstId : TEXCOORD1;    // instance -> re-read TexGeomData in the PS (light signature)
+    nointerpolation uint InstId : TEXCOORD1;    // instance -> re-read TextureGeomData in the PS (light signature)
     nointerpolation float Fade : TEXCOORD2;     // fetched in the VERTEX stage - see GradFillPSInput
     nointerpolation float4 ClipBox   : TEXCOORD3;   // ...and so is the ancestor's rounded clip
     nointerpolation float4 ClipRadii : TEXCOORD4;
@@ -1221,8 +1221,8 @@ struct TexFillPSInput
 [shader("vertex")]
 TexFillPSInput TexFillVS(UI_VERTEX v, uint instanceId : SV_InstanceID)
 {
-    TexGeomData* items = (TexGeomData*)InstancesAddress;
-    TexGeomData it = items[instanceId];
+    TextureGeomData* items = (TextureGeomData*)InstancesAddress;
+    TextureGeomData it = items[instanceId];
     NodeSlot* nodes = (NodeSlot*)TransformsAddress;
     float4 world = mul(mul(float4(v.position.xyz, 1.0), it.Local), nodes[(uint)it.Params.w].World);
 
@@ -1240,8 +1240,8 @@ TexFillPSInput TexFillVS(UI_VERTEX v, uint instanceId : SV_InstanceID)
 [shader("fragment")]
 float4 TexFillPS(TexFillPSInput input) : SV_Target
 {
-    TexGeomData* items = (TexGeomData*)InstancesAddress;
-    TexGeomData it = items[input.InstId];
+    TextureGeomData* items = (TextureGeomData*)InstancesAddress;
+    TextureGeomData it = items[input.InstId];
 
     // 0..1 across the shape's box -> TILE space -> the content's rect inside one tile -> the source's sub-rectangle.
     float2 t = (input.Local - it.LocalBounds.xy) / max(it.LocalBounds.zw, float2(1e-4, 1e-4));
@@ -1257,7 +1257,11 @@ float4 TexFillPS(TexFillPSInput input) : SV_Target
 
     // SampleLevel, not Sample: frac() makes uv discontinuous at every tile seam, and the derivative Sample picks its mip
     // by spikes there - one column of pixels from the smallest mip, i.e. a thin line down each seam.
-    float4 color = SourceTexture.SampleLevel(SourceSampler, uv, 0.0) * it.Tint;
+    // Component by component, not float4(it.Tint): the whole-vector conversion of a uint8_t4 is what this driver's
+    // shader compiler will not take in the TEXTURED MESH passes - it access-violates inside vkCreateShadersEXT, the
+    // one shader of this effect that would not create. The SDF textured pass above takes the plain form.
+    float4 tint = float4(it.Tint.x, it.Tint.y, it.Tint.z, it.Tint.w) * (1.0 / 255.0);
+    float4 color = SourceTexture.SampleLevel(SourceSampler, uv, 0.0) * tint;
 
     // Outside the content's rect inside its tile there is nothing to paint - the gap a Uniform fit leaves.
     float inside = step(0.0, n.x) * step(n.x, 1.0) * step(0.0, n.y) * step(n.y, 1.0);
@@ -1284,8 +1288,8 @@ struct TexFringePSInput
 [shader("vertex")]
 TexFringePSInput InstancedTexFringeVS(FringeVertex v, uint instanceId : SV_InstanceID)
 {
-    TexGeomData* items = (TexGeomData*)InstancesAddress;
-    TexGeomData it = items[instanceId];
+    TextureGeomData* items = (TextureGeomData*)InstancesAddress;
+    TextureGeomData it = items[instanceId];
     NodeSlot* nodes = (NodeSlot*)TransformsAddress;
     float4x4 m = mul(mul(it.Local, nodes[(uint)it.Params.w].World), Projection);
 
@@ -1305,8 +1309,8 @@ TexFringePSInput InstancedTexFringeVS(FringeVertex v, uint instanceId : SV_Insta
 [shader("fragment")]
 float4 TexFringePS(TexFringePSInput input) : SV_Target
 {
-    TexGeomData* items = (TexGeomData*)InstancesAddress;
-    TexGeomData it = items[input.InstId];
+    TextureGeomData* items = (TextureGeomData*)InstancesAddress;
+    TextureGeomData it = items[input.InstId];
 
     // The ring is expanded a pixel OUTWARD, so its outer edge lies just outside the shape's box: clamp before mapping,
     // or the band would sample past the picture (and the single-copy clip below would erase the fringe entirely).
@@ -1320,7 +1324,11 @@ float4 TexFringePS(TexFringePSInput input) : SV_Target
     float2 n = (inTile - it.Drawn.xy) / max(it.Drawn.zw, float2(1e-4, 1e-4));
     float2 uv = it.UvRect.xy + saturate(n) * it.UvRect.zw;
 
-    float4 color = SourceTexture.SampleLevel(SourceSampler, uv, 0.0) * it.Tint;
+    // Component by component, not float4(it.Tint): the whole-vector conversion of a uint8_t4 is what this driver's
+    // shader compiler will not take in the TEXTURED MESH passes - it access-violates inside vkCreateShadersEXT, the
+    // one shader of this effect that would not create. The SDF textured pass above takes the plain form.
+    float4 tint = float4(it.Tint.x, it.Tint.y, it.Tint.z, it.Tint.w) * (1.0 / 255.0);
+    float4 color = SourceTexture.SampleLevel(SourceSampler, uv, 0.0) * tint;
     float inside = step(0.0, n.x) * step(n.x, 1.0) * step(0.0, n.y) * step(n.y, 1.0);
     color.a *= inside * input.Coverage * input.Fade * ClipCoverage(input.Position.xy, input.ClipBox, input.ClipRadii);
 

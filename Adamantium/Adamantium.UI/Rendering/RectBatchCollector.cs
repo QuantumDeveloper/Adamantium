@@ -191,6 +191,20 @@ internal sealed class RectBatchCollector : ShapeSdfCollector<RectItem>
     /// <summary>The largest of the four - what the quad has to make room for, and all the vertex stage needs.</summary>
     internal static float MaxOf(Vector4F radii) => Math.Max(Math.Max(radii.X, radii.Y), Math.Max(radii.Z, radii.W));
 
+    /// <summary>A colour with an opacity folded into its ALPHA, staying in the four BYTES a record carries the whole
+    /// way. THE one place that fold happens: a colour is bytes to begin with, so taking it through a
+    /// <see cref="Vector4F"/> and back only rounds it twice for nothing.</summary>
+    internal static Color WithOpacity(Color colour, double opacity)
+    {
+        colour.A = Color.ToByte((int)(colour.A * opacity));
+        return colour;
+    }
+
+    /// <summary>The fill a solid brush contributes. Anything but a solid brush contributes nothing - alpha 0, which is
+    /// how these batches say "no fill".</summary>
+    internal static Color FillColour(Brush brush, double opacity)
+        => brush is SolidColorBrush solid ? WithOpacity(solid.Color, opacity * solid.Opacity) : default;
+
     // All six caps, drawn analytically by CapReach in BatchEffect.fx. Codes MATCH the geometry stroker's MapCap so the two
     // stroke paths render the same shape: 0 flat, 1 square, 2 convex round, 3 convex triangle, 4 concave triangle, 5 concave round.
     private static float CapCode(PenLineCap cap) => cap switch
@@ -229,12 +243,7 @@ internal sealed class RectBatchCollector : ShapeSdfCollector<RectItem>
         const float eps = 1e-4f;
         if (Math.Abs(world.M12) > eps || Math.Abs(world.M21) > eps) return false;   // rotation/shear -> per-unit
 
-        var color = Vector4F.Zero;
-        if (p.Brush is SolidColorBrush solid)
-        {
-            color = solid.Color.ToVector4();
-            color.W *= (float)(opacity * solid.Opacity);
-        }
+        var color = FillColour(p.Brush, opacity);
 
         // Stroke (optional): the full pen baked to the instance (colour + device-px width, dash on/gap, dash offset,
         // trim), CENTRE-aligned (half in / half out). Solid, dashed and trimmed strokes all draw analytically in the SDF
@@ -265,7 +274,7 @@ internal sealed class RectBatchCollector : ShapeSdfCollector<RectItem>
             Params = new Vector4F(MaxOf(radii), transformSlot, p.AntiAlias ? 0 : 1, fadeSlot),
             Radii = radii,
             Color = color,
-            StrokeColor = strokeColor,
+            StrokeColor = new Color(strokeColor),
             Stroke0 = stroke0,
             Stroke1 = stroke1,
             Dash = dash,

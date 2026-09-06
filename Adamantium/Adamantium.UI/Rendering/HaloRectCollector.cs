@@ -176,7 +176,7 @@ internal sealed class HaloRectCollector : ShapeSdfCollector<HaloRectItem>
                 Params = new Vector4F(RectBatchCollector.MaxOf(radii), transformSlot, (float)shape, band.Inner ? 1f : 0f),
                 Radii = radii,
                 Band = new Vector4F(band.Offset.X * iso, band.Offset.Y * iso, band.Spread * iso, band.Softness * iso),
-                Color = color,
+                Color = new Color(color),
                 // .y = the rounded clip's slot, .z = the opacity slot (-1 = none for either): a band is cut - and
                 // faded - by an ancestor exactly like the fill it sits under.
                 Field = new Vector4F((float)fieldRange * iso, clipSlot, fadeSlot, 0)
