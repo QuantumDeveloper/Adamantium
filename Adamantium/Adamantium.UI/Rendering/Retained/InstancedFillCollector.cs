@@ -524,8 +524,8 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
         Span<Vector4F> cols = stackalloc Vector4F[GradientBake.MaxStops];
         Span<float> offs = stackalloc float[GradientBake.MaxStops];
         var count = GradientBake.PackStops(g, alpha, cols, offs);
-        inst.Stop0 = cols[0]; inst.Stop1 = cols[1]; inst.Stop2 = cols[2]; inst.Stop3 = cols[3];
-        inst.Stop4 = cols[4]; inst.Stop5 = cols[5]; inst.Stop6 = cols[6]; inst.Stop7 = cols[7];
+        inst.Stop0 = new Color(cols[0]); inst.Stop1 = new Color(cols[1]); inst.Stop2 = new Color(cols[2]); inst.Stop3 = new Color(cols[3]);
+        inst.Stop4 = new Color(cols[4]); inst.Stop5 = new Color(cols[5]); inst.Stop6 = new Color(cols[6]); inst.Stop7 = new Color(cols[7]);
         inst.Offsets0 = new Vector4F(offs[0], offs[1], offs[2], offs[3]);
         inst.Offsets1 = new Vector4F(offs[4], offs[5], offs[6], offs[7]);
         var type = GradientBake.PackGeometry(g, out var geom0, out var geom1);

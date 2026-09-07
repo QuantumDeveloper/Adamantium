@@ -318,10 +318,8 @@ struct GradGeomData
     float4 Geom0;        // LOCAL 0..1: linear (startXY, endXY) | radial (centerXY, radiusXY)
     float4 Geom1;        // radial focal (originXY, _); .w = transform-table slot
     float4 LocalBounds;  // shape local bounds: minXY, sizeXY
-    // STILL float4, unlike GradientRectData's: this stage will not take four-byte stops at all - the body stops drawing
-    // (255 -> 0) and the device follows, whether the widening is inline here or in a helper. See the C# record.
-    float4 Stop0; float4 Stop1; float4 Stop2; float4 Stop3;
-    float4 Stop4; float4 Stop5; float4 Stop6; float4 Stop7;
+    uint8_t4 Stop0; uint8_t4 Stop1; uint8_t4 Stop2; uint8_t4 Stop3;   // straight stop RGBA in four bytes, as the rect record
+    uint8_t4 Stop4; uint8_t4 Stop5; uint8_t4 Stop6; uint8_t4 Stop7;
     float4 Offsets0; float4 Offsets1;
     float4 Clip;         // .x = the ROUNDED CLIP's slot, or -1; .yzw spare
 };
@@ -330,7 +328,8 @@ struct GradGeomData
 // component - Geom1.z is the SHAPE FLAG the pixel shader branches on, and writing the slot there drew nothing at all.
 // Same trick the SDF gradient already uses for its own spread/interp/slot triple. Unpacked by hand at each site: a
 // helper that takes NodeSlot* blanks the window on this driver, so the fetch is never wrapped in one.
-int GradGeomFadeSlot(GradGeomData it) { return int(it.Params.w * 0.5) - 1; }
+// The VERTEX stages do the same arithmetic in line rather than calling a helper here: one that takes the record BY
+// VALUE is another whole-record read, which is the thing those stages must not do (see GradientFillVS).
 int GradGeomInterp(GradGeomData it)   { return int(fmod(it.Params.w, 2.0)); }
 
 struct GradFillPSInput
@@ -349,20 +348,25 @@ struct GradFillPSInput
 GradFillPSInput GradientFillVS(UI_VERTEX v, uint instanceId : SV_InstanceID)
 {
     GradGeomData* items = (GradGeomData*)InstancesAddress;
-    GradGeomData it = items[instanceId];
+    // FIELD BY FIELD, not a copy of the whole record: this stage needs four float4s out of it and never looks at a
+    // stop, and pulling the struct in wholesale drags the eight FOUR-BYTE colours through the vertex stage with it.
+    float4x4 local = items[instanceId].Local;
+    float4 geom1 = items[instanceId].Geom1;
+    float4 gparams = items[instanceId].Params;
+    float4 clip = items[instanceId].Clip;
     // local -> slot space -> world, as InstancedFillVS: the slot matrix lives in the transform table, so a node move
     // rewrites 64 bytes there and every instance under it follows without this buffer being touched.
     NodeSlot* nodes = (NodeSlot*)TransformsAddress;
-    float4 world = mul(mul(float4(v.position.xyz, 1.0), it.Local), nodes[(uint)it.Geom1.w].World);
+    float4 world = mul(mul(float4(v.position.xyz, 1.0), local), nodes[(uint)geom1.w].World);
 
     GradFillPSInput o;
     o.Position = mul(world, Projection);
     o.Local = v.position.xy;
     o.InstId = instanceId;
-    int gradFadeSlot = GradGeomFadeSlot(it);
+    int gradFadeSlot = int(gparams.w * 0.5) - 1;
     o.Fade = lerp(1.0, nodes[max(gradFadeSlot, 0)].Params.x, step(0.0, float(gradFadeSlot)));
-    o.ClipBox   = ClipShapeBox(it.Clip.x);
-    o.ClipRadii = ClipShapeRadii(it.Clip.x);
+    o.ClipBox   = ClipShapeBox(clip.x);
+    o.ClipRadii = ClipShapeRadii(clip.x);
     return o;
 }
 
@@ -378,21 +382,21 @@ float4 GradGeomColor(GradGeomData it, float2 local)
     gd.StrokeColor = uint8_t4(0, 0, 0, 0);
     gd.Stroke0 = float4(0.0, 0.0, 0.0, 0.0);
     gd.Stroke1 = float4(0.0, 0.0, 0.0, 0.0);
-    // The stops are NOT copied across: this record keeps its own float4 ones and hands them to the evaluator directly,
-    // so nothing in this stage ever reads or writes a four-byte colour. gd's are zeroed because gd's are never read.
-    gd.Stop0 = uint8_t4(0, 0, 0, 0); gd.Stop1 = uint8_t4(0, 0, 0, 0);
-    gd.Stop2 = uint8_t4(0, 0, 0, 0); gd.Stop3 = uint8_t4(0, 0, 0, 0);
-    gd.Stop4 = uint8_t4(0, 0, 0, 0); gd.Stop5 = uint8_t4(0, 0, 0, 0);
-    gd.Stop6 = uint8_t4(0, 0, 0, 0); gd.Stop7 = uint8_t4(0, 0, 0, 0);
+    gd.Stop0 = it.Stop0; gd.Stop1 = it.Stop1; gd.Stop2 = it.Stop2; gd.Stop3 = it.Stop3;
+    gd.Stop4 = it.Stop4; gd.Stop5 = it.Stop5; gd.Stop6 = it.Stop6; gd.Stop7 = it.Stop7;
     gd.Offsets0 = it.Offsets0; gd.Offsets1 = it.Offsets1;
 
     float2 uv = (local - it.LocalBounds.xy) / max(it.LocalBounds.zw, float2(1e-4, 1e-4));
     float gt = GradSpread(GradParam(gd, uv), int(gd.Params.w));
-    float4 meshCols[8] = { it.Stop0, it.Stop1, it.Stop2, it.Stop3, it.Stop4, it.Stop5, it.Stop6, it.Stop7 };
+    // Widened in THIS stage's own body - see GradColor.
+    float4 meshCols[8] = { float4(it.Stop0) * (1.0 / 255.0), float4(it.Stop1) * (1.0 / 255.0),
+                           float4(it.Stop2) * (1.0 / 255.0), float4(it.Stop3) * (1.0 / 255.0),
+                           float4(it.Stop4) * (1.0 / 255.0), float4(it.Stop5) * (1.0 / 255.0),
+                           float4(it.Stop6) * (1.0 / 255.0), float4(it.Stop7) * (1.0 / 255.0) };
     float4 grad = GradColor(gd, meshCols, gt, min(fwidth(gt), fwidth(frac(gt + 0.5))), GradGeomInterp(it));   // wrap-aware AA (conic/repeat seam)
     // MESH (type 4) here too: a mesh brush has NO axis geometry, so without this branch the maths above runs on zeros and
     // walks the stop table with a meaningless parameter. Same branch-free select as the rect pass.
-    float4 mesh = lerp(lerp(it.Stop0, it.Stop1, uv.x), lerp(it.Stop2, it.Stop3, uv.x), uv.y);
+    float4 mesh = lerp(lerp(meshCols[0], meshCols[1], uv.x), lerp(meshCols[2], meshCols[3], uv.x), uv.y);
     return lerp(grad, mesh, step(3.5, gd.Params.y));
 }
 
@@ -422,9 +426,13 @@ struct GradFringePSInput
 GradFringePSInput InstancedGradientFringeVS(FringeVertex v, uint instanceId : SV_InstanceID)
 {
     GradGeomData* items = (GradGeomData*)InstancesAddress;
-    GradGeomData it = items[instanceId];
+    // Field by field, as GradientFillVS - the stops have no business in a vertex stage.
+    float4x4 local = items[instanceId].Local;
+    float4 geom1 = items[instanceId].Geom1;
+    float4 gparams = items[instanceId].Params;
+    float4 clip = items[instanceId].Clip;
     NodeSlot* nodes = (NodeSlot*)TransformsAddress;
-    float4x4 m = mul(mul(it.Local, nodes[(uint)it.Geom1.w].World), Projection);
+    float4x4 m = mul(mul(local, nodes[(uint)geom1.w].World), Projection);
 
     GradFringePSInput o;
     float coverage;
@@ -432,10 +440,10 @@ GradFringePSInput InstancedGradientFringeVS(FringeVertex v, uint instanceId : SV
     o.Local = v.Position;
     o.Coverage = coverage;
     o.InstId = instanceId;
-    int gradFadeSlot = GradGeomFadeSlot(it);
+    int gradFadeSlot = int(gparams.w * 0.5) - 1;
     o.Fade = lerp(1.0, nodes[max(gradFadeSlot, 0)].Params.x, step(0.0, float(gradFadeSlot)));
-    o.ClipBox   = ClipShapeBox(it.Clip.x);
-    o.ClipRadii = ClipShapeRadii(it.Clip.x);
+    o.ClipBox   = ClipShapeBox(clip.x);
+    o.ClipRadii = ClipShapeRadii(clip.x);
     return o;
 }
 
@@ -1720,14 +1728,12 @@ technique Gradient
 {
     pass Sdf
     {
-        Profile = 6.6;
         VertexShader = GradientRectInstancedVS;
         PixelShader = GradientPS;
     }
 
     pass Mesh
     {
-        Profile = 6.6;
         VertexShader = GradientFillVS;
         PixelShader = GradientFillPS;
     }
@@ -1736,7 +1742,6 @@ technique Gradient
     // cannot share the flat-colour fringe.
     pass Fringe
     {
-        Profile = 6.6;
         VertexShader = InstancedGradientFringeVS;
         PixelShader = InstancedGradientFringePS;
     }
@@ -1756,98 +1761,84 @@ technique Pattern
 {
     pass CheckerboardSdf
     {
-        Profile = 6.6;
         VertexShader = PatternRectInstancedVS;
         PixelShader = PatternCheckerboardSdfPS;
     }
 
     pass StripesSdf
     {
-        Profile = 6.6;
         VertexShader = PatternRectInstancedVS;
         PixelShader = PatternStripesSdfPS;
     }
 
     pass DotsSdf
     {
-        Profile = 6.6;
         VertexShader = PatternRectInstancedVS;
         PixelShader = PatternDotsSdfPS;
     }
 
     pass GridSdf
     {
-        Profile = 6.6;
         VertexShader = PatternRectInstancedVS;
         PixelShader = PatternGridSdfPS;
     }
 
     pass HexagonSdf
     {
-        Profile = 6.6;
         VertexShader = PatternRectInstancedVS;
         PixelShader = PatternHexagonSdfPS;
     }
 
     pass HatchSdf
     {
-        Profile = 6.6;
         VertexShader = PatternRectInstancedVS;
         PixelShader = PatternHatchSdfPS;
     }
 
     pass WeaveSdf
     {
-        Profile = 6.6;
         VertexShader = PatternRectInstancedVS;
         PixelShader = PatternWeaveSdfPS;
     }
 
     pass CheckerboardMesh
     {
-        Profile = 6.6;
         VertexShader = PatternFillVS;
         PixelShader = PatternCheckerboardMeshPS;
     }
 
     pass StripesMesh
     {
-        Profile = 6.6;
         VertexShader = PatternFillVS;
         PixelShader = PatternStripesMeshPS;
     }
 
     pass DotsMesh
     {
-        Profile = 6.6;
         VertexShader = PatternFillVS;
         PixelShader = PatternDotsMeshPS;
     }
 
     pass GridMesh
     {
-        Profile = 6.6;
         VertexShader = PatternFillVS;
         PixelShader = PatternGridMeshPS;
     }
 
     pass HexagonMesh
     {
-        Profile = 6.6;
         VertexShader = PatternFillVS;
         PixelShader = PatternHexagonMeshPS;
     }
 
     pass HatchMesh
     {
-        Profile = 6.6;
         VertexShader = PatternFillVS;
         PixelShader = PatternHatchMeshPS;
     }
 
     pass WeaveMesh
     {
-        Profile = 6.6;
         VertexShader = PatternFillVS;
         PixelShader = PatternWeaveMeshPS;
     }
@@ -1859,112 +1850,96 @@ technique Noise
 {
     pass SimplexSdf
     {
-        Profile = 6.6;
         VertexShader = PatternRectInstancedVS;
         PixelShader = NoiseSimplexSdfPS;
     }
 
     pass PerlinSdf
     {
-        Profile = 6.6;
         VertexShader = PatternRectInstancedVS;
         PixelShader = NoisePerlinSdfPS;
     }
 
     pass ValueSdf
     {
-        Profile = 6.6;
         VertexShader = PatternRectInstancedVS;
         PixelShader = NoiseValueSdfPS;
     }
 
     pass WorleySdf
     {
-        Profile = 6.6;
         VertexShader = PatternRectInstancedVS;
         PixelShader = NoiseWorleySdfPS;
     }
 
     pass RidgedSdf
     {
-        Profile = 6.6;
         VertexShader = PatternRectInstancedVS;
         PixelShader = NoiseRidgedSdfPS;
     }
 
     pass TurbulenceSdf
     {
-        Profile = 6.6;
         VertexShader = PatternRectInstancedVS;
         PixelShader = NoiseTurbulenceSdfPS;
     }
 
     pass VoronoiSdf
     {
-        Profile = 6.6;
         VertexShader = PatternRectInstancedVS;
         PixelShader = NoiseVoronoiSdfPS;
     }
 
     pass CombustibleSdf
     {
-        Profile = 6.6;
         VertexShader = PatternRectInstancedVS;
         PixelShader = NoiseCombustibleSdfPS;
     }
 
     pass SimplexMesh
     {
-        Profile = 6.6;
         VertexShader = PatternFillVS;
         PixelShader = NoiseSimplexMeshPS;
     }
 
     pass PerlinMesh
     {
-        Profile = 6.6;
         VertexShader = PatternFillVS;
         PixelShader = NoisePerlinMeshPS;
     }
 
     pass ValueMesh
     {
-        Profile = 6.6;
         VertexShader = PatternFillVS;
         PixelShader = NoiseValueMeshPS;
     }
 
     pass WorleyMesh
     {
-        Profile = 6.6;
         VertexShader = PatternFillVS;
         PixelShader = NoiseWorleyMeshPS;
     }
 
     pass RidgedMesh
     {
-        Profile = 6.6;
         VertexShader = PatternFillVS;
         PixelShader = NoiseRidgedMeshPS;
     }
 
     pass TurbulenceMesh
     {
-        Profile = 6.6;
         VertexShader = PatternFillVS;
         PixelShader = NoiseTurbulenceMeshPS;
     }
 
     pass VoronoiMesh
     {
-        Profile = 6.6;
         VertexShader = PatternFillVS;
         PixelShader = NoiseVoronoiMeshPS;
     }
 
     pass CombustibleMesh
     {
-        Profile = 6.6;
         VertexShader = PatternFillVS;
         PixelShader = NoiseCombustibleMeshPS;
     }
@@ -1976,21 +1951,18 @@ technique Texture
 {
     pass Sdf
     {
-        Profile = 6.6;
         VertexShader = TexRectInstancedVS;
         PixelShader = TexRectPS;
     }
 
     pass Mesh
     {
-        Profile = 5.1;
         VertexShader = TexFillVS;
         PixelShader = TexFillPS;
     }
 
     pass Fringe
     {
-        Profile = 5.1;
         VertexShader = InstancedTexFringeVS;
         PixelShader = TexFringePS;
     }
@@ -2007,49 +1979,42 @@ technique Fractal
 {
     pass QuadraticSdf
     {
-        Profile = 6.6;
         VertexShader = FractalRectInstancedVS;
         PixelShader = FractalQuadraticPS;
     }
 
     pass BurningShipSdf
     {
-        Profile = 6.6;
         VertexShader = FractalRectInstancedVS;
         PixelShader = FractalBurningShipPS;
     }
 
     pass TricornSdf
     {
-        Profile = 6.6;
         VertexShader = FractalRectInstancedVS;
         PixelShader = FractalTricornPS;
     }
 
     pass CelticSdf
     {
-        Profile = 6.6;
         VertexShader = FractalRectInstancedVS;
         PixelShader = FractalCelticPS;
     }
 
     pass MultibrotSdf
     {
-        Profile = 6.6;
         VertexShader = FractalRectInstancedVS;
         PixelShader = FractalMultibrotPS;
     }
 
     pass NewtonSdf
     {
-        Profile = 6.6;
         VertexShader = FractalRectInstancedVS;
         PixelShader = FractalNewtonPS;
     }
 
     pass DeepSdf
     {
-        Profile = 6.6;
         VertexShader = FractalRectInstancedVS;
         PixelShader = FractalDeepPS;
     }
