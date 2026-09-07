@@ -112,8 +112,8 @@ internal sealed class GradientRectCollector : BrushSdfCollector<GradientRectItem
         Span<Vector4F> cols = stackalloc Vector4F[GradientBake.MaxStops];
         Span<float> offs = stackalloc float[GradientBake.MaxStops];
         var count = GradientBake.PackStops(g, alpha, cols, offs);
-        item.Stop0 = cols[0]; item.Stop1 = cols[1]; item.Stop2 = cols[2]; item.Stop3 = cols[3];
-        item.Stop4 = cols[4]; item.Stop5 = cols[5]; item.Stop6 = cols[6]; item.Stop7 = cols[7];
+        item.Stop0 = new Color(cols[0]); item.Stop1 = new Color(cols[1]); item.Stop2 = new Color(cols[2]); item.Stop3 = new Color(cols[3]);
+        item.Stop4 = new Color(cols[4]); item.Stop5 = new Color(cols[5]); item.Stop6 = new Color(cols[6]); item.Stop7 = new Color(cols[7]);
         item.Offsets0 = new Vector4F(offs[0], offs[1], offs[2], offs[3]);
         item.Offsets1 = new Vector4F(offs[4], offs[5], offs[6], offs[7]);
 
@@ -124,7 +124,7 @@ internal sealed class GradientRectCollector : BrushSdfCollector<GradientRectItem
         item.Geom1.W = transformSlot;  // transform-table slot (0 = identity world bake; node-local otherwise)
 
         RectBatchCollector.BakeStroke(pen, opacity, (float)sx, out var strokeColor, out var stroke0, out var stroke1, out var dash);
-        item.StrokeColor = strokeColor;
+        item.StrokeColor = new Color(strokeColor);
         item.Stroke0 = stroke0;
         item.Stroke1 = stroke1;
         item.Dash = dash;

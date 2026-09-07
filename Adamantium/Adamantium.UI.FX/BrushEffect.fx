@@ -45,12 +45,12 @@ struct GradientRectData
     float4 Radii;        // corner radii: x = TL, y = TR, z = BR, w = BL
     float4 Geom0;        // LOCAL 0..1: linear (startXY, endXY) | radial (centerXY, radiusXY)
     float4 Geom1;        // radial focal (originXY, _, _); unused for linear
-    float4 StrokeColor;  // straight stroke RGBA (.w == 0 -> no stroke)
+    uint8_t4 StrokeColor; // straight stroke RGBA in four bytes (alpha 0 -> no stroke)
     float4 Stroke0;      // width_px, align, dashOn, dashGap
     float4 Stroke1;      // dashOffset, trimStart, trimEnd, flags
     float4 Dash;         // dash runs 2..5 (device px); runs 0 and 1 ride in Stroke0.zw, the count in Stroke1.w
-    float4 Stop0; float4 Stop1; float4 Stop2; float4 Stop3;   // straight stop RGBA (opacity folded), only .z of Params valid
-    float4 Stop4; float4 Stop5; float4 Stop6; float4 Stop7;
+    uint8_t4 Stop0; uint8_t4 Stop1; uint8_t4 Stop2; uint8_t4 Stop3;   // straight stop RGBA in four bytes, only .z of Params valid
+    uint8_t4 Stop4; uint8_t4 Stop5; uint8_t4 Stop6; uint8_t4 Stop7;
     float4 Offsets0;     // stop offsets 0..3
     float4 Offsets1;     // stop offsets 4..7
     float4 Clip;         // .x = the ROUNDED CLIP's slot, or -1; .yzw spare
@@ -148,16 +148,18 @@ float3 OklabToLinear(float3 c)
 // lookup) so a zero-width segment still contributes its 1px transition. `mode` 1 interpolates in OKLab (perceptual): the
 // stops are converted to OKLab up front, blended there, and the result converted back - only the blend space changes (mode
 // 0 is byte-for-byte the old sRGB path).
-float4 GradColor(GradientRectData it, float t, float aa, int mode)
+// The stops arrive ALREADY UNPACKED, from the caller's own body. They are four bytes each in both records, and the
+// obvious place to widen them is right here where they are used - but this evaluator is shared with GradGeomColor, and
+// the MESH gradient stage will not take the widening in a function it did not write: measured, the body stops drawing
+// entirely (255 -> 0, FillFringeRenderTests) and the device follows. Each stage does its own, in line, and hands the
+// result over. Same shape as the three other passes in this effect that cannot take a shared unpack.
+float4 GradColor(GradientRectData it, float4 cols[8], float t, float aa, int mode)
 {
     int n = int(it.Params.z);
     if (n <= 0) return float4(0.0, 0.0, 0.0, 0.0);
     float offs[8];
     offs[0] = it.Offsets0.x; offs[1] = it.Offsets0.y; offs[2] = it.Offsets0.z; offs[3] = it.Offsets0.w;
     offs[4] = it.Offsets1.x; offs[5] = it.Offsets1.y; offs[6] = it.Offsets1.z; offs[7] = it.Offsets1.w;
-    float4 cols[8];
-    cols[0] = it.Stop0; cols[1] = it.Stop1; cols[2] = it.Stop2; cols[3] = it.Stop3;
-    cols[4] = it.Stop4; cols[5] = it.Stop5; cols[6] = it.Stop6; cols[7] = it.Stop7;
 
     if (mode == 1)   // straight-sRGB stop colours -> OKLab (alpha stays linear)
     {
@@ -266,11 +268,17 @@ float4 GradientPS(GradPSInput input) : SV_Target
     // Wrap-aware AA width: at a conic/repeat seam gt jumps 1->0 so fwidth(gt) spikes to ~1 (the whole gradient collapses to
     // hard-stop ramps -> a coloured line). Shifting by half a turn moves the discontinuity to the far side, so min() picks
     // the TRUE small derivative everywhere. Harmless for linear/radial (min keeps the real value).
-    float4 grad = GradColor(it, gt, min(fwidth(gt), fwidth(frac(gt + 0.5))), (packedW >> 3) & 1);
+    // Widened in THIS stage's own body - see GradColor.
+    float4 sdfCols[8] = { float4(it.Stop0) * (1.0 / 255.0), float4(it.Stop1) * (1.0 / 255.0),
+                          float4(it.Stop2) * (1.0 / 255.0), float4(it.Stop3) * (1.0 / 255.0),
+                          float4(it.Stop4) * (1.0 / 255.0), float4(it.Stop5) * (1.0 / 255.0),
+                          float4(it.Stop6) * (1.0 / 255.0), float4(it.Stop7) * (1.0 / 255.0) };
+    float4 grad = GradColor(it, sdfCols, gt, min(fwidth(gt), fwidth(frac(gt + 0.5))), (packedW >> 3) & 1);
     // MESH gradient (type 4): four CORNER colours blended bilinearly across the shape - no axis, no stops, so the
     // gradient maths above has nothing meaningful to chew on for it (GradientBake packs zero geometry). The corners ride
     // the stop slots. Selected BRANCH-FREE: this pass has a history of device-losing on a ?:, so both are computed.
-    float4 mesh = lerp(lerp(it.Stop0, it.Stop1, uv.x), lerp(it.Stop2, it.Stop3, uv.x), uv.y);
+    float4 mesh = lerp(lerp(float4(it.Stop0) * (1.0 / 255.0), float4(it.Stop1) * (1.0 / 255.0), uv.x),
+                       lerp(float4(it.Stop2) * (1.0 / 255.0), float4(it.Stop3) * (1.0 / 255.0), uv.x), uv.y);
     float4 fill = lerp(grad, mesh, step(3.5, it.Params.y));
 
     // The stroke record is baked in SLOT units; the SDF above is in device pixels, so its LENGTHS convert (align, trim
@@ -292,7 +300,8 @@ float4 GradientPS(GradPSInput input) : SV_Target
     // The element's fade came across from the vertex stage - fill and stroke both take it. So did the ancestor clip's
     // shape, and for the same reason; here it is only arithmetic.
     float4 outColor = CompositeFillStroke(d, float4(fill.rgb, fill.a * input.Fade),
-                               float4(it.StrokeColor.rgb, it.StrokeColor.a * input.Fade), widthPx, it.Stroke0.y, mask, 0.0);
+                               float4(it.StrokeColor.x, it.StrokeColor.y, it.StrokeColor.z,
+                                      float(it.StrokeColor.w) * input.Fade) * (1.0 / 255.0), widthPx, it.Stroke0.y, mask, 0.0);
     return float4(outColor.rgb, outColor.a * ClipCoverage(input.Position.xy, input.ClipBox, input.ClipRadii));
 }
 
@@ -309,6 +318,8 @@ struct GradGeomData
     float4 Geom0;        // LOCAL 0..1: linear (startXY, endXY) | radial (centerXY, radiusXY)
     float4 Geom1;        // radial focal (originXY, _); .w = transform-table slot
     float4 LocalBounds;  // shape local bounds: minXY, sizeXY
+    // STILL float4, unlike GradientRectData's: this stage will not take four-byte stops at all - the body stops drawing
+    // (255 -> 0) and the device follows, whether the widening is inline here or in a helper. See the C# record.
     float4 Stop0; float4 Stop1; float4 Stop2; float4 Stop3;
     float4 Stop4; float4 Stop5; float4 Stop6; float4 Stop7;
     float4 Offsets0; float4 Offsets1;
@@ -364,19 +375,24 @@ float4 GradGeomColor(GradGeomData it, float2 local)
     gd.Bounds = float4(0.0, 0.0, 0.0, 0.0);
     gd.Params = float4(0.0, it.Params.x, it.Params.z, it.Params.y);   // (_, type, stopCount, spread)
     gd.Geom0 = it.Geom0; gd.Geom1 = it.Geom1;
-    gd.StrokeColor = float4(0.0, 0.0, 0.0, 0.0);
+    gd.StrokeColor = uint8_t4(0, 0, 0, 0);
     gd.Stroke0 = float4(0.0, 0.0, 0.0, 0.0);
     gd.Stroke1 = float4(0.0, 0.0, 0.0, 0.0);
-    gd.Stop0 = it.Stop0; gd.Stop1 = it.Stop1; gd.Stop2 = it.Stop2; gd.Stop3 = it.Stop3;
-    gd.Stop4 = it.Stop4; gd.Stop5 = it.Stop5; gd.Stop6 = it.Stop6; gd.Stop7 = it.Stop7;
+    // The stops are NOT copied across: this record keeps its own float4 ones and hands them to the evaluator directly,
+    // so nothing in this stage ever reads or writes a four-byte colour. gd's are zeroed because gd's are never read.
+    gd.Stop0 = uint8_t4(0, 0, 0, 0); gd.Stop1 = uint8_t4(0, 0, 0, 0);
+    gd.Stop2 = uint8_t4(0, 0, 0, 0); gd.Stop3 = uint8_t4(0, 0, 0, 0);
+    gd.Stop4 = uint8_t4(0, 0, 0, 0); gd.Stop5 = uint8_t4(0, 0, 0, 0);
+    gd.Stop6 = uint8_t4(0, 0, 0, 0); gd.Stop7 = uint8_t4(0, 0, 0, 0);
     gd.Offsets0 = it.Offsets0; gd.Offsets1 = it.Offsets1;
 
     float2 uv = (local - it.LocalBounds.xy) / max(it.LocalBounds.zw, float2(1e-4, 1e-4));
     float gt = GradSpread(GradParam(gd, uv), int(gd.Params.w));
-    float4 grad = GradColor(gd, gt, min(fwidth(gt), fwidth(frac(gt + 0.5))), GradGeomInterp(it));   // wrap-aware AA (conic/repeat seam)
+    float4 meshCols[8] = { it.Stop0, it.Stop1, it.Stop2, it.Stop3, it.Stop4, it.Stop5, it.Stop6, it.Stop7 };
+    float4 grad = GradColor(gd, meshCols, gt, min(fwidth(gt), fwidth(frac(gt + 0.5))), GradGeomInterp(it));   // wrap-aware AA (conic/repeat seam)
     // MESH (type 4) here too: a mesh brush has NO axis geometry, so without this branch the maths above runs on zeros and
     // walks the stop table with a meaningless parameter. Same branch-free select as the rect pass.
-    float4 mesh = lerp(lerp(gd.Stop0, gd.Stop1, uv.x), lerp(gd.Stop2, gd.Stop3, uv.x), uv.y);
+    float4 mesh = lerp(lerp(it.Stop0, it.Stop1, uv.x), lerp(it.Stop2, it.Stop3, uv.x), uv.y);
     return lerp(grad, mesh, step(3.5, gd.Params.y));
 }
 
