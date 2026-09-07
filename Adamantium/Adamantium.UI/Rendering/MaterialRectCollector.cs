@@ -349,22 +349,22 @@ internal sealed class MaterialRectCollector : SdfBatchCollector<MaterialRectItem
 
     public bool TryAdd(RectanglePayload p, Matrix4x4F world, double opacity, Rect2D scissor, Rect logicalBounds,
         int transformSlot = 0, int fadeSlot = -1, ITexture source = null, int clipSlot = -1)
-        => Add(p.Brush, p.DestinationRect, p.CornerRadius, p.Pen, ShapeRect, opacity, scissor, logicalBounds,
+        => Add(p.Brush, world, p.DestinationRect, p.CornerRadius, p.Pen, ShapeRect, opacity, scissor, logicalBounds,
             transformSlot, fadeSlot, source, clipSlot: clipSlot);
 
     /// <summary>An ELLIPSE filled with a material. Same pass, same record - the shader branches on the shape flag baked
     /// into Params.x, exactly as the pattern batch does it, so no separate collector or pass is needed.</summary>
     public bool TryAddEllipse(EllipsePayload p, Matrix4x4F world, double opacity, Rect2D scissor, Rect logicalBounds,
         int transformSlot = 0, int fadeSlot = -1, ITexture source = null, int clipSlot = -1)
-        => Add(p.Brush, p.DestinationRect, ProceduralGeometry.CornerRadius.Empty, p.Pen, ShapeEllipse, opacity, scissor,
-            logicalBounds, transformSlot, fadeSlot, source, clipSlot: clipSlot);
+        => Add(p.Brush, world, p.DestinationRect, ProceduralGeometry.CornerRadius.Empty, p.Pen, ShapeEllipse, opacity,
+            scissor, logicalBounds, transformSlot, fadeSlot, source, clipSlot: clipSlot);
 
     /// <summary>A regular POLYGON filled with a material. Its corner count and start angle ride in the radii, which is
     /// what the shape function reads for this flag.</summary>
     public bool TryAddPolygon(RegularPolygonPayload p, Matrix4x4F world, double opacity, Rect2D scissor,
         Rect logicalBounds, int transformSlot = 0, int fadeSlot = -1, ITexture source = null, int clipSlot = -1)
-        => Add(p.Brush, p.DestinationRect, ProceduralGeometry.CornerRadius.Empty, p.Pen, ShapePolygon, opacity, scissor,
-            logicalBounds, transformSlot, fadeSlot, source, p.Corners, (float)p.StartAngle, clipSlot);
+        => Add(p.Brush, world, p.DestinationRect, ProceduralGeometry.CornerRadius.Empty, p.Pen, ShapePolygon, opacity,
+            scissor, logicalBounds, transformSlot, fadeSlot, source, p.Corners, (float)p.StartAngle, clipSlot);
 
     // The shape flags, as the shader reads them out of Params.x: a real radius for a rounded rect, and negative values
     // standing for the other figures. The same encoding the pattern batch uses - one convention across the procedural
@@ -380,23 +380,23 @@ internal sealed class MaterialRectCollector : SdfBatchCollector<MaterialRectItem
     /// <see cref="Add"/>, which calls this and then keeps the segment's own state (wallpaper/glass/source).</summary>
     public static bool BakeItem(RectanglePayload p, Matrix4x4F world, double opacity, int transformSlot, int fadeSlot,
         ITexture source, int clipSlot, out MaterialRectItem item)
-        => BakeCore(p.Brush, p.DestinationRect, p.CornerRadius, p.Pen, ShapeRect, opacity, transformSlot, fadeSlot,
+        => BakeCore(p.Brush, world, p.DestinationRect, p.CornerRadius, p.Pen, ShapeRect, opacity, transformSlot, fadeSlot,
             source, 0, 0f, clipSlot, out item);
 
     /// <inheritdoc cref="BakeItem"/>
     public static bool BakeEllipseItem(EllipsePayload p, Matrix4x4F world, double opacity, int transformSlot, int fadeSlot,
         ITexture source, int clipSlot, out MaterialRectItem item)
-        => BakeCore(p.Brush, p.DestinationRect, ProceduralGeometry.CornerRadius.Empty, p.Pen, ShapeEllipse, opacity,
+        => BakeCore(p.Brush, world, p.DestinationRect, ProceduralGeometry.CornerRadius.Empty, p.Pen, ShapeEllipse, opacity,
             transformSlot, fadeSlot, source, 0, 0f, clipSlot, out item);
 
     /// <inheritdoc cref="BakeItem"/>
     public static bool BakePolygonItem(RegularPolygonPayload p, Matrix4x4F world, double opacity, int transformSlot, int fadeSlot,
         ITexture source, int clipSlot, out MaterialRectItem item)
-        => BakeCore(p.Brush, p.DestinationRect, ProceduralGeometry.CornerRadius.Empty, p.Pen, ShapePolygon, opacity,
+        => BakeCore(p.Brush, world, p.DestinationRect, ProceduralGeometry.CornerRadius.Empty, p.Pen, ShapePolygon, opacity,
             transformSlot, fadeSlot, source, p.Corners, (float)p.StartAngle, clipSlot, out item);
 
-    private static bool BakeCore(Brush brush, Rect destination, ProceduralGeometry.CornerRadius corners, Pen pen, float shape,
-        double opacity, int transformSlot, int fadeSlot, ITexture source,
+    private static bool BakeCore(Brush brush, Matrix4x4F world, Rect destination, ProceduralGeometry.CornerRadius corners,
+        Pen pen, float shape, double opacity, int transformSlot, int fadeSlot, ITexture source,
         int polygonCorners, float polygonStart, int clipSlot, out MaterialRectItem item)
     {
         item = default;
@@ -412,10 +412,12 @@ internal sealed class MaterialRectCollector : SdfBatchCollector<MaterialRectItem
             : new Vector4F((float)corners.TopLeft, (float)corners.TopRight,
                 (float)corners.BottomRight, (float)corners.BottomLeft);
 
+        var sx = world.M11; var sy = world.M22; var tx = world.M41; var ty = world.M42;
+
         item = new MaterialRectItem
         {
-            Bounds = new Vector4F((float)destination.X, (float)destination.Y,
-                (float)destination.Width, (float)destination.Height),
+            Bounds = new Vector4F((float)(destination.X * sx + tx), (float)(destination.Y * sy + ty),
+                (float)(destination.Width * sx), (float)(destination.Height * sy)),
             Params = new Vector4F(shape == ShapeRect ? (float)corners.TopLeft : shape,
                 transformSlot, (float)Math.Clamp(opacity * material.Opacity, 0.0, 1.0), fadeSlot),
             Radii = radii,
@@ -440,13 +442,13 @@ internal sealed class MaterialRectCollector : SdfBatchCollector<MaterialRectItem
         return true;
     }
 
-    private bool Add(Brush brush, Rect destination, ProceduralGeometry.CornerRadius corners, Pen pen, float shape,
-        double opacity, Rect2D scissor, Rect logicalBounds, int transformSlot, int fadeSlot, ITexture source,
+    private bool Add(Brush brush, Matrix4x4F world, Rect destination, ProceduralGeometry.CornerRadius corners, Pen pen,
+        float shape, double opacity, Rect2D scissor, Rect logicalBounds, int transformSlot, int fadeSlot, ITexture source,
         int polygonCorners = 0, float polygonStart = 0f, int clipSlot = -1)
     {
         EnsureCpuCapacity(Count + 1);
         if (Count + 1 > GpuCapacity) return false;
-        if (!BakeCore(brush, destination, corners, pen, shape, opacity, transformSlot, fadeSlot, source,
+        if (!BakeCore(brush, world, destination, corners, pen, shape, opacity, transformSlot, fadeSlot, source,
                 polygonCorners, polygonStart, clipSlot, out var item)) return false;
 
         Items[Count++] = item;
@@ -468,6 +470,14 @@ internal sealed class MaterialRectCollector : SdfBatchCollector<MaterialRectItem
     /// at flush. Nothing is written into the instances: the rectangle reaches the shader as a parameter set at draw
     /// time, so a replayed frame gets this segment's own value back through <see cref="BindSegment"/>.</summary>
     public void SetCaptureRect(Rect2D region) => CaptureRegion = region;
+
+    /// <summary>Rewrite an already recorded segment's capture region - what a MOVE needs, since the region is a
+    /// world-space rectangle and a motion node rewrites one matrix and REPLAYS.</summary>
+    public void SetSegmentRegion(int id, Rect2D region)
+    {
+        var index = SegmentIndexOf(id);
+        if ((uint)index < (uint)_segRegion.Count) _segRegion[index] = region;
+    }
 
     /// <summary>Where an author's OWN picture lands, in the frame's device pixels. Element has no entry here on purpose:
     /// it cannot be a rectangle in the frame (every instance has its own, and a rotated shape has none), so the shader

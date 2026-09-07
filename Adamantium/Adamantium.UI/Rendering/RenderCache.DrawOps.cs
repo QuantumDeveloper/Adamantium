@@ -333,7 +333,11 @@ public partial class RenderCache
                     Height = box.Extent.Height + blurMargin * 2
                 }
             }, limit));
-            RecordSegment(13, _materialBatch.Flush(device, fullScissor, _projectionMatrix));
+            var matSegId = _materialBatch.Flush(device, fullScissor, _projectionMatrix);
+            if (matSegId >= 0 && _batchClip != null && NodeOf(_batchClip) is { } matNode)
+                _matSegNode[matSegId] = (matNode, World(matNode));
+            
+            RecordSegment(13, matSegId);
         }
 
         // An INNER band lies inside the shape, so it belongs OVER every fill - drawn under, the shape's own fill covers

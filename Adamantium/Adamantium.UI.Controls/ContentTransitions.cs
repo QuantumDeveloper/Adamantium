@@ -1,5 +1,3 @@
-using System;
-using Adamantium.Mathematics;
 using Adamantium.UI.Controls.Base;
 using Adamantium.UI.Core;
 using Adamantium.UI.Core.Media;
@@ -23,8 +21,6 @@ internal static class ContentTransitions
     public static void Run(ContentTransition direction, double durationSeconds, Size size,
         IUIComponent incoming, IUIComponent outgoing, Action onOutgoingComplete)
     {
-        // Nothing coming in is not nothing happening: content can be on its way (built off the loop thread) while what it
-        // replaces still has to leave. What is leaving leaves either way; only the entrance is skipped.
         if (direction == ContentTransition.None || (incoming == null && outgoing == null))
         {
             onOutgoingComplete?.Invoke();
@@ -35,24 +31,8 @@ internal static class ContentTransitions
         var horizontal = direction is ContentTransition.SlideLeft or ContentTransition.SlideRight;
         var distance = horizontal ? size.Width : size.Height;
 
-        // SlideLeft/SlideUp: new enters from the positive side (right/below); SlideRight/SlideDown mirror it.
         var enterFrom = direction is ContentTransition.SlideLeft or ContentTransition.SlideUp ? distance : -distance;
         var axis = horizontal ? Transform.TranslateXProperty : Transform.TranslateYProperty;
-
-        // A slide is a whole view translating as ONE thing, which is exactly what a render motion node is for: its subtree
-        // rides its transform-table slot, so each frame of the slide costs one matrix instead of re-baking everything
-        // under it, and ResolveScissor stops culling its units - the thing that decides whether content sliding INTO the
-        // viewport has a draw recorded for it at all. Without this the whole scene was re-recorded on every frame of
-        // every tab switch (measured: 261 frames of a 40 s run, ~60 ms each on a 22k-node tab).
-        // Set BEFORE the animation starts, so its very first tick already takes the node route (see Transform.OnChanged),
-        // and NEVER cleared afterwards. The flip itself is the expensive part: a snapshot records whether an element is a
-        // motion node, so changing it is a change the recorded stream cannot survive (StreamSurvives) - the frame walks
-        // the scene. Promoting and demoting around every slide meant paying that twice per switch, to save re-recording
-        // during the slide. Measured on the stand as "moved<LayoutView>", nine of the run's heaviest frames.
-        // Being a motion node is simply a correct way to draw, so a view promoted once stays one and the second and every
-        // later switch flips nothing at all.
-        AsMotionNode(incoming, true);
-        AsMotionNode(outgoing, true);
 
         EnsureRenderTransform(incoming)?.BeginAnimation(axis,
             new DoubleAnimation { From = enterFrom, To = 0, Duration = duration });
@@ -61,18 +41,24 @@ internal static class ContentTransitions
         if (outTransform != null)
             outTransform.BeginAnimation(axis, new DoubleAnimation { From = 0, To = -enterFrom, Duration = duration }, onOutgoingComplete);
         else
-            onOutgoingComplete?.Invoke();   // nothing (or nothing transformable) to slide out - drop it now
+            onOutgoingComplete?.Invoke();
     }
 
-    // Promote the sliding view. The mark is what re-freezes its layout entry: the snapshot records whether an element is
-    // a motion node, and the draw side bakes its subtree node-relative or world-baked accordingly - so a flip nobody
-    // announced would leave the two disagreeing about where everything is. Idempotent, which is the point: a view that
-    // is already one is not touched, and the frame stays cheap.
+    /// <summary>Promotes the two sliding views to render motion nodes, so the slide costs one matrix per frame instead
+    /// of re-baking the subtree under them. Called at adoption, before the content is measured or arranged.</summary>
+    public static void Prepare(IUIComponent incoming, IUIComponent outgoing)
+    {
+        AsMotionNode(incoming, true);
+        AsMotionNode(outgoing, true);
+    }
+
     private static void AsMotionNode(IUIComponent component, bool on)
     {
         if (component is not UIComponent ui || ui.IsRenderMotionNode == on) return;
         ui.IsRenderMotionNode = on;
         RenderDirty.MarkTransform(ui);
+        RenderDirty.MarkStructural(ui);
+        RenderDirty.MarkSubtreeGeometry(ui);
     }
 
     private static Transform EnsureRenderTransform(IUIComponent component)
