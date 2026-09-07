@@ -38,7 +38,6 @@ technique Probe
 {
     pass Only
     {
-        Profile = 6.6;
         VertexShader = ProbeVS;
         PixelShader = ProbePS;
     }

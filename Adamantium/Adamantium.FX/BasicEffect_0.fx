@@ -145,7 +145,6 @@ technique Render
 {
 	pass Textured
 	{
-		Profile = 5.1;
 		VertexShader = TexturedVertexShader;
 		PixelShader = TexturedPixelShader;
 	}
@@ -155,35 +154,30 @@ technique Basic
 {
     pass Default
     {
-        Profile = 5.1;
         VertexShader = Basic_VS;
         PixelShader = BasicColored_PS;
     }
     
     pass Textured
         {
-            Profile = 5.1;
             VertexShader = Basic_VS;
             PixelShader = BasicTextured_PS;
         }
         
     pass Colored
         {
-            Profile = 5.1;
             VertexShader = Basic_VS;
             PixelShader = BasicColored_PS;
         }
         
     pass VertexColored
     {
-        Profile = 5.1;
         VertexShader = Basic_VS;
         PixelShader = BasicVertexColored_PS;
     }
 
     pass Subpixel
     {
-        Profile = 5.1;
         VertexShader = Basic_VS;
         PixelShader = Subpixel_PS;
     }

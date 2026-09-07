@@ -765,7 +765,6 @@ technique Stroke
     {
         // Slang ignores this (targets spirv_1_6); kept non-zero for the parser + SM 6.6 for the DXC fallback.
         EffectName = "StrokeEffect";
-        Profile = 6.6;
         ComputeShader = StrokeExpandCS;
     }
 
@@ -773,7 +772,6 @@ technique Stroke
     pass DashCut
     {
         EffectName = "StrokeEffect";
-        Profile = 6.6;
         ComputeShader = StrokeDashCutCS;
     }
 
@@ -781,7 +779,6 @@ technique Stroke
     pass Draw
     {
         EffectName = "StrokeEffect";
-        Profile = 6.6;
         VertexShader = StrokeVS;
         PixelShader = StrokePS;
     }
@@ -790,7 +787,6 @@ technique Stroke
     pass UnionDepth
     {
         EffectName = "StrokeEffect";
-        Profile = 6.6;
         VertexShader = StrokeVS;
         PixelShader = StrokeUnionDepthPS;
     }
@@ -798,7 +794,6 @@ technique Stroke
     pass UnionDraw
     {
         EffectName = "StrokeEffect";
-        Profile = 6.6;
         VertexShader = StrokeVS;
         PixelShader = StrokeUnionDrawPS;
     }

@@ -30,7 +30,6 @@ technique IndirectDraw
     pass Run
     {
         EffectName = "IndirectDraw";
-        Profile = 6.6;
         ComputeShader = IndirectDrawCS;
     }
 }

@@ -63,7 +63,6 @@ technique StrokeExpand
     {
         // Slang ignores this (targets spirv_1_6); kept non-zero for the parser + SM 6.6 for the DXC fallback.
         EffectName = "StrokeExpand";
-        Profile = 6.6;
         ComputeShader = StrokeExpandCS;
     }
 }
