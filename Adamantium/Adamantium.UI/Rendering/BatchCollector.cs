@@ -99,6 +99,8 @@ internal abstract class BatchCollector<TItem> : BatchArena where TItem : struct
     /// <summary>Where a segment currently sits in draw order, or -1 if this id is not part of the recorded frame.</summary>
     private int IndexOf(int id) => _indexById.TryGetValue(id, out var index) ? index : -1;
 
+    protected int SegmentIndexOf(int id) => IndexOf(id);
+
     /// <summary>Same, for a derived collector that keeps per-segment state of its own (the text sheet).</summary>
     protected int IndexOfSegment(int id) => IndexOf(id);
 

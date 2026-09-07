@@ -227,6 +227,7 @@ public class ContentPresenter : InputUIComponent
         // The slide distance is the laid-out size, so defer starting it to the next arrange (size known there). If a
         // transition was expected but produced no new root, drop the kept-alive outgoing content now.
         _transitionPending = animate && (_currentRoot != null || _outgoingRoot != null);
+        if (_transitionPending) ContentTransitions.Prepare(_currentRoot, _outgoingRoot);
         if (animate && !_transitionPending)
             RemoveOutgoing();
 

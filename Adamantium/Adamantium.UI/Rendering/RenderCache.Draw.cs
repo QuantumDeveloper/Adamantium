@@ -60,6 +60,7 @@ public partial class RenderCache
     // SDF family: shapes whose fill is a BACKDROP MATERIAL - acrylic, mica, liquid glass. Created on the first one, and
     // flushed LAST of the fills, because it reads the frame that the others have already drawn.
     private MaterialRectCollector _materialBatch;
+    private readonly Dictionary<int, (IUIComponent Node, Matrix4x4F World)> _matSegNode = new();
     private FractalRectCollector _fractalBatch;   // SDF family: rounded rects with an escape-time FRACTAL fill (Julia/Mandelbrot)
     private TextureBatchCollector _texRectBatch;   // SDF family: rounded rects whose fill is SAMPLED from a texture (ImageBrush / NineSliceBrush)
     // The soft band (aura / shadow) in its TWO paint positions. An OUTER band goes under every fill; an INNER one over
@@ -1861,6 +1862,23 @@ public partial class RenderCache
     // cost the whole frame a re-record. Derive them again instead: each names the component its rect came from, and
     // CumulativeClip answers from the (already updated) frozen snapshot. There are tens of these ops in a frame against
     // tens of thousands of nodes in the scene, so this is the cheap end of the trade by three orders of magnitude.
+    private void RefreshMaterialCaptureRegion(int segId, Rect2D limit, Rect2D fullScissor)
+    {
+        if (_materialBatch == null || !_matSegNode.TryGetValue(segId, out var recorded)) return;
+
+        var now = World(recorded.Node);
+        var dx = now.M41 - recorded.World.M41;
+        var dy = now.M42 - recorded.World.M42;
+        if (dx == 0 && dy == 0) return;
+
+        var bounds = _materialBatch.SegmentBounds(segId);
+        if (bounds.IsEmpty) return;
+
+        _materialBatch.SetSegmentRegion(segId,
+            MaterialCaptureRegion(new Rect(bounds.X + dx, bounds.Y + dy, bounds.Width, bounds.Height), limit, fullScissor));
+        _matSegNode[segId] = (recorded.Node, now);
+    }
+
     private void RefreshMovedScissors(Rect2D fullScissor)
     {
         // An ORDINARY mover carries viewports past too - a whole view sliding into place takes its scroll area with it -
@@ -1886,6 +1904,7 @@ public partial class RenderCache
                     break;
                 case RenderOpKind.Segment:
                     ArenaOf(op.Batch)?.SetSegmentScissor(op.SegId, rect);
+                    if (op.Batch == 13) RefreshMaterialCaptureRegion(op.SegId, rect, fullScissor);
                     break;
                 case RenderOpKind.InstancedFlush:
                     _instancedFill?.SetFlushScissor(op.SegId, rect);
