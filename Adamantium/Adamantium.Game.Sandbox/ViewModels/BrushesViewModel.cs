@@ -1,7 +1,6 @@
 using System;
 using Adamantium.Mathematics;
 using Adamantium.Navigation;
-using Adamantium.ProceduralGeometry;
 using Adamantium.MVVM;
 using Adamantium.UI.Core;
 using Adamantium.UI.Core.Collections;
@@ -17,13 +16,14 @@ namespace Adamantium.Game.Sandbox.ViewModels;
 [ViewModel]
 public partial class BrushesViewModel : TabPageViewModel
 {
-    /// <summary>The region the stands are navigated into. One view at a time, and the previous one is dropped rather
-    /// than left hidden - which is the whole reason the stands are separate views instead of collapsed panels.</summary>
-    public IRegion Region { get; }
+    // The stands are navigated into a region the VIEW declares (nav:RegionManager.RegionName) and this addresses by
+    // NAME - see RegionNames.BrushStand, which both sides quote. A view-model holding the IRegion itself would be
+    // holding a piece of the view's layout.
+    private readonly IRegionManager _regions;
 
-    public BrushesViewModel(INavigationService navigation) : base("Brushes")
+    public BrushesViewModel(IRegionManager regions) : base("Brushes")
     {
-        Region = navigation.Regions.CreateRegion();
+        _regions = regions;
         ShowStand(_liveStand);
 
         // The three gradients start from the same field values the controls show, so the stand opens describing itself
@@ -490,8 +490,11 @@ public partial class BrushesViewModel : TabPageViewModel
     // THIS object, shown through the stand's view. Navigating by TYPE would send the region to the container for a
     // BrushesViewModel - and the first of these runs inside this very constructor, where asking for it either recurses
     // or hands back a second copy. That is why the first stand never appeared until a button was pressed.
+    //
+    // GetOrCreate, not a lookup: this runs before the view exists, so the first call is what brings the named region
+    // into being and the ContentControl binds to that same one when it attaches.
     private void ShowStand(LiveStand stand)
-        => _ = Region?.NavigateToInstanceAsync(this, stand.ToString());
+        => _ = _regions.GetOrCreateRegion(RegionNames.BrushStand).NavigateToInstanceAsync(this, stand.ToString());
 
     /// <summary>Every stand, in declaration order - the source for the selector row.</summary>
     public LiveStand[] LiveStands { get; } = Enum.GetValues<LiveStand>();

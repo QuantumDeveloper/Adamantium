@@ -10,13 +10,20 @@ public sealed class ContentControlRegionAdapter : IRegionAdapter
 {
     private readonly IViewLocator _viewLocator;
 
-    // What is currently shown, so leaving it can park it. Read off the ContentControl instead and a transition that has
-    // not finished swapping would hand back the wrong one.
-    private object _currentViewModel;
+    /// <summary>What one HOST is currently showing. Per host, not per adapter: RegionAdapterMappings hands out a single
+    /// adapter INSTANCE for a control type, so every ContentControl region in the app shares this object. Keeping "what
+    /// is shown" in its fields meant two such regions overwrote each other's answer, and each then decided a navigation
+    /// was "already shown" and drew nothing - which is what a second ContentControl region turned up the moment one
+    /// existed.</summary>
+    private sealed class Shown
+    {
+        // Read off the ContentControl instead and a transition that has not finished swapping hands back the wrong one.
+        public object ViewModel;
 
-    // ...and WHICH VIEW of it. One view-model can be read through several views, and then this is the only thing that
-    // changes between two navigations - comparing the model alone would call every one of them "already shown".
-    private string _currentViewKey;
+        // ...and WHICH VIEW of it. One view-model can be read through several views, and then this is the only thing
+        // that changes between two navigations - comparing the model alone would call every one of them "already shown".
+        public string ViewKey;
+    }
 
     public ContentControlRegionAdapter(IViewLocator viewLocator)
     {
@@ -27,30 +34,31 @@ public sealed class ContentControlRegionAdapter : IRegionAdapter
     {
         if (host is not ContentControl content) return;
         region.SingleActiveView = true;
+        var shown = new Shown();
         region.PropertyChanged += (sender, e) =>
         {
-            if (e.PropertyName is nameof(IRegion.CurrentViewModel) or nameof(IRegion.CurrentViewKey)) Render(region, content);
+            if (e.PropertyName is nameof(IRegion.CurrentViewModel) or nameof(IRegion.CurrentViewKey)) Render(region, content, shown);
         };
-        Render(region, content);
+        Render(region, content, shown);
     }
 
-    private void Render(IRegion region, ContentControl content)
+    private void Render(IRegion region, ContentControl content, Shown shown)
     {
         var viewModel = region.CurrentViewModel;
         var viewKey = region.CurrentViewKey;
-        if (ReferenceEquals(viewModel, _currentViewModel) && string.Equals(viewKey, _currentViewKey, StringComparison.Ordinal)) return;
+        if (ReferenceEquals(viewModel, shown.ViewModel) && string.Equals(viewKey, shown.ViewKey, StringComparison.Ordinal)) return;
 
         // Leaving: a view that asked to be kept is handed to the framework's store, which parks it - so the detach that
         // follows reads as "coming back" and the renderer keeps what it built. Anything else is dropped, as before. The
         // view here is the CONTENT itself (a resolved view element), so the presenter cannot keep it for us - whoever
         // supplied it has to.
-        if (_currentViewModel != null && content.Content is IUIComponent leaving && ParkedVisuals.ShouldKeep(leaving))
+        if (shown.ViewModel != null && content.Content is IUIComponent leaving && ParkedVisuals.ShouldKeep(leaving))
         {
-            ParkedVisuals.Keep(content, ParkKey(_currentViewModel, _currentViewKey), leaving);
+            ParkedVisuals.Keep(content, ParkKey(shown.ViewModel, shown.ViewKey), leaving);
         }
 
-        _currentViewModel = viewModel;
-        _currentViewKey = viewKey;
+        shown.ViewModel = viewModel;
+        shown.ViewKey = viewKey;
         if (viewModel == null)
         {
             content.Content = null;

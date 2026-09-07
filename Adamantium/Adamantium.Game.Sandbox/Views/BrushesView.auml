@@ -1,7 +1,8 @@
 <View xmlns="http://adamantium/ui"
       xmlns:x="http://adamantium/ui/xaml/extensions"
       xmlns:conv="clr-namespace:Adamantium.Game.Sandbox.Converters"
-      xmlns:nav="clr-namespace:Adamantium.UI.Controls.Navigation;assembly=Adamantium.UI.Controls">
+      xmlns:nav="clr-namespace:Adamantium.UI.Controls.Navigation;assembly=Adamantium.UI.Controls"
+      xmlns:local="clr-namespace:Adamantium.Game.Sandbox">
     <!-- DataContext is the BrushesViewModel. Every gradient below is authored in AUML (element syntax:
          <Shape.Fill><LinearGradientBrush><GradientStop/>...) - proving gradients are fully markup-authorable, on any
          element, and batched by the SDF gradient batches. -->
@@ -52,13 +53,7 @@
             <!-- THE STAND ITSELF. Each one is its own view over this same view-model, navigated in by key - so leaving a
                  stand drops its markup instead of leaving it built and hidden, and the shared figure and slot survive
                  the switch because the object behind them never changed. -->
-            <!-- KNOWN DEFECT, left ON so it stays visible: with the transition running, the MATERIAL stand draws from
-                 the presenter's origin instead of its own laid-out position - its header ends up underneath its own
-                 preview box. Turning ContentTransition off puts it right, which is how it was pinned to the transition
-                 rather than to the markup. The lead is in ContentTransitions.Run: a sliding view is promoted to a motion
-                 node and never demoted, and that promotion changes how its subtree is baked - node-relative rather than
-                 world-baked. It shows on the material because that stand is the largest; the smaller ones hide it. -->
-            <ContentControl nav:Region.Source="{Binding Region}" ContentTransition="SlideLeft"/>
+            <ContentControl nav:RegionManager.RegionName="{x:Static local:RegionNames.BrushStand}" ContentTransition="SlideLeft"/>
 
 
             <!-- BACKDROP MATERIALS, live. Unlike every other brush here, these have nothing of their own to show: they
