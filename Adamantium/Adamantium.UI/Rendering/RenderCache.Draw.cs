@@ -1874,9 +1874,10 @@ public partial class RenderCache
         var bounds = _materialBatch.SegmentBounds(segId);
         if (bounds.IsEmpty) return;
 
+        // Measured from the FLUSH, never from the previous frame: the footprint below is the one the segment recorded and
+        // does not move, so a per-frame increment would carry it by one step instead of the whole displacement.
         _materialBatch.SetSegmentRegion(segId,
             MaterialCaptureRegion(new Rect(bounds.X + dx, bounds.Y + dy, bounds.Width, bounds.Height), limit, fullScissor));
-        _matSegNode[segId] = (recorded.Node, now);
     }
 
     private void RefreshMovedScissors(Rect2D fullScissor)
