@@ -72,4 +72,9 @@
         </PropertyTrigger>
     </Style>
 
+    <!-- The same control wearing the toggle button's clothes: `<RadioButton Classes="Toggle"/>`. See the macOS set for
+         why a row that is one choice wants this rather than ToggleButtons. Last in the file: at equal type specificity
+         document order decides, so it must follow the plain RadioButton styles it replaces. -->
+    <Style Selector="RadioButton.Toggle" BasedOn="ToggleButton"/>
+
 </StyleSet>
