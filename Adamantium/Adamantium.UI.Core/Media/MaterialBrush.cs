@@ -97,12 +97,6 @@ public sealed class MaterialBrush : Brush
     public static readonly AdamantiumProperty RoughnessProperty = AdamantiumProperty.Register(nameof(Roughness),
         typeof(double), typeof(MaterialBrush), new PropertyMetadata(0.08, PropertyMetadataOptions.AffectsPaint));
 
-    /// <summary>How far the highlight is STRETCHED along the grain, 0..1. Zero is an isotropic surface (cast, or
-    /// polished); high is the long smear a brushed finish drags across its grinding, which is the whole look of
-    /// stainless steel. Metal only.</summary>
-    public static readonly AdamantiumProperty AnisotropyProperty = AdamantiumProperty.Register(nameof(Anisotropy),
-        typeof(double), typeof(MaterialBrush), new PropertyMetadata(0.7, PropertyMetadataOptions.AffectsPaint));
-
     /// <summary>The metal itself, as the colour it reflects at face-on incidence (F0). Grey is steel and aluminium;
     /// warm yellows are gold and brass; pink-orange is copper. Metal only.</summary>
     public static readonly AdamantiumProperty MetalColorProperty = AdamantiumProperty.Register(nameof(MetalColor),
@@ -225,12 +219,6 @@ public sealed class MaterialBrush : Brush
         set => SetValue(RoughnessProperty, value);
     }
 
-    public double Anisotropy
-    {
-        get => GetValue<double>(AnisotropyProperty);
-        set => SetValue(AnisotropyProperty, value);
-    }
-
     public Color MetalColor
     {
         get => GetValue<Color>(MetalColorProperty);
@@ -332,7 +320,6 @@ public sealed class MaterialBrush : Brush
             GrainScale = GrainScale,
             GrainDirection = GrainDirection,
             Roughness = Roughness,
-            Anisotropy = Anisotropy,
             LightAngle = LightAngle,
             LightElevation = LightElevation,
             Opacity = Opacity   // the frozen snapshot paints at the same strength the live brush did
