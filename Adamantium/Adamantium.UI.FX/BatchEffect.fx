@@ -689,10 +689,10 @@ struct HaloLivingData
     float4 Radii;        // corner radii: x = TL, y = TR, z = BR, w = BL
     float4 Band;      // .z spread, .w softness - slot units
     float4 Field;     // .x field range, .y turbulence, .z flow, .w detail
-    float4 Color;     // used when the palette is empty
+    uint8_t4 Color;   // used when the palette is empty - straight RGBA in four bytes
     float4 Ramp;      // .x = valid palette stops; .y = the ROUNDED CLIP's slot, or -1; .zw spare
-    float4 Stop0; float4 Stop1; float4 Stop2; float4 Stop3;
-    float4 Stop4; float4 Stop5; float4 Stop6; float4 Stop7;
+    uint8_t4 Stop0; uint8_t4 Stop1; uint8_t4 Stop2; uint8_t4 Stop3;   // the palette, four bytes each
+    uint8_t4 Stop4; uint8_t4 Stop5; uint8_t4 Stop6; uint8_t4 Stop7;
     float4 Offsets0; float4 Offsets1;
 };
 
@@ -733,7 +733,12 @@ HaloPSInput HaloLivingVS(uint vertexId : SV_VertexID, uint instanceId : SV_Insta
 float4 LivingPalette(HaloLivingData it, float t)
 {
     float count = it.Ramp.x;
-    float4 colours[8] = { it.Stop0, it.Stop1, it.Stop2, it.Stop3, it.Stop4, it.Stop5, it.Stop6, it.Stop7 };
+    // Unpacked HERE rather than through a shared helper: the same arithmetic wrapped in a function is what three of
+    // this effect's stages answer with a device loss (see the halo rect's own unpack below and BrushEffect's notes).
+    float4 colours[8] = { float4(it.Stop0) * (1.0 / 255.0), float4(it.Stop1) * (1.0 / 255.0),
+                          float4(it.Stop2) * (1.0 / 255.0), float4(it.Stop3) * (1.0 / 255.0),
+                          float4(it.Stop4) * (1.0 / 255.0), float4(it.Stop5) * (1.0 / 255.0),
+                          float4(it.Stop6) * (1.0 / 255.0), float4(it.Stop7) * (1.0 / 255.0) };
     float offsets[8] = { it.Offsets0.x, it.Offsets0.y, it.Offsets0.z, it.Offsets0.w,
                          it.Offsets1.x, it.Offsets1.y, it.Offsets1.z, it.Offsets1.w };
 
@@ -800,7 +805,7 @@ float4 HaloLivingPS(HaloPSInput input) : SV_Target
     // brightness - the far end always lands where the band has already faded - so one colour is never really seen.
     // Decorrelated, the hues travel across the band independently of how far it happens to be reaching.
     float hue = SimplexNoise(ring * 0.8 + float2(-t * 0.35, t * 0.9)) * 0.5 + 0.5;
-    float4 colour = lerp(it.Color, LivingPalette(it, saturate(hue)), step(1.5, it.Ramp.x));
+    float4 colour = lerp(float4(it.Color) * (1.0 / 255.0), LivingPalette(it, saturate(hue)), step(1.5, it.Ramp.x));
     colour.a *= saturate(a) * input.Fade * ClipCoverage(input.Position.xy, input.ClipBox, input.ClipRadii);
     return colour;
 }

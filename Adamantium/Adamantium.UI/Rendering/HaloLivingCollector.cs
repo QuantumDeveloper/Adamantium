@@ -127,7 +127,7 @@ internal sealed class HaloLivingCollector : ShapeSdfCollector<HaloLivingItem>
             Radii = radii,
             Band = new Vector4F(0, 0, band.Spread * iso, band.Softness * iso),
             Field = new Vector4F((float)fieldRange * iso, band.Turbulence, band.Flow, band.Detail),
-            Color = colour,
+            Color = new Color(colour),
             // .y = the rounded clip's slot, .z = the opacity slot (-1 = none for either) - Field is full here, so both
             // ride in the ramp's spare components.
             Ramp = new Vector4F(band.StopCount, clipSlot, fadeSlot, 0)
@@ -135,8 +135,8 @@ internal sealed class HaloLivingCollector : ShapeSdfCollector<HaloLivingItem>
 
         if (band.Palette is { Length: >= 8 } p && band.Offsets is { Length: >= 8 } o)
         {
-            item.Stop0 = p[0]; item.Stop1 = p[1]; item.Stop2 = p[2]; item.Stop3 = p[3];
-            item.Stop4 = p[4]; item.Stop5 = p[5]; item.Stop6 = p[6]; item.Stop7 = p[7];
+            item.Stop0 = new Color(p[0]); item.Stop1 = new Color(p[1]); item.Stop2 = new Color(p[2]); item.Stop3 = new Color(p[3]);
+            item.Stop4 = new Color(p[4]); item.Stop5 = new Color(p[5]); item.Stop6 = new Color(p[6]); item.Stop7 = new Color(p[7]);
             item.Offsets0 = new Vector4F(o[0], o[1], o[2], o[3]);
             item.Offsets1 = new Vector4F(o[4], o[5], o[6], o[7]);
         }

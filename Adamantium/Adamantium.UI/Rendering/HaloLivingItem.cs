@@ -29,20 +29,22 @@ public struct HaloLivingItem
     /// .w = detail.</summary>
     public Vector4F Field;
 
-    /// <summary>The aura's own colour, used when the palette is empty.</summary>
-    public Vector4F Color;
+    /// <summary>The aura's own colour, used when the palette is empty. Straight (non-premultiplied) RGBA with the
+    /// element's opacity folded into the alpha - four BYTES, read by the shader as a <c>uint8_t4</c>.</summary>
+    public Color Color;
 
     /// <summary>.x = how many palette stops are valid; 0 = use <see cref="Color"/>.</summary>
     public Vector4F Ramp;
 
-    public Vector4F Stop0;
-    public Vector4F Stop1;
-    public Vector4F Stop2;
-    public Vector4F Stop3;
-    public Vector4F Stop4;
-    public Vector4F Stop5;
-    public Vector4F Stop6;
-    public Vector4F Stop7;
+    /// <summary>The palette, straight RGBA in four bytes each, as <see cref="Color"/> above.</summary>
+    public Color Stop0;
+    public Color Stop1;
+    public Color Stop2;
+    public Color Stop3;
+    public Color Stop4;
+    public Color Stop5;
+    public Color Stop6;
+    public Color Stop7;
 
     public Vector4F Offsets0;
     public Vector4F Offsets1;
