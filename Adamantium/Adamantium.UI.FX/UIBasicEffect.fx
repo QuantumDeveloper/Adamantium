@@ -115,28 +115,24 @@ technique Basic
 {
 	pass SolidColor
 	{
-		Profile = 5.1;
 		VertexShader = UIVertexShader;
 		PixelShader = SolidColor_PS;
 	}
 
 	pass Textured
 	{
-		Profile = 5.1;
 		VertexShader = UIVertexShader;
 		PixelShader = Textured_PS;
 	}
 
 	pass TexturedFill
 	{
-		Profile = 5.1;
 		VertexShader = TexturedFillVS;
 		PixelShader = TexturedFill_PS;
 	}
 
 	pass TexturedArray
 	{
-		Profile = 5.1;
 		VertexShader = UIVertexShader;
 		PixelShader = TexturedArray_PS;
 	}

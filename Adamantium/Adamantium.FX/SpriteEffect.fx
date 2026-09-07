@@ -91,7 +91,6 @@ technique SpriteBatch
     pass Render
     {
         EffectName = "SpriteEffect";
-        Profile = 5.1;
         VertexShader = SpriteVertexShader;
         PixelShader = SpritePixelShader;
     }

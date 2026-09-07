@@ -115,7 +115,6 @@ technique DashCut
     pass Run
     {
         EffectName = "DashCut";
-        Profile = 6.6;
         ComputeShader = DashCutCS;
     }
 }

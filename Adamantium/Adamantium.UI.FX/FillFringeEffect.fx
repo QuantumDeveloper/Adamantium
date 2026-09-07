@@ -137,7 +137,6 @@ technique FillFringe
     pass Draw
     {
         EffectName = "FillFringeEffect";
-        Profile = 6.6;
         VertexShader = FillFringeVS;
         PixelShader = FillFringePS;
     }

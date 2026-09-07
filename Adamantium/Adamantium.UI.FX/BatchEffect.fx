@@ -822,7 +822,6 @@ technique Batch
     // SDF rounded-rect fills - per-instance RectData from a BDA storage buffer by SV_InstanceID; quad from SV_VertexID.
     pass Rect
     {
-        Profile = 6.6;
         VertexShader = RectBatchInstancedVS;
         PixelShader = RectBatchPS;
     }
@@ -830,7 +829,6 @@ technique Batch
     // General geometry instancing - a shared local mesh drawn N times, per-instance world+colour from a BDA buffer.
     pass Fill
     {
-        Profile = 6.6;
         VertexShader = InstancedFillVS;
         PixelShader = InstancedFillPS;
     }
@@ -838,7 +836,6 @@ technique Batch
     // The analytic-AA fringe of those same instances: one shared scale-free ring, the same instance buffer, one draw.
     pass Fringe
     {
-        Profile = 6.6;
         VertexShader = InstancedFringeVS;
         PixelShader = InstancedFringePS;
     }
@@ -846,14 +843,12 @@ technique Batch
     // The flat ring of the PATTERN/NOISE instances - their fill is a brush (BrushEffect), their ring is not.
     pass PatternFringe
     {
-        Profile = 6.6;
         VertexShader = InstancedPatternFringeVS;
         PixelShader = InstancedFringePS;
     }
 
     pass Halo
     {
-        Profile = 5.1;
         VertexShader = HaloRectInstancedVS;
         PixelShader = HaloRectPS;
     }
@@ -862,7 +857,6 @@ technique Batch
     // the plain Halo pass so a still band pays nothing for the noise.
     pass HaloLiving
     {
-        Profile = 5.1;
         VertexShader = HaloLivingVS;
         PixelShader = HaloLivingPS;
     }
@@ -870,7 +864,6 @@ technique Batch
     // SDF ellipse/circle fills - per-instance EllipseData from a BDA storage buffer by SV_InstanceID; quad from SV_VertexID.
     pass Ellipse
     {
-        Profile = 6.6;
         VertexShader = EllipseBatchInstancedVS;
         PixelShader = EllipseBatchPS;
     }
@@ -878,7 +871,6 @@ technique Batch
     // Regular polygons - a triangle and a circle differ by one number, the corner count.
     pass Polygon
     {
-        Profile = 6.6;
         VertexShader = PolygonBatchInstancedVS;
         PixelShader = PolygonBatchPS;
     }

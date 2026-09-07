@@ -71,21 +71,18 @@ technique Render
 {
 	pass Debug
 	{
-		Profile = 5.1;
 		VertexShader = LightVertexShader;
 		PixelShader = LightPixelShader;
 	}
 
 	pass SolidColor
 	{
-		Profile = 5.1;
 		VertexShader = TexturedVertexShader;
 		PixelShader = SolidColorPixelShader;
 	}
 
 	pass Textured
 	{
-		Profile = 5.1;
 		VertexShader = TexturedVertexShader;
 		PixelShader = TexturedPixelShader;
 	}

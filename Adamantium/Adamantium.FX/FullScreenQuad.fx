@@ -20,13 +20,11 @@ technique ScreenQuad
 {
    pass Quad
    {
-      Profile = 5.1;
       VertexShader = VS;
    }
 
    pass QuadPS
    {
-      Profile = 5.1;
       VertexShader = VS;
       PixelShader = PS;
    }

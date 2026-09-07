@@ -984,70 +984,60 @@ technique Material
 {
     pass FrostedSdf
     {
-        Profile = 6.6;
         VertexShader = MaterialRectInstancedVS;
         PixelShader = MaterialFrostedPS;
     }
 
     pass GlassSdf
     {
-        Profile = 6.6;
         VertexShader = MaterialRectInstancedVS;
         PixelShader = MaterialGlassPS;
     }
 
     pass FrostedMesh
     {
-        Profile = 6.6;
         VertexShader = MaterialFillVS;
         PixelShader = MaterialFrostedMeshPS;
     }
 
     pass GlassMesh
     {
-        Profile = 6.6;
         VertexShader = MaterialFillVS;
         PixelShader = MaterialGlassMeshPS;
     }
 
     pass SheenSdf
     {
-        Profile = 6.6;
         VertexShader = MaterialRectInstancedVS;
         PixelShader = MaterialSheenPS;
     }
 
     pass SheenMesh
     {
-        Profile = 6.6;
         VertexShader = MaterialFillVS;
         PixelShader = MaterialSheenMeshPS;
     }
 
     pass MetalSdf
     {
-        Profile = 6.6;
         VertexShader = MaterialRectInstancedVS;
         PixelShader = MaterialMetalPS;
     }
 
     pass MetalMesh
     {
-        Profile = 6.6;
         VertexShader = MaterialFillVS;
         PixelShader = MaterialMetalMeshPS;
     }
 
     pass WoodSdf
     {
-        Profile = 6.6;
         VertexShader = MaterialRectInstancedVS;
         PixelShader = MaterialWoodPS;
     }
 
     pass WoodMesh
     {
-        Profile = 6.6;
         VertexShader = MaterialFillVS;
         PixelShader = MaterialWoodMeshPS;
     }

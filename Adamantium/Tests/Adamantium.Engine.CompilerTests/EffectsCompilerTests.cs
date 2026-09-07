@@ -138,7 +138,7 @@ namespace Adamantium.Engine.CompilerTests
             includeLine + @"
 float4 VS(float4 p : POSITION) : SV_Position { return p; }
 float4 PS(float4 p : SV_Position) : SV_Target0 { return Tint(float4(1, 1, 1, 1)); }
-technique T { pass P { Profile = 6.6; VertexShader = VS; PixelShader = PS; } }
+technique T { pass P { VertexShader = VS; PixelShader = PS; } }
 ";
 
         /// <summary>The baseline for the test below: a REAL #include is expanded, so the function it defines resolves.</summary>

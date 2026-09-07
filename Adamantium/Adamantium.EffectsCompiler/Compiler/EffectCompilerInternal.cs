@@ -49,7 +49,9 @@ namespace Adamantium.EffectsCompiler
         private string preprocessorText;
         private EffectData.Technique technique;
         private int nextSubPassCount;
-        private float profile;
+        // The SPIR-V profile THIS pass asked for, or null when it named none - then the newest is used. Reset per pass:
+        // a Profile is a statement inside one pass and must not leak into the next, which is what a plain field did.
+        private string passSpirvProfile;
         private List<ResourceBindingKey> resourceKeys = new List<ResourceBindingKey>();
 
         //private StreamOutputElement[] currentStreamOutputElements;
@@ -274,6 +276,7 @@ namespace Adamantium.EffectsCompiler
         private void HandlePass(Ast.Pass passAst)
         {
             resourceKeys.Clear();
+            passSpirvProfile = null;
             SetupPass(passAst.Name, passAst.Span);
 
             if (nextSubPassCount > 0)
@@ -817,28 +820,41 @@ namespace Adamantium.EffectsCompiler
             }
         }
 
+        /// <summary>A pass's <c>Profile</c> - the SPIR-V version its shaders are compiled to, e.g. <c>Profile = 1.4</c>.
+        /// A pass that names none takes the newest the compiler supports.</summary>
         private void HandleProfile(Ast.Expression expression)
         {
-            if (expression is Ast.IdentifierExpression identifierExpression)
+            // INVARIANT all the way: the literal's value arrives as a number, and ToString() on a comma-decimal locale
+            // renders 1.4 as "1,4", which no invariant parse accepts. The same trap the markup numbers fell into.
+            var text = expression switch
             {
-                profile = Convert.ToSingle(identifierExpression.Name.Text, CultureInfo.InvariantCulture);
-            }
-            else if (expression is Ast.LiteralExpression)
-            {
-                var literalValue = ((Ast.LiteralExpression)expression).Value.Value.ToString();
-                try
-                {
-                    profile = Convert.ToSingle(literalValue);
-                }
-                catch (Exception)
-                {
-                    // ignored
-                }
+                Ast.IdentifierExpression identifier => identifier.Name.Text,
+                Ast.LiteralExpression literal => Convert.ToString(literal.Value.Value, CultureInfo.InvariantCulture),
+                _ => null
+            };
 
-                if (string.IsNullOrEmpty(literalValue))
-                    logger.Error("Unexpected assignment for [Profile] attribute: expecting only [identifier (fx_4_0, fx_4_1... etc.), or number (9.3, 10.0, 11.0... etc.)]", expression.Span);
+            if (!float.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out var version))
+            {
+                logger.Error("Unexpected assignment for [Profile] attribute: expecting a SPIR-V version number ({0})",
+                    expression.Span, string.Join(", ", SupportedProfileVersions()));
+                return;
             }
+
+            // Named, so it must be a version this compiler can actually target. Anything else is an error and not a
+            // fallback: a number that silently means nothing is the whole reason this attribute was rewritten.
+            var name = "spirv_" + version.ToString("0.0", CultureInfo.InvariantCulture).Replace('.', '_');
+            if (!SlangShaderCompiler.SpirvProfiles.Contains(name))
+            {
+                logger.Error("Unsupported [Profile] {0}: this compiler targets SPIR-V {1}",
+                    expression.Span, text, string.Join(", ", SupportedProfileVersions()));
+                return;
+            }
+
+            passSpirvProfile = name;
         }
+
+        private static IEnumerable<string> SupportedProfileVersions() =>
+            SlangShaderCompiler.SpirvProfiles.Select(p => p.Replace("spirv_", string.Empty).Replace('_', '.'));
 
         private string ExtractShaderName(EffectShaderType effectShaderType, Ast.Expression expression)
         {
@@ -986,7 +1002,8 @@ namespace Adamantium.EffectsCompiler
 
             try
             {
-                return slangCompiler.Compile(slangSource, entryPoint, shaderKind, ResolveSlangInclude);
+                return slangCompiler.Compile(slangSource, entryPoint, shaderKind,
+                    passSpirvProfile ?? SlangShaderCompiler.LatestSpirvProfile, ResolveSlangInclude);
             }
             catch (Exception ex)
             {
@@ -1102,7 +1119,7 @@ namespace Adamantium.EffectsCompiler
             {
                 Name = shaderName,
                 EntryPoint = entryPoint,
-                Level = GetShaderModelFromProfile(profile),
+                Level = passSpirvProfile ?? SlangShaderCompiler.LatestSpirvProfile,
                 Bytecode = compilationResult.Bytecode,
                 Hashcode = Utilities.ComputeHashFNV1Modified(compilationResult.Bytecode),
                 Type = type,
@@ -1118,11 +1135,6 @@ namespace Adamantium.EffectsCompiler
             }
 
             return shader;
-        }
-
-        private string GetShaderModelFromProfile(float profile)
-        {
-            return profile.ToString(CultureInfo.InvariantCulture).Replace('.', '_');
         }
 
         private void ProcessShaderData(EffectShaderType type, ShaderCompilationResult bytecode, EffectData.Shader shader)

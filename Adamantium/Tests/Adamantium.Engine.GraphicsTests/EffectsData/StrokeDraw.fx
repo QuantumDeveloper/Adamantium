@@ -28,7 +28,6 @@ technique StrokeDraw
     pass Run
     {
         EffectName = "StrokeDraw";
-        Profile = 6.6;
         VertexShader = StrokeVS;
         PixelShader = StrokePS;
     }

@@ -104,7 +104,6 @@ technique FontBatch
     pass Render
     {
         EffectName = "FontEffect";
-        Profile = 5.1;
         VertexShader = FontVertexShader;
         GeometryShader = FontItemGenerationGS;
         PixelShader = FontPixelShader;

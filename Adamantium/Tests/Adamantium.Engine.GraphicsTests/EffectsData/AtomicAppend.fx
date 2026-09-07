@@ -27,7 +27,6 @@ technique AtomicAppend
     pass Run
     {
         EffectName = "AtomicAppend";
-        Profile = 6.6;
         ComputeShader = AtomicAppendCS;
     }
 }

@@ -14,15 +14,25 @@ namespace Adamantium.EffectsCompiler.Compiler
     /// </summary>
     internal sealed class SlangShaderCompiler : IDisposable
     {
-        // The Vulkan environment the engine's pipelines are created for.
-        private const string SpirvProfile = "spirv_1_6";
+        /// <summary>The SPIR-V versions a pass may ask for by <c>Profile</c>, newest last. The last is what a pass that
+        /// names none is compiled at.</summary>
+        public static readonly IReadOnlyList<string> SpirvProfiles =
+            ["spirv_1_0", "spirv_1_1", "spirv_1_2", "spirv_1_3", "spirv_1_4", "spirv_1_5", "spirv_1_6"];
 
-        private readonly SlangCompiler compiler;
+        /// <summary>The newest of <see cref="SpirvProfiles"/> - the default target.</summary>
+        public static string LatestSpirvProfile => SpirvProfiles[SpirvProfiles.Count - 1];
 
-        public SlangShaderCompiler()
+        // ONE SESSION PER PROFILE, built on demand. The profile is a property of the Slang SESSION, while Profile is
+        // declared per PASS, so an effect whose passes disagree needs one session each - and an effect whose passes all
+        // take the default (which is all of them) still builds exactly one.
+        private readonly Dictionary<string, SlangCompiler> compilers = new();
+
+        private SlangCompiler CompilerFor(string profile)
         {
-            compiler = new SlangCompiler(
-                SpirvProfile,
+            if (compilers.TryGetValue(profile, out var existing)) return existing;
+
+            var created = new SlangCompiler(
+                profile,
                 // VulkanUseEntryPointName keeps the real entry-point name in the SPIR-V (instead of "main") so Vulkan
                 // can create pipelines by the shader's name.
                 options:
@@ -37,11 +47,17 @@ namespace Adamantium.EffectsCompiler.Compiler
                 // Legacy HLSL spellings the engine's .fx files still use but Slang's stricter front end does not define;
                 // applied as session-wide preprocessor macros.
                 defines: new Dictionary<string, string> { ["sampler"] = "SamplerState" });
+
+            compilers[profile] = created;
+            return created;
         }
 
+        /// <param name="profile">The SPIR-V target profile, one of <see cref="SpirvProfiles"/>.</param>
         /// <param name="resolveInclude">Maps an <c>#include</c> path to file contents (null = not found).</param>
-        public ShaderCompilationResult Compile(string source, string entryPoint, EffectShaderType stage, Func<string, string> resolveInclude)
+        public ShaderCompilationResult Compile(string source, string entryPoint, EffectShaderType stage, string profile,
+            Func<string, string> resolveInclude)
         {
+            var compiler = CompilerFor(profile);
             compiler.IncludeResolver = resolveInclude;
             try
             {
@@ -73,6 +89,10 @@ namespace Adamantium.EffectsCompiler.Compiler
             }
         }
 
-        public void Dispose() => compiler.Dispose();
+        public void Dispose()
+        {
+            foreach (var compiler in compilers.Values) compiler.Dispose();
+            compilers.Clear();
+        }
     }
 }
