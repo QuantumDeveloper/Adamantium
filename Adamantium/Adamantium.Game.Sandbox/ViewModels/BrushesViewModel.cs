@@ -541,7 +541,6 @@ public partial class BrushesViewModel : TabPageViewModel
     [Bindable] private double _materialGrainScale = 6;
     [Bindable] private double _materialGrainDirection = 0;
     [Bindable] private double _materialRoughness = 0.35;
-    [Bindable] private double _materialAnisotropy = 0.7;
     [Bindable] private double _materialLightAngle = 315;
     [Bindable] private double _materialLightElevation = 0.45;
 
@@ -582,7 +581,6 @@ public partial class BrushesViewModel : TabPageViewModel
             case MaterialType.Velvet:
                 MaterialRoughness = 0.35;
                 MaterialGrainScale = 6;
-                MaterialAnisotropy = 0.7;
                 break;
 
             case MaterialType.Metal:
@@ -666,7 +664,6 @@ public partial class BrushesViewModel : TabPageViewModel
     partial void OnMaterialGrainScaleChanged(double value) => LiveMaterial.GrainScale = value;
     partial void OnMaterialGrainDirectionChanged(double value) => LiveMaterial.GrainDirection = value;
     partial void OnMaterialRoughnessChanged(double value) => LiveMaterial.Roughness = value;
-    partial void OnMaterialAnisotropyChanged(double value) => LiveMaterial.Anisotropy = value;
     partial void OnMaterialLightAngleChanged(double value) => LiveMaterial.LightAngle = value;
     partial void OnMaterialLightElevationChanged(double value) => LiveMaterial.LightElevation = value;
 
