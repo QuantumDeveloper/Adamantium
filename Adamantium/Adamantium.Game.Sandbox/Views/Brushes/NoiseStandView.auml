@@ -127,5 +127,92 @@
                 </StackPanel>
             </StackPanel>
         </StackPanel>
+
+        <!-- The swatch row belongs to THIS stand, not to the tab: one labelled square per noise type, so what the
+             sliders above can be pointed at is on screen beside them. -->
+        <TextBlock Text="Noise types (all selectable in the live panel above)" FontSize="18" Margin="0,20,0,10"/>
+        <WrapPanel Orientation="Horizontal">
+            <StackPanel Orientation="Vertical" Margin="10">
+                <Rectangle Width="150" Height="110" CornerRadius="12">
+                    <Rectangle.Fill>
+                        <NoiseBrush NoiseType="Simplex" Scale="42" Octaves="5" Animate="true" FlowSpeed="0.6" Color1="#0B1220" Color2="#7DD3FC"/>
+                    </Rectangle.Fill>
+                </Rectangle>
+                <TextBlock Text="Simplex" HorizontalAlignment="Center" MarginTop="6" Foreground="{ResourceReference TextFillColorSecondary}"/>
+            </StackPanel>
+            <StackPanel Orientation="Vertical" Margin="10">
+                <Rectangle Width="150" Height="110" CornerRadius="12">
+                    <Rectangle.Fill>
+                        <NoiseBrush NoiseType="Perlin" Scale="42" Octaves="5" Animate="true" FlowSpeed="0.6" Color1="#0B1220" Color2="#86EFAC"/>
+                    </Rectangle.Fill>
+                </Rectangle>
+                <TextBlock Text="Perlin" HorizontalAlignment="Center" MarginTop="6" Foreground="{ResourceReference TextFillColorSecondary}"/>
+            </StackPanel>
+            <StackPanel Orientation="Vertical" Margin="10">
+                <Rectangle Width="150" Height="110" CornerRadius="12">
+                    <Rectangle.Fill>
+                        <NoiseBrush NoiseType="Value" Scale="42" Octaves="5" Animate="true" FlowSpeed="0.6" Color1="#0B1220" Color2="#FDE68A"/>
+                    </Rectangle.Fill>
+                </Rectangle>
+                <TextBlock Text="Value" HorizontalAlignment="Center" MarginTop="6" Foreground="{ResourceReference TextFillColorSecondary}"/>
+            </StackPanel>
+            <StackPanel Orientation="Vertical" Margin="10">
+                <Rectangle Width="150" Height="110" CornerRadius="12">
+                    <Rectangle.Fill>
+                        <NoiseBrush NoiseType="Worley" Scale="52" Octaves="2" Color1="#0B1220" Color2="#FCA5A5"/>
+                    </Rectangle.Fill>
+                </Rectangle>
+                <TextBlock Text="Worley" HorizontalAlignment="Center" MarginTop="6" Foreground="{ResourceReference TextFillColorSecondary}"/>
+            </StackPanel>
+            <StackPanel Orientation="Vertical" Margin="10">
+                <Rectangle Width="150" Height="110" CornerRadius="12">
+                    <Rectangle.Fill>
+                        <NoiseBrush NoiseType="Worley" Scale="56" Octaves="1" Animate="true" FlowSpeed="0.8" Color1="#0B1220" Color2="#C4B5FD"/>
+                    </Rectangle.Fill>
+                </Rectangle>
+                <TextBlock Text="Worley (flow)" HorizontalAlignment="Center" MarginTop="6" Foreground="{ResourceReference TextFillColorSecondary}"/>
+            </StackPanel>
+            <StackPanel Orientation="Vertical" Margin="10">
+                <Rectangle Width="150" Height="110" CornerRadius="12">
+                    <Rectangle.Fill>
+                        <NoiseBrush NoiseType="Ridged" Scale="60" Octaves="6" Animate="true" FlowSpeed="0.5" Color1="#0B1220" Color2="#FBBF24"/>
+                    </Rectangle.Fill>
+                </Rectangle>
+                <TextBlock Text="Ridged" HorizontalAlignment="Center" MarginTop="6" Foreground="{ResourceReference TextFillColorSecondary}"/>
+            </StackPanel>
+            <StackPanel Orientation="Vertical" Margin="10">
+                <Rectangle Width="150" Height="110" CornerRadius="12">
+                    <Rectangle.Fill>
+                        <NoiseBrush NoiseType="Turbulence" Scale="54" Octaves="6" Animate="true" FlowSpeed="0.5" Color1="#0B1220" Color2="#38BDF8"/>
+                    </Rectangle.Fill>
+                </Rectangle>
+                <TextBlock Text="Turbulence" HorizontalAlignment="Center" MarginTop="6" Foreground="{ResourceReference TextFillColorSecondary}"/>
+            </StackPanel>
+            <StackPanel Orientation="Vertical" Margin="10">
+                <Rectangle Width="150" Height="110" CornerRadius="12">
+                    <Rectangle.Fill>
+                        <NoiseBrush NoiseType="VoronoiBorders" Scale="46" Animate="true" FlowSpeed="0.7" Color1="#0B1220" Color2="#67E8F9"/>
+                    </Rectangle.Fill>
+                </Rectangle>
+                <TextBlock Text="Voronoi borders" HorizontalAlignment="Center" MarginTop="6" Foreground="{ResourceReference TextFillColorSecondary}"/>
+            </StackPanel>
+            <StackPanel Orientation="Vertical" Margin="10">
+                <Rectangle Width="150" Height="110" CornerRadius="12">
+                    <Rectangle.Fill>
+                        <NoiseBrush NoiseType="CombustibleVoronoi" Scale="40" Animate="true" FlowSpeed="1.0"/>
+                    </Rectangle.Fill>
+                </Rectangle>
+                <TextBlock Text="Combustible (fire)" HorizontalAlignment="Center" MarginTop="6" Foreground="{ResourceReference TextFillColorSecondary}"/>
+            </StackPanel>
+            <StackPanel Orientation="Vertical" Margin="10">
+                <Rectangle Width="150" Height="110" CornerRadius="12">
+                    <Rectangle.Fill>
+                        <NoiseBrush NoiseType="CombustibleVoronoi" Scale="40" Animate="true" FlowSpeed="1.0"
+                                    UseFirePalette="false" Color1="#020617" MidColor="#0EA5E9" Color2="#E0F2FE"/>
+                    </Rectangle.Fill>
+                </Rectangle>
+                <TextBlock Text="Combustible (custom)" HorizontalAlignment="Center" MarginTop="6" Foreground="{ResourceReference TextFillColorSecondary}"/>
+            </StackPanel>
+        </WrapPanel>
     </StackPanel>
 </View>

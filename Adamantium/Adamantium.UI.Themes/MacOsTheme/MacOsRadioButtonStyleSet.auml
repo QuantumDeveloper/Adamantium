@@ -81,4 +81,14 @@
         </PropertyTrigger>
     </Style>
 
+    <!-- The same control wearing the toggle button's clothes: `<RadioButton Classes="Toggle"/>`. For a row that is
+         really ONE choice - a family selector, a view switch - where the circle and dot would be wrong beside their
+         neighbours but the exclusivity is exactly what is wanted. Written with ToggleButtons such a row needs the bound
+         property to clear the others, and a click on the one already down turns it off: the choice disappears while
+         what it chose stays on screen.
+         BasedOn rather than a copied template - a type style is a boundary here, so this pulls the toggle look in whole
+         and the two cannot drift. Last in the file on purpose: at equal type specificity document order decides, so it
+         has to be declared after the plain RadioButton styles it replaces. -->
+    <Style Selector="RadioButton.Toggle" BasedOn="ToggleButton"/>
+
 </StyleSet>

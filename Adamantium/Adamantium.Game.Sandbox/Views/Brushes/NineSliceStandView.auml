@@ -57,5 +57,65 @@
                 <ColorPickerButton Width="48" Height="32" SelectedColor="{Binding SliceTint, Mode=TwoWay}"/>
             </StackPanel>
         </StackPanel>
+
+        <!-- The fixed cases the live panel above is compared against: one 64x64 picture dressing four sizes, then the
+             SAME picture as a plain ImageBrush - the corners smear, which is the whole argument for nine-slice. -->
+        <TextBlock Text="NineSliceBrush — one picture, any size, corners never distort" FontSize="18" Margin="0,20,0,10"/>
+        <TextBlock Text="The source is 64×64 with a 16px frame (Slice = 0.25). Compare with the plain ImageBrush below: the same picture stretched."
+                   Foreground="{ResourceReference TextFillColorSecondary}"
+                   MarginBottom="8"/>
+        <WrapPanel Orientation="Horizontal">
+            <Border Width="90" Height="90" Margin="10">
+                <Border.Background>
+                    <NineSliceBrush Source="Textures/nine-slice-frame.png" Slice="0.25"/>
+                </Border.Background>
+            </Border>
+            <Border Width="240" Height="90" Margin="10">
+                <Border.Background>
+                    <NineSliceBrush Source="Textures/nine-slice-frame.png" Slice="0.25"/>
+                </Border.Background>
+                <TextBlock Text="stretched edges" Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+            </Border>
+            <Border Width="240" Height="90" Margin="10">
+                <Border.Background>
+                    <NineSliceBrush Source="Textures/nine-slice-frame.png"
+                                    Slice="0.25"
+                                    EdgeMode="Repeat"/>
+                </Border.Background>
+                <TextBlock Text="repeated edges" Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+            </Border>
+            <Border Width="240" Height="140" Margin="10">
+                <Border.Background>
+                    <NineSliceBrush Source="Textures/nine-slice-frame.png"
+                                    Slice="0.25"
+                                    EdgeMode="Repeat"
+                                    DrawCenter="False"/>
+                </Border.Background>
+                <TextBlock Text="frame only (DrawCenter=False)" Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+            </Border>
+        </WrapPanel>
+
+        <TextBlock Text="…and the same picture as a plain ImageBrush — stretched, corners and all"
+                   Foreground="{ResourceReference TextFillColorSecondary}"
+                   MarginTop="12"
+                   MarginBottom="6"/>
+        <WrapPanel Orientation="Horizontal">
+            <Border Width="90" Height="90" Margin="10">
+                <Border.Background>
+                    <ImageBrush Source="Textures/nine-slice-frame.png"/>
+                </Border.Background>
+            </Border>
+            <Border Width="240" Height="90" Margin="10">
+                <Border.Background>
+                    <ImageBrush Source="Textures/nine-slice-frame.png"/>
+                </Border.Background>
+            </Border>
+            <Border Width="240" Height="90" Margin="10">
+                <Border.Background>
+                    <ImageBrush Source="Textures/nine-slice-frame.png" Tint="#66FF88"/>
+                </Border.Background>
+                <TextBlock Text="tinted" Foreground="Black" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+            </Border>
+        </WrapPanel>
     </StackPanel>
 </View>
