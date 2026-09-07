@@ -734,10 +734,6 @@ public partial class BrushesViewModel : TabPageViewModel
 
     // The band is drawn OUTSIDE the element and the engine does not grow the layout for it - that is the author's job.
     // The stand makes the point live: drag the margin down and watch the glow get cut off by the panel.
-    /// <summary>Every shape: the rect and the ellipse compute their distance, the polygon and the star READ one baked
-    /// per mesh - same pass, same falloff, so there is nothing to leave out.</summary>
-    public PreviewShape[] HaloShapes { get; } = Enum.GetValues<PreviewShape>();
-
     /// <summary>The halo stand's star. Its box is 180x120 rather than the size sliders of the image stand, so it is
     /// fixed - what moves here is the BAND, not the shape.</summary>
     public PointsCollection HaloStar { get; } = Star(180, 120);
@@ -747,7 +743,6 @@ public partial class BrushesViewModel : TabPageViewModel
     [Bindable] private bool _haloClip;
     [Bindable] private double _haloMargin = 40;
     [Bindable] private double _haloRadius = 16;
-    [Bindable] private PreviewShape _haloShape = PreviewShape.Rectangle;
 
     partial void OnAuraOnChanged(bool value) => LiveAura.IsEnabled = value;
     partial void OnShadowOnChanged(bool value) => LiveShadow.IsEnabled = value;
