@@ -65,6 +65,8 @@ public partial class RenderCache
     private readonly HashSet<IUIComponent> _movedNodeOwners = new();
     // Motion nodes that moved because a node ABOVE them did - they carry their own world, so they need writing too.
     private readonly List<IUIComponent> _nestedMovedNodes = new();
+    // Motion nodes sitting inside an ORDINARY mover's subtree - their slots move with it, and nothing else writes them.
+    private readonly List<IUIComponent> _movedNodesInSubtree = new();
     // APPLIER-owned: the ORDINARY movers of the packets drained for this draw (RefreshMovedComponents writes their
     // subtrees' slots, then clears). Filled only for movers the applier forgave.
     private readonly List<IUIComponent> _movedOwnersBuf = new();
@@ -756,10 +758,29 @@ public partial class RenderCache
             return false;
         }
 
+        // A MOTION NODE inside an ordinary mover's subtree has to have its matrix written too, and nothing else writes
+        // it: RefreshMovedNodes covers the nodes that were marked moved and the nodes under THOSE, while a node whose
+        // ancestor moved as an ordinary component is in neither set. Its own Bounds did not change - it sits where it
+        // always sat inside its parent - so no move is announced for it, and the slot its whole subtree is baked
+        // against keeps last frame's world. The page then tears: everything re-baked follows the scroll and everything
+        // riding that node stays behind. Asked BEFORE anything is written, as the node path does, so a refusal costs
+        // the frame only the walk it was already going to take.
+        _movedNodesInSubtree.Clear();
+        foreach (var c in _movedSubtree)
+            if (ApplySnap(c).IsMotionNode) _movedNodesInSubtree.Add(c);
+        foreach (var node in _movedNodesInSubtree) if (!CanCarryStragglers(node)) return false;
+
         // Positions moved -> the composed world memos are stale (same reasoning as RefreshMovedNodes; the clip memo is
         // deliberately kept - a mover that changes a viewport is structural).
         _worldCache.Clear();
         _relWorldCache.Clear();
+
+        foreach (var node in _movedNodesInSubtree)
+        {
+            if (_transformTable.TryGetSlot(node.RenderId, out var nodeSlot))
+                _transformTable.SetMatrix(device, nodeSlot, World(node));
+            _movedNodeOwners.Add(node);   // the replay re-points the per-unit draws under them
+        }
 
         foreach (var c in _movedSubtree)
         {
@@ -771,6 +792,9 @@ public partial class RenderCache
                 if (!PatchSlot(device, u, bakeWorld, slot)) return false;
             }
         }
+
+        // ...and whatever under those nodes cannot ride their slots, exactly as the node path carries its own.
+        foreach (var node in _movedNodesInSubtree) if (!CarryStragglers(device, node)) return false;
 
         _movedOwnersBuf.Clear();
         return true;

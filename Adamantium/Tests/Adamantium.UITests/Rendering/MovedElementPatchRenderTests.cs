@@ -351,6 +351,29 @@ public class MovedElementPatchRenderTests
         AssertMatchesAFullWalk(scene, patched, "the element must be drawn at its NEW size, not its old one");
     }
 
+    // A MOTION NODE inside the moved subtree. The node is not the mover and its own Bounds do not change - it sits where
+    // it always sat inside its parent - so nothing announces a move for it, and its subtree is baked against a slot only
+    // the applier can write. RefreshMovedNodes writes the nodes that were MARKED moved and the nodes under those; a node
+    // under an ORDINARY mover is in neither set, and its slot kept last frame's world. On the stand that tore the page in
+    // two: one wheel notch at the top of a scroll moved everything re-baked and left everything riding the node behind.
+    [Test]
+    public void MovingAContainer_CarriesAMotionNodeInsideIt()
+    {
+        using var scene = NewScene();
+
+        // Promote the rider and let a walk record the scene in its new shape, so what follows is a plain MOVE.
+        scene.Rider.IsRenderMotionNode = true;
+        RenderDirty.MarkStructural();
+        scene.Draw();
+
+        scene.Mover.Bounds = new Rect(48, 56, 24, 24);
+        scene.Draw();
+
+        var patched = Pixels(scene.Renderer);
+        AssertMatchesAFullWalk(scene, patched,
+            "the motion node under the mover must be carried - its slot is the only thing that moves its subtree");
+    }
+
     // The unit factory needs one, but nothing here draws a texture or text.
     private sealed class StubResourceFactory : IResourceFactory
     {
