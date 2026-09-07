@@ -27,13 +27,19 @@ public struct PatternGeometryInstance
     /// <summary>The shape's local-space bounds (minX, minY, sizeX, sizeY): the pattern origin is minXY; combustible centres on it.</summary>
     public Vector4F LocalBounds;
 
-    /// <summary>Primary colour, straight RGBA, opacity folded.</summary>
+    /// <summary>Primary colour, straight RGBA, opacity folded.
+    /// <para>These three stay float4 while every other fill's colours are four bytes, and it is not an oversight: the
+    /// MESH material rides this same record, and there the identically named fields carry a SURFACE and the blur and
+    /// refraction knobs - lengths and factors outside 0..1, which eight bits per channel cannot hold. Packing them is
+    /// only possible once the mesh material has a record of its own.</para></summary>
     public Vector4F Color1;
 
-    /// <summary>Secondary colour, straight RGBA, opacity folded.</summary>
+    /// <summary>Secondary colour, straight RGBA, opacity folded. Carries the mesh material's response - see
+    /// <see cref="Color1"/> for why this one cannot be packed either.</summary>
     public Vector4F Color2;
 
-    /// <summary>Optional MID colour for the 3-colour noise gradient-map (.w == 0 = off). Also the combustible custom ramp mid.</summary>
+    /// <summary>Optional MID colour for the 3-colour noise gradient-map (.w == 0 = off). Also the combustible custom
+    /// ramp mid, and the mesh material's light - see <see cref="Color1"/>.</summary>
     public Vector4F Color3;
 
     /// <summary>Noise params (noise types only): x octaves (sign = animate flag), y seed, z lacunarity, w gain
