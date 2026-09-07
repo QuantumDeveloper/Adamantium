@@ -69,7 +69,14 @@ public struct MaterialRectItem
     ///
     /// <para>Packed into a spare component rather than given a field of its own, and NOT because that is tidier - a
     /// thirteenth field was written, measured and works on its own. But adding it while a wood PASS exists loses the
-    /// device every time, and neither alone does; the mechanism is not understood and is recorded in the tech debt.
-    /// Reusing a component that is already there keeps the record at the size that is known to be safe.</para></summary>
+    /// device every time, and neither alone does. Reusing a component that is already there keeps the record at the
+    /// size that is known to be safe.</para>
+    ///
+    /// <para>THE RULE THIS LEAVES: do not grow this record. The failure is deterministic, arrives within seconds on any
+    /// tab, and the validation layer says nothing at all - so it is the GPU refusing, not the API being misused. Ruled
+    /// out by measurement, one at a time: shader weight (cut below what lives), branching on a value from memory,
+    /// reading the field itself, the bevel, the number of passes, the shader cache, a stale incremental blob, and the
+    /// buffer layout and stride. The mechanism is still not understood, so anything that would make this struct bigger
+    /// has to be proven on a live run rather than on the tests.</para></summary>
     public Vector4F Light;
 }
