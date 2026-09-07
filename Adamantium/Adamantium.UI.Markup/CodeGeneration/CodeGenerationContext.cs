@@ -652,7 +652,13 @@ public class CodeGenerationContext
                     // Convert the literal to the attached property's value type (quote strings, resolve enums, parse the
                     // rest) exactly like a regular property. Emitting the raw text only ever compiled for the int-typed
                     // ones (Grid.Column="0"); a string like ToolTip="hint" broke as bare C# identifiers.
-                    var expr = BuildValueExpression(prop.GetTextValue(), resolvedType);
+                    //
+                    // ...but the value is not always a literal. GetTextValue() on anything else returns the AST NODE's
+                    // ToString(), so an {x:Static} here emitted the node's type name as the argument - it compiled, ran,
+                    // and set the property to nonsense. Route a non-text value the way every other property does.
+                    var expr = prop.Values.Count == 1 && !prop.Values[0].IsTextNode()
+                        ? ProcessNestedValue(prop.Values[0], diagnostics, isResource)
+                        : BuildValueExpression(prop.GetTextValue(), resolvedType);
                     // The ROOT element has no parent variable - it IS the generated class, as the object-valued path
                     // below already knows. Writing CurrentParent unguarded emitted `SetX(, value)` for an attached
                     // property authored on the root (ResourceContext.Scope on a Theme).
