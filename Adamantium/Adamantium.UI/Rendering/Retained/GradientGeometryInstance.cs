@@ -33,8 +33,12 @@ public struct GradientGeometryInstance
     /// <summary>The shape's local-space bounds (minX, minY, sizeX, sizeY): a fragment's uv = (localPos - min) / size.</summary>
     public Vector4F LocalBounds;
 
-    /// <summary>Straight stop colours (opacity folded into .w); only the first Params.z are valid.</summary>
-    public Vector4F Stop0, Stop1, Stop2, Stop3, Stop4, Stop5, Stop6, Stop7;
+    /// <summary>Straight stop colours (opacity folded into the alpha); only the first Params.z are valid. Four BYTES
+    /// each, as <see cref="GradientRectItem"/> carries them.
+    /// <para>Its stages must read this record FIELD BY FIELD, never as a whole struct: both vertex shaders want four
+    /// float4s out of it and no stop at all, and pulling it in wholesale dragged these eight through the vertex stage,
+    /// which that driver answers by not drawing the body at all (255 -&gt; 0) and then losing the device.</para></summary>
+    public Color Stop0, Stop1, Stop2, Stop3, Stop4, Stop5, Stop6, Stop7;
 
     /// <summary>Stop offsets 0..3.</summary>
     public Vector4F Offsets0;
