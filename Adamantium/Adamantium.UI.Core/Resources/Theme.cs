@@ -444,12 +444,19 @@ public class Theme : AdamantiumComponent, ITheme
 
         // Colours first: writing into the brushes that already exist, so every element drawing with one keeps drawing
         // with the same object and simply repaints.
+        // A RAW COLOUR HAS TO BE ANNOUNCED; a brush does not. Writing into a brush that already exists reaches everyone
+        // holding it, because they hold the same object. A colour is a VALUE: the entry is replaced and nobody hears -
+        // so anything that took one live kept the old one. That is how every acrylic and liquid-glass surface stayed
+        // dark through a switch to light while the solid fills beside it followed: the tint is a raw colour.
+        var rawChanged = false;
+
         foreach (var entry in definition.Colors)
         {
             if (entry.Key == null) continue;
 
             if (entry.As == PaletteEntryKind.Color)
             {
+                if (!_rawColors.TryGetValue(entry.Key, out var had) || had != entry.Color) rawChanged = true;
                 _rawColors[entry.Key] = entry.Color;
                 continue;
             }
@@ -457,6 +464,11 @@ public class Theme : AdamantiumComponent, ITheme
             if (_palette.TryGetValue(entry.Key, out var brush)) brush.Color = entry.Color;
             else _palette[entry.Key] = new SolidColorBrush(entry.Color);
         }
+
+        // ONCE, after the whole palette is in place, and only when something actually moved. Per key would re-resolve
+        // every live reference in the application once per colour, which is the shape of fan-out that has frozen this
+        // loop before; and announcing mid-way would hand a listener a palette half in one variant and half in the other.
+        if (rawChanged) ResourceManager?.NotifyResourcesChanged();
 
         // ...then the theme's own properties, which is where {ThemeResource} looks. AccentColor derives the whole ramp
         // on assignment, so setting the seed is enough.

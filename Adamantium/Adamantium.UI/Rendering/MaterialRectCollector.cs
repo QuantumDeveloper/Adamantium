@@ -209,6 +209,20 @@ internal sealed class MaterialRectCollector : SdfBatchCollector<MaterialRectItem
     /// </summary>
     public static bool NeedsBackdrop(MaterialType material) => NeedsBackdrop(TreatmentOf(material));
 
+    /// <summary>The blur radius in TEXELS of the capture, per logical unit - divided by the copy's own shrink, which a
+    /// quarter-size copy has already done two levels' worth of.
+    /// <para>Not turned into a pyramid level here: that is a logarithm of the radius in DEVICE pixels, and how many of
+    /// those a logical unit is worth is known only per instance, in the shader (the same Scale the pen's width uses).
+    /// Taking the log here made the blur differ between two monitors at different DPI.</para></summary>
+    internal static float BlurTexels(MaterialBrush material)
+    {
+        var shrink = TreatmentOf(material.Material) == MaterialTreatment.Glass
+            ? BackdropCapture.Sharp
+            : BackdropCapture.Downscale;
+
+        return (float)(material.BlurAmount / shrink);
+    }
+
     /// <summary>The same question asked where only the treatment is still known - by the mesh carrier, which refuses to
     /// draw a segment whose backdrop would not bind. Stated ONCE, here: written out a second time it becomes a list of
     /// surfaces that somebody has to remember to extend, and a surface left off it is asked for a capture it never
@@ -429,7 +443,7 @@ internal sealed class MaterialRectCollector : SdfBatchCollector<MaterialRectItem
             // .w says the picture is pinned to the ELEMENT, and the shader then takes its coordinates from the fragment's
             // place in the shape instead of from its place in the frame. It cannot be a rectangle in SourceUv like the
             // other anchors: each instance in the segment has its own, and a rotated shape has none at all.
-            Knobs = new Vector4F((float)material.BlurAmount, (float)material.NoiseAmount, (float)material.Refraction,
+            Knobs = new Vector4F(BlurTexels(material), (float)material.NoiseAmount, (float)material.Refraction,
                 source != null && material.Anchor == MaterialAnchor.Element ? 1f : 0f),
             StrokeColor = strokeColor,
             Stroke0 = stroke0,

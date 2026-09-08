@@ -552,54 +552,21 @@ float2 CaptureUv(float2 fragment, float4 sourceUv)
     return fragment * sourceUv.xy + sourceUv.zw;
 }
 
-// Widening blur: a small ring of taps around the fragment. The capture is already downscaled, so each tap here reaches
-// four times as far as its pixel count suggests - eight taps plus the centre buy a radius that would cost dozens at
-// full resolution. Ring rather than a box: the same taps spread over a circle read smoother at equal cost.
-// FIVE taps, not nine, and NOT a variable called `step`: that name belongs to a standard-library function in Slang (as
-// it does in HLSL), and shadowing it inside a file whose other shaders call step() is asking the compiler to guess.
-// Named texel here.
-//
-// Deliberately small. The capture is already downscaled fourfold, so each tap reaches four times its pixel count, and
-// this driver has a documented ceiling on what one pixel shader can carry before vkCreateShadersEXT or the GPU itself
-// gives out - the pattern shader hit it, and it is the reason materials are a separate effect at all. Widen only with a
-// measurement in hand.
-// Takes the SCALE, not the whole mapping: a picture pinned to the element has no rectangle in the frame at all, and
-// only the tap spacing is wanted here.
-/// A GAUSSIAN, written the standard way, and the two ad-hoc kernels it replaces are the reason to say so. First a cross
-/// of five taps, then a thirteen-tap tent: both are a handful of POINTS with nothing sampled between them, so at a
-/// small radius they barely blur and at a large one they stop blurring and start duplicating - a thin thing beneath the
-/// panel came through as several copies of itself, and a checkerboard came through as moire.
-///
-/// <para>Separable weights, applied as their outer product: a 9x9 Gaussian sampled as 5x5 BILINEAR fetches. Each fetch
-/// sits BETWEEN two texels at the offset the standard formulation gives (Rakos), so one sample carries two texels
-/// already weighted - which is what buys a 9-wide kernel for 25 fetches instead of 81. The offsets scale with the
-/// radius, and because the Gaussian falls off smoothly there is no radius at which the taps come apart.</para>
-float4 BlurCapture(float2 uv, float2 uvScale, float radiusPx)
+// A blur is ONE SAMPLE from a level of the capture's MIP PYRAMID - the levels are built by halving blits, so level N
+// is the average of 2^N texels, which is what a blur of that radius is. It costs one tap however wide it gets, and
+// there is no radius at which it comes apart. Knobs.x carries the LEVEL, not a radius: the collector takes the
+// logarithm, where the copy's own shrink is known.
+float4 BlurCapture(float2 uv, float level)
 {
-    // The standard linear-sampling Gaussian: three distinct offsets and weights per axis, mirrored into five taps.
-    const float3 gw = float3(0.2270270270, 0.3162162162, 0.0702702703);
-    const float3 go = float3(0.0, 1.3846153846, 3.2307692308);
+    return SourceTexture.SampleLevel(SourceSampler, uv, level);
+}
 
-    float weights[5] = { gw.z, gw.y, gw.x, gw.y, gw.z };
-    float offsets[5] = { -go.z, -go.y, go.x, go.y, go.z };
-
-    // The radius is stated in FRAME pixels; put it through the same scale the mapping uses, and normalise so the
-    // outermost tap lands exactly at that radius.
-    float2 step = (radiusPx / go.z) * uvScale;
-
-    float4 sum = float4(0.0, 0.0, 0.0, 0.0);
-    [unroll]
-    for (int i = 0; i < 5; i++)
-    {
-        [unroll]
-        for (int j = 0; j < 5; j++)
-        {
-            float2 o = float2(offsets[i], offsets[j]) * step;
-            sum += SourceTexture.Sample(SourceSampler, uv + o) * (weights[i] * weights[j]);
-        }
-    }
-
-    return sum;   // the separable weights sum to 1, so their outer product does too
+// The radius the brush states is LOGICAL; a pyramid level is a halving of DEVICE pixels. How many of the second a unit
+// of the first is worth is the same Scale the pen's width uses, so the logarithm belongs here and not on the CPU -
+// taken there, the same brush blurred differently on two monitors at different DPI.
+float BlurLevelOf(float texelsPerUnit, float scale)
+{
+    return log2(max(texelsPerUnit * scale, 1.0));
 }
 
 [shader("fragment")]
@@ -620,7 +587,7 @@ float4 MaterialFrostedPS(MaterialPSInput input) : SV_Target
     float2 uvLocal = input.Local / max(2.0 * input.Half, float2(1.0, 1.0)) + 0.5;
     float2 uvScale = lerp(SourceUv.xy, 1.0 / max(2.0 * input.Half, float2(1.0, 1.0)), pin);
     float2 uv = saturate(lerp(CaptureUv(input.Position.xy, SourceUv), uvLocal, pin));
-    float4 behind = BlurCapture(uv, uvScale, it.Knobs.x);
+    float4 behind = BlurCapture(uv, BlurLevelOf(it.Knobs.x, input.Scale));
 
     // Tint over the capture, then grain. The grain is what keeps a large pane from banding - the capture came from an
     // 8-bit target and was smoothed twice, so its gradients are flatter than the eye tolerates at this size.
@@ -695,17 +662,26 @@ float4 MaterialGlassPS(MaterialPSInput input) : SV_Target
 
     // Dispersion: the three channels take slightly different paths, which is why the fringe appears only where the
     // bending is strong - along the rim - and not across the flat middle.
-    float3 behind;
-    behind.r = SourceTexture.Sample(SourceSampler, saturate(uv + push * 1.06)).r;
-    behind.g = SourceTexture.Sample(SourceSampler, saturate(uv + push)).g;
-    behind.b = SourceTexture.Sample(SourceSampler, saturate(uv + push * 0.94)).b;
+    float3 sharp;
+    sharp.r = SourceTexture.Sample(SourceSampler, saturate(uv + push * 1.06)).r;
+    sharp.g = SourceTexture.Sample(SourceSampler, saturate(uv + push)).g;
+    sharp.b = SourceTexture.Sample(SourceSampler, saturate(uv + push * 0.94)).b;
+
+    // The flat middle transmits BLURRED (that is what stops text behind colliding with text on the pane); the rim keeps
+    // the sharp dispersed samples, where the lens bends hardest and the fringe is the point. Zero skips it entirely.
+    float curve = GlassCurve(d, rim);
+    float3 behind = sharp;
+    if (it.Knobs.x > 0.01)
+    {
+        float3 blurred = BlurCapture(uv + push, BlurLevelOf(it.Knobs.x, input.Scale)).rgb;
+        behind = lerp(blurred, sharp, saturate(curve));
+    }
 
     // A LIGHT tint only: glass takes its colour from what is behind it, and a heavy tint turns it back into a panel.
     float3 colour = lerp(behind, it.Tint.rgb, saturate(it.Tint.a) * 0.5);
 
     // The rim highlight, brightest where the surface turns over. Weighted towards the upper-left because that is where
     // light is assumed to come from throughout this engine's shading.
-    float curve = GlassCurve(d, rim);
     float facing = saturate(dot(slope, normalize(float2(-0.7, -0.7))));
     colour += curve * curve * facing * 0.35;
 
@@ -851,7 +827,11 @@ float4 MaterialFrostedMeshPS(MaterialMeshPSInput input) : SV_Target
     float2 uvLocal = (input.Local - it.LocalBounds.xy) / extent;
     float2 uvScale = lerp(SourceUv.xy, 1.0 / extent, pin);
     float2 uv = saturate(lerp(CaptureUv(input.Position.xy, SourceUv), uvLocal, pin));
-    float4 behind = BlurCapture(uv, uvScale, it.Color3.x);
+    // SCALE 1, and that is a known gap rather than an oversight: this carrier has no Scale, and giving it one - a fifth
+    // interpolator plus SlotPixelScale in the vertex stage - made the device die on every launch, three out of three.
+    // The ceiling this file's header describes is real and this pass is at it. So a material on a MESH blurs by its
+    // logical radius as if the display were at 100%; the rectangle paths above follow the DPI properly.
+    float4 behind = BlurCapture(uv, BlurLevelOf(it.Color3.x, 1.0));
 
     float3 colour = lerp(behind.rgb, it.Color1.rgb, saturate(it.Color1.a));
     float grain = (Hash21(input.Position.xy) - 0.5) * it.Color3.y;

@@ -723,18 +723,37 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
         ImageLayout newLayout,
         PipelineStageFlagBits sourceStageMask,
         PipelineStageFlagBits destinationStageMask)
+        => InsertImageMemoryBarrier(commandBuffer, texture, sourceAccessMask, destinationAccessMask,
+            oldLayout, newLayout, sourceStageMask, destinationStageMask, 0, ~0U);
+
+    /// <summary>The same barrier over ONE RANGE OF MIP LEVELS. Building a pyramid needs it: each level is written as a
+    /// transfer destination and then read as the source of the next, so the levels are in different layouts at the same
+    /// time and a whole-image barrier cannot say that.
+    /// <para>The texture's own <see cref="ITexture.ImageLayout"/> is only updated for a barrier that covers the WHOLE
+    /// image - a partial one would leave that field claiming something untrue of most of it.</para></summary>
+    public void InsertImageMemoryBarrier(
+        CommandBuffer commandBuffer,
+        ITexture texture,
+        AccessFlagBits sourceAccessMask,
+        AccessFlagBits destinationAccessMask,
+        ImageLayout oldLayout,
+        ImageLayout newLayout,
+        PipelineStageFlagBits sourceStageMask,
+        PipelineStageFlagBits destinationStageMask,
+        uint baseMipLevel,
+        uint levelCount)
     {
         if (texture == null) return;
-        
+
         var range = new ImageSubresourceRange
         {
             AspectMask = texture.ImageAspect,
-            BaseMipLevel = 0,
-            LevelCount = (~0U),
+            BaseMipLevel = baseMipLevel,
+            LevelCount = levelCount,
             BaseArrayLayer = 0,
             LayerCount = (~0U)
         };
-        
+
         var barrier = new ImageMemoryBarrier();
         barrier.SrcQueueFamilyIndex = (~0U);
         barrier.DstQueueFamilyIndex = (~0U);
@@ -756,7 +775,7 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
             1,
             barrier);
 
-        texture.ImageLayout = newLayout;
+        if (baseMipLevel == 0 && levelCount == ~0U) texture.ImageLayout = newLayout;
     }
 
     public void TransitionImagesForRendering(CommandBuffer commandBuffer, params ITexture[] inputTargets)

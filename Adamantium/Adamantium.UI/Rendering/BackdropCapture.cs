@@ -80,6 +80,15 @@ internal sealed class BackdropCapture : IDisposable
 
         var w = (uint)Math.Max(1, (right - x) / downscale);
         var h = (uint)Math.Max(1, (bottom - y) / downscale);
+
+        // ROUNDED DOWN to a multiple of 2^halvings, so every level of the pyramid is exactly half of the one above it.
+        // The REGION is left alone on purpose: the blit scales whatever rectangle it is given into whatever size the
+        // copy is, so the copy still covers exactly the region and the material's mapping stays true. Shrinking the
+        // region to match was tried and is wrong twice over - it cuts pixels off the area the element actually sits in,
+        // and what showed through the pane then no longer lined up with what was beside it.
+        var align = 1u << Halvings(w, h);
+        w -= w % align;
+        h -= h % align;
         EnsureTexture(gd, w, h);
         _current = _ring[gd.CurrentFrame % (uint)_ring.Length];
         if (_current == null) return false;
@@ -132,10 +141,8 @@ internal sealed class BackdropCapture : IDisposable
         commandBuffer.BlitImage(source.GetImage(), ImageLayout.TransferSrcOptimal,
             _current.GetImage(), ImageLayout.TransferDstOptimal, 1, blit, Filter.Linear);
 
-        gd.InsertImageMemoryBarrier(commandBuffer, _current,
-            AccessFlagBits.TransferWriteBit, AccessFlagBits.ShaderReadBit,
-            ImageLayout.TransferDstOptimal, ImageLayout.ShaderReadOnlyOptimal,
-            PipelineStageFlagBits.TransferBit, PipelineStageFlagBits.FragmentShaderBit);
+        // Leaves EVERY level, level 0 included, in ShaderReadOnly - so nothing more is owed here.
+        BuildPyramid(gd, commandBuffer, _current, (int)w, (int)h);
 
         gd.InsertImageMemoryBarrier(commandBuffer, source,
             AccessFlagBits.TransferReadBit, AccessFlagBits.ColorAttachmentWriteBit,
@@ -148,6 +155,136 @@ internal sealed class BackdropCapture : IDisposable
         gd.ResumeRendering();
         return true;
     }
+
+    /// <summary>The smallest a level is allowed to get. Below this a level stops being a blur of the picture and
+    /// becomes an average of the whole thing.</summary>
+    private const uint SmallestLevel = 8;
+
+    /// <summary>The most halvings a copy will carry: level 6 is a blur 64 device pixels wide, past anything a surface
+    /// asks for.</summary>
+    private const int MaxHalvings = 6;
+
+    /// <summary>How many times this size can be halved EXACTLY while every level stays usable - and therefore what the
+    /// copy's size has to be a multiple of.
+    /// <para>The height matters as much as the filter: a level that does not exist cannot be sampled, so a radius past
+    /// the top of the pyramid is CLAMPED to it. That clamp is in device pixels, so the same brush covered the same
+    /// number of pixels on a 100% and a 150% display - and since the pane is half again as big on the second, the blur
+    /// read as weaker there. A taller pyramid is what makes the radius mean the same thing on both.</para></summary>
+    private static int Halvings(uint width, uint height)
+    {
+        var smaller = Math.Min(width, height);
+        var halvings = 0;
+        while (halvings < MaxHalvings && (smaller >> (halvings + 1)) >= SmallestLevel) halvings++;
+        return halvings;
+    }
+
+    /// <summary>How many levels this copy carries, and only while the halving is EXACT.
+    /// <para>An odd dimension halves to something that is not half of it, so that level covers a slightly different
+    /// area than the one above - and the same 0..1 coordinate then means two different places on two levels. Sampled
+    /// across levels that shows as the backdrop SLIDING a pixel or two as the blur widens, with the error growing at
+    /// every step. Stopping where the halving stops being exact costs a level and removes the slide.</para></summary>
+    internal static uint CountLevels(uint width, uint height)
+    {
+        var levels = 1u;
+        while (width > 1 && height > 1 && (width & 1) == 0 && (height & 1) == 0)
+        {
+            width >>= 1;
+            height >>= 1;
+            levels++;
+        }
+
+        return levels;
+    }
+
+    // Each level is DRAWN from the one above it by a thirteen-tap filter (see CaptureBlurEffect). A halving blit was
+    // what stood here, and its LINEAR filter is a box: it does not suppress what is above Nyquist before decimating, so
+    // a regular pattern behind a pane folded into moire at every level instead of blurring.
+    //
+    // The levels walk through layouts one at a time - the one just written becomes the SOURCE of the next - which is
+    // why every barrier here is per-level and the whole-image form cannot be used.
+    private void BuildPyramid(GraphicsDevice gd, CommandBuffer commandBuffer, Texture texture, int width, int height)
+    {
+        var levels = CountLevels((uint)width, (uint)height);
+        if (levels < 2) return;
+
+        _blur ??= new Adamantium.UI.Effects.Generated.CaptureBlurEffect(gd);
+
+        // THE VIEWPORT AND SCISSOR ARE THE FRAME'S, and they are CACHED - the device sends them only when they change.
+        // Each level here needs its own, tiny, and leaving the last one behind clipped everything the frame drew after
+        // the material away: the pane appeared and the panel beside it did not.
+        var viewport = gd.CurrentViewports.Length > 0 ? gd.CurrentViewports[0] : default;
+        var scissor = gd.CurrentScissors.Length > 0 ? gd.CurrentScissors[0] : default;
+
+        var w = width;
+        var h = height;
+
+        // Level 0 arrives as a transfer destination; it is about to be READ.
+        gd.InsertImageMemoryBarrier(commandBuffer, texture,
+            AccessFlagBits.TransferWriteBit, AccessFlagBits.ShaderReadBit,
+            ImageLayout.TransferDstOptimal, ImageLayout.ShaderReadOnlyOptimal,
+            PipelineStageFlagBits.TransferBit, PipelineStageFlagBits.FragmentShaderBit,
+            0, 1);
+
+        for (var level = 1u; level < levels; level++)
+        {
+            var nw = Math.Max(1, w / 2);
+            var nh = Math.Max(1, h / 2);
+
+            gd.InsertImageMemoryBarrier(commandBuffer, texture,
+                AccessFlagBits.None, AccessFlagBits.ColorAttachmentWriteBit,
+                ImageLayout.Undefined, ImageLayout.ColorAttachmentOptimal,
+                PipelineStageFlagBits.TopOfPipeBit, PipelineStageFlagBits.ColorAttachmentOutputBit,
+                level, 1);
+
+            var attachment = new RenderingAttachmentInfo
+            {
+                ImageView = texture.GetLevelView(level),
+                ImageLayout = ImageLayout.ColorAttachmentOptimal,
+                LoadOp = AttachmentLoadOp.DontCare,
+                StoreOp = AttachmentStoreOp.Store
+            };
+
+            var info = new RenderingInfo
+            {
+                RenderArea = new Rect2D
+                {
+                    Offset = new Offset2D(),
+                    Extent = new Extent2D { Width = (uint)nw, Height = (uint)nh }
+                },
+                PColorAttachments = new[] { attachment },
+                ColorAttachmentCount = 1,
+                LayerCount = 1
+            };
+
+            commandBuffer.BeginRendering(info);
+            gd.SetViewports(new Viewport { Width = nw, Height = nh, MaxDepth = 1.0f });
+            gd.SetScissors(info.RenderArea);
+
+            _blur.SourceTexture.SetResource(texture);
+            _blur.SourceSampler.SetResource(gd.SamplerStates.LinearClampToEdge);
+            _blur.BlurStep.SetValue(new Vector4F(level - 1, nw, nh, 0));
+            _blur.CaptureBlurDownPass.Apply();
+            gd.Draw(3, 1);
+
+            commandBuffer.EndRendering();
+
+            // What was just drawn becomes the next step's source.
+            gd.InsertImageMemoryBarrier(commandBuffer, texture,
+                AccessFlagBits.ColorAttachmentWriteBit, AccessFlagBits.ShaderReadBit,
+                ImageLayout.ColorAttachmentOptimal, ImageLayout.ShaderReadOnlyOptimal,
+                PipelineStageFlagBits.ColorAttachmentOutputBit, PipelineStageFlagBits.FragmentShaderBit,
+                level, 1);
+
+            w = nw;
+            h = nh;
+        }
+
+        gd.SetViewports(viewport);
+        gd.SetScissors(scissor);
+    }
+
+    private Adamantium.UI.Effects.Generated.CaptureBlurEffect _blur;
+
 
     // Kept between captures and re-made only when the size changes - the same rule the off-screen renderer's target
     // follows, and for the same reason: a fresh image per capture exhausts device memory in seconds when something
@@ -178,7 +315,10 @@ internal sealed class BackdropCapture : IDisposable
                 Height = height,
                 Depth = 1,
                 ArrayLayers = 1,
-                MipLevels = 1,
+                // A PYRAMID, because that is how a wide blur is actually built: not one wide kernel over the full-size
+                // copy, but a small one over a smaller image. Each level halves both axes, so level N is a blur of
+                // radius 2^N for the price of a single sample - and there is no radius at which it falls apart.
+                MipLevels = CountLevels(width, height),
                 Samples = MSAALevel.None,
                 Format = Format.R8G8B8A8_UNORM,
                 InitialLayout = ImageLayout.Undefined,
@@ -186,7 +326,12 @@ internal sealed class BackdropCapture : IDisposable
                 ImageType = ImageType._2d,
                 ImageAspect = ImageAspectFlagBits.ColorBit,
                 ImageTiling = Vulkan.Core.ImageTiling.Optimal,
-                Usage = ImageUsageFlagBits.SampledBit | ImageUsageFlagBits.TransferDstBit,
+                // TransferSrc as well: every level but the last is the SOURCE of the blit that makes the next one.
+                // ColorAttachment because a level is also DRAWN into - the filter that fills it is a shader, and a
+                // shader writes through an attachment. No descriptor is involved in that direction, which is why this
+                // route needs nothing from the heap.
+                Usage = ImageUsageFlagBits.SampledBit | ImageUsageFlagBits.TransferDstBit
+                        | ImageUsageFlagBits.TransferSrcBit | ImageUsageFlagBits.ColorAttachmentBit,
                 Dimension = TextureDimension.Texture2D
             }, $"BackdropCapture:{i}");
         }

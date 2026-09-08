@@ -16,9 +16,13 @@
 
          TWO CONSEQUENCES WORTH KNOWING BEFORE JUDGING IT:
 
-         There is no BlurAmount here, and its absence is not an oversight - the glass pass never blurs. It samples the
-         capture sharply and displaces it. Setting the knob would leave a number in the theme that does nothing, which
-         is how a file ends up with settings nobody can tell the effect of.
+         THE NUMBERS MOVED WITH THE FILTER. They were 3 and 2 against the old kernel, where the value was the outermost
+         tap's radius and the kernel fell apart past about three. It is now a radius in LOGICAL pixels, realised through
+         the capture's pyramid, and honest up to sixty-four device pixels - so the same look needs a far larger number.
+
+         BlurAmount now DOES something: above zero the pass blurs what the flat middle transmits - through the same
+         Gaussian the frosted pass uses - and leaves the rim sharp. Zero skips it entirely. The Brushes stand carries
+         the slider; these numbers are where the line was drawn between legible and still-glass.
 
          And the tint is CAPPED AT HALF by the material itself (the pass multiplies the alpha by 0.5, because glass that
          takes a heavy tint is a panel again). So 1.0 here is not "opaque", it is the most tint this material admits -
@@ -27,6 +31,11 @@
 
     <!-- The flyout surface: menus, submenus, drop-down lists, the ribbon's flyout, a slide panel.
 
+         THE TINT IS TAKEN LIVE, with {ObservableResource} and not {ResourceReference}: a static reference resolves once,
+         and a brush does not live in the visual tree, so these surfaces kept the colour of the variant they were built
+         under and stayed dark through every switch to light while the solid fills around them followed. Gradient stops
+         fell into the same trap and this is the same cure.
+
          Refraction is the material's OWN default, and left there deliberately after a spell at 8: the strength is the
          displacement at the very edge in device pixels, and the lens band it drives reaches twice that inwards. At 8
          the band is 16px, which on a menu is a hairline nobody reads as glass; at 12 it is 24 and the bend is a thing
@@ -34,8 +43,9 @@
          and not a number to chase: over a flat panel a lens and a blur both leave a flat panel. -->
     <MaterialBrush x:Key="FlyoutSurfaceFill"
                    Material="LiquidGlass"
-                   TintColor="{ResourceReference AcrylicFillColorDefault}"
+                   TintColor="{ObservableResource AcrylicFillColorDefault}"
                    TintOpacity="1.0"
+                   BlurAmount="5"
                    Refraction="12"
                    NoiseAmount="0.02"/>
 
@@ -43,8 +53,9 @@
          bending would reach the middle of it and there would be no flat part left to read text on. -->
     <MaterialBrush x:Key="TooltipSurfaceFill"
                    Material="LiquidGlass"
-                   TintColor="{ResourceReference AcrylicFillColorDefault}"
+                   TintColor="{ObservableResource AcrylicFillColorDefault}"
                    TintOpacity="1.0"
+                   BlurAmount="4"
                    Refraction="7"
                    NoiseAmount="0.02"/>
 

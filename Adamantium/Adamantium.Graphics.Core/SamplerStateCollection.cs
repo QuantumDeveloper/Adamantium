@@ -105,6 +105,11 @@ namespace Adamantium.Graphics.Core
             samplerInfo.CompareOp = compareOp;
             samplerInfo.MipmapMode = SamplerMipmapMode.Linear;
 
+            // WITHOUT THIS ONLY LEVEL 0 IS EVER READ: MaxLod defaults to zero, which clamps every sample to the top of
+            // the pyramid however high a level the shader asks for. A texture with one level is unaffected - it has
+            // nothing else to reach.
+            samplerInfo.MaxLod = 32.0f;
+
             return SamplerState.New(device, name, samplerInfo);
         }
 
