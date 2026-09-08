@@ -20,4 +20,23 @@
                          Brush="{ResourceReference TextFillColorSecondary}"/>
     </DrawingImage>
 
+    <DrawingImage x:Key="ChevronLeftIcon">
+        <GeometryDrawing Geometry="M7,0 L1,5 L7,10 Z"
+                         Brush="{ResourceReference TextFillColorSecondary}"/>
+    </DrawingImage>
+
+    <!-- The chevron ending against a WALL: "as far as this goes", which is a different statement from "one more step"
+         and has to look different at a glance, or a pager's four arrows read as two pairs of the same button. Both
+         shapes in one geometry rather than a bar drawn beside an icon - the pair is one glyph, and splitting it would
+         let the two halves drift apart in every template that used them. -->
+    <DrawingImage x:Key="FirstPageIcon">
+        <GeometryDrawing Geometry="M0,0 L1.5,0 L1.5,10 L0,10 Z M9.5,0 L3.5,5 L9.5,10 Z"
+                         Brush="{ResourceReference TextFillColorSecondary}"/>
+    </DrawingImage>
+
+    <DrawingImage x:Key="LastPageIcon">
+        <GeometryDrawing Geometry="M8.5,0 L10,0 L10,10 L8.5,10 Z M0.5,0 L6.5,5 L0.5,10 Z"
+                         Brush="{ResourceReference TextFillColorSecondary}"/>
+    </DrawingImage>
+
 </ResourceDictionary>

@@ -1061,13 +1061,19 @@ public class CodeGenerationContext
     // parsers read it and as the framework's own runtime conversion does. Emitting the text as written produced
     // "DockZone.Center,Bottom" - not a diagnostic but a syntax error inside generated code, which lands on the user as
     // CS1002 pointing at a file they never wrote.
-    // Not gated on [Flags]: a comma only means one thing here, and a non-flags enum written with one is a mistake worth
-    // reporting as "Bottom is not a member" rather than as a missing semicolon.
+    // BOTH SPELLINGS, and the pipe is the one an author actually reaches for: DisplayMode="FirstLast|Numeric" is how the
+    // same value is written in C#. .NET's own parser takes only the comma, so the natural form has to be understood
+    // here and in TypeCastFactory.ParseEnum together - accepted by the compiler and rejected by the loader would be
+    // worse than rejected by both.
+    // Not gated on [Flags]: a separator only means one thing here, and a non-flags enum written with one is a mistake
+    // worth reporting as "Bottom is not a member" rather than as a missing semicolon.
+    private static readonly char[] EnumFlagSeparators = [',', '|'];
+
     private static string BuildEnumExpression(string valueText, IResolvedType member)
     {
-        if (valueText.IndexOf(',') < 0) return $"{member.FullName}.{valueText}";
+        if (valueText.IndexOfAny(EnumFlagSeparators) < 0) return $"{member.FullName}.{valueText}";
 
-        var parts = valueText.Split(',');
+        var parts = valueText.Split(EnumFlagSeparators);
         var terms = new List<string>(parts.Length);
 
         foreach (var part in parts)

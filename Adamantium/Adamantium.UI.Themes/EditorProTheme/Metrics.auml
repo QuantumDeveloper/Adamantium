@@ -169,6 +169,22 @@
     <sys:Double x:Key="ExpanderBoxSize">12</sys:Double>
     <!-- A command glyph, two pixels down from Fluent's: at this row height a 16-pixel icon crowds the label. -->
     <sys:Double x:Key="IconSize">14</sys:Double>
+
+    <!-- ── The pager's line ────────────────────────────────────────────────────────────────────────────────────────
+         Stated here and not borrowed, because this theme does not link Fluent's metrics at all - only its icons. A key
+         that exists in Fluent's file and nowhere else simply has no answer in this theme.
+         Everything on the row takes the same CELL: height fixed, width a floor. A height that followed its content
+         would be one number on an arrow and another on a page button, and the line would step as parts came and went.
+         Denser than Fluent's, like every other control here: 24 tall against 32. -->
+    <sys:Double x:Key="PagerButtonMinWidth">26</sys:Double>
+    <sys:Double x:Key="PagerButtonHeight">24</sys:Double>
+    <sys:Double x:Key="PagerGlyphSize">9</sys:Double>
+
+    <!-- The two FIELDS on that line. Both arrive carrying ControlMinWidth (96) - a floor meant for a field standing
+         alone in a form, and far more than either needs here. Each has to be stated as Width AND MinWidth: a floor
+         beats a width, so setting only the width changes nothing and the field shoulders the buttons out of the line. -->
+    <sys:Double x:Key="PagerSizePickerWidth">64</sys:Double>
+    <sys:Double x:Key="PagerPageBoxWidth">52</sys:Double>
     <!-- The bar down the left edge of a selected row. An editor selects rows constantly - a solid accent fill per
          selection turns a file tree into a stripe pattern - so the mark is an edge and a faint wash. -->
     <sys:Double x:Key="SelectionBarWidth">2</sys:Double>

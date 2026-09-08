@@ -243,6 +243,17 @@ public class ContentControl : Control, IContentControl
          if (visual is not IMeasurableComponent child) continue;
          var size = new Size(Math.Min(child.DesiredSize.Width, finalSize.Width),
                              Math.Min(child.DesiredSize.Height, finalSize.Height));
+
+         // THE CONTENT IS NOT THE ONLY THING THAT SETS THIS CONTROL'S SIZE. Width/Height/Min*/Max* are what the element
+         // itself asked to be; measure already applied them to its DesiredSize, and dropping them here made the two
+         // disagree - the control desired one size and then drew at another. A radio wearing a toggle template is the
+         // case that found it: its MinWidth widened it in measure and this collapsed it back onto the digit, so a row of
+         // page buttons hugged its numbers however wide the theme said they were.
+         // Still never PAST the slot - not filling the slot is the whole point of this method, and the clamp below is
+         // what keeps that true when a constraint asks for more than there is room for.
+         size = this.ApplyLayoutConstraints(size);
+         size = new Size(Math.Min(size.Width, finalSize.Width), Math.Min(size.Height, finalSize.Height));
+
          child.Arrange(new Rect(size));
          return size;
       }

@@ -1,0 +1,196 @@
+<?xml version="1.0" encoding="utf-8"?>
+<StyleSet xmlns="http://adamantium/ui"
+          xmlns:x="http://adamantium/ui/xaml/extensions">
+
+    <!-- The pager: a row of steps through a collection, and a statement of where in it you are. One line, because that
+         is what it is - a caption for the list above it, not a panel in its own right.
+
+         The arrows are plain Buttons, not RepeatButtons. Auto-repeat looks like the right answer - hold one and walk the
+         pages - but a page turn re-fills the list under the pointer, and repeating at the button's rate turns that into
+         a flicker rather than a walk. One click, one page; a page further off is typed into the box, which is the whole
+         reason the box is there.
+
+         "LAST" IS BOUND TO CanGoForward LIKE THE OTHERS, and that is not a shortcut: over a source with an unknown total
+         the control refuses the jump anyway (there is no last page to jump to yet), so the button is live and does
+         nothing. It comes right the moment a short page reveals the end - which is why the text says "of ?" and not
+         "of 0". -->
+
+    <Style Selector="DataPager">
+        <Setter Property="Foreground" Value="{ObservableResource TextFillColorPrimary}"/>
+        <Setter Property="FontSize" Value="{ResourceReference FontSizeBody}"/>
+        <Setter Property="MinHeight" Value="{ResourceReference ControlHeight}"/>
+
+        <!-- The pager takes the width it is given and puts its buttons at the LEADING edge, under the first column of
+             the list it belongs to. Alignment is a SETTER rather than a constant in the template, so an author who
+             wants the row centred or trailing says so on the control. -->
+        <Setter Property="HorizontalAlignment" Value="Stretch"/>
+        <Setter Property="HorizontalContentAlignment" Value="Left"/>
+        <Setter Property="VerticalContentAlignment" Value="Center"/>
+    </Style>
+
+    <Style Selector="DataPager">
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="DataPager">
+                    <!-- CLIPPED, and that is the floor rather than the plan. The control gives up parts until the line
+                         fits (see DataPager.MeasureOverride); below the width of what is left there is nothing sensible
+                         to give up, and a row that spilled would draw its arrows over the numbers. Clipped is
+                         wrong-looking; overlapping is wrong AND unreadable. -->
+                    <Border x:Name="Chrome" HorizontalAlignment="Stretch" Padding="{TemplateBinding Padding}"
+                            ClipToBounds="True">
+                        <!-- TWO COLUMNS, because the row does two different jobs: stepping to a NEARBY page, which is
+                             what the buttons are for, and going to one too far away to be worth listing, which is what
+                             the box is for. Separated, so neither has to grow to cover the other's job. -->
+                        <Grid ColumnDefinitions="*,Auto">
+                            <StackPanel Grid.Column="0" Orientation="Horizontal"
+                                        HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                        VerticalAlignment="{TemplateBinding VerticalContentAlignment}">
+                                <Button x:Name="PART_FirstPage" Classes="PagerArrow" MarginRight="4"
+                                        IsEnabled="{TemplateBinding CanGoBack}">
+                                    <Image Source="{ResourceReference FirstPageIcon}"
+                                           Width="{ResourceReference PagerGlyphSize}"
+                                           Height="{ResourceReference PagerGlyphSize}"
+                                           HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                </Button>
+                                <Button x:Name="PART_PreviousPage" Classes="PagerArrow" MarginRight="8"
+                                        IsEnabled="{TemplateBinding CanGoBack}">
+                                    <Image Source="{ResourceReference ChevronLeftIcon}"
+                                           Width="{ResourceReference PagerGlyphSize}"
+                                           Height="{ResourceReference PagerGlyphSize}"
+                                           HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                </Button>
+
+                                <!-- The numbers are a RADIO GROUP wearing the toggle look, which is what the row
+                                     actually is: one choice out of several, and clicking the page you are already on
+                                     does nothing by construction. The ellipsis is an entry of the same shape and just
+                                     as LIVE - it steps one page its way; see PagerPageItem.
+                                     ALWAYS THE SAME NUMBER OF ENTRIES - see PageButtonCount. The row neither grows with
+                                     the page count nor loses a place at the ends, so no button under the pointer moves
+                                     out from under it. -->
+                                <ItemsControl x:Name="NumbersGroup" ItemsSource="{TemplateBinding PageItems}"
+                                              MarginRight="8" VerticalAlignment="Center">
+                                    <!-- NOT VIRTUALIZED, deliberately. As an items host this panel places its children
+                                         on a UNIFORM pitch - one measured extent for all of them - which is right for a
+                                         list of equal rows and wrong here: a page button is as wide as its number, so
+                                         "999" and "1000" are different sizes and the wide ones run into their
+                                         neighbours. There are five buttons; there is nothing to virtualize. -->
+                                    <ItemsControl.ItemsPanel>
+                                        <ItemsPanelTemplate>
+                                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center"
+                                                        IsVirtualizing="False"/>
+                                        </ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <RadioButton Classes="PagerPage"
+                                                         Content="{Binding Text}"
+                                                         IsChecked="{Binding IsCurrent}"
+                                                         IsEnabled="{Binding IsEnabled}"
+                                                         Command="{Binding Command}"
+                                                         MarginRight="4"/>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+
+                                <Button x:Name="PART_NextPage" Classes="PagerArrow" MarginRight="4"
+                                        IsEnabled="{TemplateBinding CanGoForward}">
+                                    <Image Source="{ResourceReference ChevronRightIcon}"
+                                           Width="{ResourceReference PagerGlyphSize}"
+                                           Height="{ResourceReference PagerGlyphSize}"
+                                           HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                </Button>
+                                <Button x:Name="PART_LastPage" Classes="PagerArrow"
+                                        IsEnabled="{TemplateBinding CanGoForward}">
+                                    <Image Source="{ResourceReference LastPageIcon}"
+                                           Width="{ResourceReference PagerGlyphSize}"
+                                           Height="{ResourceReference PagerGlyphSize}"
+                                           HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                </Button>
+                            </StackPanel>
+
+                            <!-- The right-hand side: how big a page is, and which one you are on. Both are STATEMENTS
+                                 about the whole collection rather than steps through it, which is why they sit apart
+                                 from the buttons instead of extending that row.
+                                 The two FIELDS take their width from metrics as BOTH Width and MinWidth: each is a
+                                 drop-down or a text field and arrives carrying ControlMinWidth, a floor meant for one
+                                 standing alone in a form - and a floor beats a width, so stating only the width would
+                                 leave the field at its 120 and shoulder the buttons out of the line. -->
+                            <StackPanel Grid.Column="1" Orientation="Horizontal" MarginLeft="16"
+                                        VerticalAlignment="Center">
+                                <StackPanel x:Name="PageSizeGroup" Orientation="Horizontal" MarginRight="16"
+                                            VerticalAlignment="Center">
+                                    <TextBlock Text="Rows"
+                                               VerticalAlignment="Center"
+                                               MarginRight="6"
+                                               Foreground="{TemplateBinding Foreground}"
+                                               FontSize="{TemplateBinding FontSize}"/>
+                                    <DropDown x:Name="PART_PageSizeSelector" VerticalAlignment="Center"
+                                              Width="{ResourceReference PagerSizePickerWidth}"
+                                              MinWidth="{ResourceReference PagerSizePickerWidth}"
+                                              Height="{ResourceReference PagerButtonHeight}"
+                                              ItemsSource="{TemplateBinding PageSizes}"/>
+                                </StackPanel>
+
+                                <StackPanel x:Name="PageInputGroup" Orientation="Horizontal" VerticalAlignment="Center">
+                                    <TextBlock Text="Page"
+                                               VerticalAlignment="Center"
+                                               MarginRight="6"
+                                               Foreground="{TemplateBinding Foreground}"
+                                               FontSize="{TemplateBinding FontSize}"/>
+                                    <!-- A NUMBER box with no buttons: a page is a whole number in a known range, and
+                                         NumericUpDown already refuses a decimal separator at the keystroke and clamps
+                                         to Minimum/Maximum. The steppers are off because the arrows beside it are the
+                                         steppers - two ways to go one page on the same line would be one too many. -->
+                                    <NumericUpDown x:Name="PART_PageBox" VerticalAlignment="Center"
+                                                   AreButtonsVisible="False"
+                                                   InputMode="Integers"
+                                                   Width="{ResourceReference PagerPageBoxWidth}"
+                                                   MinWidth="{ResourceReference PagerPageBoxWidth}"
+                                                   Height="{ResourceReference PagerButtonHeight}"/>
+                                    <TextBlock Text="{TemplateBinding PageCountText}"
+                                               VerticalAlignment="Center"
+                                               MarginLeft="6"
+                                               Foreground="{TemplateBinding Foreground}"
+                                               FontSize="{TemplateBinding FontSize}"/>
+                                </StackPanel>
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- DisplayMode, part by part. Everything is VISIBLE in the template and a trigger takes it away, rather than the
+         other way round: the default pager shows the lot, so the common case runs no triggers at all, and a part
+         someone forgets to wire is visible-and-obvious instead of missing-and-silent.
+         The flags are read one boolean at a time because that is all a trigger can read - a PropertyTrigger matches a
+         WHOLE value, so a combination could never be tested here. See DataPager. -->
+    <Style Selector="DataPager">
+        <!-- DISABLED, said ONCE for the whole row. IsEnabled is not an inheriting property here, so the buttons and
+             fields inside never learn they are off and go on looking live - while input is dead, because hit-testing
+             prunes the whole subtree of a disabled element. Opacity is the statement that reaches all of it, drawn
+             glyphs included. -->
+        <PropertyTrigger Property="IsEnabled" Value="false">
+            <Setter TargetName="Chrome" Property="Opacity" Value="0.4"/>
+        </PropertyTrigger>
+        <PropertyTrigger Property="ShowsFirstLast" Value="false">
+            <Setter TargetName="PART_FirstPage" Property="Visibility" Value="Collapsed"/>
+            <Setter TargetName="PART_LastPage" Property="Visibility" Value="Collapsed"/>
+        </PropertyTrigger>
+        <PropertyTrigger Property="ShowsPreviousNext" Value="false">
+            <Setter TargetName="PART_PreviousPage" Property="Visibility" Value="Collapsed"/>
+            <Setter TargetName="PART_NextPage" Property="Visibility" Value="Collapsed"/>
+        </PropertyTrigger>
+        <PropertyTrigger Property="ShowsNumbers" Value="false">
+            <Setter TargetName="NumbersGroup" Property="Visibility" Value="Collapsed"/>
+        </PropertyTrigger>
+        <PropertyTrigger Property="ShowsPageSizeSelector" Value="false">
+            <Setter TargetName="PageSizeGroup" Property="Visibility" Value="Collapsed"/>
+        </PropertyTrigger>
+        <PropertyTrigger Property="ShowsPageInput" Value="false">
+            <Setter TargetName="PageInputGroup" Property="Visibility" Value="Collapsed"/>
+        </PropertyTrigger>
+    </Style>
+
+</StyleSet>

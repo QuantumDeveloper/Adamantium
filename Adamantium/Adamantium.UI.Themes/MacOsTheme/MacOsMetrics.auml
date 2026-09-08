@@ -43,6 +43,12 @@
     <Thickness x:Key="PaddingControl">12 4 12 5</Thickness>
     <Thickness x:Key="PaddingControlCompact">9 3 9 4</Thickness>
 
+    <!-- The pager's cell, stated HERE and not left to Fluent's: this theme's controls are 28 where Windows uses 32, and
+         a row of page buttons that kept Fluent's height would be the one strip in the theme that did not get shorter.
+         Height is fixed and width is a floor - see the Fluent metrics for why that asymmetry is the point. -->
+    <sys:Double x:Key="PagerButtonMinWidth">30</sys:Double>
+    <sys:Double x:Key="PagerButtonHeight">28</sys:Double>
+
     <!-- A HAIRLINE, not a stroke. Fluent draws control borders 2 wide; a Mac's are one device pixel and are there to
          seat the control on its surface rather than to outline it. -->
     <Thickness x:Key="StrokeControl">1</Thickness>

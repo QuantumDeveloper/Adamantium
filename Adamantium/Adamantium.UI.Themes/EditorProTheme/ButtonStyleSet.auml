@@ -118,4 +118,29 @@
         <Setter Property="ForegroundPressed" Value="{ThemeResource AccentForegroundColor}"/>
     </Style>
 
+    <!-- A PAGER'S STEP ARROW (Button.PagerArrow). This theme's buttons are already quiet - an editor's toolbar is a
+         field of glyphs and a fill per glyph would be a wall - so an arrow only has to give up the outline it carries
+         at rest and let the pointer's own plate say where it is.
+         Height fixed, width a floor: the pair every entry on the pager's line takes, so the row cannot step. Disabled
+         dims the GLYPH, because a drawn one carries its own brush and never sees ForegroundDisabled. -->
+    <Style Selector="Button.PagerArrow">
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="BorderBrush" Value="Transparent"/>
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="BackgroundDisabled" Value="Transparent"/>
+        <Setter Property="Padding" Value="0"/>
+        <Setter Property="MinWidth" Value="{ResourceReference PagerButtonMinWidth}"/>
+        <Setter Property="Height" Value="{ResourceReference PagerButtonHeight}"/>
+        <Setter Property="MinHeight" Value="0"/>
+        <Setter Property="HorizontalContentAlignment" Value="Center"/>
+        <Setter Property="VerticalContentAlignment" Value="Center"/>
+        <Setter Property="VerticalAlignment" Value="Center"/>
+    </Style>
+
+    <Style Selector="Button.PagerArrow">
+        <PropertyTrigger Property="IsEnabled" Value="false">
+            <Setter TargetName="PART_ContentPresenter" Property="Opacity" Value="0.35"/>
+        </PropertyTrigger>
+    </Style>
+
 </StyleSet>

@@ -77,4 +77,19 @@
          document order decides, so it must follow the plain RadioButton styles it replaces. -->
     <Style Selector="RadioButton.Toggle" BasedOn="ToggleButton"/>
 
+    <!-- A PAGE NUMBER in a pager's row: the toggle look, sized to the line's cell. No padding and a floor instead - the
+         control inset made the button's width follow its LABEL, so the row shifted under the pointer as the digits
+         changed. Centring is said outright: a plain RadioButton is a dot with a label BESIDE it, and its content is
+         left-aligned until the toggle look this is based on says otherwise. -->
+    <Style Selector="RadioButton.PagerPage" BasedOn="ToggleButton"/>
+
+    <Style Selector="RadioButton.PagerPage">
+        <Setter Property="Padding" Value="0"/>
+        <Setter Property="MinWidth" Value="{ResourceReference PagerButtonMinWidth}"/>
+        <Setter Property="Height" Value="{ResourceReference PagerButtonHeight}"/>
+        <Setter Property="HorizontalContentAlignment" Value="Center"/>
+        <Setter Property="VerticalContentAlignment" Value="Center"/>
+        <Setter Property="VerticalAlignment" Value="Center"/>
+    </Style>
+
 </StyleSet>

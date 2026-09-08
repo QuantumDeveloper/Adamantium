@@ -4,6 +4,32 @@ namespace Adamantium.UI.Core;
 
 public static class TypeCastFactory
 {
+    /// <summary>Reads an enum value from markup, combined flags included: <c>"FirstLast|Numeric"</c> and
+    /// <c>"FirstLast,Numeric"</c> both mean the same set.
+    /// <para>The pipe is the form an author reaches for, because it is how the same value is written in C#, and .NET's
+    /// own parser accepts only the comma - so a markup file written the natural way threw from inside the loader
+    /// instead of setting the property. One entry point for every reader, so the two spellings cannot be accepted in
+    /// one place and rejected in the next.</para></summary>
+    public static object ParseEnum(Type enumType, string text) =>
+        Enum.Parse(enumType, text.Replace('|', ','), ignoreCase: true);
+
+    /// <summary>The <see cref="ParseEnum(Type, string)"/> form that reports failure instead of throwing.</summary>
+    public static bool TryParseEnum(Type enumType, string text, out object value)
+    {
+        value = null;
+        if (string.IsNullOrEmpty(text)) return false;
+
+        try
+        {
+            value = ParseEnum(enumType, text);
+            return true;
+        }
+        catch (ArgumentException)
+        {
+            return false;
+        }
+    }
+
     public static object CastFromString(object input, Type finalType)
     {
         // Already a valid value for the target type -> use it as-is. Covers the exact type AND the assignable cases:
@@ -42,7 +68,7 @@ public static class TypeCastFactory
                 return Convert.ChangeType(input, finalType, System.Globalization.CultureInfo.InvariantCulture);
             }
 
-            if (finalType.IsEnum) return Enum.Parse(finalType, input.ToString(), ignoreCase: true);
+            if (finalType.IsEnum) return ParseEnum(finalType, input.ToString());
 
             // Everything else (Brush, Thickness, CornerRadius, Color, Vector2, Geometry, …) converts through the engine's
             // TypeParser - honouring [TypeParser] + the ParserRegistry - i.e. the same conversion a compiled build uses.

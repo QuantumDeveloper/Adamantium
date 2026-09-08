@@ -188,7 +188,9 @@ public class MergedFluentThemeTests
         // 50 rather than 49 since the busy indicator was SPLIT: the plain one stayed Fluent's, and the nine classed
         // effects moved to Shared/BusyEffectsStyleSet, which belongs to no theme. Nothing was lost - one entry became
         // two - and the count is raised deliberately rather than the guarantee relaxed.
-        Assert.That(merged.StyleIncludes.Count, Is.EqualTo(50));
+        // 51 since the DataPager arrived: a NEW control, so a new set. Raised for the same reason and in the same
+        // spirit - this guard is against a set going missing, not against the theme ever gaining one.
+        Assert.That(merged.StyleIncludes.Count, Is.EqualTo(51));
     }
 
     [Test]

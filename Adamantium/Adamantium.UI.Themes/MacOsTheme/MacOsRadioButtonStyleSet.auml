@@ -91,4 +91,54 @@
          has to be declared after the plain RadioButton styles it replaces. -->
     <Style Selector="RadioButton.Toggle" BasedOn="ToggleButton"/>
 
+    <!-- A PAGE NUMBER in a pager's row: the toggle look, plus the one thing a toggle in this theme does not do. Same
+         reasoning as RepeatButton.PagerArrow - a row of numbers is read as a row of destinations, and the pointer has
+         to say which one it is on before the click, because unlike a lone toggle there are five of them side by side.
+
+         The hover is a MULTITRIGGER rather than a plain one so the CURRENT page keeps its accent while the pointer is
+         over it. A bare IsMouseOver trigger sits above the inherited IsChecked one and would swap the accent for the
+         subtle fill - the page you are on would go grey exactly when you pointed at it. -->
+    <Style Selector="RadioButton.PagerPage" BasedOn="ToggleButton"/>
+
+    <!-- NO PADDING, A FLOOR INSTEAD. The control padding is a text inset - it is 12 to the left and 12 to the right of
+         a word, and vertically 4 above and 5 below, which is right for a caption sitting on a baseline and wrong for a
+         number centred in a square. Worse, it made the button's width a function of its LABEL: "1" and "146" came out
+         different widths, so every button beside them shifted as the reader paged, and the ellipsis - a narrow glyph
+         with the same 24 points of inset - set its own width too. Zero inset plus a minimum leaves the number centred
+         in a square that only grows once a number is genuinely wider than the square. -->
+    <Style Selector="RadioButton.PagerPage">
+        <Setter Property="BackgroundPointerOver" Value="{ResourceReference SubtleFillColorSecondary}"/>
+        <Setter Property="Padding" Value="0"/>
+
+        <!-- The same two keys the arrows take, so the row lines up by construction rather than by two numbers that
+             happen to be equal today. Height FIXED, width a floor - a height that followed its content would step up
+             and down as the digits changed. -->
+        <Setter Property="MinWidth" Value="{ResourceReference PagerButtonMinWidth}"/>
+        <Setter Property="Height" Value="{ResourceReference PagerButtonHeight}"/>
+
+        <!-- Said outright, not inherited. The plain RadioButton states only its VERTICAL content alignment - a radio is
+             a dot with a label beside it, so its content is left-aligned by default - and the centring these need
+             arrives only through the toggle look this class is based on. Once the padding is gone and the width is a
+             floor, an uncentred number sits against the left wall of a 30-point box, which is what "off" looks like.
+             The button itself is centred in the row for the same reason: its height is fixed, so anything that stretched
+             or topped it would put it at a different level from its neighbours. -->
+        <Setter Property="HorizontalContentAlignment" Value="Center"/>
+        <Setter Property="VerticalContentAlignment" Value="Center"/>
+        <Setter Property="VerticalAlignment" Value="Center"/>
+    </Style>
+
+    <!-- The hover is gated on NOT being the current page. A trigger setter carries the BAND of the style that declared
+         it and a class style outranks a type style, so an unguarded IsMouseOver here would sit above the inherited
+         IsChecked trigger and the page you are on would go grey the moment you pointed at it. Pressed is left to the
+         toggle's own triggers, which this does not contradict. -->
+    <Style Selector="RadioButton.PagerPage">
+        <MultiTrigger>
+            <MultiTrigger.Conditions>
+                <Condition Property="IsMouseOver" Value="true"/>
+                <Condition Property="IsChecked" Value="false"/>
+            </MultiTrigger.Conditions>
+            <Setter TargetName="InnerBorder" Property="Background" Value="{TemplateBinding BackgroundPointerOver}"/>
+        </MultiTrigger>
+    </Style>
+
 </StyleSet>

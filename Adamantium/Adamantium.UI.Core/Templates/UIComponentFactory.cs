@@ -131,7 +131,7 @@ public class UIComponentFactory
         }
         else if (propertyType.IsEnum)
         {
-            var enumValue = Enum.Parse(propertyType, textValue.Text);
+            var enumValue = TypeCastFactory.ParseEnum(propertyType, textValue.Text);
             property.SetValue(obj, enumValue);
         }
         else if (propertyType == typeof(IList<>))

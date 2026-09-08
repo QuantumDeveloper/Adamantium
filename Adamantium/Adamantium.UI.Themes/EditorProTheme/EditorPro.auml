@@ -60,6 +60,7 @@
     <StyleInclude Source="{x:Type editor:ToggleSwitchStyleSet}"/>
     <StyleInclude Source="{x:Type editor:DropDownStyleSet}"/>
     <StyleInclude Source="{x:Type editor:NumericUpDownStyleSet}"/>
+    <StyleInclude Source="{x:Type editor:DataPagerStyleSet}"/>
     <StyleInclude Source="{x:Type editor:ProgressBarStyleSet}"/>
     <StyleInclude Source="{x:Type editor:SliderStyleSet}"/>
     <StyleInclude Source="{x:Type editor:RangeSliderStyleSet}"/>

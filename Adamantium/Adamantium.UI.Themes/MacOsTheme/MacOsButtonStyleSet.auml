@@ -119,4 +119,32 @@
             <Setter TargetName="InnerBorder" Property="Background" Value="{TemplateBinding BackgroundPointerOver}"/>
         </PropertyTrigger>
     </Style>
+
+    <!-- A PAGER'S STEP ARROW. Worn ALONGSIDE Icon - the template says Classes="Icon PagerArrow" - rather than based on
+         it: BasedOn resolves through PURE-TYPE styles only, so BasedOn="Button.Icon" would quietly hand back the plain
+         bordered button and look like a typo in the theme rather than a bug. Two classes on one button is what the
+         mechanism is for, and it leaves the flat look with ONE owner.
+         So this class is only what Icon does not say. THE HEIGHT IS FIXED AND THE WIDTH IS A FLOOR, and that asymmetry
+         is the whole point: a height that followed its content would be one number on an arrow and another on a page
+         button, and the row would step up and down as well as sideways. One height for every entry, taken from the same
+         key, so they cannot drift; width free to grow past the floor, because a five-digit page number has to fit.
+         AND IT DIMS ITS GLYPH. The plain button greys a disabled control through the content presenter's FOREGROUND,
+         which is how these arrows read while they were the characters "<" and ">"; a drawn glyph carries its own brush
+         and ignores that, so on page one the two back arrows sat there looking live. Opacity reaches a picture. -->
+    <Style Selector="Button.PagerArrow">
+        <Setter Property="MinWidth" Value="{ResourceReference PagerButtonMinWidth}"/>
+        <Setter Property="Height" Value="{ResourceReference PagerButtonHeight}"/>
+
+        <!-- Centred in the row and centred in itself, both said outright: the height is fixed, so an arrow left to
+             stretch or to sit at the top would stand at a different level from the numbers beside it. -->
+        <Setter Property="HorizontalContentAlignment" Value="Center"/>
+        <Setter Property="VerticalContentAlignment" Value="Center"/>
+        <Setter Property="VerticalAlignment" Value="Center"/>
+    </Style>
+
+    <Style Selector="Button.PagerArrow">
+        <PropertyTrigger Property="IsEnabled" Value="false">
+            <Setter TargetName="PART_ContentPresenter" Property="Opacity" Value="0.35"/>
+        </PropertyTrigger>
+    </Style>
 </StyleSet>

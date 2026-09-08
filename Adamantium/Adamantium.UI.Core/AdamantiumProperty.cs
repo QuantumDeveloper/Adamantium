@@ -319,19 +319,12 @@ public sealed class AdamantiumProperty:IEquatable<AdamantiumProperty>
       }
    }
 
-   private static bool FindType(Type typeToCompare, Type typeToSearch)
-   {
-      Type tmpType = typeToSearch;
-      while (tmpType != null)
-      {
-         if (tmpType == typeToCompare)
-         {
-            return true;
-         }
-         tmpType = tmpType.GetTypeInfo().BaseType;
-      }
-      return false;
-   }
+   // Is a default value acceptable for a property of this type? INTERFACES COUNT. Walking only the base-class chain
+   // meant a property typed as an interface could not have a default at all - the one thing every implementation of it
+   // is not is a base class of it - so an IList-typed property was forced to default to null and have its real default
+   // written in a constructor, which takes the Local slot and masks every binding on it for the life of the object.
+   private static bool FindType(Type typeToCompare, Type typeToSearch) =>
+      typeToCompare.GetTypeInfo().IsAssignableFrom(typeToSearch.GetTypeInfo());
 
    public static AdamantiumProperty Register(String name, Type propertyType, Type ownerType)
    {
