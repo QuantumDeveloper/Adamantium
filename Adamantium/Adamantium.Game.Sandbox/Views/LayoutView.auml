@@ -22,7 +22,7 @@
          is the live check that the ellipse SDF renders a real ellipse (rx != ry) crisply at any aspect. The resource
          dictionary is linked into the Local scope above, so it lives only while this tab is open. (Stroke/Pen playground
          moved to the Shapes tab - here we keep just size + template.) -->
-    <Grid RowDefinitions="Auto,*" Margin="24">
+    <Grid RowDefinitions="Auto,*,Auto" Margin="24">
         <StackPanel Grid.Row="0" Orientation="Horizontal">
             <TextBlock Text="Width:" VerticalAlignment="Center"/>
             <!-- The range comes from the view-model, which also decides the size the tab opens at - the same number in
@@ -65,7 +65,7 @@
 
         <ListBox Grid.Row="1" x:Name="TileGrid"
                  Margin="0 14 0 0"
-                 ItemsSource="{Binding Rectangles}"
+                 ItemsSource="{Binding TileSource}"
                  SelectedItem="{Binding SelectedRect, Mode=TwoWay}">
             <!-- The base template (rounded rectangle) is a Setter, NOT a local ItemTemplate attribute: a local value
                  (priority Local=1) would outrank the DataTrigger's Setter (Trigger=3) and the toggle could never swap it.
@@ -110,5 +110,22 @@
                 </ItemsPanelTemplate>
             </ListBox.ItemsPanel>
         </ListBox>
+
+        <!-- THE OTHER ANSWER TO THE SAME PROBLEM, on the same 60 000 tiles. Virtualization keeps the whole collection
+             and realizes a window of it; paging hands the grid a shorter collection and lets it realize the lot. The
+             tab opens VIRTUALIZED because that is what it exists to measure - the switch is here so the two can be
+             compared on identical data rather than on two stands with different rows.
+             The pager is always present: with paging off it has one page of everything and says so, which is a truer
+             picture than a control that appears and disappears. -->
+        <!-- A GRID, not a horizontal StackPanel. A stack offers its children UNBOUNDED width along its orientation, and
+             an unbounded width is not a width: the pager would take whatever it wanted and never learn what it has, so
+             it could neither shed a part nor be told it had overflowed the tab. The star column gives it a real one. -->
+        <Grid Grid.Row="2" ColumnDefinitions="Auto,*" Margin="0,12,0,0">
+            <CheckBox Grid.Column="0" Content="Page the tiles instead of virtualizing them"
+                      IsChecked="{Binding IsPaged, Mode=TwoWay}"
+                      VerticalAlignment="Center" MarginRight="24"/>
+            <DataPager Grid.Column="1" Source="{Binding Paged}" IsEnabled="{Binding IsPaged}"
+                       PageSizes="{Binding PageSteps}" PageSize="500" VerticalAlignment="Center"/>
+        </Grid>
     </Grid>
 </View>

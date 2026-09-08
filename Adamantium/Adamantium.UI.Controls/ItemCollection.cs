@@ -74,7 +74,14 @@ public sealed class ItemCollection : IList<object>, IReadOnlyList<object>, INoti
                 for (var i = 0; i < e.NewItems.Count; i++)
                     _sourceSnapshot[e.OldStartingIndex + i] = e.NewItems[i];
                 break;
+            // A MOVE is carried, not flattened into a rebuild. Live sorting reports an item changing places as exactly
+            // this, and answering it with Reset would throw away every realized container on the screen to relocate one
+            // row - which is the difference between a row sliding to its new place and the list blinking.
             case NotifyCollectionChangedAction.Move:
+                var moved = _sourceSnapshot[e.OldStartingIndex];
+                _sourceSnapshot.RemoveAt(e.OldStartingIndex);
+                _sourceSnapshot.Insert(e.NewStartingIndex, moved);
+                break;
             case NotifyCollectionChangedAction.Reset:
                 _sourceSnapshot = _source?.Cast<object>().ToList() ?? [];
                 Raise(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Reset));

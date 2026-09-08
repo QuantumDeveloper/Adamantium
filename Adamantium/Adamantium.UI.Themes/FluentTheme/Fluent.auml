@@ -69,6 +69,7 @@
         <StyleInclude Source="{x:Type fluent:TilesHostStyleSet}"/>
         <StyleInclude Source="{x:Type fluent:FlipTileStyleSet}"/>
         <StyleInclude Source="{x:Type fluent:DropDownStyleSet}"/>
+        <StyleInclude Source="{x:Type fluent:DataPagerStyleSet}"/>
         <StyleInclude Source="{x:Type fluent:DropDownItemStyleSet}"/>
         <StyleInclude Source="{x:Type fluent:TextBoxStyleSet}"/>
         <StyleInclude Source="{x:Type fluent:ToolTipStyleSet}"/>

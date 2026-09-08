@@ -1,26 +1,120 @@
 <View xmlns="http://adamantium/ui">
     <!-- DataContext is the ListsViewModel. Both ListBoxes share Items; single-select is bound two-way to SelectedItem. -->
-    <StackPanel Orientation="Horizontal" Margin="24">
+    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto">
+    <StackPanel Orientation="Vertical" Margin="24">
 
-        <StackPanel Orientation="Vertical">
-            <TextBlock Text="Single select" Margin="0,0,0,6"/>
-            <ListBox Width="200" Height="240"
-                     ItemsSource="{Binding Items}"
-                     SelectedItem="{Binding SelectedItem, Mode=TwoWay}"/>
-            <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
-                <Button Content="Add" Command="{Binding AddCommand}" Width="80" Height="32" Margin="0,0,8,0"/>
-                <Button Content="Remove" Command="{Binding RemoveSelectedCommand}" Width="90" Height="32"/>
+        <StackPanel Orientation="Horizontal">
+
+            <StackPanel Orientation="Vertical">
+                <TextBlock Text="Single select" Margin="0,0,0,6"/>
+                <ListBox Width="200" Height="240"
+                         ItemsSource="{Binding Items}"
+                         SelectedItem="{Binding SelectedItem, Mode=TwoWay}"/>
+                <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
+                    <Button Content="Add" Command="{Binding AddCommand}" Width="80" Height="32" Margin="0,0,8,0"/>
+                    <Button Content="Remove" Command="{Binding RemoveSelectedCommand}" Width="90" Height="32"/>
+                </StackPanel>
+            </StackPanel>
+
+            <StackPanel Orientation="Vertical" Margin="24,0,0,0">
+                <TextBlock Text="Multiple select" Margin="0,0,0,6"/>
+                <ListBox Width="200" Height="240" SelectionMode="Multiple" ItemsSource="{Binding Items}"/>
+            </StackPanel>
+
+            <StackPanel Orientation="Vertical" Margin="24,0,0,0">
+                <TextBlock Text="Selected (single):"/>
+                <TextBlock Text="{Binding SelectedItem}" FontSize="18" Margin="0,6,0,0"/>
             </StackPanel>
         </StackPanel>
 
-        <StackPanel Orientation="Vertical" Margin="24,0,0,0">
-            <TextBlock Text="Multiple select" Margin="0,0,0,6"/>
-            <ListBox Width="200" Height="240" SelectionMode="Multiple" ItemsSource="{Binding Items}"/>
+        <!-- THE LARGE LIST. Twenty thousand rows through a CollectionView: filtered as you type, sorted, then cut into
+             pages - in that order, which is the only one that means anything. The list and the pager are bound to the
+             SAME view, so they are turning the same pages.
+             What to watch: type into the box and the count moves while you type, not when you stop; the page you are on
+             re-fills rather than going short; and with a filter that leaves less than a page, the pager falls back to
+             the last page that exists instead of showing nothing. -->
+        <TextBlock Text="Large list — 20 000 rows, filtered live and paged" FontSize="18" Margin="0,24,0,8"/>
+
+        <!-- Only the search stays out here: it belongs to the LIST. How big a page is belongs to the pager, and it now
+             has its own picker - two of them would be two answers to the same question. -->
+        <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+            <TextBlock Text="Search" VerticalAlignment="Center" MarginRight="8"/>
+            <TextBox Width="220" Height="32" Text="{Binding Search, Mode=TwoWay}"/>
         </StackPanel>
 
-        <StackPanel Orientation="Vertical" Margin="24,0,0,0">
-            <TextBlock Text="Selected (single):"/>
-            <TextBlock Text="{Binding SelectedItem}" FontSize="18" Margin="0,6,0,0"/>
+        <ListBox Width="720" Height="300" ItemsSource="{Binding Large}" HorizontalAlignment="Left"/>
+
+        <!-- The same width as the list it belongs to, so the row of buttons centres over the rows it is turning. -->
+        <DataPager Width="720" HorizontalAlignment="Left" Margin="0,8,0,0"
+                   Source="{Binding Large}" DisplayMode="{Binding PagerMode}"
+                   PageSizes="{Binding PageSteps}"/>
+
+        <!-- DisplayMode is one value carrying five independent bits; a check box is the control for a bit. Tick them and
+             watch BOTH pagers - the wide one obeys directly, and the narrow one below obeys and then drops whatever no
+             longer fits, which is how you can see the two mechanisms are not the same thing. -->
+        <TextBlock Text="Parts to show" Margin="0,16,0,4"/>
+        <StackPanel Orientation="Horizontal">
+            <CheckBox Content="First/Last" IsChecked="{Binding ShowFirstLast, Mode=TwoWay}" MarginRight="16"/>
+            <CheckBox Content="Previous/Next" IsChecked="{Binding ShowPreviousNext, Mode=TwoWay}" MarginRight="16"/>
+            <CheckBox Content="Numbers" IsChecked="{Binding ShowNumeric, Mode=TwoWay}" MarginRight="16"/>
+            <CheckBox Content="Rows per page" IsChecked="{Binding ShowPageSizeSelector, Mode=TwoWay}" MarginRight="16"/>
+            <CheckBox Content="Page input" IsChecked="{Binding ShowPageInput, Mode=TwoWay}"/>
         </StackPanel>
+
+        <!-- The progression EDITED IN PLACE, which is a different question from replacing it: the picker is watching the
+             same collection, so a step added has to appear without anything being re-assigned - and a step taken away
+             while it is the one in use has to move the page size to one that still exists, live. -->
+        <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
+            <TextBlock Text="Page sizes on offer" VerticalAlignment="Center" MarginRight="8"/>
+            <Button Content="Add a step" Command="{Binding AddStepCommand}" Height="32" MarginRight="8"/>
+            <Button Content="Drop the one in use" Command="{Binding DropCurrentStepCommand}" Height="32" MarginRight="16"/>
+
+            <!-- The progression itself, bound to the SAME collection the pager's picker is bound to. If this list moves
+                 and the picker does not, the fault is in the picker; if neither moves, the button never fired. -->
+            <TextBlock Text="now:" VerticalAlignment="Center" MarginRight="6"/>
+            <!-- ONE TEXT BLOCK, not a list. An items host places its rows on a uniform pitch - one measured extent for
+                 all of them - which is right for rows of equal size and wrong for numbers of two, three and four
+                 digits: the narrow ones got a gap and the wide ones ran into each other, and no Spacing can mend that
+                 because the spacing is added to the pitch, not between the actual widths. -->
+            <TextBlock Text="{Binding PageStepsText}" VerticalAlignment="Center"/>
+        </StackPanel>
+
+        <!-- ── A SERVER THAT HANDS OUT ONE PAGE AT A TIME ────────────────────────────────────────────────────────────
+             The other half of the contract, and the half an in-memory view can never show. Watch for four things:
+             the total is "?" until the LAST page comes back short - it is discovered, not announced;
+             a page ARRIVES, so there is a moment of loading and the buttons go quiet while it is in flight;
+             clicking through fast SUPERSEDES - the answer to a request nobody is waiting for any more is thrown away;
+             and a failure leaves the page you were on ON SCREEN. A source that emptied the list on a failure would be
+             punishing the reader for the server's mistake. -->
+        <TextBlock Text="A server that hands out one page at a time — 237 rows it will not count for you"
+                   FontSize="18" Margin="0,28,0,8"/>
+
+        <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+            <TextBlock Text="Answers in" VerticalAlignment="Center" MarginRight="8"/>
+            <NumericUpDown Width="90" VerticalAlignment="Center" InputMode="Integers"
+                           Minimum="0" Maximum="5000" SmallChange="100"
+                           Value="{Binding ServerDelay, Mode=TwoWay}"/>
+            <TextBlock Text="ms" VerticalAlignment="Center" MarginLeft="6" MarginRight="16"/>
+            <Button Content="Fail the next page" Command="{Binding FailNextServerRequestCommand}"
+                    Height="32" MarginRight="8"/>
+            <Button Content="Ask again" Command="{Binding ReloadServerPageCommand}" Height="32" MarginRight="16"/>
+            <TextBlock Text="{Binding ServerStatus}" VerticalAlignment="Center"/>
+        </StackPanel>
+
+        <ListBox Width="720" Height="220" ItemsSource="{Binding Server}" HorizontalAlignment="Left"/>
+
+        <DataPager Width="720" HorizontalAlignment="Left" Margin="0,8,0,0"
+                   Source="{Binding Server}"/>
+
+        <!-- THE SAME VIEW, THROUGH A NARROWER PAGER. Both turn the same pages - which is the point of one view behind
+             both - and this one has to fit the same row into far less room: it gives up the size picker first, then the
+             jumps to the ends, then the numbers, and never the step arrows or the page it is on. Watch it against the
+             wide one above: the two are always on the same page. -->
+        <TextBlock Text="The same view, 420 wide — the row sheds what does not fit" Margin="0,16,0,4"/>
+        <DataPager Width="420" HorizontalAlignment="Left"
+                   Source="{Binding Large}" DisplayMode="{Binding PagerMode}"
+                   PageSizes="{Binding PageSteps}"/>
+
     </StackPanel>
+    </ScrollViewer>
 </View>

@@ -340,7 +340,10 @@ internal sealed class AumlInstantiator
     {
         result = default;
         var text = (value as AumlAstTextNode)?.Text;
-        return !string.IsNullOrEmpty(text) && Enum.TryParse(text, ignoreCase: true, out result);
+        if (!TypeCastFactory.TryParseEnum(typeof(T), text, out var parsed)) return false;
+
+        result = (T)parsed;
+        return true;
     }
 
     // Resolves a markup value node to a runtime object: a markup extension (incl. a converter authored AS a markup
@@ -451,7 +454,7 @@ internal sealed class AumlInstantiator
             // An object-typed property (e.g. Setter.Value="Auto") takes the raw string in markup; the real
             // conversion happens later when the value is applied to its concrete target property.
             if (t == typeof(object)) { result = text; return true; }
-            if (t.IsEnum) { result = Enum.Parse(t, text, ignoreCase: true); return true; }
+            if (t.IsEnum) { result = TypeCastFactory.ParseEnum(t, text); return true; }
             if (t == typeof(bool)) { result = bool.Parse(text); return true; }
             if (t.IsPrimitive || t == typeof(decimal))
             {

@@ -16,6 +16,29 @@
          wrong the first time one is not. -->
     <sys:Double x:Key="IconSize">16</sys:Double>
 
+    <!-- The step arrows on a pager. Between the two above because that is what they are: bigger than a chevron that
+         only says "there is more here", smaller than a command's glyph, since four of them sit in one line of text. -->
+    <sys:Double x:Key="PagerGlyphSize">10</sys:Double>
+
+    <!-- THE CELL a pager's row is built from - every entry in it, arrow and number alike, is at least this box. Two
+         keys rather than four so the arrows and the numbers cannot be given matching sizes that later drift apart:
+         they line up because they are told the same number, not because two numbers happen to be equal.
+         The width is a FLOOR, not a width. A page number is one to five digits wide and its button follows it, but
+         never goes under this - so a row of single digits is a row of even cells rather than a line of slivers, and the
+         ellipsis, narrower than any number, sits at exactly this instead of setting its own. Padding is zero on these
+         buttons, so this is the whole of what holds them apart. -->
+    <sys:Double x:Key="PagerButtonMinWidth">32</sys:Double>
+    <sys:Double x:Key="PagerButtonHeight">32</sys:Double>
+
+    <!-- The two FIELDS on a pager's line. Both arrive carrying ControlMinWidth (120) - a floor meant for a field that
+         stands alone in a form, and roughly twice what either needs here: the picker shows "100", the box shows a page
+         number, and PaddingField leaves 20 of the box to the inset.
+         BOTH have to be stated as Width AND MinWidth. A floor beats a width (ApplyLayoutConstraints does Max last), so
+         setting only the width changes nothing at all and the field silently keeps its 120 and shoulders the buttons
+         out of the line - which is exactly how this row first shipped, twice. -->
+    <sys:Double x:Key="PagerSizePickerWidth">76</sys:Double>
+    <sys:Double x:Key="PagerPageBoxWidth">60</sys:Double>
+
     <!-- ── Type scale ─────────────────────────────────────────────────────────────────────────────────────────────
          Named by ROLE, not by size: what a template asks for is "chrome text" or "a caption", and a theme decides how
          big that is. The names are a CONTRACT between themes - a template that asks for a key is included by other

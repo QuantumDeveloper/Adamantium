@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using System.Linq;
 using Adamantium.MVVM;
+using Adamantium.UI.Core.Collections;
 
 namespace Adamantium.Game.Sandbox.ViewModels;
 
@@ -16,7 +17,37 @@ public partial class LayoutViewModel : TabPageViewModel
     {
         Rectangles = new(Enumerable.Range(0, 60000)
             .Select(i => new ColorRect { Color = Palette[i % Palette.Length] }));
+
+        // No page size here: the PAGER owns it. It pushes its own into whatever source it is given, so a size stated in
+        // both places is a size stated twice, and the one written here would simply be overwritten on attach.
+        Paged = new CollectionView(Rectangles);
+        TileSource = Rectangles;
     }
+
+    // ── VIRTUALIZED, OR PAGED - the same 60 000 tiles either way ───────────────────────────────────────────────────
+    //
+    // Two answers to the same problem, side by side on the data that makes the problem real. Virtualization keeps the
+    // whole collection and realizes a window of it; paging hands the list a SHORTER COLLECTION and lets it realize the
+    // lot. This tab exists to measure the first, so the first is what it opens on - the switch is here so the second
+    // can be measured against it on identical data rather than on a stand of its own with different rows.
+
+    /// <summary>The paged view of the same tiles. Five hundred to a page: enough that a page is still a screenful of
+    /// work, few enough that the difference from 60 000 is the point.</summary>
+    public CollectionView Paged { get; }
+
+    /// <summary>The page sizes THIS tab offers, and they are nothing like a list's. Ten tiles is not a page, it is a
+    /// row; the interesting range here starts where a page is a real amount of layout and ends where it is most of the
+    /// sixty thousand - which is the comparison the tab is for. The control's own 10/25/50/100 would put every choice
+    /// below the point at which either mechanism is under any strain.</summary>
+    public int[] PageSteps { get; } = [100, 250, 500, 1000, 2500, 5000];
+
+    /// <summary>What the grid is actually showing - the whole collection, or one page of it.</summary>
+    [Bindable] private object _tileSource;
+
+    /// <summary>Off: the grid holds all 60 000 and virtualizes. On: it holds one page and does not have to.</summary>
+    [Bindable] private bool _isPaged;
+
+    partial void OnIsPagedChanged(bool value) => TileSource = value ? Paged : (object)Rectangles;
 
     private static readonly string[] Palette =
         ["#3B82F6", "#22C55E", "#F59E0B", "#EF4444", "#8B5CF6", "#14B8A6", "#EC4899", "#EAB308"];

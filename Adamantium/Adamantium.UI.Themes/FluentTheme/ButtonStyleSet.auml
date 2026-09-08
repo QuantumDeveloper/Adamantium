@@ -91,4 +91,32 @@
         <Setter Property="BackgroundDisabled" Value="{ThemeResource AccentFillColorDisabled}"/>
         <Setter Property="ForegroundPressed" Value="{ThemeResource AccentForegroundColor}"/>
     </Style>
+
+    <!-- A PAGER'S STEP ARROW (Button.PagerArrow): the same template with its chrome taken away, so what is left is the
+         glyph and the plate the pointer brings. The hover and pressed brushes are inherited untouched - this theme
+         answers the pointer on every button, and an arrow is no exception.
+         THE HEIGHT IS FIXED AND THE WIDTH IS A FLOOR, the same pair every entry on that line takes, so the row lines up
+         by construction rather than by two numbers that happen to agree.
+         AND IT DIMS ITS GLYPH: the base greys a disabled control through the content presenter's FOREGROUND, which a
+         drawn glyph carries its own brush and ignores - so on the first page the two back arrows sat there looking live.
+         Opacity is what reaches a picture. -->
+    <Style Selector="Button.PagerArrow">
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="BorderBrush" Value="Transparent"/>
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="BackgroundDisabled" Value="Transparent"/>
+        <Setter Property="Padding" Value="0"/>
+        <Setter Property="MinWidth" Value="{ResourceReference PagerButtonMinWidth}"/>
+        <Setter Property="Height" Value="{ResourceReference PagerButtonHeight}"/>
+        <Setter Property="MinHeight" Value="0"/>
+        <Setter Property="HorizontalContentAlignment" Value="Center"/>
+        <Setter Property="VerticalContentAlignment" Value="Center"/>
+        <Setter Property="VerticalAlignment" Value="Center"/>
+    </Style>
+
+    <Style Selector="Button.PagerArrow">
+        <PropertyTrigger Property="IsEnabled" Value="false">
+            <Setter TargetName="PART_ContentPresenter" Property="Opacity" Value="0.35"/>
+        </PropertyTrigger>
+    </Style>
 </StyleSet>
