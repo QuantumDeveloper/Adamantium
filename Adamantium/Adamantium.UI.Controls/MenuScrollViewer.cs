@@ -54,6 +54,13 @@ public class MenuScrollViewer : ScrollViewer
 
     private void UpdateArrows()
     {
+        // Not arranged yet -> there is no viewport to compare against, and answering anyway answers against ZERO: any
+        // content at all "overflows" nothing, the down arrow lights up, and it then keeps itself lit - the arrow lives
+        // INSIDE this template and takes its own 18px off the viewport, so the overflow it was shown for is the overflow
+        // it creates. Measured on an 84px menu: extent=84/viewport=0 -> down, extent=84/viewport=66 -> still down,
+        // extent=84/viewport=84 -> off. Three passes and a card 18px too tall on every single open.
+        if (ViewportSize.Height <= 0) return;
+
         var maxY = Math.Max(0, ExtentSize.Height - ViewportSize.Height);
         CanScrollUp = ScrollOffset.Y > 0.5;
         CanScrollDown = ScrollOffset.Y < maxY - 0.5;
