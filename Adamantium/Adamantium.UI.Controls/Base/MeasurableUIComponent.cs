@@ -816,7 +816,11 @@ public class MeasurableUIComponent : ObservableUIComponent, IName, IMeasurableCo
 
     public virtual void InvalidateMeasure()
     {
-        if (Core.Diagnostics.LayoutTrace.Counting) Core.Diagnostics.LayoutTrace.Count(GetType(), "*any-measure*");
+        if (Core.Diagnostics.LayoutTrace.Counting)
+        {
+            Core.Diagnostics.LayoutTrace.Count(GetType(), "*any-measure*");
+            Core.Diagnostics.LayoutTrace.CountCaller(GetType(), "invalidate-measure", 1);
+        }
 
         // NO early return for an already-invalid node. The flag and the QUEUE are two different things: a node marked
         // invalid at a moment when it could not be enqueued - detached (the dirty queue belongs to the visual root), or

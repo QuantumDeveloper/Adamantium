@@ -126,6 +126,10 @@ public class Program
                 // changes width, is shoving its neighbours and cascading into the whole window.
                 var countLayout = Environment.GetEnvironmentVariable("ADAM_LAYOUT_COUNT") == "1";
                 if (countLayout) Adamantium.UI.Core.Diagnostics.LayoutTrace.Counting = true;
+                // ADAM_LAYOUT_CALLERS=1: also walk the stack for WHO asked. Slow, and the only thing that answers
+                // "this subtree is dirty every frame and no property changed".
+                if (Environment.GetEnvironmentVariable("ADAM_LAYOUT_CALLERS") == "1")
+                    Adamantium.UI.Core.Diagnostics.LayoutTrace.CountCallers = true;
                 var secondIndex = 0; long lastRetained = 0;   // retainMB: forced-collection sample, taken every 8th second
 
                 // TEMP (ADAM_THEME_FLIP=N): swap the theme N times WHILE the measurement window runs - on its own thread,

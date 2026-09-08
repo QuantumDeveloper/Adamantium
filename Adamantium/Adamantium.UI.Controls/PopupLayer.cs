@@ -108,6 +108,7 @@ public class PopupLayer
         // Iterate a snapshot: a popup can open/close (Add/Remove on the pump thread) while this lays out on the render thread.
         Popup[] snapshot;
         lock (_sync) snapshot = _popups.ToArray();
+
         foreach (var popup in snapshot)
         {
             if (popup.ChildValue is not MeasurableUIComponent child) continue;
@@ -142,6 +143,7 @@ public class PopupLayer
             // RemeasureIfDirty cascades the re-measure down to the dirty node, so a static tooltip costs ~nothing.
             var remeasured = RemeasureIfDirty(child, new Size(double.PositiveInfinity, double.PositiveInfinity));
             var size = child.DesiredSize;
+
             if (!IsFinitePositive(size.Width) || !IsFinitePositive(size.Height)) continue;
 
             // Never larger than the window (a degenerate huge content can't blow up the render target).
@@ -209,6 +211,7 @@ public class PopupLayer
     private static bool NeedsArrange(IUIComponent node)
     {
         if (node == null) return false;
+        if (node.Visibility == Visibility.Collapsed) return false;   // never arranged either - see NeedsLayout
         if (node is IMeasurableComponent { IsArrangeValid: false }) return true;
         foreach (var child in node.VisualChildren)
             if (NeedsArrange(child)) return true;
@@ -227,7 +230,14 @@ public class PopupLayer
     private static bool NeedsLayout(IUIComponent node)
     {
         if (node == null) return false;
+        // A COLLAPSED subtree is never measured, so it can never come back clean, and asking about it makes the popup
+        // dirty on every pass for ever: InvalidateSubtree marks the whole tree, the forced measure reaches only what the
+        // parents actually measure, and what is left over is found again next pass. Measured on the macOS menu - the
+        // hidden PART_ScrollUp/Down arrows kept the flyout re-measuring at frame rate. Becoming visible again is safe:
+        // OnVisibilityChanged tells the parent (NotifyParentOfContributionChange), which IS measured and IS asked here.
+        if (node.Visibility == Visibility.Collapsed) return false;
         if (node is IMeasurableComponent { IsMeasureValid: false }) return true;
+
         foreach (var child in node.VisualChildren)
             if (NeedsLayout(child)) return true;
         return false;
