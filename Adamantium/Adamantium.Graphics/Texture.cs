@@ -380,7 +380,9 @@ public unsafe class Texture : GraphicsResource, ITexture
         {
             AspectMask = description.ImageAspect,
             BaseMipLevel = 0,
-            LevelCount = 1,
+            // EVERY level the image has, not one. A view over level 0 alone makes the rest unreachable: a shader
+            // sampling an explicit level past the view's range is out of bounds, which is a crash rather than a clamp.
+            LevelCount = Math.Max(1u, description.MipLevels),
             BaseArrayLayer = 0,
             LayerCount = description.ArrayLayers > 1 ? description.ArrayLayers : 1
         };
@@ -389,7 +391,51 @@ public unsafe class Texture : GraphicsResource, ITexture
         ImageView = GraphicsDevice.LogicalDevice.CreateImageView(createInfo);
         Info = createInfo;
     }
-        
+
+    private ImageViewCreateInfo[] _levelInfos;
+    private ImageView[] _levelViews;
+
+    /// <summary>A view of ONE mip level, made on first use and kept. The texture's own view spans every level, which is
+    /// what SAMPLING wants; writing into a level - a blur pyramid filled by a shader, a target attached per level -
+    /// needs a view that is exactly that level and nothing else.</summary>
+    public ImageView GetLevelView(uint level)
+    {
+        var levels = Math.Max(1u, Description.MipLevels);
+        if (level >= levels) level = levels - 1;
+
+        _levelViews ??= new ImageView[levels];
+        _levelInfos ??= new ImageViewCreateInfo[levels];
+        if (_levelViews[level] != null) return _levelViews[level];
+
+        var info = new ImageViewCreateInfo
+        {
+            Image = GetImage(),
+            ViewType = Info.ViewType,
+            Format = Info.Format,
+            Components = Info.Components,
+            SubresourceRange = new ImageSubresourceRange
+            {
+                AspectMask = Description.ImageAspect,
+                BaseMipLevel = level,
+                LevelCount = 1,
+                BaseArrayLayer = 0,
+                LayerCount = Description.ArrayLayers > 1 ? Description.ArrayLayers : 1
+            }
+        };
+
+        _levelInfos[level] = info;
+        _levelViews[level] = GraphicsDevice.LogicalDevice.CreateImageView(info);
+        return _levelViews[level];
+    }
+
+    /// <summary>The create-info of <see cref="GetLevelView"/>'s view - what a descriptor write is handed.</summary>
+    public ImageViewCreateInfo GetLevelViewInfo(uint level)
+    {
+        GetLevelView(level);
+        return _levelInfos[Math.Min(level, (uint)_levelInfos.Length - 1)];
+    }
+
+
     public static uint CalculateMipLevels(int width, int height, MipMapCount mipLevels)
     {
         return CalculateMipLevels(width, height, 1, mipLevels);

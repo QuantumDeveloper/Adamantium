@@ -794,7 +794,7 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
             // The NAP, in the three fields a material otherwise leaves empty. Same numbers as the SDF carrier bakes,
             // from the same helpers, so a velvet path and a velvet rectangle wear one cloth.
             Color2 = MaterialRectCollector.SurfaceOf(brush),
-            Color3 = new Vector4F((float)brush.BlurAmount, (float)brush.NoiseAmount, (float)brush.Refraction,
+            Color3 = new Vector4F(MaterialRectCollector.BlurTexels(brush), (float)brush.NoiseAmount, (float)brush.Refraction,
                 (float)Math.Clamp(opacity * brush.Opacity, 0.0, 1.0)),
             Noise = MaterialRectCollector.ResponseOf(brush),
             // .xyz the nap and the light; .w = the rounded ancestor clip's slot (-1 = none): this carrier shares

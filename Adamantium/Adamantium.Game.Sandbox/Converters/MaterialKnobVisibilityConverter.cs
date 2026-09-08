@@ -22,7 +22,7 @@ public class MaterialKnobVisibilityConverter : IValueConverter
         {
             // A SURFACE has no capture to scatter, bend or tint: every knob about the thing BEHIND the element is
             // meaningless on it, and showing a control that does nothing is worse than showing none.
-            "Blur" => !glass && !surface,
+            "Blur" => !surface,   // glass blurs its flat middle too, so the knob belongs on the stand for it
             "Refraction" => glass,
             "Tint" => !surface,
             // Film grain hides the banding an 8-bit CAPTURE brings. A surface captures nothing, so the control had

@@ -21,7 +21,10 @@
          fallback for a platform with no capture, and going back is one attribute.
 
          The TINT comes from the palette so the variants keep their contract - light and dark supply a colour, the
-         brush itself belongs to the theme. -->
+         brush itself belongs to the theme. It is taken with {ObservableResource} and NOT with {ResourceReference}: a
+         static reference resolves once, and a brush does not live in the visual tree, so these surfaces kept the colour
+         of the variant they were built under and stayed dark through every switch to light while the solid fills around
+         them followed. This is the same trap gradient stops fell into, and the same cure. -->
 
     <!-- The flyout surface: menus, submenus, drop-down lists, the ribbon's flyout, a colour picker's popup.
          Tint at 0.78 rather than the sandbox's 0.55, and that is a legibility floor, not a taste: a menu can open over
@@ -32,18 +35,18 @@
          same number meant under the old point-sampled kernels, and it does not need to be large. -->
     <MaterialBrush x:Key="FlyoutSurfaceFill"
                    Material="Acrylic"
-                   TintColor="{ResourceReference AcrylicFillColorDefault}"
+                   TintColor="{ObservableResource AcrylicFillColorDefault}"
                    TintOpacity="0.78"
-                   BlurAmount="4"
+                   BlurAmount="28"
                    NoiseAmount="0.03"/>
 
     <!-- The same material, thinner, for surfaces that sit CLOSE to what they cover and want to be felt through:
          a tooltip, which is small enough that a heavy tint reads as a black box. -->
     <MaterialBrush x:Key="TooltipSurfaceFill"
                    Material="Acrylic"
-                   TintColor="{ResourceReference AcrylicFillColorDefault}"
+                   TintColor="{ObservableResource AcrylicFillColorDefault}"
                    TintOpacity="0.70"
-                   BlurAmount="3"
+                   BlurAmount="20"
                    NoiseAmount="0.03"/>
 
 </ResourceDictionary>
