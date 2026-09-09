@@ -349,16 +349,7 @@ public class ScrollContentPresenter : ContentPresenter, IScrollableContent
         if (_inner != null) _inner.ScrollMetricsChanged += OnInnerMetricsChanged;
     }
 
-    private static IScrollableContent FindInner(IUIComponent root)
-    {
-        foreach (var child in root.VisualChildren)
-        {
-            if (child is IScrollableContent scrollable) return scrollable;
-            var deeper = FindInner(child);
-            if (deeper != null) return deeper;
-        }
-        return null;
-    }
+    private static IScrollableContent FindInner(IUIComponent root) => ScrollableContent.FindIn(root);
 
     private Vector2 _lastTranslatedInnerOffset;
 

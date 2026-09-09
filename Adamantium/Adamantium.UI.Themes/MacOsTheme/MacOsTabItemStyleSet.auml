@@ -20,6 +20,11 @@
         <Setter Property="BorderThickness" Value="0"/>
         <Setter Property="CornerRadius" Value="5"/>
         <Setter Property="Padding" Value="12 3 12 4"/>
+        <!-- A CEILING on the width, which the strip had none of: a tab sizes to its content, so one long title made one
+             enormous tab and pushed the rest out of reach. Past this the header trims with an ellipsis (see
+             PART_ContentPresenter). The floor stays with the content - a short title keeps a small tab, and that is the
+             look a content-sized strip is for; set TabPanel.ItemWidth to make every tab the same instead. -->
+        <Setter Property="MaxWidth" Value="240"/>
         <Setter Property="FontSize" Value="{ResourceReference FontSizeChrome}"/>
         <!-- CENTRED, unlike Fluent's left-aligned label: a segment's name sits in the middle of its capsule, and that is
              what makes a row of them read as one control rather than as a list of headings. -->
@@ -55,6 +60,7 @@
                                     VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
                                     Foreground="{TemplateBinding Foreground}"
                                     FontSize="{TemplateBinding FontSize}"
+                                    TextTrimming="CharEllipses"
                                     Content="{TemplateBinding Header}"
                                     ContentTemplate="{TemplateBinding HeaderTemplate}"
                                     ContentTemplateSelector="{TemplateBinding HeaderTemplateSelector}"/>
@@ -101,6 +107,15 @@
         <PropertyTrigger Property="IsSelected" Value="true">
             <Setter TargetName="TabBorder" Property="Background" Value="{TemplateBinding BackgroundSelected}"/>
             <Setter TargetName="PART_ContentPresenter" Property="Foreground" Value="{TemplateBinding ForegroundSelected}"/>
+        </PropertyTrigger>
+        <!-- A SIDE strip reads as a list, and a list's labels line up on the left; centring each in its own row leaves the
+             column ragged. The centring this overrides is for a TOP strip, where the tabs stand side by side as capsules.
+             A TRIGGER and not a "TabItem[IsSideTab=true]" style, which is where this started: a second style for the type
+             re-runs the whole set on every tab whose state flipped, Template setter included, so moving the strip from top
+             to left rebuilt hundreds of tab templates - measured at 278 rebuilds and 70,113 layout invalidations in a
+             second, which is the "the panel moves sideways slowly" this was. A trigger writes the one value it names. -->
+        <PropertyTrigger Property="IsSideTab" Value="true">
+            <Setter TargetName="PART_ContentPresenter" Property="HorizontalAlignment" Value="Left"/>
         </PropertyTrigger>
         <!-- Close reveals on hover and stays on the selected tab, but only where the owner enabled it. Off = Collapsed
              (no space); on-but-idle = Hidden (RESERVES space so the tab does not jump when it reveals); on + hover or

@@ -18,6 +18,10 @@
              two-value form padded a tab 12 on the left AND top against 6 on the right and bottom. Invisible in a wide
              strip; on a turned label in a narrow column it read as text pushed off-centre. -->
         <Setter Property="Padding" Value="{ResourceReference PaddingTab}"/>
+        <!-- A CEILING on the width, which the strip had none of: a tab sizes to its content, so one long title made one
+             enormous tab and pushed the rest out of reach. Past this the header trims with an ellipsis. Set
+             TabPanel.ItemWidth to make every tab the same width instead. -->
+        <Setter Property="MaxWidth" Value="240"/>
         <Setter Property="FontSize" Value="{ResourceReference FontSizeChrome}"/>
         <!-- LEFT, not centre: a tab is a label, and it reads from the left of whatever room it has. No difference at all
              for an ordinary content-sized tab (its slot IS the header); it decides where the name of a lone stretched
@@ -57,6 +61,7 @@
                                     VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
                                     Foreground="{TemplateBinding Foreground}"
                                     FontSize="{TemplateBinding FontSize}"
+                                    TextTrimming="CharEllipses"
                                     Content="{TemplateBinding Header}"
                                     ContentTemplate="{TemplateBinding HeaderTemplate}"
                                     ContentTemplateSelector="{TemplateBinding HeaderTemplateSelector}"/>

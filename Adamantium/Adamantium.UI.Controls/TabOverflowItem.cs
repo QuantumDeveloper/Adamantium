@@ -18,16 +18,20 @@ public sealed class TabOverflowItem
 {
     private readonly TabControl _owner;
     private readonly TabItem _tab;
+    private readonly object _item;   // what the tab hosts - the only handle a row has on a tab with no container
 
-    internal TabOverflowItem(TabControl owner, TabItem tab, object header, DataTemplate headerTemplate)
+    internal TabOverflowItem(TabControl owner, TabItem tab, object item, object header, DataTemplate headerTemplate)
     {
         _owner = owner;
         _tab = tab;
+        _item = item;
         Header = header;
         HeaderTemplate = headerTemplate;
         Icon = tab?.Icon;
         IconTemplate = tab?.IconTemplate ?? owner?.IconTemplate;
-        CanClose = tab is { ShowCloseButton: true };
+        // Falls back to the CONTROL when there is no container: most rows here stand for tabs that are off screen, and
+        // asking the missing container left every one of them without a close button.
+        CanClose = tab != null ? tab.ShowCloseButton : owner is { ShowCloseButton: true };
         Close = new CloseTabCommand(this);
     }
 
@@ -50,6 +54,11 @@ public sealed class TabOverflowItem
     /// tab, so it answers in the terms the view asks in.</summary>
     public Visibility CloseVisibility => CanClose ? Visibility.Visible : Visibility.Collapsed;
 
+    /// <summary>The owner's close-button look, handed on so a flyout row's × is the SAME button as a tab's - hover and
+    /// all. Drawn by hand in the row template it was a bare glyph that never lit up, so nothing said it could be
+    /// pressed; and a theme that restyles the close button would have had to do it twice.</summary>
+    public ControlTemplate CloseButtonTemplate => _owner?.CloseButtonTemplate;
+
     /// <summary>Closes the tab this row stands for, through the same path a click on the tab's own × takes - so a
     /// <see cref="TabControl.TabCloseRequested"/> handler can veto it exactly as it would there.</summary>
     public ICommand Close { get; }
@@ -62,10 +71,9 @@ public sealed class TabOverflowItem
 
         public bool CanExecute(object parameter = null) => _row.CanClose;
 
-        public void Execute(object parameter = null)
-        {
-            if (_row._tab != null) _row._owner?.RequestClose(_row._tab);
-        }
+        // By ITEM: a row usually has no container to hand over, and asking for one made the × a no-op - the click then
+        // fell through to the row and SELECTED the tab.
+        public void Execute(object parameter = null) => _row._owner?.RequestCloseItem(_row._item);
 
         public event EventHandler CanExecuteChanged;
 

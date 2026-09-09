@@ -1,3 +1,4 @@
+using System.Collections.ObjectModel;
 using System.Linq;
 using Adamantium.Mathematics;
 using Adamantium.UI.Controls;
@@ -152,13 +153,18 @@ public class TabStripScrollerTests
     }
 
     [Test]
-    public void RealizesAllTabs_EvenWhenViewportIsNarrow()
+    public void RealizesOnlyTheVisibleTabs_WhenTheViewportIsNarrow()
     {
-        var ic = StripControl(8);              // 640 wide
-        ic.Measure(new Size(200, 100));        // narrower than the strip -> overflows (pannable), but ALL still realized
+        var ic = StripControl(8);              // 640 wide, 80px a tab
+        ic.Measure(new Size(200, 100));        // narrower than the strip -> overflows, and only the window is realized
         ic.Arrange(new Rect(0, 0, 200, 100));
 
-        Assert.That(ic.ItemContainerGenerator.RealizedCount, Is.EqualTo(8));
+        // 200px of viewport holds 2.5 tabs; the panel keeps a two-tab buffer either side, so the window is small but
+        // NOT tight - the assertion is that it is bounded by the viewport rather than by the item count.
+        Assert.That(ic.ItemContainerGenerator.RealizedCount, Is.LessThan(8),
+            "a narrow strip must not realize every tab - that is the whole point of virtualizing it");
+        Assert.That(ic.ItemContainerGenerator.ContainerFromIndex(0), Is.Not.Null,
+            "the tabs actually on screen are realized");
     }
 
     // Builds a TabControl whose strip is a content-sized TabPanel, realized + arranged so every tab has real Bounds -
@@ -209,16 +215,23 @@ public class TabStripScrollerTests
             Assert.That(tc.Items.IndexOf(tabs[3]), Is.EqualTo(3), "the far tab did not move");
         });
 
-        // The items-host panel's children must reorder to match (the moved tab in slot 1, NOT appended to the end): this
-        // is where the "flew to the end" bug lived - Children.Insert appended the moved tab. Children order drives the
-        // arrange in a real layout pass, so it's the harness-independent proof the reorder is correct.
-        var children = tc.ItemsHostPanel.Children.Cast<object>().ToList();
+        // The tabs must LAND where the new order puts them (the moved tab in slot 1, NOT appended to the end): this is
+        // where the "flew to the end" bug lived - Children.Insert appended the moved tab. Asked of the arranged
+        // positions rather than of the panel's Children: the strip virtualizes, so containers belong to the generator
+        // and Children is empty - position is what the reorder actually has to get right, and what the eye sees.
+        // Invalidate from the top before re-laying out: the panel marked ITSELF dirty when the items moved, but it is a
+        // measure BOUNDARY, so that mark does not travel up - in the app the layout manager drains the panel directly,
+        // and here there is no manager, so a plain tc.Measure would short-circuit and read the pre-reorder positions.
+        for (IUIComponent n = tc.ItemsHostPanel; n != null; n = n.VisualParent)
+            (n as IMeasurableComponent)?.InvalidateMeasure();
+        tc.Measure(new Size(1000, 100));
+        tc.Arrange(new Rect(0, 0, 1000, 100));
         Assert.Multiple(() =>
         {
-            Assert.That(children[0], Is.SameAs(tabs[1]), "neighbour shifted into slot 0");
-            Assert.That(children[1], Is.SameAs(tabs[0]), "the moved tab sits in slot 1, NOT appended to the end");
-            Assert.That(children[2], Is.SameAs(tabs[2]));
-            Assert.That(children[3], Is.SameAs(tabs[3]));
+            Assert.That(tabs[1].Bounds.X, Is.EqualTo(0).Within(0.5), "neighbour shifted into slot 0");
+            Assert.That(tabs[0].Bounds.X, Is.EqualTo(100).Within(0.5), "the moved tab sits in slot 1, NOT at the end");
+            Assert.That(tabs[2].Bounds.X, Is.EqualTo(140).Within(0.5));
+            Assert.That(tabs[3].Bounds.X, Is.EqualTo(200).Within(0.5));
         });
     }
 
@@ -320,4 +333,235 @@ public class TabStripScrollerTests
         });
     }
 
+    // A TabControl whose strip is a TabPanel, with tabs of DIFFERING natural width so a uniform slot is visibly a
+    // decision rather than a coincidence.
+    private static (TabControl tc, TabItem[] tabs) WidthStrip(double tabWidth, int count, bool virtualizing = true)
+    {
+        var tc = new TabControl { TabWidth = tabWidth, IsVirtualizing = virtualizing };
+        var tabs = Enumerable.Range(0, count)
+            .Select(i => new TabItem { Width = 40 + i % 3 * 30, Height = 24 })
+            .ToArray();
+        foreach (var t in tabs) tc.Items.Add(t);
+        tc.ItemsPanel = new ItemsPanelTemplate(() => new TemplateResult
+        {
+            RootComponent = new TabPanel { Orientation = Orientation.Horizontal }
+        });
+        tc.Template = new ControlTemplate(() =>
+        {
+            var presenter = new ItemsPresenter();
+            var result = new TemplateResult { RootComponent = presenter };
+            result.RegisterName("PART_ItemsPresenter", presenter);
+            return result;
+        });
+        return (tc, tabs);
+    }
+
+    [Test]
+    public void TabWidth_GivesEveryTabTheSameSlot()
+    {
+        var (tc, tabs) = WidthStrip(tabWidth: 100, count: 4);
+        tc.Measure(new Size(1000, 100));
+        tc.Arrange(new Rect(0, 0, 1000, 100));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(tabs[0].Bounds.X, Is.EqualTo(0).Within(0.5));
+            Assert.That(tabs[1].Bounds.X, Is.EqualTo(100).Within(0.5), "slot n starts at n x TabWidth");
+            Assert.That(tabs[2].Bounds.X, Is.EqualTo(200).Within(0.5));
+            Assert.That(tabs[3].Bounds.X, Is.EqualTo(300).Within(0.5),
+                "and the tabs' own differing widths do not shift the ones after them");
+        });
+    }
+
+    [Test]
+    public void IsVirtualizing_IsTheSwitch_AndOffMeansEveryTabIsBuilt()
+    {
+        var (tc, _) = WidthStrip(tabWidth: 100, count: 40);
+        tc.Measure(new Size(300, 100));       // three slots' worth of viewport against forty tabs
+        tc.Arrange(new Rect(0, 0, 300, 100));
+        Assert.That(tc.ItemContainerGenerator.RealizedCount, Is.LessThan(40),
+            "a uniform slot is exact without a container, so only the window is built");
+
+        var (plain, _) = WidthStrip(tabWidth: double.NaN, count: 40, virtualizing: false);
+        plain.Measure(new Size(300, 100));
+        plain.Arrange(new Rect(0, 0, 300, 100));
+        Assert.That(plain.ItemContainerGenerator.RealizedCount, Is.EqualTo(40),
+            "content-sized tabs have no position until measured, so none may be left out");
+    }
+
+    // The panel is a measure boundary with its own cache, so marking only the CONTROL left it holding the tabs it already
+    // had - the switch appeared to do nothing until the first scroll woke the panel.
+    [Test]
+    public void IsVirtualizing_TakesEffectWithoutAScroll()
+    {
+        var (tc, _) = WidthStrip(tabWidth: 100, count: 40, virtualizing: false);
+        tc.Measure(new Size(300, 100));
+        tc.Arrange(new Rect(0, 0, 300, 100));
+        Assert.That(tc.ItemContainerGenerator.RealizedCount, Is.EqualTo(40), "off: every tab is built");
+
+        tc.IsVirtualizing = true;
+
+        // Measured directly, as the layout manager measures a dirty boundary - going through the control would stop at
+        // the presenter, which is still valid. It re-runs only because the switch marked the PANEL, which is the fix.
+        var panel = (IMeasurableComponent)tc.ItemsHostPanel;
+        panel.Measure(new Size(300, 100));
+        panel.Arrange(new Rect(0, 0, 300, 100));
+
+        Assert.That(tc.ItemContainerGenerator.RealizedCount, Is.LessThan(40),
+            "the very next pass windows down - nothing has scrolled");
+    }
+
+    // Turning it on without a width is not an error and not a no-op: a default slot stands in, so the strip virtualizes.
+    [Test]
+    public void IsVirtualizing_WithNoTabWidth_FallsBackToADefaultSlot()
+    {
+        var (tc, _) = WidthStrip(tabWidth: double.NaN, count: 200);
+        tc.Measure(new Size(400, 100));
+        tc.Arrange(new Rect(0, 0, 400, 100));
+
+        Assert.That(tc.ItemContainerGenerator.RealizedCount, Is.LessThan(200),
+            "asked to virtualize, it does - a missing TabWidth is filled in, never refused");
+    }
+
+    [Test]
+    public void MaxOpenedTabs_ClosesTheOldestRatherThanHidingIt()
+    {
+        var tc = new TabControl { MaxOpenedTabs = 3 };
+        var tabs = Enumerable.Range(0, 6).Select(i => new TabItem { Header = $"T{i}" }).ToArray();
+        foreach (var t in tabs) tc.Items.Add(t);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(tc.Items.Count, Is.EqualTo(3), "the cap CLOSES tabs; it does not hide them somewhere");
+            Assert.That(tc.Items, Does.Contain(tabs[5]), "the tab just opened is the newest thing there is");
+            Assert.That(tc.Items, Does.Contain(tabs[4]));
+            Assert.That(tc.Items, Does.Not.Contain(tabs[1]), "the earliest-opened goes first");
+            Assert.That(tc.Items, Does.Not.Contain(tabs[2]));
+            Assert.That(tc.Items, Does.Not.Contain(tabs[3]));
+
+            // tabs[0] was selected the moment it was added, and what someone is reading is not what a limit closes.
+            Assert.That(tc.Items, Does.Contain(tabs[0]), "the SELECTED tab survives the cap whatever its age");
+        });
+    }
+
+    // A bound collection arrives ALL AT ONCE, which reports as a Reset and names nothing that was added. Journalling the
+    // open order from the change args alone left it empty, the cap could not name an oldest tab, and a strip bound to
+    // twelve items sat at twelve with a limit of five.
+    [Test]
+    public void MaxOpenedTabs_AppliesToTabsThatArrivedAllAtOnce()
+    {
+        var source = new ObservableCollection<object>(
+            Enumerable.Range(1, 12).Select(i => (object)new TabItem { Header = $"Report {i}" }));
+
+        var tc = new TabControl { ItemsSource = source, MaxOpenedTabs = 5 };
+
+        Assert.That(source.Count, Is.EqualTo(5),
+            "the cap holds however the tabs got here - one by one or as a whole collection");
+    }
+
+    [Test]
+    public void MaxOpenedTabs_NeverClosesAPinnedTab()
+    {
+        var tc = new TabControl { MaxOpenedTabs = 2 };
+        var pinned = new TabItem { Header = "Pinned", IsPinned = true };
+        tc.Items.Add(pinned);
+        for (var i = 0; i < 5; i++) tc.Items.Add(new TabItem { Header = $"T{i}" });
+
+        Assert.That(tc.Items, Does.Contain(pinned), "pinning IS the request to keep a tab");
+        Assert.That(tc.Items.Count(i => i is TabItem { IsPinned: false }), Is.LessThanOrEqualTo(3),
+            "and the cap counts only the unpinned ones (plus whichever is selected)");
+    }
+
+    // The reorder has to work in BOTH strips. The tests above drag a content-sized one (every tab realized); this drags a
+    // virtualized one, where most tabs have no container at all and the slots are arithmetic.
+    [Test]
+    public void Drag_Reorders_OnAVirtualizedStripToo()
+    {
+        var (tc, tabs) = WidthStrip(tabWidth: 100, count: 40);
+        tc.Measure(new Size(300, 100));
+        tc.Arrange(new Rect(0, 0, 300, 100));
+        Assert.That(tc.ItemContainerGenerator.RealizedCount, Is.LessThan(40), "the strip really is virtualized here");
+
+        // The tabs carry explicit widths (40..100) so the uniform slot is visibly the thing deciding positions - which
+        // means the DRAGGED tab is 40 wide inside its 100 slot, and its centre is reckoned from that.
+        tc.BeginDrag(tabs[0], 5.0);       // grabbed 5px in
+        tc.UpdateDrag(tabs[0], 160.0);    // dragged centre = 175 -> past slot 1's centre (150), short of slot 2's (250)
+        tc.EndDrag(tabs[0]);
+        AnimationManager.Tick(10);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(tc.Items.IndexOf(tabs[0]), Is.EqualTo(1), "landed one slot right");
+            Assert.That(tc.Items.IndexOf(tabs[1]), Is.EqualTo(0), "the passed neighbour took the vacated slot");
+        });
+    }
+
+    [Test]
+    public void TabWidth_IsTheThicknessOfASideStrip()
+    {
+        var tc = new TabControl { TabWidth = 120, TabHeight = 30, TabStripPlacement = TabStripPlacement.Left };
+        var tabs = Enumerable.Range(0, 5)
+            .Select(i => new TabItem { Width = 40 + i * 40, Height = 24 })   // one of them far wider than TabWidth
+            .ToArray();
+        foreach (var t in tabs) tc.Items.Add(t);
+        tc.ItemsPanel = new ItemsPanelTemplate(() => new TemplateResult
+        {
+            RootComponent = new TabPanel { Orientation = Orientation.Vertical }
+        });
+        tc.Template = new ControlTemplate(() =>
+        {
+            var presenter = new ItemsPresenter();
+            var result = new TemplateResult { RootComponent = presenter };
+            result.RegisterName("PART_ItemsPresenter", presenter);
+            return result;
+        });
+
+        // UNBOUNDED across, which is how a side strip is really measured (it sits in an Auto column, so the question
+        // asked of it is "how wide would you like to be?"). On a bounded axis a virtualizing panel answers with the slot
+        // it was offered, by contract, and the question would not be asked at all.
+        tc.Measure(new Size(double.PositiveInfinity, 600));
+
+        var panel = (IMeasurableComponent)tc.ItemsHostPanel;
+        Assert.That(panel.DesiredSize.Width, Is.EqualTo(120).Within(0.5),
+            "the column is as wide as TabWidth says - NOT as wide as its widest tab");
+    }
+
+    // Moving the strip from top to left swaps the whole template branch, and the new panel is measured before it is
+    // parented under the TabControl. It cannot read TabWidth then - and must NOT read that as "no uniform slot, so build
+    // every tab": that answered a thousand-tab strip with a thousand templates and froze the window for seconds.
+    [Test]
+    public void APanelThatCannotSeeItsTabControlYet_DoesNotBuildEveryTab()
+    {
+        var ic = new ItemsControl
+        {
+            ItemsSource = Enumerable.Range(0, 500).Cast<object>().ToList(),
+            ItemTemplate = new DataTemplate(() => new TemplateResult { RootComponent = new Border { Width = 80, Height = 30 } }),
+            ItemsPanel = new ItemsPanelTemplate(() => new TemplateResult
+            {
+                RootComponent = new TabPanel { Orientation = Orientation.Horizontal }
+            })
+        };
+        ic.Template = new ControlTemplate(() =>
+        {
+            var presenter = new ItemsPresenter();
+            var result = new TemplateResult { RootComponent = presenter };
+            result.RegisterName("PART_ItemsPresenter", presenter);
+            return result;
+        });
+
+        ic.Measure(new Size(600, 100));   // no TabControl anywhere above it - the "cannot tell yet" case
+
+        Assert.That(ic.ItemContainerGenerator.RealizedCount, Is.LessThan(500),
+            "not knowing the slot is not the same as knowing there is none");
+    }
+
+    [Test]
+    public void MaxOpenedTabs_OffByDefault()
+    {
+        var tc = new TabControl();
+        for (var i = 0; i < 20; i++) tc.Items.Add(new TabItem { Header = $"T{i}" });
+
+        Assert.That(tc.MaxOpenedTabs, Is.EqualTo(0), "no cap unless asked for");
+        Assert.That(tc.UnpinnedItems.Count, Is.EqualTo(20), "so every tab stays in the strip");
+    }
 }

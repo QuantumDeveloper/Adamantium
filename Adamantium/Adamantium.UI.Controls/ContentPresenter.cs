@@ -92,6 +92,20 @@ public class ContentPresenter : InputUIComponent
     public static readonly AdamantiumProperty TransitionDurationProperty = AdamantiumProperty.Register(nameof(TransitionDuration),
         typeof(Double), typeof(ContentPresenter), new PropertyMetadata(0.25));
 
+    /// <summary>How a GENERATED label is cut when it does not fit - the presenter builds the TextBlock for a plain string
+    /// content, so a template has no other way to ask for an ellipsis. Default <see cref="TextTrimming.None"/>, i.e. the
+    /// label reports the width it wants and the slot grows. A tab strip with a uniform slot needs the opposite: the slot
+    /// is fixed and the title has to agree to be cut.</summary>
+    public static readonly AdamantiumProperty TextTrimmingProperty = AdamantiumProperty.Register(nameof(TextTrimming),
+        typeof(TextTrimming), typeof(ContentPresenter),
+        new PropertyMetadata(TextTrimming.None, PropertyMetadataOptions.AffectsMeasure, OnTextStyleChanged));
+
+    public TextTrimming TextTrimming
+    {
+        get => GetValue<TextTrimming>(TextTrimmingProperty);
+        set => SetValue(TextTrimmingProperty, value);
+    }
+
     // The generated text follows the presenter's Foreground/FontSize (template-bound from the templated control, so its
     // theme states - accent/pressed/disabled - drive the text); the callback re-pushes them onto the already-built TextBlock.
     static ContentPresenter()
@@ -307,6 +321,7 @@ public class ContentPresenter : InputUIComponent
                 {
                     Text = newContent.ToString(),
                     FontSize = FontSize,
+                    TextTrimming = TextTrimming,
                     HorizontalTextAlignment = ToTextAlignment(HorizontalAlignment),
                     VerticalTextAlignment = ToTextAlignment(VerticalAlignment),
                     // The BLOCK is placed by layout; the text alignments above only place text inside it. Which matters
@@ -770,6 +785,7 @@ public class ContentPresenter : InputUIComponent
         // invisible in its new home, where the live presenter's white could no longer reach it.
         if (!_textIsGenerated || _currentRoot is not TextBlock textBlock) return;
         textBlock.FontSize = FontSize;
+        textBlock.TextTrimming = TextTrimming;
         if (Foreground != null) textBlock.Foreground = Foreground;
     }
 
