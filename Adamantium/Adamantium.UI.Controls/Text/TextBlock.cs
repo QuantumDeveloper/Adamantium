@@ -126,8 +126,12 @@ public class TextBlock : InputUIComponent
         // gave this measure (WPF-style reflow to the parent) so wrapping needs no hardcoded Width. A NoWrap block keeps
         // the old unbounded behaviour (explicit Width only) so ordinary labels never start trimming to their slot. An
         // unconstrained parent (Infinity) stays unbounded. ProcessText maps NaN -> unbounded.
+        // ...and a block that ASKED to be trimmed asked for a boundary by the same words: trimming with nothing to trim
+        // against can never do anything, which is why a tab header (NoWrap, no Width) could not ellipsize at all.
         var width = Width;
-        if (double.IsNaN(width) && TextWrapping != TextWrapping.NoWrap && !double.IsInfinity(_lastConstraint.Width))
+        if (double.IsNaN(width)
+            && (TextWrapping != TextWrapping.NoWrap || TextTrimming != TextTrimming.None)
+            && !double.IsInfinity(_lastConstraint.Width))
             width = _lastConstraint.Width;
         var height = Height;
 
@@ -147,6 +151,17 @@ public class TextBlock : InputUIComponent
         var eb2 = System.GC.GetAllocatedBytesForCurrentThread();
         _cachedSize = _textLayout.ProcessText(Text, FontSize, new Size(width, height), TextWrapping, TextTrimming,
             HorizontalTextAlignment, VerticalTextAlignment, JustifyLastLine);
+
+        // A NoWrap block took that width only so TRIMMING had an edge to work to - it must not then ASK for it. The
+        // layout reports the text AREA once one is given, not the letters, so a short label in a wide slot claimed the
+        // whole slot and every tab stretched to fill it. Report the ink instead, capped by the area. A WRAPPING block is
+        // untouched: there the area IS the answer, because that is the width the text was flowed into.
+        if (TextTrimming != TextTrimming.None && TextWrapping == TextWrapping.NoWrap
+            && double.IsNaN(Width) && !double.IsNaN(width))
+        {
+            var ink = System.Math.Ceiling(_textLayout.RealTextDimensions.Width);
+            if (ink > 0) _cachedSize = new Size(Math.Min(_cachedSize.Width, ink), _cachedSize.Height);
+        }
         ShapeBytes += System.GC.GetAllocatedBytesForCurrentThread() - eb2;
         ShapeCalls++;
 
@@ -324,6 +339,12 @@ public class TextBlock : InputUIComponent
     /// <para>The layout call stays: it is what produces the text, and it is not free to skip. Only the answer changes.</para></summary>
     protected override Size ArrangeOverride(Size finalSize)
     {
+        // A trimmed block trims to the slot it actually GOT, which is not always the one it was measured against: a tab
+        // header is measured unbounded and then capped by the tab's MaxWidth, so the boundary only exists here. Re-stated
+        // before the layout call so the ellipsis lands at the real edge instead of at a width nobody will give it.
+        if (TextTrimming != TextTrimming.None && double.IsNaN(Width) && finalSize.Width > 0)
+            _lastConstraint = new Size(finalSize.Width, _lastConstraint.Height);
+
         var b0 = System.GC.GetAllocatedBytesForCurrentThread();
         _ = HasInlines ? EnsureInlineLayout() : EnsureLayout();
         OverrideBytes += System.GC.GetAllocatedBytesForCurrentThread() - b0;

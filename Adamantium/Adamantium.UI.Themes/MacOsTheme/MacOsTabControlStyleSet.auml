@@ -171,17 +171,14 @@
                                 Content="{Binding Header}"
                                 ContentTemplate="{Binding HeaderTemplate}"/>
                         <!-- Closes through the tab's own path, so a TabCloseRequested handler can veto it here too. -->
+                        <!-- The SAME button as a tab's ×, template and all, rather than a glyph drawn again here: drawn
+                             by hand it had no hover, so nothing said it could be pressed. -->
                         <Button Grid.Column="2"
-                                Margin="8 0 0 0" Width="16" Height="16" MinWidth="0" MinHeight="0" Padding="0"
+                                Template="{Binding CloseButtonTemplate}"
+                                Margin="8 0 0 0" MinWidth="0" MinHeight="0" Padding="0"
                                 VerticalAlignment="Center"
-                                HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
-                                Background="Transparent" BorderThickness="0"
                                 Command="{Binding Close}"
-                                Visibility="{Binding CloseVisibility}">
-                            <Path Data="M0,0 L7,7 M7,0 L0,7"
-                                  Stroke="{ResourceReference TextFillColorSecondary}" StrokeThickness="1.1"
-                                  HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                        </Button>
+                                Visibility="{Binding CloseVisibility}"/>
                     </Grid>
                 </DataTemplate>
             </Setter.Value>

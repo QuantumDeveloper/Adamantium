@@ -39,6 +39,13 @@ public class TabStripScroller : InputUIComponent, IContainer
     private double _extent;      // the child's length along the axis (from measure)
     private double _viewport;    // our own length along the axis (from arrange)
 
+    // The strip's panel, when it virtualizes (TabPanel as an items host). It owns which tabs exist, so it has to be told
+    // where the strip has been panned to and how much of it shows - otherwise it realizes the window for offset zero
+    // forever and panning reveals empty space. Null for a plain strip (no items host), where this control pans the whole
+    // child itself exactly as before.
+    private IScrollableContent _inner;
+    private bool Delegating => _inner != null;
+
     public TabStripScroller()
     {
         ClipToBounds = true;
@@ -172,7 +179,15 @@ public class TabStripScroller : InputUIComponent, IContainer
         for (var n = element; n != null && !ReferenceEquals(n, child); n = n.VisualParent)
             start += IsHorizontal ? n.Bounds.X : n.Bounds.Y;
 
-        var size = IsHorizontal ? element.Bounds.Width : element.Bounds.Height;
+        return ScrollIntoView(start, IsHorizontal ? element.Bounds.Width : element.Bounds.Height);
+    }
+
+    /// <summary>The same, addressed by POSITION along the strip rather than by an element - for a tab that has no
+    /// container to point at. A virtualized strip only builds the tabs in view, so the one being scrolled TO is usually
+    /// exactly the one that does not exist yet; the panel knows where it would be (VirtualizingPanel.TryGetItemRect) and
+    /// that is what this takes.</summary>
+    public bool ScrollIntoView(double start, double size)
+    {
         var max = Math.Max(0, _extent - _viewport);
 
         // A tab WIDER than the viewport can never be "fully visible", so the caller's retry loop had nothing to settle
@@ -243,13 +258,23 @@ public class TabStripScroller : InputUIComponent, IContainer
         var child = Child;
         if (child == null) return Size.Zero;
 
-        // Give the strip unbounded room along the axis so it lays out at full length (never shrinks); constrain the cross.
-        var probe = IsHorizontal
-            ? new Size(double.PositiveInfinity, availableSize.Height)
-            : new Size(availableSize.Width, double.PositiveInfinity);
+        ResolveInner();
+
+        // A VIRTUALIZING strip is measured with the real length, because that length IS the panel's viewport and the
+        // panel decides which tabs to realize from it; unbounded would read as "everything is visible" and realize the
+        // whole strip, which is the thing virtualization is here to avoid. Its extent then comes from the panel, which
+        // is the only one that knows how long the strip would be if all of it existed.
+        // A PLAIN strip keeps the old bargain: unbounded room so it lays out at full length and never shrinks.
+        var probe = Delegating
+            ? availableSize
+            : (IsHorizontal
+                ? new Size(double.PositiveInfinity, availableSize.Height)
+                : new Size(availableSize.Width, double.PositiveInfinity));
         child.Measure(probe);
         var d = child.DesiredSize;
-        _extent = IsHorizontal ? d.Width : d.Height;
+        _extent = Delegating
+            ? (IsHorizontal ? _inner.Extent.Width : _inner.Extent.Height)
+            : (IsHorizontal ? d.Width : d.Height);
 
         // Take the child's cross size, but only as much of the axis as offered (so we clip, never overflow the parent).
         return IsHorizontal
@@ -265,14 +290,20 @@ public class TabStripScroller : InputUIComponent, IContainer
             _viewport = IsHorizontal ? finalSize.Width : finalSize.Height;
             ClampOffset();
             UpdateScrollState();
+            PushOffset();
             // The panned child is a render MOTION NODE: its subtree bakes in ITS space and rides its transform-table
             // slot, so a pan rewrites one matrix and replays the recorded frame instead of re-walking the window.
             if (child is UIComponent panned)
                 panned.IsRenderMotionNode = true;
 
+            // Translate by what the panel has actually REALIZED, not by where we have been panned to: the two differ for
+            // the frame between a pan and the panel's next measure, and translating to the newer value slides tabs that
+            // do not exist yet into view - a gap at the leading edge. For a plain strip the two are the same number.
+            var shift = Delegating ? (IsHorizontal ? _inner.RealizedOffset.X : _inner.RealizedOffset.Y) : _offset;
+            _lastShift = shift;
             var rect = IsHorizontal
-                ? new Rect(-_offset, 0, Math.Max(_extent, finalSize.Width), finalSize.Height)
-                : new Rect(0, -_offset, finalSize.Width, Math.Max(_extent, finalSize.Height));
+                ? new Rect(-shift, 0, Math.Max(_extent, finalSize.Width), finalSize.Height)
+                : new Rect(0, -shift, finalSize.Width, Math.Max(_extent, finalSize.Height));
             child.Arrange(rect);
         }
         return finalSize;
@@ -288,6 +319,37 @@ public class TabStripScroller : InputUIComponent, IContainer
     }
 
     private void ClampOffset() => _offset = Math.Clamp(_offset, 0, Math.Max(0, _extent - _viewport));
+
+    // Hand the pan to the panel so it realizes the window we are about to show. Only when it CHANGED: SetOffset raises
+    // metrics, and re-raising them from inside our own arrange every pass is how a host and a panel invalidate each
+    // other forever (the ScrollContentPresenter carries the same guard, for the same crash).
+    private void PushOffset()
+    {
+        if (!Delegating) return;
+        var wanted = IsHorizontal ? new Vector2((float)_offset, 0) : new Vector2(0, (float)_offset);
+        if (_inner.Offset != wanted) _inner.SetOffset(wanted);
+    }
+
+    // The panel that virtualizes the strip, if there is one. Re-asked on every measure because a template can be applied
+    // (or re-applied on a theme change) long after this control was built.
+    private void ResolveInner()
+    {
+        var found = Child is IUIComponent root ? ScrollableContent.FindIn(root) : null;
+        if (ReferenceEquals(found, _inner)) return;
+        if (_inner != null) _inner.ScrollMetricsChanged -= OnInnerMetricsChanged;
+        _inner = found;
+        if (_inner != null) _inner.ScrollMetricsChanged += OnInnerMetricsChanged;
+    }
+
+    // The panel re-clamped or re-realized: re-translate so the shift follows its realized offset. Guarded on an actual
+    // change - this also fires from the panel's own arrange, and an unconditional invalidate would loop.
+    private void OnInnerMetricsChanged(object sender, EventArgs e)
+    {
+        var realized = IsHorizontal ? _inner.RealizedOffset.X : _inner.RealizedOffset.Y;
+        if (!realized.Equals(_lastShift)) InvalidateArrange();
+    }
+
+    private double _lastShift = double.NaN;
 
     // IContainer: the AUML loader nests the ItemsPresenter as Child.
     public void AddOrSetChildComponent(object component) { if (component is IMeasurableComponent c) Child = c; }

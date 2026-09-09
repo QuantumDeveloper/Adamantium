@@ -1,5 +1,6 @@
 using System;
 using Adamantium.Mathematics;
+using Adamantium.UI.Core;
 
 namespace Adamantium.UI.Controls;
 
@@ -41,4 +42,24 @@ public interface IScrollableContent
     /// <summary>Raised whenever <see cref="Extent"/>, <see cref="Viewport"/>, or <see cref="Offset"/> changes, so the
     /// viewer can refresh its scrollbars.</summary>
     event EventHandler ScrollMetricsChanged;
+}
+
+/// <summary>Finding the scrollable content under a host. Two hosts ask it - the <see cref="ScrollContentPresenter"/> and
+/// the tab strip's <see cref="TabStripScroller"/> - and both mean the same thing by it, so it is answered once here
+/// rather than walked separately in each.</summary>
+public static class ScrollableContent
+{
+    /// <summary>The first <see cref="IScrollableContent"/> in <paramref name="root"/>'s visual subtree, or null when the
+    /// content scrolls as one piece (no virtualizing panel inside) and the host must translate it itself.</summary>
+    public static IScrollableContent FindIn(IUIComponent root)
+    {
+        if (root == null) return null;
+        foreach (var child in root.VisualChildren)
+        {
+            if (child is IScrollableContent scrollable) return scrollable;
+            var deeper = FindIn(child);
+            if (deeper != null) return deeper;
+        }
+        return null;
+    }
 }

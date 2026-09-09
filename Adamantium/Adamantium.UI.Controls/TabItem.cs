@@ -282,6 +282,7 @@ public class TabItem : ContentControl, ISelectable, ISpringLoadable
         {
             IsSelected = owner.IsContainerSelected(this);
             IsStretched = owner.HasStretchedTab;
+            IsSideTab = owner.TabStripPlacement is TabStripPlacement.Left or TabStripPlacement.Right;
             // Pull the close-button config from the owner (authored + generated tabs alike) and follow later changes.
             _closeOwner = owner;
             _closeOwner.PropertyChanged += OnOwnerPropertyChanged;
@@ -361,6 +362,20 @@ public class TabItem : ContentControl, ISelectable, ISpringLoadable
             SyncIconTemplate();
         else if (e.Property == TabControl.HasStretchedTabProperty && sender is TabControl owner)
             IsStretched = owner.HasStretchedTab;
+        else if (e.Property == TabControl.TabStripPlacementProperty && sender is TabControl placed)
+            IsSideTab = placed.TabStripPlacement is TabStripPlacement.Left or TabStripPlacement.Right;
+    }
+
+    /// <summary>This tab is in a SIDE strip (left or right). The tab itself is still an ordinary horizontal header - only
+    /// a collapsed docking panel turns one on its side - but a column of them reads as a list, and a list's labels line up
+    /// on the left rather than each floating in the middle of its own row. Set by the owner, never authored.</summary>
+    public static readonly AdamantiumProperty IsSideTabProperty = AdamantiumProperty.Register(
+        nameof(IsSideTab), typeof(bool), typeof(TabItem), new PropertyMetadata(false));
+
+    public bool IsSideTab
+    {
+        get => GetValue<bool>(IsSideTabProperty);
+        internal set => SetValue(IsSideTabProperty, value);
     }
 
     /// <summary>This tab fills its whole strip because it is the only one (see <see cref="TabControl.StretchSingleTab"/>).

@@ -299,15 +299,86 @@ public class TabControl : Selector
     {
         PinnedItems.Clear();
         UnpinnedItems.Clear();
+        _unpinnedAll.Clear();
 
         foreach (var item in Items)
         {
             if (item is TabItem { IsPinned: true }) PinnedItems.Add(item);
-            else UnpinnedItems.Add(item);
+            else _unpinnedAll.Add(item);
         }
+
+        foreach (var item in _unpinnedAll) UnpinnedItems.Add(item);
 
         HasPinnedTabs = PinnedItems.Count > 0;
         HasUnpinnedTabs = UnpinnedItems.Count > 0;
+    }
+
+    private readonly List<object> _unpinnedAll = new();
+
+    // Open order, oldest first. Not touched by selection: a tab you looked at a moment ago is not thereby a newer tab.
+    private readonly List<object> _openOrder = new();
+    private readonly HashSet<object> _openOrderSet = new();
+    private bool _evicting;
+
+    // Reconciled, not journalled from the change args: a bound collection arrives at once and reports a RESET that names
+    // nothing, which left the order empty and the cap unable to name an oldest tab.
+    private void SyncOpenOrder()
+    {
+        var live = new HashSet<object>(Items);
+        if (_openOrder.RemoveAll(i => !live.Contains(i)) > 0)
+        {
+            _openOrderSet.Clear();
+            foreach (var known in _openOrder) _openOrderSet.Add(known);
+        }
+
+        foreach (var item in Items)
+            if (_openOrderSet.Add(item)) _openOrder.Add(item);
+    }
+
+    // Closes tabs, oldest-opened first, back under MaxOpenedTabs. Never the selected one or a pinned one: closing what
+    // someone is reading, or what they asked to keep, is not a limit.
+    private void EnforceTabLimit()
+    {
+        var max = MaxOpenedTabs;
+        if (max <= 0 || _evicting) return;
+
+        _evicting = true;
+        try
+        {
+            while (Items.Count(i => i is not TabItem { IsPinned: true }) > max)
+            {
+                var victim = _openOrder.FirstOrDefault(i => IndexOfItem(i) >= 0
+                                                            && i is not TabItem { IsPinned: true }
+                                                            && !ReferenceEquals(i, SelectedItem));
+                if (victim == null) break;   // everything left is pinned or being read - the cap yields to that
+
+                RequestCloseItem(victim);
+                if (IndexOfItem(victim) >= 0) break;   // a TabCloseRequested handler vetoed it; do not spin on it
+            }
+        }
+        finally { _evicting = false; }
+    }
+
+
+    /// <summary>The most tabs that may be open at once. Past it the oldest-opened tab is CLOSED to make room, as an
+    /// editor's strip does; zero (the default) switches it off. Pinned tabs and the selected one are never closed.
+    /// <para>It is the answer for a strip that does not virtualize (see <see cref="TabWidth"/>), where every tab open is
+    /// a tab built and a long session would grow the layout with it.</para></summary>
+    public static readonly AdamantiumProperty MaxOpenedTabsProperty = AdamantiumProperty.Register(
+        nameof(MaxOpenedTabs), typeof(Int32), typeof(TabControl),
+        new PropertyMetadata(0, PropertyMetadataOptions.AffectsMeasure, OnMaxOpenedTabsChanged));
+
+    public Int32 MaxOpenedTabs
+    {
+        get => GetValue<Int32>(MaxOpenedTabsProperty);
+        set => SetValue(MaxOpenedTabsProperty, value);
+    }
+
+    private static void OnMaxOpenedTabsChanged(AdamantiumComponent d, AdamantiumPropertyChangedEventArgs e)
+    {
+        if (d is not TabControl tabs) return;
+        tabs.SyncOpenOrder();   // it can be set before any tab arrives, or after they all have
+        tabs.EnforceTabLimit();
     }
 
     public static readonly AdamantiumProperty HasUnpinnedTabsProperty = AdamantiumProperty.RegisterReadOnly(
@@ -437,6 +508,8 @@ public class TabControl : Selector
 
     private void OnItemsChanged(object sender, NotifyCollectionChangedEventArgs e)
     {
+        SyncOpenOrder();
+
         if (_reordering) return;   // a drag-reorder move is mid-flight; MoveItem re-points the selection itself afterwards
 
         // Keep a valid tab selected as the collection mutates (WPF selects the first tab by default and never leaves the
@@ -463,6 +536,10 @@ public class TabControl : Selector
         _reselecting = false;
         UpdateSelectedContent();
         SyncStretchedTab();
+
+        // LAST, and after the selection has settled: the cap must know which tab is being read before it decides which
+        // one to close, and a tab just opened has only now become the selected one.
+        EnforceTabLimit();
     }
 
     /// <summary>True while ONE tab is filling the whole strip (see <see cref="StretchSingleTab"/>). A tab that spans its
@@ -849,7 +926,8 @@ public class TabControl : Selector
         for (var i = 0; i < Items.Count; i++)
         {
             if (i == _dragStartIndex || Reorders(i) is not { } other) continue;
-            var otherCentre = SlotStart(other) + Extent(other) / 2;
+            if (!SlotOfIndex(i, other, out var otherStart, out var otherExtent)) continue;
+            var otherCentre = otherStart + otherExtent / 2;
             if (i > _dragStartIndex && centre > otherCentre) target = Math.Max(target, i);
             else if (i < _dragStartIndex && centre < otherCentre) target = Math.Min(target, i);
         }
@@ -930,6 +1008,26 @@ public class TabControl : Selector
         for (var i = 0; i < Items.Count; i++)
             if (ContainerOfTab(i) is TabItem t && t.RenderTransform is Transform)
                 SetOffset(t, 0);
+    }
+
+    /// <summary>Where tab <paramref name="index"/> sits along the strip. Asked of the PANEL first, and of the container
+    /// only as a fallback, because a container's Bounds are not a position until it has been arranged - and on a
+    /// virtualized strip most tabs never are. An AUTHORED tab is its own container, so it exists and answers with
+    /// Bounds of ZERO whether or not it has ever been placed; every such tab then read as sitting at the very start,
+    /// which put its centre behind the dragged one and flung a two-slot drag to the end of the strip. False when
+    /// nothing can say where it is, which is the honest answer for a tab with no slot yet.</summary>
+    private bool SlotOfIndex(int index, TabItem container, out double start, out double extent)
+    {
+        if (ItemsHostPanel is Panels.VirtualizingPanel panel && panel.TryGetItemRect(index, out var rect))
+        {
+            start = _dragVertical ? rect.Y : rect.X;
+            extent = _dragVertical ? rect.Height : rect.Width;
+            return extent > 0;
+        }
+
+        start = SlotStart(container);
+        extent = Extent(container);
+        return extent > 0;
     }
 
     private double SlotStart(TabItem tab) => _dragVertical ? tab.Bounds.Y : tab.Bounds.X;
@@ -1164,15 +1262,26 @@ public class TabControl : Selector
         if (!_scrollPending) return;
         if (_tabStrip == null || SelectedIndex < 0) return;
 
-        if (ContainerOfTab(SelectedIndex) is not IUIComponent container) return;
-        // Not laid out yet - scrolling to a tab with no bounds scrolls to nowhere. The next pass will find it placed.
-        if (container.Bounds.Width <= 0 && container.Bounds.Height <= 0) return;
-
         // Cleared only once the tab is ALL the way in view. The overflow button's visibility is decided after a layout
         // pass, and when it appears the strip's viewport narrows - so an offset computed before that leaves the tail of
         // the tab, its close button, just past the new edge. Retrying until nothing needs moving converges in a pass or
         // two and cannot strand a clipped tail.
-        _scrollPending = !_tabStrip.ScrollIntoView(container);
+        if (ContainerOfTab(SelectedIndex) is IUIComponent container
+            && (container.Bounds.Width > 0 || container.Bounds.Height > 0))
+        {
+            _scrollPending = !_tabStrip.ScrollIntoView(container);
+            return;
+        }
+
+        // No container, or one not laid out yet. On a VIRTUALIZED strip that is the normal case for the tab being
+        // scrolled to - it is off screen, which is precisely why it is being scrolled to - so ask the panel where it
+        // WOULD be. Without this the scroll silently did nothing and the selected tab stayed off the end.
+        if (ItemsHostPanel is Panels.VirtualizingPanel panel && panel.TryGetItemRect(SelectedIndex, out var slot))
+        {
+            var start = StripIsVertical ? slot.Y : slot.X;
+            var size = StripIsVertical ? slot.Height : slot.Width;
+            if (size > 0) _scrollPending = !_tabStrip.ScrollIntoView(start, size);
+        }
     }
 
     private void PlaceIndicator()
@@ -1349,6 +1458,57 @@ public class TabControl : Selector
     public static readonly AdamantiumProperty ShowCloseButtonProperty = AdamantiumProperty.Register(
         nameof(ShowCloseButton), typeof(bool), typeof(TabControl), new PropertyMetadata(false));
 
+    /// <summary>Whether the tab STRIP virtualizes - builds only the headers on screen. Off by default.
+    /// <para>Virtualizing needs a uniform slot, because the position of a tab that was never built has to be arithmetic
+    /// rather than a measurement: slot n starts at n x <see cref="TabWidth"/>. Turning this on therefore makes the tabs
+    /// uniform, at TabWidth (or <see cref="TabHeight"/> on a side strip) if set and at a sensible default if not - so
+    /// there is no such thing as "asked to virtualize but cannot".</para>
+    /// <para>Worth it past a few hundred tabs: 1000 cost 2.5s of layout unvirtualized against 45ms. Below that leave it
+    /// off, where tabs size to their own titles and the strip reads better.</para></summary>
+    public static readonly AdamantiumProperty IsVirtualizingProperty = AdamantiumProperty.Register(
+        nameof(IsVirtualizing), typeof(bool), typeof(TabControl),
+        new PropertyMetadata(false, PropertyMetadataOptions.AffectsMeasure, OnStripLayoutKnobChanged));
+
+    // AffectsMeasure marks THIS control, and the strip's panel is a measure boundary with its own cache - so it kept the
+    // set of tabs it had until something else woke it, which in practice was the first scroll. Told directly instead.
+    private static void OnStripLayoutKnobChanged(AdamantiumComponent d, AdamantiumPropertyChangedEventArgs e) =>
+        ((d as TabControl)?.ItemsHostPanel as IMeasurableComponent)?.InvalidateMeasure();
+
+    public bool IsVirtualizing
+    {
+        get => GetValue<bool>(IsVirtualizingProperty);
+        set => SetValue(IsVirtualizingProperty, value);
+    }
+
+    /// <summary>One width for every tab, or NaN (the default) to let each size to its own header.
+    /// <para>Setting it makes the strip uniform on its own; <see cref="IsVirtualizing"/> is what decides whether only the
+    /// visible tabs are built. A title too long for the slot trims with an ellipsis.</para>
+    /// <para>On the CONTROL because the panel comes from an ItemsPanelTemplate, so there is no instance to address; the
+    /// panel reads it from here, as it does <see cref="StretchSingleTab"/>.</para></summary>
+    public static readonly AdamantiumProperty TabWidthProperty = AdamantiumProperty.Register(
+        nameof(TabWidth), typeof(Double), typeof(TabControl),
+        new PropertyMetadata(Double.NaN, PropertyMetadataOptions.AffectsMeasure, OnStripLayoutKnobChanged));
+
+    public Double TabWidth
+    {
+        get => GetValue<Double>(TabWidthProperty);
+        set => SetValue(TabWidthProperty, value);
+    }
+
+    /// <summary>One height for every tab on a SIDE strip, or NaN (the default) to let each size to its own header - the
+    /// vertical counterpart of <see cref="TabWidth"/>, and what virtualizes a left/right strip.
+    /// <para>Separate from TabWidth: a side strip stacks ordinary horizontal headers downwards, so its length is made of
+    /// HEIGHTS. Reusing TabWidth there set a tab's height from a number named for its width.</para></summary>
+    public static readonly AdamantiumProperty TabHeightProperty = AdamantiumProperty.Register(
+        nameof(TabHeight), typeof(Double), typeof(TabControl),
+        new PropertyMetadata(Double.NaN, PropertyMetadataOptions.AffectsMeasure, OnStripLayoutKnobChanged));
+
+    public Double TabHeight
+    {
+        get => GetValue<Double>(TabHeightProperty);
+        set => SetValue(TabHeightProperty, value);
+    }
+
     public static readonly AdamantiumProperty CloseButtonTemplateProperty = AdamantiumProperty.Register(
         nameof(CloseButtonTemplate), typeof(ControlTemplate), typeof(TabControl), new PropertyMetadata(null));
 
@@ -1510,7 +1670,7 @@ public class TabControl : Selector
                 ? authored.Header is IUIComponent visual ? visual.ToString() : authored.Header
                 : item;
 
-            rows.Add(new TabOverflowItem(this, tab, header, ItemTemplate));
+            rows.Add(new TabOverflowItem(this, tab, item, header, ItemTemplate));
         }
         return rows;
     }
@@ -1584,6 +1744,9 @@ public class TabControl : Selector
         CanScrollTabsForward = _tabStrip?.CanScrollForward ?? false;
 
         if (_overflow == null) return;
+        // Scrolling is not the only way a tab can be out of reach. MaxOpenedTabs holds tabs OUT of the strip, so the strip
+        // fits perfectly and reports nothing to scroll - while the flyout is the only way back to what it is holding out.
+        // Deciding by geometry alone hid the ▾ exactly when it was the sole route to those tabs.
         var overflowing = CanScrollTabsBack || CanScrollTabsForward;
         var visibility = ShowTabOverflowMenu && overflowing ? Visibility.Visible : Visibility.Collapsed;
         if (_overflow.Visibility == visibility) return;
@@ -1602,9 +1765,21 @@ public class TabControl : Selector
 
     // Called by a TabItem when its close button is clicked: raise the cancelable event, and unless vetoed remove the tab
     // (mutating ItemsSource when data-bound to a writable list, else the authored Items) - mirroring MoveItem's source rule.
-    internal void RequestClose(TabItem tab)
+    /// <summary>Closes the tab that hosts <paramref name="item"/>, whether or not it has a container. The overflow flyout
+    /// needs this: it lists tabs that are NOT in the strip, so most of its rows have no TabItem to point at, and a close
+    /// that insisted on one did nothing at all - leaving the click to fall through to the row and OPEN the tab instead of
+    /// closing it.</summary>
+    internal void RequestCloseItem(object item)
     {
-        var index = IndexOfTab(tab);
+        var index = IndexOfItem(item);
+        if (index < 0 || index >= Items.Count) return;
+        RequestClose(ContainerOfTab(index) as TabItem, index);
+    }
+
+    internal void RequestClose(TabItem tab) => RequestClose(tab, IndexOfTab(tab));
+
+    private void RequestClose(TabItem tab, int index)
+    {
         if (index < 0 || index >= Items.Count) return;
 
         var args = new TabCloseRequestedEventArgs(tab, Items[index]);
