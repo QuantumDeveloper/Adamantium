@@ -21,7 +21,7 @@ public class Polygon : Shape
     public static readonly AdamantiumProperty PointsProperty = AdamantiumProperty.Register(nameof(Points),
         typeof(PointsCollection), typeof(Polygon),
         new PropertyMetadata(null,
-            PropertyMetadataOptions.BindsTwoWayByDefault | PropertyMetadataOptions.AffectsMeasure |
+            PropertyMetadataOptions.AffectsMeasure |
             PropertyMetadataOptions.AffectsArrange | PropertyMetadataOptions.AffectsRender, PointsChangedCallback));
 
     public static readonly AdamantiumProperty FillRuleProperty = AdamantiumProperty.Register(nameof(FillRule),

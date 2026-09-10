@@ -35,6 +35,11 @@ public static class VisualTreeNotifications
     /// content is untouched; what changed is the shape of everything drawn beneath it.</summary>
     public static event Action<IUIComponent> ClipChanged;
 
+    /// <summary>An element's PLACE among its siblings changed (ZIndex) - nothing it draws is different and nothing
+    /// moved, only WHEN it is painted. Structural, because the retained order decides that by a rank handed out once,
+    /// at placement.</summary>
+    public static event Action<IUIComponent> ZOrderChanged;
+
     /// <summary>An element's CONTENT is stale: what it draws is not what it drew (a new size, a new shape, new text).</summary>
     public static event Action<IUIComponent> ContentInvalidated;
 
@@ -55,6 +60,7 @@ public static class VisualTreeNotifications
     public static void RaiseVisibilityChanged(IUIComponent component) { if (component != null) VisibilityChanged?.Invoke(component); }
     public static void RaiseShownOrHidden(IUIComponent component) { if (component != null) ShownOrHidden?.Invoke(component); }
     public static void RaiseClipChanged(IUIComponent component) { if (component != null) ClipChanged?.Invoke(component); }
+    public static void RaiseZOrderChanged(IUIComponent component) { if (component != null) ZOrderChanged?.Invoke(component); }
     public static void RaiseContentInvalidated(IUIComponent component) { if (component != null) ContentInvalidated?.Invoke(component); }
     public static void RaisePaintInvalidated(IUIComponent component) { if (component != null) PaintInvalidated?.Invoke(component); }
     public static void RaiseMoved(IUIComponent component) { if (component != null) Moved?.Invoke(component); }

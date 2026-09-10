@@ -48,6 +48,12 @@ public static class LayerProbe
     public static void Cycle() => _cyclesThisFrame++;
     public static void Segment() => _segmentsThisFrame++;
 
+    // SCRATCH (ADAM_OP_OWNERS=1): WHO ends a batch. A scissor change closes the run, so the draw count is decided by
+    // which elements clip, and the op stream is the only place that says which. Filled at the end of a record walk.
+    public static readonly bool DumpOwners = Environment.GetEnvironmentVariable("ADAM_OP_OWNERS") == "1";
+    public static string LastOpDump = "";
+    public static int LastOpCount;
+
     public static string Dump()
     {
         var f = Math.Max(1, Frames);

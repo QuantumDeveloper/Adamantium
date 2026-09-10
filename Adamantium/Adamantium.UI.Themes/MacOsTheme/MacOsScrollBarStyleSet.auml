@@ -33,12 +33,16 @@
             <Setter.Value>
                 <ControlTemplate TargetType="ScrollBar">
                     <Border Background="{TemplateBinding Background}">
+                        <!-- MinThumbLength is this theme's own: the thumb is a ROUNDED bar, so it stops reading as a
+                             thumb long before a square one does. At the shared floor of 12 a list of ten thousand rows
+                             left a dot that was hard to even aim at. -->
                         <Track x:Name="PART_Track"
                                Orientation="{TemplateBinding Orientation}"
                                Minimum="{TemplateBinding Minimum}"
                                Maximum="{TemplateBinding Maximum}"
                                Value="{TemplateBinding Value}"
-                               ViewportSize="{TemplateBinding ViewportSize}">
+                               ViewportSize="{TemplateBinding ViewportSize}"
+                               MinThumbLength="32">
                             <Track.DecreaseRepeatButton>
                                 <ScrollBarPageButton Focusable="false"/>
                             </Track.DecreaseRepeatButton>

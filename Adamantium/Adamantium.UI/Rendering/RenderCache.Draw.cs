@@ -183,6 +183,7 @@ public partial class RenderCache
     // that shows up as exactly the thing a smooth window cannot have - some frames costing much more than their
     // neighbours for no visible reason.
     private readonly List<ControlGroup> _leftTheOrder = new();
+    private bool _orderJoined;   // a group arrived since the recorded walk - see ApplyStructural / TryPartialReplay
 
     // The departed groups' tags, as one set, so the arena is asked once instead of once per group.
     private readonly HashSet<int> _departedTags = new();
@@ -549,6 +550,10 @@ public partial class RenderCache
                 BlankOrphanInstances(device);
                 _leftTheOrder.Clear();
             }
+
+            // Cleared where the departures are: both say "the paint order is not the one the stream was recorded
+            // against", and both are answered by the frame that has just been drawn.
+            _orderJoined = false;
 
             if (Core.Diagnostics.FrameTrace.Enabled)
             {
@@ -1661,6 +1666,13 @@ public partial class RenderCache
         if (_recording)
         {
             _opsRecorded = true; _recording = false;
+            // The BIGGEST stream only: several caches share this field (a window and its adorner layers), and an empty
+            // adorner recording last would otherwise be the whole report.
+            if (LayerProbe.DumpOwners && _ops.Count > LayerProbe.LastOpCount)
+            {
+                LayerProbe.LastOpCount = _ops.Count;
+                LayerProbe.LastOpDump = DumpOpOwners();
+            }
             // The transform + layout state this op stream was recorded AGAINST. A replay is faithful only while it holds.
             _opsMatrixVersion = _transformTable?.MatrixVersion ?? 0;
             _opsLayoutVersion = _transformTable?.LayoutMatrixVersion ?? 0;
@@ -2022,6 +2034,11 @@ public partial class RenderCache
 
     private bool TryPartialReplay(IGraphicsDevice device, Rect2D fullScissor)
     {
+        // A patch repairs a frame whose PAINT ORDER is the one that was recorded: it writes remembered slot addresses
+        // and replays that walk's stream. A group that has left or joined since invalidates both, and only rect
+        // instances carry an owner tag to check (see PatchSlot) - the other families can only be answered by a walk.
+        if (_leftTheOrder.Count > 0 || _orderJoined) return SpliceRefused("orderChanged");
+
         // Moved motion nodes first: rewrite their table matrices (64B each) so the replayed segments draw the scrolled
         // subtrees at their new position. A moved node with non-node-aware retained content bails to the full walk.
         if (!RefreshMovedNodes(device)) return SpliceRefused("movedNode");
@@ -2257,8 +2274,9 @@ public partial class RenderCache
         // into the arena from a snapshot frozen when it last drew - nobody measures or arranges a control that is not
         // drawing - so the bar the window outgrew comes back at the size and place it had, once per animation tick.
         // Answering "done" rather than "cannot": the frame is correct, and refusing would cost it a full walk.
+        ControlGroup owner = null;
         if (u.Component != null
-            && (!_groupById.TryGetValue(u.Component.RenderId, out var owner) || !owner.InOrder))
+            && (!_groupById.TryGetValue(u.Component.RenderId, out owner) || !owner.InOrder))
         {
             return true;
         }
@@ -2275,6 +2293,10 @@ public partial class RenderCache
 
             if (_rectSlotByUnit.TryGetValue(u, out var rectSlot))
             {
+                // WHOSE slot is it NOW: writing into one that has been handed on paints that group with these bytes and
+                // takes its tag, so the true owner goes blank and this control appears twice.
+                if (!_rectBatch.SlotOwnedBy(rectSlot, owner?.Tag ?? 0)) return false;
+
                 if (!RectBatchCollector.BakeItem(rru.RectPayload, bakeWorld, rru.FillOpacity, transformSlot, rru.FadeSlot, out var item)) return false;
                 // The record the WALK writes carries its rounded clip (TryAdd, same line after the same bake). A patch
                 // that leaves it out writes a record the walk would never have written: dragging a shape across a rounded

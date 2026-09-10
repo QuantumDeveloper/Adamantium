@@ -117,10 +117,10 @@
         <PropertyTrigger Property="HasItems" Value="false">
             <Setter TargetName="PART_Expander" Property="Visibility" Value="Hidden"/>
         </PropertyTrigger>
-        <!-- Selection last so it wins the Root background over hover. -->
+        <!-- Selection last so it wins the Root background over hover. A WASH, like the list beside it: the row's own
+             icon and chevron have to stay visible through it. -->
         <PropertyTrigger Property="IsSelected" Value="true">
-            <Setter TargetName="Root" Property="Background" Value="{ThemeResource AccentFillColorDefault}"/>
-            <Setter TargetName="PART_ContentPresenter" Property="Foreground" Value="{ThemeResource AccentForegroundColor}"/>
+            <Setter TargetName="Root" Property="Background" Value="{ThemeResource AccentFillColorSelection}"/>
         </PropertyTrigger>
     </Style>
 

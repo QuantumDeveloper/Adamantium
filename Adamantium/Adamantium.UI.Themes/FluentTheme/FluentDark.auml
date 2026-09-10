@@ -40,6 +40,11 @@
     <PaletteColor Key="DockCompassPreviewColor" Color="#592D7FF9"/>
     <PaletteColor Key="SubtleFillColorTertiary" Color="#0AFFFFFF"/>
     <PaletteColor Key="ControlStrokeColorDefault" Color="#12FFFFFF"/>
+    <!-- The table's rules, OPAQUE. Every other stroke in the palette is translucent so it composites with the surface
+         behind it - which is right for a static frame and wrong for a line that content scrolls under: what passes
+         beneath shows through the hairline. This is ControlStrokeColorDefault already composited over the table's own
+         CardBackgroundFillColorDefault, so the table looks the same and stops being see-through. -->
+    <PaletteColor Key="DataGridLineColor" Color="#3B3B3B"/>
     <PaletteColor Key="ControlStrokeColorSecondary" Color="#18FFFFFF"/>
     <PaletteColor Key="TextFillColorPrimary" Color="#FFFFFF"/>
     <PaletteColor Key="TextFillColorSecondary" Color="#C5FFFFFF"/>

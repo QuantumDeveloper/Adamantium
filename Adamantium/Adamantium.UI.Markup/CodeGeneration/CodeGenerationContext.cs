@@ -806,10 +806,10 @@ public class CodeGenerationContext
                 {
                     TextGenerator.WriteLine($"{elementName}.{collection}.Add({childName});");
                 }
-                else if (typeInfo.ImplementsInterface("IContainer"))
-                {
-                    TextGenerator.WriteLine($"(({typeInfo.GetInterface("IContainer").FullName}){elementName}).AddOrSetChildComponent({childName});");
-                }
+                // [Content] BEFORE IContainer: the attribute is a statement by THIS type about where its markup
+                // children go and is searched most-derived first, while IContainer is one implementation for the whole
+                // hierarchy - a type declaring its own content property and inheriting a container was losing the
+                // declaration. Where both agree (a Panel's Children) the emitted line is the same either way.
                 else if (typeInfo.FindPropertyWithAttribute("Adamantium.UI.Core.ContentAttribute", out var contentProp))
                 {
                     if (contentProp.PropertyType.IsCollection())
@@ -820,6 +820,10 @@ public class CodeGenerationContext
                     {
                         TextGenerator.WriteLine($"{elementName}.{contentProp.Name} = {childName};");
                     }
+                }
+                else if (typeInfo.ImplementsInterface("IContainer"))
+                {
+                    TextGenerator.WriteLine($"(({typeInfo.GetInterface("IContainer").FullName}){elementName}).AddOrSetChildComponent({childName});");
                 }
                 else if (isResource && Metadata.RootEntityType != EntityType.ResourceDictionary)
                 {

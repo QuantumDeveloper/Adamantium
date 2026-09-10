@@ -61,7 +61,14 @@ public class BindingExpression : BindingExpressionBase
       TargetProperty = targetProperty;
       BindingBase = bindingBase;
       Binding = (Binding)bindingBase;
-      Mode = Binding.Mode;
+
+      // Default means "whatever this PROPERTY says" (PropertyMetadataOptions.BindsTwoWayByDefault). Read HERE because
+      // nothing else read it: the metadata carried DefaultBindingMode for 67 properties and no expression ever asked,
+      // so every {Binding} without an explicit Mode was silently one-way.
+      // A producer (a trigger's condition, a MultiBinding child) has no target property to ask, and stays as written.
+      Mode = Binding.Mode == BindingMode.Default && target != null && targetProperty != null
+         ? targetProperty.GetDefaultMetadata(target.GetType()).DefaultBindingMode
+         : Binding.Mode;
    }
 
    public BindingExpression(IAdamantiumComponent target, string targetPropertyName, BindingBase bindingBase)

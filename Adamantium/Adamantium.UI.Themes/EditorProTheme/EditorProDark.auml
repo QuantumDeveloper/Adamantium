@@ -36,6 +36,8 @@
     <PaletteColor Key="SubtleFillColorSecondary" Color="#0DFFFFFF"/>
     <PaletteColor Key="SubtleFillColorTertiary" Color="#08FFFFFF"/>
     <PaletteColor Key="ControlStrokeColorDefault" Color="#1FFFFFFF"/>
+    <!-- The table's rules, OPAQUE - see FluentDark for why a rule content scrolls under cannot be translucent. -->
+    <PaletteColor Key="DataGridLineColor" Color="#393E44"/>
     <PaletteColor Key="ControlStrokeColorSecondary" Color="#2EFFFFFF"/>
 
     <PaletteColor Key="OnAccentOverlayPointerOver" Color="#33FFFFFF"/>

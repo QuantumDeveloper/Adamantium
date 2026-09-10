@@ -1,3 +1,4 @@
+using System;
 using Adamantium.Mathematics;
 using Adamantium.UI.Controls;
 using Adamantium.UI.Controls.Decorators;
@@ -133,6 +134,54 @@ public class GridAutoTrackTests
             Assert.That(grid.Children[0].Bounds.Width, Is.EqualTo(16));
             Assert.That(grid.Children[1].Bounds.X, Is.EqualTo(16));
             Assert.That(grid.Children[1].Bounds.Width, Is.EqualTo(24));
+        });
+    }
+
+    // A child whose height depends on the width it is handed - what wrapping text is. The engine's grid measures cells
+    // that sit in a star track TWICE: once before the star sizes exist, once after. Only the star half of that first,
+    // provisional measurement is meant to be thrown away.
+    private sealed class WrappingProbe : Border
+    {
+        private const double Ink = 1200;
+        private const double LineHeight = 20;
+
+        protected override Size MeasureOverride(Size availableSize)
+        {
+            var width = double.IsInfinity(availableSize.Width) || availableSize.Width <= 0 ? 1 : availableSize.Width;
+            return new Size(Math.Min(Ink, width), Math.Ceiling(Ink / width) * LineHeight);
+        }
+    }
+
+    // An Auto ROW holding a child that spans STAR columns. The provisional pass hands that child the star width it does
+    // not know yet - zero - and a wrapping child answers that with a column of one word per line. That answer was going
+    // straight into the row's Auto size, and since a track size only ever grows, the honest second measurement could
+    // never take it back: a two-line paragraph kept half the page, and everything under it was pushed off the bottom.
+    [Test]
+    public void AnAutoRow_IsSizedByTheHONESTMeasurementOfAStarSpanningChild()
+    {
+        var grid = new Grid
+        {
+            RowDefinitions = { new RowDefinition { Height = GridLength.Auto },
+                               new RowDefinition { Height = new GridLength(1, GridUnitType.Star) } },
+            ColumnDefinitions = { Star(), Star() }
+        };
+
+        var paragraph = new WrappingProbe();
+        Grid.SetColumnSpan(paragraph, 2);
+        var body = new Border();
+        Grid.SetRow(body, 1);
+        Grid.SetColumnSpan(body, 2);
+        grid.Children.Add(paragraph);
+        grid.Children.Add(body);
+
+        grid.Measure(new Size(600, 400));
+        grid.Arrange(new Rect(0, 0, 600, 400));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(paragraph.Bounds.Height, Is.EqualTo(40), "600 wide is two lines of it, and the row is two lines");
+            Assert.That(body.Bounds.Y, Is.EqualTo(40), "so the star row starts right under it");
+            Assert.That(body.Bounds.Height, Is.EqualTo(360), "and keeps the rest of the grid");
         });
     }
 

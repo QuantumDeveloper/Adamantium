@@ -1,0 +1,151 @@
+<View xmlns="http://adamantium/ui"
+      xmlns:x="http://adamantium/ui/xaml/extensions"
+      xmlns:conv="clr-namespace:Adamantium.Game.Sandbox.Converters">
+    <!-- A column stands in the grid's LOGICAL tree, so everything on it binds like anything else: its value against the
+         row's item, its list of choices against this page's view-model. -->
+    <!-- The table on the left, its settings in a panel of their own on the right - they never overlap, and the switches
+         stop being a heap along the bottom. -->
+    <Grid ColumnDefinitions="*,Auto" Margin="16">
+    <Grid Grid.Column="0" RowDefinitions="Auto,Auto,*" Margin="0,0,16,0">
+
+        <TextBlock Grid.Row="0" Text="TreeDataGrid" FontSize="18"/>
+        <TextBlock Grid.Row="1" Margin="0,4,0,10" TextWrapping="WrapByWords"
+                   Foreground="{ObservableResource TextFillColorSecondary}"
+                   Text="10 000 rows, every fifth with a branch, and one of every column type. Double-click a cell to edit it; the panel on the right drives the rest."/>
+
+        <!-- The tint comes from the picker below by ELEMENT, not through the view-model: the swatch's brush is the one
+             live object and both the button and the table paint from it. -->
+        <TreeDataGrid Grid.Row="2" x:Name="Table"
+                      ItemsSource="{Binding Nodes}"
+                      ChildrenPath="Children"
+                      GridLinesVisibility="{Binding GridLines}"
+                      ShowRowNumbers="{Binding ShowRowNumbers}"
+                      SelectionUnit="{Binding SelectionUnit}"
+                      AlternationCount="{Binding AlternationCount}"
+                      AlternationBrush="{Binding SelectedBrush, ElementName=TintPicker}"
+                      Indent="16"
+                      ExpanderColumnIndex="2">
+            <!-- EVERY column type, so each one's editor can be seen: text, drop-down, check box and a fully templated
+                 one. Double-click any cell (or press F2) to open its editor. -->
+            <TreeDataGrid.Columns>
+                <!-- ONE CELL refuses an edit its column allows: a finished record keeps the code it was filed under.
+                     The refusal is an ordinary binding, read off the row. -->
+                <!-- FrozenSide is an ordinary bindable property of the column, and the column stands in the grid's
+                     logical tree - so a check box on this page pins it with no code behind anything. -->
+                <DataGridTextColumn Header="Code" Binding="{Binding Code}" Width="110" SortMemberPath="Code"
+                                    IsReadOnlyBinding="{Binding IsLocked}"
+                                    FrozenSide="{Binding CodeSide}"/>
+
+                <!-- The choices come straight from the view-model - the column binds to it like any element would. -->
+                <DataGridDropDownColumn Header="Owner" Binding="{Binding Owner}" Width="100" SortMemberPath="Owner"
+                                        ItemsSource="{Binding OwnerChoices}"/>
+
+                <!-- The carrier is named by the grid's ExpanderColumnIndex above, not by a flag here: "exactly one of
+                     these" cannot be said with a boolean per column without admitting two of them claiming it. -->
+                <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="320" SortMemberPath="Name" MinWidth="160"/>
+
+                <DataGridCheckBoxColumn Header="Done" Binding="{Binding Done}" Width="60" SortMemberPath="Done"/>
+
+                <DataGridTextColumn Header="Size" Binding="{Binding Size}" Width="80" SortMemberPath="Size"/>
+
+                <!-- Read-only BY THE COLUMN, which is the other way to refuse an edit: Code refuses one cell at a time
+                     instead. Both are honoured by the same BeginEdit. -->
+                <DataGridTextColumn Header="Checksum" Binding="{Binding Checksum}" Width="120" IsReadOnly="True"/>
+
+                <!-- From here on the columns exist to overflow the viewport: scroll sideways and only the columns in
+                     view carry cells (the header strip follows the same offset). -->
+                <!-- A column pinned from the MIDDLE of the table: the pinned zone is a place in the layout, not a
+                     prefix of the declaration, so this one leaves its neighbours and joins the left zone. -->
+                <DataGridTextColumn Header="Region" Binding="{Binding Region}" Width="110" SortMemberPath="Region"
+                                    FrozenSide="{Binding RegionSide}"/>
+                <DataGridTextColumn Header="Batch" Binding="{Binding Batch}" Width="90" SortMemberPath="Batch"/>
+                <DataGridTextColumn Header="Revision" Binding="{Binding Revision}" Width="90" SortMemberPath="Revision"/>
+                <DataGridTextColumn Header="Line" Binding="{Binding Line}" Width="90" SortMemberPath="Line"/>
+                <DataGridTextColumn Header="Shift" Binding="{Binding Shift}" Width="80" SortMemberPath="Shift"/>
+                <DataGridTextColumn Header="Updated" Binding="{Binding Updated}" Width="110" SortMemberPath="Updated"/>
+
+                <!-- A template column owns both looks. Its cell holds the ROW, so the templates bind to its members and
+                     the editor writes straight through. Its cells still carry a MEANING - the model says "Error", the
+                     theme decides what that looks like. -->
+                <DataGridTemplateColumn Header="Status" Width="110" SortMemberPath="Status"
+                                        FrozenSide="{Binding StatusSide}"
+                                        StateBinding="{Binding StatusState}">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <Border CornerRadius="8" Padding="8 0" HorizontalAlignment="Left"
+                                    VerticalAlignment="Center"
+                                    Background="{ObservableResource ControlFillColorSecondary}">
+                                <TextBlock Text="{Binding Status}" VerticalAlignment="Center"/>
+                            </Border>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                    <DataGridTemplateColumn.CellEditingTemplate>
+                        <DataTemplate>
+                            <TextBox Text="{Binding Status, Mode=TwoWay}" BorderThickness="0" Padding="0"
+                                     MinWidth="0" MinHeight="0"/>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellEditingTemplate>
+                </DataGridTemplateColumn>
+            </TreeDataGrid.Columns>
+        </TreeDataGrid>
+
+    </Grid>
+
+    <Border Grid.Column="1" Width="250"
+            Background="{ObservableResource CardBackgroundFillColorDefault}"
+            BorderBrush="{ObservableResource ControlStrokeColorDefault}"
+            BorderThickness="1" CornerRadius="4" Padding="12">
+        <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+            <StackPanel Orientation="Vertical">
+                <TextBlock Text="Grid settings" FontSize="15" Margin="0,0,0,10"/>
+
+                <TextBlock Text="COLUMNS" FontSize="11" Margin="0,4,0,6"
+                           Foreground="{ObservableResource TextFillColorSecondary}"/>
+                <!-- Three pins, one on each kind of column: the first, one from the MIDDLE, and one pinned to the
+                     other EDGE. A pinned column leaves its neighbours and joins the zone at its side. -->
+                <CheckBox Content="Pin Code left" Margin="0,0,0,6"
+                          IsChecked="{Binding PinCode, Mode=TwoWay}"/>
+                <CheckBox Content="Pin Region left" Margin="0,0,0,6"
+                          IsChecked="{Binding PinRegion, Mode=TwoWay}"/>
+                <CheckBox Content="Pin Status right" Margin="0,0,0,6"
+                          IsChecked="{Binding PinStatus, Mode=TwoWay}"/>
+
+                <TextBlock Text="ROWS" FontSize="11" Margin="0,10,0,6"
+                           Foreground="{ObservableResource TextFillColorSecondary}"/>
+                <CheckBox Content="Row numbers" Margin="0,0,0,8"
+                          IsChecked="{Binding ShowRowNumbers, Mode=TwoWay}"/>
+
+                <TextBlock Text="Tint every Nth row" Margin="0,0,0,4"/>
+                <NumericUpDown InputMode="Integers" Minimum="0" Maximum="4" SmallChange="1" Margin="0,0,0,4"
+                               Value="{Binding AlternationCount, Mode=TwoWay}"/>
+                <TextBlock Text="2 = every other row; 0 = none" FontSize="11" Margin="0,0,0,8"
+                           Foreground="{ObservableResource TextFillColorSecondary}"/>
+
+                <TextBlock Text="Tint colour" Margin="0,0,0,4"/>
+                <ColorPickerButton x:Name="TintPicker" Width="72" Height="24" HorizontalAlignment="Left"
+                                   Margin="0,0,0,8" SelectedColor="#332F6FED"/>
+
+                <TextBlock Text="LOOK" FontSize="11" Margin="0,10,0,6"
+                           Foreground="{ObservableResource TextFillColorSecondary}"/>
+                <TextBlock Text="Grid lines" Margin="0,0,0,4"/>
+                <DropDown Margin="0,0,0,8"
+                          ItemsSource="{Binding GridLineChoices}"
+                          SelectedItem="{Binding GridLines, Mode=TwoWay}"/>
+
+                <!-- What a click takes. In FullRow the press, the drag and the arrows all take rows - one funnel
+                     answers for the mode, so they cannot disagree. -->
+                <TextBlock Text="Selection unit" Margin="0,0,0,4"/>
+                <DropDown Margin="0,0,0,8"
+                          ItemsSource="{Binding SelectionUnitChoices}"
+                          SelectedItem="{Binding SelectionUnit, Mode=TwoWay}"/>
+
+                <!-- Whether the table is in edit is an ordinary bindable property, so a view-model (or, as here,
+                     another element) can hold a toolbar or postpone a refresh while a cell is open. -->
+                <TextBlock Text="editing a cell" Margin="0,10,0,0"
+                           Foreground="{ObservableResource TextFillColorSecondary}"
+                           Visibility="{Binding IsEditing, ElementName=Table, Converter={conv:BoolToVisibilityConverter}}"/>
+            </StackPanel>
+        </ScrollViewer>
+    </Border>
+    </Grid>
+</View>

@@ -208,7 +208,12 @@ public class ItemsControl : Control, IContainer
     private void OnItemsCollectionChanged(object sender, NotifyCollectionChangedEventArgs e)
     {
         _presenter?.OnItemsChanged(e);
+        OnItemsChanged(e);
     }
+
+    /// <summary>The items collection changed. For a subclass that keeps something derived from it - a selection named
+    /// before the items existed, say.</summary>
+    protected virtual void OnItemsChanged(NotifyCollectionChangedEventArgs e) { }
 
     // --- Container seam (override in selectable controls, e.g. ListBox -> ListBoxItem) -----------------------------
 

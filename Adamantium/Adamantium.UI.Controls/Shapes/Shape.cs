@@ -179,17 +179,17 @@ public abstract class Shape : InputUIComponent
 
    public static readonly AdamantiumProperty FillProperty = AdamantiumProperty.Register(nameof(Fill),
       typeof (Brush), typeof (Shape),
-      new PropertyMetadata(Brushes.Transparent, PropertyMetadataOptions.BindsTwoWayByDefault|PropertyMetadataOptions.AffectsRender));
+      new PropertyMetadata(Brushes.Transparent, PropertyMetadataOptions.AffectsRender));
 
    public static readonly AdamantiumProperty StrokeProperty = AdamantiumProperty.Register(nameof(Stroke),
       typeof (Brush), typeof (Shape),
-      new PropertyMetadata(Brushes.Transparent, PropertyMetadataOptions.BindsTwoWayByDefault | PropertyMetadataOptions.AffectsRender));
+      new PropertyMetadata(Brushes.Transparent, PropertyMetadataOptions.AffectsRender));
 
    public static readonly AdamantiumProperty StrokeThicknessProperty =
       AdamantiumProperty.Register(nameof(StrokeThickness),
          typeof (Double), typeof (Shape),
          new PropertyMetadata((Double) 0,
-            PropertyMetadataOptions.BindsTwoWayByDefault | PropertyMetadataOptions.AffectsRender, CoerceStrokeThickness ));
+            PropertyMetadataOptions.AffectsRender, CoerceStrokeThickness ));
 
    public static readonly AdamantiumProperty StrokeDashArrayProperty =
       AdamantiumProperty.Register(nameof(StrokeDashArray),
@@ -198,7 +198,7 @@ public abstract class Shape : InputUIComponent
    public static readonly AdamantiumProperty StretchProperty = AdamantiumProperty.Register(nameof(Stretch),
       typeof (Stretch), typeof (Shape),
       new PropertyMetadata(Stretch.None,
-         PropertyMetadataOptions.BindsTwoWayByDefault | PropertyMetadataOptions.AffectsMeasure|PropertyMetadataOptions.AffectsRender));
+         PropertyMetadataOptions.AffectsMeasure|PropertyMetadataOptions.AffectsRender));
 
    public static readonly AdamantiumProperty StartLineCapProperty =
       AdamantiumProperty.Register(nameof(StartLineCap), typeof(PenLineCap), typeof(Shape),

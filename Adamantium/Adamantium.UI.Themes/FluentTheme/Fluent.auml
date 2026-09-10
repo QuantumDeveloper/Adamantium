@@ -59,6 +59,7 @@
         <StyleInclude Source="{x:Type shared:BusyEffectsStyleSet}"/>
         <StyleInclude Source="{x:Type fluent:ItemsControlStyleSet}"/>
         <StyleInclude Source="{x:Type fluent:ListBoxStyleSet}"/>
+        <StyleInclude Source="{x:Type fluent:DataGridStyleSet}"/>
         <StyleInclude Source="{x:Type fluent:ListBoxItemStyleSet}"/>
         <StyleInclude Source="{x:Type fluent:DropInsertionIndicatorStyleSet}"/>
         <StyleInclude Source="{x:Type fluent:DragHandleStyleSet}"/>
@@ -69,6 +70,8 @@
         <StyleInclude Source="{x:Type fluent:TilesHostStyleSet}"/>
         <StyleInclude Source="{x:Type fluent:FlipTileStyleSet}"/>
         <StyleInclude Source="{x:Type fluent:DropDownStyleSet}"/>
+        <StyleInclude Source="{x:Type fluent:ExpanderStyleSet}"/>
+        <StyleInclude Source="{x:Type fluent:PropertyGridStyleSet}"/>
         <StyleInclude Source="{x:Type fluent:DataPagerStyleSet}"/>
         <StyleInclude Source="{x:Type fluent:DropDownItemStyleSet}"/>
         <StyleInclude Source="{x:Type fluent:TextBoxStyleSet}"/>

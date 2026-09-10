@@ -43,6 +43,8 @@
     <PaletteColor Key="SubtleFillColorSecondary" Color="#0F000000"/>
     <PaletteColor Key="SubtleFillColorTertiary" Color="#08000000"/>
     <PaletteColor Key="ControlStrokeColorDefault" Color="#1F000000"/>
+    <!-- The table's rules, OPAQUE - see FluentDark. -->
+    <PaletteColor Key="DataGridLineColor" Color="#E0E0E0"/>
     <PaletteColor Key="ControlStrokeColorSecondary" Color="#2E000000"/>
 
     <!-- The UNSET surface of a selection control - see MacOsDark for why it is one key and its own. The light side had
@@ -69,7 +71,8 @@
     <PaletteColor Key="BandFadeColorTransparent" Color="#00FFFFFF" As="Color"/>
 
     <!-- The overlay scroller's thumb - see MacOsDark for why it is translucent. -->
-    <PaletteColor Key="ScrollThumbFillColor" Color="#66000000"/>
+    <!-- See the dark variant: no track behind the capsule, so it cannot afford to be half transparent. -->
+    <PaletteColor Key="ScrollThumbFillColor" Color="#99000000"/>
 
     <!-- A slider knob is white in both appearances, so what separates it from its background is NOT its own colour -
         which means the separation has to vary by variant even though the knob does not. Here it is a shadow: white on

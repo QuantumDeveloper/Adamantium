@@ -17,7 +17,7 @@ public class Polyline : CurveBase
     public static readonly AdamantiumProperty PointsProperty = AdamantiumProperty.Register(nameof(Points),
         typeof(PointsCollection), typeof(Polyline),
         new PropertyMetadata(null,
-            PropertyMetadataOptions.BindsTwoWayByDefault | PropertyMetadataOptions.AffectsMeasure |
+            PropertyMetadataOptions.AffectsMeasure |
             PropertyMetadataOptions.AffectsArrange | PropertyMetadataOptions.AffectsRender, 
             PointsChangedCallback));
         

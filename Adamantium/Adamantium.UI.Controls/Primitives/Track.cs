@@ -16,8 +16,19 @@ namespace Adamantium.UI.Controls.Primitives;
 /// </summary>
 public class Track : Panel
 {
-    // The thumb never shrinks below this along the track, so it stays grabbable even with a huge scroll range.
-    private const double MinThumbLength = 12.0;
+    /// <summary>The shortest the thumb may get along the track, so it stays grabbable however long the content is. A
+    /// PROPERTY and not a constant: how small a thumb may become before it stops reading as a thumb is a matter of what
+    /// it looks like, and that belongs to the theme. A round macOS thumb at the old fixed 12 was a dot on a list of ten
+    /// thousand rows.</summary>
+    public static readonly AdamantiumProperty MinThumbLengthProperty = AdamantiumProperty.Register(
+        nameof(MinThumbLength), typeof(Double), typeof(Track),
+        new PropertyMetadata(12.0, PropertyMetadataOptions.AffectsArrange));
+
+    public Double MinThumbLength
+    {
+        get => GetValue<Double>(MinThumbLengthProperty);
+        set => SetValue(MinThumbLengthProperty, value);
+    }
 
     private double _density;     // value units per pixel of thumb travel (for ValueFromDistance)
     private double _remaining;   // travel length (trackLength - thumbAlong); for ValueFromPoint

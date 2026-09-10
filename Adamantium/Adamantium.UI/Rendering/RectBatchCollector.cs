@@ -393,6 +393,12 @@ internal sealed class RectBatchCollector : ShapeSdfCollector<RectItem>
         base.UpdateSlot(device, slot, item);
     }
 
+    /// <summary>Is this slot still the one <paramref name="ownerTag"/> was recorded into? A walk that did not visit a
+    /// group can have handed its slot to somebody else, and a patch that writes without asking paints that somebody
+    /// with these bytes AND takes their tag (<see cref="UpdateSlot"/> inherits it), leaving the true owner blank.</summary>
+    public bool SlotOwnedBy(int slot, int ownerTag) =>
+        ownerTag == 0 || (slot >= 0 && slot < Count && Items[slot].OwnerTag == ownerTag);
+
     public bool TryAdd(RectanglePayload p, Matrix4x4F world, double opacity, Rect2D scissor, Rect logicalBounds, int transformSlot = 0,
         int fadeSlot = -1, int ownerTag = 0, int clipSlot = -1)
     {

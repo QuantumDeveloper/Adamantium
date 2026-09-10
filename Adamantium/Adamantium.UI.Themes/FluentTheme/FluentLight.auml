@@ -38,6 +38,8 @@
     <PaletteColor Key="DockCompassStrokeColor" Color="#73000000"/>
     <PaletteColor Key="DockCompassPreviewColor" Color="#4D005FB8"/>
     <PaletteColor Key="ControlStrokeColorDefault" Color="#33000000"/>
+    <!-- The table's rules, OPAQUE - see the dark palette. -->
+    <PaletteColor Key="DataGridLineColor" Color="#CCCCCC"/>
     <PaletteColor Key="ControlStrokeColorSecondary" Color="#52000000"/>
     <PaletteColor Key="TextFillColorPrimary" Color="#E4000000"/>
     <PaletteColor Key="TextFillColorSecondary" Color="#9E000000"/>

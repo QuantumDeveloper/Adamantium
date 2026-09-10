@@ -687,6 +687,10 @@ public partial class RenderCache
         _groups.Clear();
         _groups.AddRange(_mergedGroups);
         foreach (var group in _pendingInserts) group.InOrder = true;
+
+        // A group JOINED the paint order, so the recorded stream has no ops for it at all and a patch cannot show what
+        // was not there. Departures are answered by _leftTheOrder; this is the arrival.
+        _orderJoined = true;
         Core.Diagnostics.RuntimeStats.LastApplyMergeMs += System.Diagnostics.Stopwatch.GetElapsedTime(mergeStart).TotalMilliseconds;
         Core.Diagnostics.RuntimeStats.LastApplyInserts += _pendingInserts.Count;
         Core.Diagnostics.RuntimeStats.LastApplyGroups = _groups.Count;

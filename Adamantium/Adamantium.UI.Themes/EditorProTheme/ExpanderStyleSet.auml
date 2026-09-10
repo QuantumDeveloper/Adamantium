@@ -1,0 +1,73 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<StyleSet xmlns="http://adamantium/ui"
+          xmlns:x="http://adamantium/ui/xaml/extensions">
+
+    <!-- An editor's section: a BAND, not a card. The header is a filled strip across the full width with a hairline
+         under it - the shape every tool panel in this theme already uses - and the content sits flush beneath it with
+         no indent and no box. Density over decoration: an inspector shows a dozen of these at once. -->
+
+    <Style Selector="Expander">
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="BorderBrush" Value="{ObservableResource ControlStrokeColorDefault}"/>
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="CornerRadius" Value="0"/>
+        <Setter Property="Foreground" Value="{ObservableResource TextFillColorPrimary}"/>
+        <Setter Property="FontSize" Value="{ResourceReference FontSizeBody}"/>
+        <Setter Property="Padding" Value="{ResourceReference PaddingRow}"/>
+        <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Expander">
+                    <Grid RowDefinitions="Auto,Auto">
+                        <Border Grid.Row="0" x:Name="PART_Header"
+                                Background="{ObservableResource SolidBackgroundFillColorTertiary}"
+                                BorderBrush="{ObservableResource ControlStrokeColorDefault}"
+                                BorderThickness="0 0 0 1"
+                                MinHeight="{ResourceReference RowHeight}"
+                                Padding="{TemplateBinding Padding}"
+                                Cursor="Hand">
+                            <Grid ColumnDefinitions="Auto,*">
+                                <Image Grid.Column="0" x:Name="Glyph"
+                                       Source="{ResourceReference ChevronRightIcon}"
+                                       Width="8" Height="8" Margin="0 0 6 0"
+                                       VerticalAlignment="Center"/>
+                                <ContentPresenter Grid.Column="1"
+                                        x:Name="PART_HeaderPresenter"
+                                        VerticalAlignment="Center"
+                                        TextTrimming="CharEllipses"
+                                        Foreground="{TemplateBinding Foreground}"
+                                        FontSize="{TemplateBinding FontSize}"
+                                        Content="{TemplateBinding Header}"
+                                        ContentTemplate="{TemplateBinding HeaderTemplate}"/>
+                            </Grid>
+                        </Border>
+
+                        <Border Grid.Row="1" x:Name="PART_Content" Visibility="Collapsed">
+                            <ContentPresenter
+                                    x:Name="PART_ContentPresenter"
+                                    HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                    VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
+                                    Content="{TemplateBinding Content}"
+                                    ContentTemplate="{TemplateBinding ContentTemplate}"/>
+                        </Border>
+                    </Grid>
+                    <ControlTemplate.Triggers>
+                        <PropertyTrigger Property="IsExpanded" Value="true">
+                            <Setter TargetName="PART_Content" Property="Visibility" Value="Visible"/>
+                            <Setter TargetName="Glyph" Property="Source" Value="{ResourceReference ChevronDownIcon}"/>
+                        </PropertyTrigger>
+                        <PropertyTrigger Property="IsMouseOver" Value="true">
+                            <Setter TargetName="PART_Header" Property="Background"
+                                    Value="{ObservableResource ControlFillColorTertiary}"/>
+                        </PropertyTrigger>
+                        <PropertyTrigger Property="IsEnabled" Value="false">
+                            <Setter TargetName="PART_HeaderPresenter" Property="Foreground"
+                                    Value="{ObservableResource TextFillColorDisabled}"/>
+                        </PropertyTrigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+</StyleSet>

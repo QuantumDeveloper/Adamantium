@@ -63,6 +63,8 @@
     <PaletteColor Key="SubtleFillColorSecondary" Color="#14FFFFFF"/>
     <PaletteColor Key="SubtleFillColorTertiary" Color="#0AFFFFFF"/>
     <PaletteColor Key="ControlStrokeColorDefault" Color="#1FFFFFFF"/>
+    <!-- The table's rules, OPAQUE - see FluentDark. -->
+    <PaletteColor Key="DataGridLineColor" Color="#404042"/>
     <PaletteColor Key="ControlStrokeColorSecondary" Color="#2EFFFFFF"/>
 
     <!-- The UNSET surface of a selection control - the switch's groove, the empty checkbox, the empty radio. One key,
@@ -95,7 +97,9 @@
     <!-- The overlay scroller's thumb. TRANSLUCENT, because an overlay scroller lies ON the content rather than in a
          gutter beside it: it has to be readable over a white paragraph and over a dark image, and only a colour that
          lets both through does that. -->
-    <PaletteColor Key="ScrollThumbFillColor" Color="#80FFFFFF"/>
+    <!-- Denser than a Mac's own 50%: THERE IS NO TRACK behind this capsule (see MacOsScrollBarStyleSet), so it carries
+         the contrast alone. At half alpha the text under it read straight through and the bar looked broken. -->
+    <PaletteColor Key="ScrollThumbFillColor" Color="#B8FFFFFF"/>
 
     <!-- NO shadow under the slider knob here, and the transparency is the way a VARIANT says so: the knob's template is
          shared, and a variant supplies colours rather than structure. Nothing is paid for it either - a fully
