@@ -44,6 +44,8 @@
     <!-- Heavier than the dark variant's strokes on purpose: on a light ground a hairline at the same alpha disappears,
          and this theme spends its depth on lines. -->
     <PaletteColor Key="ControlStrokeColorDefault" Color="#2E000000"/>
+    <!-- The table's rules, OPAQUE - see FluentDark. -->
+    <PaletteColor Key="DataGridLineColor" Color="#D1D1D1"/>
     <PaletteColor Key="ControlStrokeColorSecondary" Color="#47000000"/>
 
     <PaletteColor Key="OnAccentOverlayPointerOver" Color="#33FFFFFF"/>

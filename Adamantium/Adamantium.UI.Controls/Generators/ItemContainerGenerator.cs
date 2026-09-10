@@ -376,6 +376,14 @@ public class ItemContainerGenerator
     /// <summary>Drops every realized container and the recycle pool (e.g. on a Reset / ItemTemplate change).</summary>
     public void Clear()
     {
+        // Every generated container is CLEARED first, exactly as recycling one clears it: a container may hold a
+        // subscription to the item it was showing, and the ITEM is the long-lived end - dropping the container without
+        // clearing leaves the item holding it, and a closed page never goes away.
+        foreach (var container in _generated)
+        {
+            _owner.ClearContainer(container);
+        }
+
         _byIndex.Clear();
         _indexByContainer.Clear();
         PoolClear();

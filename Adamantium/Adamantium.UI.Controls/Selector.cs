@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.Specialized;
 using System.Linq;
 using Adamantium.UI.Core;
 using Adamantium.UI.Core.RoutedEvents;
@@ -30,6 +31,7 @@ public abstract class Selector : ItemsControl
     protected bool SyncingSelection { get; set; }
 
     private object _selectedItemTracked;   // last item SelectSingle selected - change detection independent of DP write ordering
+    private int _pendingIndex = -1;
 
     /// <summary>Raised when the selection changes.</summary>
     public event EventHandler SelectionChanged;
@@ -62,8 +64,32 @@ public abstract class Selector : ItemsControl
         selector.OnSelectedItemSet(e.NewValue);
     }
 
-    /// <summary>SelectedIndex was set from OUTSIDE (binding / code). Default = single-select that index.</summary>
-    protected virtual void OnSelectedIndexSet(int index) => SelectSingle(index);
+    /// <summary>SelectedIndex was set from OUTSIDE (binding / code). Default = single-select that index.
+    /// <para>An index named while the items are still empty is REMEMBERED, not discarded: a drop-down filled and
+    /// selected in one breath (its list assigned, then its choice) would otherwise come up blank, because the choice
+    /// was made against a collection that had not arrived yet.</para></summary>
+    protected virtual void OnSelectedIndexSet(int index)
+    {
+        if (index >= 0 && Items.Count == 0)
+        {
+            _pendingIndex = index;
+            return;
+        }
+
+        _pendingIndex = -1;
+        SelectSingle(index);
+    }
+
+    protected override void OnItemsChanged(NotifyCollectionChangedEventArgs e)
+    {
+        base.OnItemsChanged(e);
+
+        if (_pendingIndex < 0 || _pendingIndex >= Items.Count) return;
+
+        var index = _pendingIndex;
+        _pendingIndex = -1;
+        SelectSingle(index);
+    }
 
     /// <summary>A selection named before the items existed. Bindings are established before an ItemsSource has produced
     /// anything, so a view-model that names its own selected item states it while the collection is still empty - and

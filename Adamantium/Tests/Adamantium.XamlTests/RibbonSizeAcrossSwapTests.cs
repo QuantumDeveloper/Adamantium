@@ -40,6 +40,11 @@ public class RibbonSizeAcrossSwapTests
         themes.SetTheme(fluent);
     }
 
+    // A real swap defers its work onto a TICKER, and with no frames in a test that ticker outlives the fixture - the
+    // global animation manager is shared, so the next fixture's "nothing is running" starts at two.
+    [TearDown]
+    public void StopEverything() => Adamantium.UI.Core.Media.Animation.AnimationManager.Reset();
+
     private static void Lay(MeasurableUIComponent c)
     {
         Adamantium.UI.Extensions.WindowExtension.UpdateTree(c);
@@ -114,6 +119,12 @@ public class RibbonSizeAcrossSwapTests
         var macOs = new Adamantium.UI.Themes.MacOsTheme.MacOs();
         _app.ThemeManager.AddTheme(macOs.Name, macOs);
         _app.ThemeManager.SetTheme(macOs);
+
+        // The swap's own cascade cannot reach this button here, and not because of anything the button does: a real swap
+        // defers the re-style by a frame (there is no frame here) and then walks the application's WINDOWS, of which the
+        // test harness has none. So the per-element step the cascade performs is applied directly - which is the seam
+        // this test is about: a part that is re-styled has to say its picture is stale.
+        button.ApplyCurrentTheme();
         Adamantium.UI.Core.Data.BindingUpdateQueue.Flush();
 
         Adamantium.UI.Core.VisualTreeNotifications.ContentInvalidated -= WatchGeometry;

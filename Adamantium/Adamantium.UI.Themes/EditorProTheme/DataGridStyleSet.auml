@@ -1,0 +1,357 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<StyleSet xmlns="http://adamantium/ui"
+          xmlns:x="http://adamantium/ui/xaml/extensions">
+
+    <!-- Editor Pro's table. The same parts as everywhere - the control drives them BY NAME - in this theme's language:
+
+         FLAT AND DENSE. No rounded well, no card: an editor's table sits inside a pane that already has a frame, and a
+         second frame around it reads as a widget dropped on the page. Rows are the theme's RowHeight, which is what
+         every other list here stands at, so a table beside a file list lines up with it.
+
+         THE HEADER IS A BAR, separated by one hairline. Sorting shows as a small chevron, filtering as a funnel that
+         lights up when it is narrowing something.
+
+         SELECTION IS A WASH and the content keeps its colours - see ListBoxItemStyleSet for why this theme spends the
+         accent on what is CURRENT rather than on what is merely selected. -->
+
+    <Style Selector="TreeDataGrid">
+        <Setter Property="Background" Value="{ObservableResource SolidBackgroundFillColorBase}"/>
+        <Setter Property="BorderBrush" Value="{ObservableResource ControlStrokeColorDefault}"/>
+        <Setter Property="BorderThickness" Value="{ResourceReference StrokeThin}"/>
+        <Setter Property="CornerRadius" Value="{ResourceReference CornerRadiusSmall}"/>
+        <Setter Property="RowHeight" Value="{ResourceReference RowHeight}"/>
+        <!-- Where a dragged column would land - see Fluent's set. -->
+        <Setter Property="DropIndicatorBrush" Value="{ThemeResource AccentFillColorDefault}"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="TreeDataGrid">
+                    <Border Background="{TemplateBinding Background}"
+                            BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}"
+                            CornerRadius="{TemplateBinding CornerRadius}"
+                            ClipToBounds="True">
+                        <Grid RowDefinitions="Auto,*">
+                            <!-- The header band is OUTSIDE the scroller: it must not scroll away vertically. Sideways
+                                 it follows by hand, from the same offset the rows use. -->
+                            <Border Grid.Row="0"
+                                    Background="{ObservableResource SolidBackgroundFillColorTertiary}"
+                                    BorderBrush="{ObservableResource DataGridLineColor}"
+                                    BorderThickness="0 0 0 1">
+                                <DataGridHeadersPresenter x:Name="PART_Headers" Height="22"/>
+                            </Border>
+
+                            <ScrollViewer Grid.Row="1" x:Name="PART_ScrollHost"
+                                          CanContentScroll="True"
+                                          HorizontalScrollBarVisibility="Auto"
+                                          VerticalScrollBarVisibility="Auto">
+                                <ItemsPresenter x:Name="PART_ItemsPresenter"/>
+                            </ScrollViewer>
+
+                            <!-- Where a dragged column would land - see Fluent's set. -->
+                            <Border x:Name="PART_DropIndicator" Grid.Row="0" Grid.RowSpan="2"
+                                    Width="2" HorizontalAlignment="Left" VerticalAlignment="Stretch"
+                                    IsHitTestVisible="False" Visibility="Collapsed"
+                                    Background="{TemplateBinding DropIndicatorBrush}"/>
+                        </Grid>
+                    </Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+        <Setter Property="ItemsPanel">
+            <Setter.Value>
+                <ItemsPanelTemplate>
+                    <!-- Reports the COLUMNS' width to the scroller, which a row cannot: its desired size is clamped to
+                         the viewport it was measured in. -->
+                    <DataGridRowsPresenter Orientation="Vertical"/>
+                </ItemsPanelTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style Selector="DataGridColumnHeader">
+        <Setter Property="Foreground" Value="{ObservableResource TextFillColorSecondary}"/>
+        <Setter Property="FontSize" Value="{ResourceReference FontSizeCaption}"/>
+        <Setter Property="Padding" Value="{ResourceReference PaddingRow}"/>
+        <Setter Property="VerticalContentAlignment" Value="Center"/>
+        <Setter Property="GridLineBrush" Value="{ObservableResource DataGridLineColor}"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="DataGridColumnHeader">
+                    <!-- The strip's rule is the grid's own setting, on the header's OWN border - see Fluent's set. -->
+                    <Border x:Name="HeaderBg" Background="Transparent"
+                            BorderBrush="{TemplateBinding GridLineBrush}"
+                            BorderThickness="{TemplateBinding GridLineThickness}"
+                            Padding="{TemplateBinding Padding}">
+                        <Grid ColumnDefinitions="*,Auto,Auto">
+                            <ContentPresenter Grid.Column="0"
+                                    x:Name="PART_ContentPresenter"
+                                    TextTrimming="CharEllipses"
+                                    VerticalAlignment="Center"
+                                    Foreground="{TemplateBinding Foreground}"
+                                    FontSize="{TemplateBinding FontSize}"
+                                    Content="{TemplateBinding Content}"
+                                    ContentTemplate="{TemplateBinding ContentTemplate}"/>
+                            <Image Grid.Column="1" x:Name="SortGlyph"
+                                   Source="{ResourceReference ChevronUpIcon}"
+                                   Width="9" Height="9" Margin="6 0 0 0"
+                                   VerticalAlignment="Center" Visibility="Collapsed"/>
+
+                            <!-- The funnel answers for its own press (DataGridColumnHeader hooks it), so what reacts is
+                                 what is drawn. -->
+                            <Border Grid.Column="2" x:Name="PART_FilterButton"
+                                    Width="16" Margin="4 0 0 0" Background="Transparent"
+                                    CornerRadius="{ResourceReference CornerRadiusSmall}"
+                                    Cursor="Hand" Visibility="Collapsed" ToolTipService.ToolTip="Filter">
+                                <Image x:Name="FilterGlyph"
+                                       Source="{ResourceReference FilterIcon}"
+                                       Width="8" Height="8"
+                                       HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </Border>
+
+                            <Popup Grid.Column="2" x:Name="PART_FilterPopup"
+                                   Placement="Bottom" FlipToFit="True" VerticalOffset="4">
+                                <Popup.ChildTemplate>
+                                    <ControlTemplate TargetType="Popup">
+                                        <Border Background="{ResourceReference CardBackgroundFillColorDefault}"
+                                                BorderBrush="{ResourceReference ControlStrokeColorDefault}"
+                                                BorderThickness="{ResourceReference StrokeThin}"
+                                                CornerRadius="{ResourceReference CornerRadiusSmall}"
+                                                Padding="8">
+                                            <DataGridFilterView x:Name="PART_FilterView"/>
+                                        </Border>
+                                    </ControlTemplate>
+                                </Popup.ChildTemplate>
+                            </Popup>
+                        </Grid>
+                    </Border>
+
+                    <ControlTemplate.Triggers>
+                        <!-- PINNED: the strip scrolls under it - see Fluent's set. -->
+                        <PropertyTrigger Property="IsFrozen" Value="true">
+                            <Setter TargetName="HeaderBg" Property="Background"
+                                    Value="{ObservableResource SolidBackgroundFillColorTertiary}"/>
+                        </PropertyTrigger>
+                        <!-- Picked up - see Fluent's set. -->
+                        <PropertyTrigger Property="IsDragging" Value="true">
+                            <Setter TargetName="HeaderBg" Property="Background"
+                                    Value="{ObservableResource SubtleFillColorSecondary}"/>
+                            <Setter TargetName="HeaderBg" Property="Opacity" Value="0.6"/>
+                        </PropertyTrigger>
+                        <PropertyTrigger Property="SortDirection" Value="Ascending">
+                            <Setter TargetName="SortGlyph" Property="Visibility" Value="Visible"/>
+                        </PropertyTrigger>
+                        <PropertyTrigger Property="SortDirection" Value="Descending">
+                            <Setter TargetName="SortGlyph" Property="Visibility" Value="Visible"/>
+                            <Setter TargetName="SortGlyph" Property="Source" Value="{ResourceReference ChevronDownIcon}"/>
+                        </PropertyTrigger>
+                        <PropertyTrigger Property="CanFilter" Value="true">
+                            <Setter TargetName="PART_FilterButton" Property="Visibility" Value="Visible"/>
+                        </PropertyTrigger>
+                        <!-- A filtered column says so in the strip - the accent is a theme property, readable here but
+                             not from inside an icon's dictionary, so the BUTTON lights up rather than the glyph. -->
+                        <PropertyTrigger Property="IsFiltered" Value="true">
+                            <Setter TargetName="PART_FilterButton" Property="Background"
+                                    Value="{ThemeResource AccentFillColorDefault}"/>
+                        </PropertyTrigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style Selector="DataGridRow">
+        <Setter Property="Background" Value="Transparent"/>
+    </Style>
+
+    <!-- The zebra: band 1 is tinted, band 0 shows the table's own surface, so an unset AlternationCount changes nothing. -->
+    <Style Selector="DataGridRow[AlternationIndex=1]">
+        <Setter Property="Background" Value="{ObservableResource SolidBackgroundFillColorSecondary}"/>
+    </Style>
+
+    <!-- The number strip and its corner - see Fluent's set for why it is opaque. -->
+    <Style Selector="DataGridRowHeader">
+        <Setter Property="Background" Value="{ObservableResource SolidBackgroundFillColorTertiary}"/>
+        <Setter Property="Foreground" Value="{ObservableResource TextFillColorSecondary}"/>
+        <Setter Property="FontSize" Value="{ResourceReference FontSizeCaption}"/>
+        <Setter Property="Padding" Value="{ResourceReference PaddingRow}"/>
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="DataGridRowHeader">
+                    <Border x:Name="StripBg"
+                            Background="{TemplateBinding Background}"
+                            BorderBrush="{ObservableResource DataGridLineColor}"
+                            BorderThickness="0 0 1 1"
+                            Padding="{TemplateBinding Padding}">
+                        <ContentPresenter x:Name="PART_ContentPresenter"
+                                HorizontalAlignment="Right"
+                                VerticalAlignment="Center"
+                                TextTrimming="CharEllipses"
+                                Foreground="{TemplateBinding Foreground}"
+                                FontSize="{TemplateBinding FontSize}"
+                                Content="{TemplateBinding Content}"/>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <PropertyTrigger Property="IsSelected" Value="true">
+                            <Setter TargetName="StripBg" Property="Background"
+                                    Value="{ThemeResource AccentFillColorDefault}"/>
+                            <Setter TargetName="PART_ContentPresenter" Property="Foreground"
+                                    Value="{ThemeResource AccentForegroundColor}"/>
+                        </PropertyTrigger>
+                        <PropertyTrigger Property="IsMouseOver" Value="true">
+                            <Setter TargetName="StripBg" Property="Background"
+                                    Value="{ObservableResource SubtleFillColorSecondary}"/>
+                        </PropertyTrigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style Selector="DataGridCell">
+        <Setter Property="Foreground" Value="{ObservableResource TextFillColorPrimary}"/>
+        <Setter Property="FontSize" Value="{ResourceReference FontSizeBody}"/>
+        <Setter Property="Padding" Value="{ResourceReference PaddingRow}"/>
+        <Setter Property="VerticalContentAlignment" Value="Center"/>
+        <!-- The theme's own rules - see Fluent's set. -->
+        <Setter Property="GridLineBrush" Value="{ObservableResource DataGridLineColor}"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="DataGridCell">
+                    <!-- The rules ride on the cell's OWN border - see the macOS set for what two extra elements per
+                         cell cost. -->
+                    <Border x:Name="CellBorder"
+                            Background="Transparent"
+                            BorderBrush="{TemplateBinding GridLineBrush}"
+                            BorderThickness="{TemplateBinding GridLineThickness}"
+                            Padding="{TemplateBinding Padding}">
+                        <Grid ColumnDefinitions="Auto,*">
+                            <!-- The expander's STRIP, on the carrier column only: reserved even where there is nothing
+                                 to open, so the rows of one level line up. -->
+                            <Border Grid.Column="0" x:Name="PART_Expander"
+                                    Width="14" Background="Transparent" Visibility="Collapsed">
+                                <Image x:Name="Expander"
+                                       Source="{ResourceReference ChevronRightIcon}"
+                                       Width="8" Height="8"
+                                       HorizontalAlignment="Center" VerticalAlignment="Center"
+                                       Visibility="Collapsed"/>
+                            </Border>
+                            <ContentPresenter Grid.Column="1"
+                                    x:Name="PART_ContentPresenter"
+                                    TextTrimming="CharEllipses"
+                                    HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                    VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
+                                    Foreground="{TemplateBinding Foreground}"
+                                    FontSize="{TemplateBinding FontSize}"
+                                    Content="{TemplateBinding Content}"
+                                    ContentTemplate="{TemplateBinding ContentTemplate}"/>
+                        </Grid>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <!-- Read-only: a faint wash and disabled-weight text. Declared FIRST, so a selection, an error
+                             or an edit still wins over it. -->
+                        <PropertyTrigger Property="IsReadOnly" Value="true">
+                            <Setter TargetName="CellBorder" Property="Background"
+                                    Value="{ObservableResource SubtleFillColorSecondary}"/>
+                            <Setter TargetName="PART_ContentPresenter" Property="Foreground"
+                                    Value="{ObservableResource TextFillColorDisabled}"/>
+                        </PropertyTrigger>
+                        <PropertyTrigger Property="ShowsExpander" Value="true">
+                            <Setter TargetName="PART_Expander" Property="Visibility" Value="Visible"/>
+                        </PropertyTrigger>
+                        <MultiTrigger>
+                            <MultiTrigger.Conditions>
+                                <Condition Property="ShowsExpander" Value="true"/>
+                                <Condition Property="HasChildren" Value="true"/>
+                            </MultiTrigger.Conditions>
+                            <Setter TargetName="Expander" Property="Visibility" Value="Visible"/>
+                        </MultiTrigger>
+                        <PropertyTrigger Property="IsExpanded" Value="true">
+                            <Setter TargetName="Expander" Property="Source" Value="{ResourceReference ChevronDownIcon}"/>
+                        </PropertyTrigger>
+                        <!-- A WASH, and the content keeps its own colours: a cell holds controls and meanings, and a
+                             plate of accent swallows both. -->
+                        <PropertyTrigger Property="IsSelected" Value="true">
+                            <Setter TargetName="CellBorder" Property="Background"
+                                    Value="{ThemeResource AccentFillColorSelection}"/>
+                        </PropertyTrigger>
+                        <!-- The ACTIVE cell is outlined, not filled: it sits inside the selection and has to be told
+                             apart from it. -->
+                        <PropertyTrigger Property="IsActive" Value="true">
+                            <Setter TargetName="CellBorder" Property="BorderThickness" Value="1"/>
+                            <Setter TargetName="CellBorder" Property="BorderBrush"
+                                    Value="{ThemeResource AccentFillColorDefault}"/>
+                        </PropertyTrigger>
+                        <!-- An editor takes the WHOLE cell: the padding that keeps text off the edge would squeeze it. -->
+                        <PropertyTrigger Property="IsEditing" Value="true">
+                            <Setter TargetName="CellBorder" Property="Padding" Value="0"/>
+                        </PropertyTrigger>
+                        <!-- What the view-model called an error. A MEANING from the model, a colour from here. -->
+                        <PropertyTrigger Property="State" Value="Error">
+                            <Setter TargetName="PART_ContentPresenter" Property="Foreground"
+                                    Value="{ObservableResource SystemFillColorCritical}"/>
+                        </PropertyTrigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- The filter flyout: the values to tick, then two conditions joined by And/Or, then the buttons that actually
+         change the table. Nothing applies while it is being filled in. -->
+    <Style Selector="DataGridFilterView">
+        <Setter Property="Width" Value="236"/>
+        <Setter Property="Foreground" Value="{ObservableResource TextFillColorPrimary}"/>
+        <Setter Property="FontSize" Value="{ResourceReference FontSizeBody}"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="DataGridFilterView">
+                    <StackPanel Orientation="Vertical">
+                        <CheckBox x:Name="PART_SelectAll" Content="Select All" Margin="0 0 0 6"/>
+
+                        <!-- The list CLIPS: a virtualized list arranges a row or two beyond its viewport, and in a
+                             flyout there is nothing behind them. -->
+                        <Border BorderBrush="{ObservableResource ControlStrokeColorDefault}"
+                                BorderThickness="{ResourceReference StrokeThin}"
+                                CornerRadius="{ResourceReference CornerRadiusSmall}"
+                                Padding="2" ClipToBounds="True">
+                            <ListBox x:Name="PART_Values" MaxHeight="170" ClipToBounds="True"
+                                     BorderThickness="0" Background="Transparent">
+                                <ListBox.ItemTemplate>
+                                    <DataTemplate>
+                                        <CheckBox IsChecked="{Binding IsChecked, Mode=TwoWay}"
+                                                  Content="{Binding Text}"/>
+                                    </DataTemplate>
+                                </ListBox.ItemTemplate>
+                            </ListBox>
+                        </Border>
+
+                        <TextBlock Text="Show rows with value that" Margin="0 8 0 4"
+                                   Foreground="{ObservableResource TextFillColorSecondary}"/>
+
+                        <DropDown x:Name="PART_FirstOperator" Margin="0 0 0 4"/>
+                        <!-- aA = match case, beside the field it applies to. -->
+                        <Grid ColumnDefinitions="*,Auto" Margin="0 0 0 4">
+                            <TextBox Grid.Column="0" x:Name="PART_FirstValue"/>
+                            <ToggleButton Grid.Column="1" x:Name="PART_FirstMatchCase" Content="aA"
+                                          Margin="4 0 0 0" MinWidth="30" ToolTipService.ToolTip="Match case"/>
+                        </Grid>
+                        <DropDown x:Name="PART_Logic" Margin="0 0 0 4"/>
+                        <DropDown x:Name="PART_SecondOperator" Margin="0 0 0 4"/>
+                        <Grid ColumnDefinitions="*,Auto" Margin="0 0 0 8">
+                            <TextBox Grid.Column="0" x:Name="PART_SecondValue"/>
+                            <ToggleButton Grid.Column="1" x:Name="PART_SecondMatchCase" Content="aA"
+                                          Margin="4 0 0 0" MinWidth="30" ToolTipService.ToolTip="Match case"/>
+                        </Grid>
+
+                        <Grid ColumnDefinitions="*,*">
+                            <Button Grid.Column="0" x:Name="PART_Apply" Content="Filter" Margin="0 0 4 0"/>
+                            <Button Grid.Column="1" x:Name="PART_Clear" Content="Clear Filter" Margin="4 0 0 0"/>
+                        </Grid>
+                    </StackPanel>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+</StyleSet>

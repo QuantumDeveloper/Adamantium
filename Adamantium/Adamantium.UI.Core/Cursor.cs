@@ -1,3 +1,4 @@
+using Adamantium.Core.TypeParsing;
 using Adamantium.UI.Core.Input;
 
 namespace Adamantium.UI.Core;
@@ -8,6 +9,7 @@ namespace Adamantium.UI.Core;
 /// <c>Cursors.SizeNS</c> means the Win32 <c>IDC_SIZENS</c>, the macOS <c>resizeUpDownCursor</c> or an X11 theme shape
 /// without a control ever knowing which.
 /// </summary>
+[TypeParser(typeof(CursorParser))]
 public sealed class Cursor
 {
     /// <summary>The platform that shows cursors, registered once at startup (Win32 / AppKit / X11). Null before it is -

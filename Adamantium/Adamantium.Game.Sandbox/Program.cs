@@ -894,6 +894,7 @@ public class Program
                     + $"sampled max ms: record {maxRecord:0.0} apply {maxApply:0.0} draw {maxDraw:0.0} | frame budget at {frames / sw.Elapsed.TotalSeconds:0} fps = {1000.0 / (frames / sw.Elapsed.TotalSeconds):0.00} ms" + System.Environment.NewLine
                     + Adamantium.UI.Core.Diagnostics.FrameTrace.Percentiles() + System.Environment.NewLine
                     + Adamantium.UI.Rendering.LayerProbe.Dump() + System.Environment.NewLine
+                    + Adamantium.UI.Rendering.LayerProbe.LastOpDump + System.Environment.NewLine
                     + "theme swap: " + stripReport + System.Environment.NewLine
                     + "churn:" + System.Environment.NewLine
                     + string.Join(System.Environment.NewLine, System.Linq.Enumerable.Select(

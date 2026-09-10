@@ -12,7 +12,7 @@ public class Ellipse : Shape
    {
       // Box-shape default (as in WPF): fill the layout slot. Path/Polygon/Line keep the base Stretch.None.
       StretchProperty.OverrideMetadata(typeof(Ellipse), new PropertyMetadata(Stretch.Fill,
-         PropertyMetadataOptions.BindsTwoWayByDefault | PropertyMetadataOptions.AffectsMeasure | PropertyMetadataOptions.AffectsRender));
+         PropertyMetadataOptions.AffectsMeasure | PropertyMetadataOptions.AffectsRender));
    }
 
    public Ellipse()
@@ -22,19 +22,19 @@ public class Ellipse : Shape
    public static readonly AdamantiumProperty StartAngleProperty = AdamantiumProperty.Register(nameof(StartAngle),
       typeof(Double), typeof(Ellipse),
       new PropertyMetadata(0.0,
-         PropertyMetadataOptions.BindsTwoWayByDefault | PropertyMetadataOptions.AffectsRender,
+         PropertyMetadataOptions.AffectsRender,
          StartAngleValueCallback));
 
    public static readonly AdamantiumProperty SweepAngleProperty = AdamantiumProperty.Register(nameof(StopAngle),
       typeof(Double), typeof(Ellipse),
       new PropertyMetadata(360.0,
-         PropertyMetadataOptions.BindsTwoWayByDefault | PropertyMetadataOptions.AffectsRender,
+         PropertyMetadataOptions.AffectsRender,
          StopAngleValueCallback));
    
    public static readonly AdamantiumProperty EllipseTypeProperty = AdamantiumProperty.Register(nameof(EllipseType),
       typeof(EllipseType), typeof(Ellipse),
       new PropertyMetadata(EllipseType.Sector,
-         PropertyMetadataOptions.BindsTwoWayByDefault | PropertyMetadataOptions.AffectsRender));
+         PropertyMetadataOptions.AffectsRender));
 
    private static object StopAngleValueCallback(AdamantiumComponent adamantiumComponent, object baseValue)
    {

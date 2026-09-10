@@ -39,7 +39,7 @@ public class SelectorParser : ITypeParser<StyleSelector>
             else // Control type, optionally with chained .classes: "Button" or "Button.Accent" or "Button.Accent.Big"
             {
                 var parts = splitItem.Split('.', StringSplitOptions.RemoveEmptyEntries);
-                var type = Adamantium.Core.Reflection.LoadableTypes.FromLoadedAssemblies().FirstOrDefault(x => x.Name == parts[0]);
+                var type = Resolve(parts[0]);
                 if (type != null)
                 {
                     selector.Types.Add(type);
@@ -51,6 +51,23 @@ public class SelectorParser : ITypeParser<StyleSelector>
             }
         }
         return selector;
+    }
+
+    // A selector names a CONTROL, so a type that cannot be styled is not a candidate however early it turns up: the
+    // lookup is by simple name across every loaded assembly, and Selector="PropertyRow" bound to System.Reflection's
+    // MetadataBuilder+PropertyRow. Path, Image, Panel and Border are one referenced package from the same fate.
+    private static Type Resolve(string name)
+    {
+        Type fallback = null;
+        foreach (var type in Adamantium.Core.Reflection.LoadableTypes.FromLoadedAssemblies())
+        {
+            if (type.Name != name) continue;
+            if (typeof(IFundamentalUIComponent).IsAssignableFrom(type)) return type;
+
+            fallback ??= type;
+        }
+
+        return fallback;
     }
 
     // Splits "TabControl[TabStripPlacement=Left]" into the structural prefix ("TabControl") + one condition per bracket

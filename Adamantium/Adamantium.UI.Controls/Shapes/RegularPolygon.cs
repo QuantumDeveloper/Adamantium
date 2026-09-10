@@ -17,7 +17,7 @@ public class RegularPolygon : Shape
    {
       // Box-shape default, as Ellipse and Rectangle have: fill the layout slot.
       StretchProperty.OverrideMetadata(typeof(RegularPolygon), new PropertyMetadata(Stretch.Fill,
-         PropertyMetadataOptions.BindsTwoWayByDefault | PropertyMetadataOptions.AffectsMeasure | PropertyMetadataOptions.AffectsRender));
+         PropertyMetadataOptions.AffectsMeasure | PropertyMetadataOptions.AffectsRender));
    }
 
    public static readonly AdamantiumProperty CornersProperty = AdamantiumProperty.Register(nameof(Corners),

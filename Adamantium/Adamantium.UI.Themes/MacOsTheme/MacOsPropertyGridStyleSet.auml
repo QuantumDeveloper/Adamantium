@@ -1,0 +1,114 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<StyleSet xmlns="http://adamantium/ui"
+          xmlns:x="http://adamantium/ui/xaml/extensions">
+
+    <!-- The macOS inspector: a WELL, like the list and the text field, with the same sunken surface - and no rule
+         between the two halves beyond the grip itself. The grip is per ROW but the width is the GRID's, so the line
+         reads as one continuous rule down the whole panel.
+
+         The row's layout is a three-column Grid whose FIRST column the control sets (PART_Layout): binding a column
+         width to an ancestor's property is not something a template can say. -->
+
+    <Style Selector="PropertyGrid">
+        <Setter Property="Background" Value="{ObservableResource SolidBackgroundFillColorBase}"/>
+        <Setter Property="Foreground" Value="{ObservableResource TextFillColorPrimary}"/>
+        <Setter Property="FontSize" Value="{ResourceReference FontSizeBody}"/>
+        <!-- One number for every editor in the inspector - see Fluent's set. -->
+        <Setter Property="EditorHeight" Value="22"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="PropertyGrid">
+                    <Border Background="{TemplateBinding Background}"
+                            BorderBrush="{ObservableResource ControlStrokeColorDefault}"
+                            BorderThickness="1"
+                            CornerRadius="7"
+                            ClipToBounds="True">
+                        <!-- Pixel scrolling, not item scrolling - see Fluent's set: an item-scrolling viewer measured
+                             unbounded reports nothing, and the inspector loses its height. -->
+                        <ScrollViewer CanContentScroll="False"
+                                      HorizontalScrollBarVisibility="Disabled"
+                                      VerticalScrollBarVisibility="Auto">
+                            <StackPanel x:Name="PART_Sections" Orientation="Vertical"/>
+                        </ScrollViewer>
+                    </Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- A section is a disclosure group: triangle, caption, and the rows under them - the theme's Expander already is
+         exactly that, so this set only asks for the inspector's own spacing. -->
+    <Style Selector="PropertySection" BasedOn="Expander">
+        <Setter Property="Padding" Value="8 4"/>
+    </Style>
+
+    <Style Selector="PropertyRow">
+        <Setter Property="Foreground" Value="{ObservableResource TextFillColorPrimary}"/>
+        <Setter Property="FontSize" Value="{ResourceReference FontSizeBody}"/>
+        <!-- The editor's height plus its margin - see Fluent's set. -->
+        <Setter Property="MinHeight" Value="26"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="PropertyRow">
+                    <Border x:Name="RowBorder" Background="Transparent">
+                        <Grid x:Name="PART_Layout" ColumnDefinitions="140,7,*">
+                            <Grid Grid.Column="0" ColumnDefinitions="Auto,*" Margin="10 0 0 0">
+                                <!-- The strip that opens a composite row. Reserved on every row, so the names of one
+                                     level line up whether or not that row has children. -->
+                                <Border Grid.Column="0" x:Name="PART_Expander"
+                                        Width="14" Background="Transparent" Cursor="Hand">
+                                    <Image x:Name="Glyph"
+                                           Source="{ResourceReference ChevronRightIcon}"
+                                           Width="8" Height="8"
+                                           HorizontalAlignment="Center" VerticalAlignment="Center"
+                                           Visibility="Collapsed"/>
+                                </Border>
+                                <ContentPresenter Grid.Column="1"
+                                        x:Name="PART_Name"
+                                        VerticalAlignment="Center"
+                                        TextTrimming="CharEllipses"
+                                        Foreground="{TemplateBinding Foreground}"
+                                        FontSize="{TemplateBinding FontSize}"/>
+                            </Grid>
+
+                            <!-- The grip is its own column: a hit area of its own, and the hairline that reads as the
+                                 rule between the halves. -->
+                            <Border Grid.Column="1" x:Name="PART_Grip" Background="Transparent">
+                                <Border Width="1" HorizontalAlignment="Center"
+                                        Background="{ObservableResource ControlStrokeColorDefault}"
+                                        IsHitTestVisible="False"/>
+                            </Border>
+
+                            <!-- The value half STRETCHES - every editor is the row's height. See Fluent's set. -->
+                            <ContentPresenter Grid.Column="2"
+                                    x:Name="PART_Value"
+                                    Margin="8 2 8 2"
+                                    VerticalAlignment="Stretch"
+                                    HorizontalAlignment="Stretch"
+                                    TextTrimming="CharEllipses"
+                                    Foreground="{TemplateBinding Foreground}"
+                                    FontSize="{TemplateBinding FontSize}"/>
+                        </Grid>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <PropertyTrigger Property="HasChildren" Value="true">
+                            <Setter TargetName="Glyph" Property="Visibility" Value="Visible"/>
+                        </PropertyTrigger>
+                        <PropertyTrigger Property="IsExpanded" Value="true">
+                            <Setter TargetName="Glyph" Property="Source" Value="{ResourceReference ChevronDownIcon}"/>
+                        </PropertyTrigger>
+                        <PropertyTrigger Property="IsReadOnly" Value="true">
+                            <Setter TargetName="PART_Value" Property="Foreground"
+                                    Value="{ObservableResource TextFillColorDisabled}"/>
+                        </PropertyTrigger>
+                        <PropertyTrigger Property="IsMouseOver" Value="true">
+                            <Setter TargetName="RowBorder" Property="Background"
+                                    Value="{ResourceReference SubtleFillColorSecondary}"/>
+                        </PropertyTrigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+</StyleSet>

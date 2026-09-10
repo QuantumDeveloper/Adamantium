@@ -45,10 +45,13 @@
         <StyleInclude Source="{x:Type mac:MacOsScrollBarStyleSet}"/>
         <StyleInclude Source="{x:Type mac:MacOsScrollViewerStyleSet}"/>
         <StyleInclude Source="{x:Type mac:MacOsDropDownStyleSet}"/>
+        <StyleInclude Source="{x:Type mac:MacOsExpanderStyleSet}"/>
+        <StyleInclude Source="{x:Type mac:MacOsPropertyGridStyleSet}"/>
         <StyleInclude Source="{x:Type mac:MacOsSliderStyleSet}"/>
         <StyleInclude Source="{x:Type mac:MacOsRangeSliderStyleSet}"/>
         <StyleInclude Source="{x:Type mac:MacOsSliderKnobStyleSet}"/>
         <StyleInclude Source="{x:Type mac:MacOsListBoxStyleSet}"/>
+        <StyleInclude Source="{x:Type mac:MacOsDataGridStyleSet}"/>
         <StyleInclude Source="{x:Type mac:MacOsListBoxItemStyleSet}"/>
         <StyleInclude Source="{x:Type mac:MacOsDropDownItemStyleSet}"/>
         <StyleInclude Source="{x:Type mac:MacOsProgressBarStyleSet}"/>

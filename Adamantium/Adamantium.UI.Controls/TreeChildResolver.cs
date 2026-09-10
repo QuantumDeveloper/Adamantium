@@ -29,6 +29,20 @@ internal static class TreeChildResolver
         return node => Resolve(node, segments) as IEnumerable;
     }
 
+    /// <summary>A getter that reads <paramref name="path"/> off a node and returns the VALUE, whatever it is - what a
+    /// data grid's cell needs, and by the same compiled-accessor route the tree uses for children: a cell may be asked
+    /// for on every row in the window, on every pass.</summary>
+    public static Func<object, object> ForValuePath(string path)
+    {
+        if (string.IsNullOrEmpty(path))
+        {
+            return static node => node;
+        }
+
+        var segments = path.Split('.');
+        return node => Resolve(node, segments);
+    }
+
     /// <summary>A getter that reads a <see cref="bool"/> <paramref name="path"/> off a node (e.g. the node's own
     /// <c>IsExpanded</c>, so the flattener can RESTORE a node's expansion when the tree is rebuilt - after a tab switch the
     /// view is recreated but the view-model, and its expanded state, persist). Always false for an empty/unresolved path.</summary>
@@ -48,6 +62,47 @@ internal static class TreeChildResolver
     /// <summary>A writer for a <see cref="bool"/> <paramref name="path"/> on a node (e.g. the node's <c>IsSelected</c>), so
     /// the TreeView can persist a selection onto the node itself - INCLUDING off-screen rows that have no container to carry
     /// a binding. No-op for an empty/unresolved path. Not a hot path (selection changes on click), so a plain reflected set.</summary>
+    /// <summary>A writer for any <paramref name="path"/> - what committing a cell edit needs. Converts to the property's
+    /// own type, so a text editor's string lands in an int column. Returns whether it wrote: a read-only member, a wrong
+    /// type or an unresolved path is a refusal, not a silent no-op the caller cannot see.</summary>
+    public static Func<object, object, bool> SetterForPath(string path)
+    {
+        if (string.IsNullOrEmpty(path))
+        {
+            return static (_, _) => false;
+        }
+
+        var segments = path.Split('.');
+        return (node, value) =>
+        {
+            var target = node;
+            for (var i = 0; i < segments.Length - 1 && target != null; i++)
+            {
+                target = Getter(target.GetType(), segments[i])?.Invoke(target);
+            }
+
+            if (target == null) return false;
+
+            var prop = Props.GetOrAdd((target.GetType(), segments[^1]), static k => k.Item1.GetProperty(k.Item2));
+            if (prop is not { CanWrite: true }) return false;
+
+            try
+            {
+                var wanted = Nullable.GetUnderlyingType(prop.PropertyType) ?? prop.PropertyType;
+                var converted = value == null || wanted.IsInstanceOfType(value)
+                    ? value
+                    : Convert.ChangeType(value, wanted, System.Globalization.CultureInfo.CurrentCulture);
+                prop.SetValue(target, converted);
+                return true;
+            }
+            catch (Exception)
+            {
+                // A value the member will not take is a refusal to commit, not a crash mid-edit.
+                return false;
+            }
+        };
+    }
+
     public static Action<object, bool> SetterForBoolPath(string path)
     {
         if (string.IsNullOrEmpty(path))

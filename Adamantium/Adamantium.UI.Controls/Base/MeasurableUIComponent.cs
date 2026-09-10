@@ -23,19 +23,19 @@ public class MeasurableUIComponent : ObservableUIComponent, IName, IMeasurableCo
 
     public static readonly AdamantiumProperty WidthProperty = AdamantiumProperty.Register(nameof(Width),
         typeof(Double), typeof(MeasurableUIComponent),
-        new PropertyMetadata(Double.NaN, PropertyMetadataOptions.BindsTwoWayByDefault | PropertyMetadataOptions.AffectsMeasure | PropertyMetadataOptions.AffectsRender, WidthChangedCallBack));
+        new PropertyMetadata(Double.NaN, PropertyMetadataOptions.AffectsMeasure | PropertyMetadataOptions.AffectsRender, WidthChangedCallBack));
 
     public static readonly AdamantiumProperty HeightProperty = AdamantiumProperty.Register(nameof(Height),
         typeof(Double), typeof(MeasurableUIComponent),
-        new PropertyMetadata(Double.NaN, PropertyMetadataOptions.BindsTwoWayByDefault | PropertyMetadataOptions.AffectsMeasure | PropertyMetadataOptions.AffectsRender, HeightChangedCallBack));
+        new PropertyMetadata(Double.NaN, PropertyMetadataOptions.AffectsMeasure | PropertyMetadataOptions.AffectsRender, HeightChangedCallBack));
 
     public static readonly AdamantiumProperty MinWidthProperty = AdamantiumProperty.Register(nameof(MinWidth),
         typeof(Double), typeof(MeasurableUIComponent),
-        new PropertyMetadata((Double)0, PropertyMetadataOptions.BindsTwoWayByDefault | PropertyMetadataOptions.AffectsMeasure | PropertyMetadataOptions.AffectsRender));
+        new PropertyMetadata((Double)0, PropertyMetadataOptions.AffectsMeasure | PropertyMetadataOptions.AffectsRender));
 
     public static readonly AdamantiumProperty MinHeightProperty = AdamantiumProperty.Register(nameof(MinHeight),
         typeof(Double), typeof(MeasurableUIComponent),
-        new PropertyMetadata((Double)0, PropertyMetadataOptions.BindsTwoWayByDefault | PropertyMetadataOptions.AffectsMeasure | PropertyMetadataOptions.AffectsRender));
+        new PropertyMetadata((Double)0, PropertyMetadataOptions.AffectsMeasure | PropertyMetadataOptions.AffectsRender));
 
     public static readonly AdamantiumProperty ActualWidthProperty = AdamantiumProperty.RegisterReadOnly(nameof(ActualWidth),
         typeof(Double), typeof(MeasurableUIComponent),
@@ -47,11 +47,11 @@ public class MeasurableUIComponent : ObservableUIComponent, IName, IMeasurableCo
 
     public static readonly AdamantiumProperty MaxWidthProperty = AdamantiumProperty.Register(nameof(MaxWidth),
         typeof(Double), typeof(MeasurableUIComponent),
-        new PropertyMetadata(Double.PositiveInfinity, PropertyMetadataOptions.BindsTwoWayByDefault | PropertyMetadataOptions.AffectsMeasure | PropertyMetadataOptions.AffectsRender));
+        new PropertyMetadata(Double.PositiveInfinity, PropertyMetadataOptions.AffectsMeasure | PropertyMetadataOptions.AffectsRender));
 
     public static readonly AdamantiumProperty MaxHeightProperty = AdamantiumProperty.Register(nameof(MaxHeight),
         typeof(Double), typeof(MeasurableUIComponent),
-        new PropertyMetadata(Double.PositiveInfinity, PropertyMetadataOptions.BindsTwoWayByDefault | PropertyMetadataOptions.AffectsMeasure | PropertyMetadataOptions.AffectsRender));
+        new PropertyMetadata(Double.PositiveInfinity, PropertyMetadataOptions.AffectsMeasure | PropertyMetadataOptions.AffectsRender));
 
     public static readonly AdamantiumProperty HorizontalAlignmentProperty = AdamantiumProperty.Register(nameof(HorizontalAlignment),
         typeof(HorizontalAlignment), typeof(MeasurableUIComponent), new PropertyMetadata(HorizontalAlignment.Stretch, PropertyMetadataOptions.AffectsArrange));

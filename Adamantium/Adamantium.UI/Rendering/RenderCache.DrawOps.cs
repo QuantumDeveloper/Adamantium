@@ -12,6 +12,29 @@ namespace Adamantium.UI.Rendering;
 
 public partial class RenderCache
 {
+    // SCRATCH (ADAM_OP_OWNERS=1): every op of the retained stream by the component that drew it - the list of who costs
+    // the screen its draw calls, which no timing can name.
+    private string DumpOpOwners()
+    {
+        var byOwner = new Dictionary<string, int>();
+        foreach (var op in _ops)
+        {
+            var name = op.Clip is { } clip
+                ? clip.GetType().Name + (string.IsNullOrEmpty(clip.Name) ? "" : " '" + clip.Name + "'")
+                : "(none)";
+            var key = op.Kind + " under " + name;
+            byOwner[key] = byOwner.TryGetValue(key, out var had) ? had + 1 : 1;
+        }
+
+        var text = new System.Text.StringBuilder($"op stream: {_ops.Count} ops in {_layers.Count} layers");
+        foreach (var pair in byOwner.OrderByDescending(p => p.Value))
+        {
+            text.Append(Environment.NewLine).Append($"  {pair.Value,5}  {pair.Key}");
+        }
+
+        return text.ToString();
+    }
+
     // Replay a recorded frame's op stream (a Clean frame): re-issue scissor changes, per-unit draws and batch segments in
     // order. No walk, no bake, no upload - the batch buffers still hold last frame's bytes, and each unit's RenderData its
     // baked transform (nothing moved on a Clean frame).

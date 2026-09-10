@@ -24,6 +24,10 @@ internal static class RenderDirtyBridge
         // describes this one. STRUCTURAL, like a show/hide: what is re-recorded is not just this element's own draws.
         VisualTreeNotifications.ClipChanged += RenderDirty.MarkStructural;
 
+        // Its PLACE among its siblings changed -> the retained order hands out a rank once, at placement, so without
+        // this an element that swapped ZIndex keeps painting where it used to.
+        VisualTreeNotifications.ZOrderChanged += RenderDirty.MarkStructural;
+
         // The content it draws is stale -> it must re-render.
         VisualTreeNotifications.ContentInvalidated += RenderDirty.MarkGeometry;
 

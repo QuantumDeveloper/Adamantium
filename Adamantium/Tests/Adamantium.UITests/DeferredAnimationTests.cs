@@ -39,11 +39,16 @@ public class DeferredAnimationTests
     {
         var border = new Border { Width = 20, Height = 20 };
 
+        // What this test is about is what materializing ADDS, so it is measured as a difference. The animation manager
+        // is global and shared by every fixture in the run - asserting an absolute zero here made the test's verdict
+        // depend on whoever ran before it, which is a coin toss, not a check.
+        var before = AnimationManager.ActiveCount;
+
         // Exactly what a trigger's enter action does, on the thread that builds the subtree - which reaches the element
         // before it is in any tree.
         Task.Run(() => Spin().Apply(border)).Wait();
 
-        Assert.That(AnimationManager.ActiveCount, Is.Zero,
+        Assert.That(AnimationManager.ActiveCount, Is.EqualTo(before),
             "a subtree being built off the loop thread must not put anything on the heartbeat");
 
         var root = new StackPanel();
@@ -52,11 +57,11 @@ public class DeferredAnimationTests
         host.Content = root;
         ((Adamantium.UI.Core.IMeasurableComponent)host).Measure(new Size(100, 100));
 
-        Assert.That(AnimationManager.ActiveCount, Is.GreaterThan(0),
+        Assert.That(AnimationManager.ActiveCount, Is.GreaterThan(before),
             "the request waited for the element to go up - it must be running now");
 
-        var before = border.Opacity;
+        var opacity = border.Opacity;
         AnimationManager.Tick(0.3);
-        Assert.That(border.Opacity, Is.Not.EqualTo(before), "...and running means advancing");
+        Assert.That(border.Opacity, Is.Not.EqualTo(opacity), "...and running means advancing");
     }
 }

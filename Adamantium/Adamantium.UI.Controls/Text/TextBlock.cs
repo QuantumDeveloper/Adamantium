@@ -43,11 +43,13 @@ public class TextBlock : InputUIComponent
     {
         FontFamilyProperty.OverrideMetadata(typeof(TextBlock),
             new PropertyMetadata(null, PropertyMetadataOptions.Inherits, OnFontFamilyChanged));
-        // Foreground is the inherited property from UIComponent; keep the White default + two-way + render flag a TextBlock
-        // had, and preserve Inherits so an ancestor's set Foreground cascades into unstyled text.
+        // Foreground is the inherited property from UIComponent; keep the White default + render flag a TextBlock had,
+        // and preserve Inherits so an ancestor's set Foreground cascades into unstyled text. NOT two-way: a brush is
+        // something text is PAINTED with, never something it edits, and a colour written back into whatever supplied it
+        // is how a selected tab's label kept the selected colour after the tab lost selection.
         ForegroundProperty.OverrideMetadata(typeof(TextBlock),
             new PropertyMetadata(Brushes.White,
-                PropertyMetadataOptions.Inherits | PropertyMetadataOptions.BindsTwoWayByDefault | PropertyMetadataOptions.AffectsRender));
+                PropertyMetadataOptions.Inherits | PropertyMetadataOptions.AffectsRender));
         FontSizeProperty.OverrideMetadata(typeof(TextBlock),
             new PropertyMetadata(12.0d, PropertyMetadataOptions.Inherits | PropertyMetadataOptions.AffectsMeasure | PropertyMetadataOptions.AffectsRender));
     }

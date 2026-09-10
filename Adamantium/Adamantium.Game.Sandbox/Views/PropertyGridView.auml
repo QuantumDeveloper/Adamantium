@@ -1,0 +1,59 @@
+<View xmlns="http://adamantium/ui"
+      xmlns:x="http://adamantium/ui/xaml/extensions"
+      xmlns:ui="clr-namespace:Adamantium.UI.Core;assembly=Adamantium.UI.Core">
+    <Grid RowDefinitions="Auto,Auto,Auto,*,Auto" ColumnDefinitions="*,*" Margin="16">
+
+        <TextBlock Grid.Row="0" Grid.ColumnSpan="2" Text="PropertyGrid" FontSize="18"/>
+        <TextBlock Grid.Row="1" Grid.ColumnSpan="2" Margin="0,4,0,12" TextWrapping="WrapByWords"
+                   Text="Two inspectors over the SAME object. Every editable row is live - type, pick, tick, or drag a number sideways. Drag the grip on any row and all of them follow."/>
+
+        <TextBlock Grid.Row="2" Grid.Column="0" Margin="0,0,8,6"
+                   Text="Written by hand - sections and properties declared in markup"/>
+        <TextBlock Grid.Row="2" Grid.Column="1" Margin="8,0,0,6"
+                   Text="Generated - PropertyDefinitionBuilder read the type, no markup at all"/>
+
+        <PropertyGrid Grid.Row="3" Grid.Column="0" x:Name="Inspector" Margin="0,0,8,0"
+                      SelectedObjects="{Binding Selection}"
+                      NameColumnWidth="150">
+            <PropertySection Header="General" IsExpanded="True">
+                <StringProperty Header="Name" Binding="{Binding Name}"/>
+                <BooleanProperty Header="Enabled" Binding="{Binding IsEnabled}"/>
+                <StringProperty Header="Tag" Binding="{Binding Tag}"/>
+                <!-- A value that may be READ but not written: the binding is one-way and the line says so. -->
+                <StringProperty Header="Guid" Binding="{Binding Guid, Mode=OneWay}" IsReadOnly="True"/>
+            </PropertySection>
+
+            <PropertySection Header="Transform" IsExpanded="True">
+                <!-- A composite: one line folded, three when opened. Its children are indented; their VALUES still line
+                     up with every other value - that is what one shared grip is for. -->
+                <CompositeProperty Header="Position">
+                    <NumericProperty Header="X" Binding="{Binding PositionX}" Step="0.5"/>
+                    <NumericProperty Header="Y" Binding="{Binding PositionY}" Step="0.5"/>
+                    <NumericProperty Header="Z" Binding="{Binding PositionZ}" Step="0.5"/>
+                </CompositeProperty>
+            </PropertySection>
+
+            <PropertySection Header="Physics" IsExpanded="True">
+                <NumericProperty Header="Mass" Binding="{Binding Mass}" Minimum="0" Maximum="1000" Step="5"/>
+                <ChoiceProperty Header="Visibility" Binding="{Binding Visibility}" EnumType="{x:Type ui:Visibility}"/>
+                <!-- Two bindings on one line, and they read DIFFERENT things - which is the whole point. The VALUE is
+                     read off the object being inspected; every other property of the definition resolves against the
+                     page's DataContext, because a definition stands in the inspector's logical tree. So the list of
+                     materials comes straight from the view-model, with no provider in between. -->
+                <ChoiceProperty Header="Material" Binding="{Binding Material}" ItemsSource="{Binding Materials}"/>
+            </PropertySection>
+        </PropertyGrid>
+
+        <PropertyGrid Grid.Row="3" Grid.Column="1" Margin="8,0,0,0"
+                      SelectedObjects="{Binding Selection}"
+                      SectionsSource="{Binding Generated}"
+                      NameColumnWidth="170"/>
+
+        <StackPanel Grid.Row="4" Grid.ColumnSpan="2" Orientation="Horizontal" Margin="0,12,0,0">
+            <CheckBox Content="Inspect two objects at once" IsChecked="{Binding Both, Mode=TwoWay}"
+                      VerticalAlignment="Center"/>
+            <TextBlock Margin="12,0,0,0" VerticalAlignment="Center"
+                       Text="Rows the two agree on show the value; the rest come up blank as 'different'. An edit reaches both."/>
+        </StackPanel>
+    </Grid>
+</View>

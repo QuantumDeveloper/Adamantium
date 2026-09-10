@@ -11,7 +11,7 @@ public class Rectangle : Shape
    {
       // Box-shape default (as in WPF): fill the layout slot. Path/Polygon/Line keep the base Stretch.None.
       StretchProperty.OverrideMetadata(typeof(Rectangle), new PropertyMetadata(Stretch.Fill,
-         PropertyMetadataOptions.BindsTwoWayByDefault | PropertyMetadataOptions.AffectsMeasure | PropertyMetadataOptions.AffectsRender));
+         PropertyMetadataOptions.AffectsMeasure | PropertyMetadataOptions.AffectsRender));
    }
 
    public Rectangle()
@@ -22,7 +22,7 @@ public class Rectangle : Shape
    public static readonly AdamantiumProperty CornerRadiusProperty = AdamantiumProperty.Register(nameof(CornerRadius),
       typeof(CornerRadius), typeof(Rectangle),
       new PropertyMetadata(new CornerRadius(0),
-         PropertyMetadataOptions.BindsTwoWayByDefault | PropertyMetadataOptions.AffectsRender));
+         PropertyMetadataOptions.AffectsRender));
 
    public CornerRadius CornerRadius
    {

@@ -115,9 +115,10 @@
         <PropertyTrigger Property="HasItems" Value="false">
             <Setter TargetName="PART_Expander" Property="Visibility" Value="Hidden"/>
         </PropertyTrigger>
+        <!-- A WASH, like the list and the table: a tree row carries an icon and a chevron of its own, and a plate of
+             accent paints over both. -->
         <PropertyTrigger Property="IsSelected" Value="true">
-            <Setter TargetName="Root" Property="Background" Value="{ThemeResource AccentFillColorDefault}"/>
-            <Setter TargetName="PART_ContentPresenter" Property="Foreground" Value="{ThemeResource AccentForegroundColor}"/>
+            <Setter TargetName="Root" Property="Background" Value="{ThemeResource AccentFillColorSelection}"/>
         </PropertyTrigger>
     </Style>
 

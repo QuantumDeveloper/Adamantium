@@ -66,16 +66,16 @@ public class Grid: Panel
          new PropertyMetadata(false, PropertyMetadataOptions.AffectsRender));
 
    public static readonly AdamantiumProperty IndividualRowSpacingProperty = AdamantiumProperty.Register(nameof(IndividualRowSpacingProperty),
-      typeof(Boolean), typeof(Grid), new PropertyMetadata(false, PropertyMetadataOptions.AffectsMeasure | PropertyMetadataOptions.BindsTwoWayByDefault));
+      typeof(Boolean), typeof(Grid), new PropertyMetadata(false, PropertyMetadataOptions.AffectsMeasure));
 
    public static readonly AdamantiumProperty IndividualColumnSpacingProperty = AdamantiumProperty.Register(nameof(IndividualColumnSpacingProperty),
-      typeof(Boolean), typeof(Grid), new PropertyMetadata(false, PropertyMetadataOptions.AffectsMeasure | PropertyMetadataOptions.BindsTwoWayByDefault));
+      typeof(Boolean), typeof(Grid), new PropertyMetadata(false, PropertyMetadataOptions.AffectsMeasure));
 
    public static readonly AdamantiumProperty RowSpacingProperty = AdamantiumProperty.Register(nameof(RowSpacing),
-      typeof(Double), typeof(Grid), new PropertyMetadata(0d, PropertyMetadataOptions.AffectsMeasure|PropertyMetadataOptions.BindsTwoWayByDefault));
+      typeof(Double), typeof(Grid), new PropertyMetadata(0d, PropertyMetadataOptions.AffectsMeasure));
 
    public static readonly AdamantiumProperty ColumnSpacingProperty = AdamantiumProperty.Register(nameof(ColumnSpacing),
-      typeof(Double), typeof(Grid), new PropertyMetadata(0d, PropertyMetadataOptions.AffectsMeasure | PropertyMetadataOptions.BindsTwoWayByDefault));
+      typeof(Double), typeof(Grid), new PropertyMetadata(0d, PropertyMetadataOptions.AffectsMeasure));
 
    public Boolean ShowGridLines
    {
@@ -331,7 +331,8 @@ public class Grid: Panel
 
       if (emptyRows)
       {
-         rowSegments[0] = new GridSegment(0, 0, double.PositiveInfinity, GridUnitType.Star, 0) {Stars = 1.0};
+         SegmentAt(rowSegments, 0).Set(0, 0, double.PositiveInfinity, GridUnitType.Star, 0);
+         rowSegments[0].Stars = 1.0;
          rowSegments[0].MeasuredSize = Double.PositiveInfinity;
          rowSegments[0].MeasureType = replaceRowStarsWithAuto ? InnerGridUnitType.Auto : InnerGridUnitType.Star;
       }
@@ -353,7 +354,8 @@ public class Grid: Panel
                margin = 0;
             }
 
-            var segment = new GridSegment(0, def.MinHeight, def.MaxHeight, height.GridUnitType, i);
+            var segment = SegmentAt(rowSegments, i);
+            segment.Set(0, def.MinHeight, def.MaxHeight, height.GridUnitType, i);
 
             switch (def.Height.GridUnitType)
             {
@@ -379,13 +381,13 @@ public class Grid: Panel
             segment.Margin = margin;
             segment.Padding = padding;
 
-            rowSegments[i] = segment;
          }
       }
 
       if (emptyCols)
       {
-         colSegments[0] = new GridSegment(0, 0, double.PositiveInfinity, GridUnitType.Star, 0) {Stars = 1.0};
+         SegmentAt(colSegments, 0).Set(0, 0, double.PositiveInfinity, GridUnitType.Star, 0);
+         colSegments[0].Stars = 1.0;
          colSegments[0].MeasuredSize = Double.PositiveInfinity;
          colSegments[0].MeasureType = replaceColStarsWithAuto ? InnerGridUnitType.Auto : InnerGridUnitType.Star;
       }
@@ -408,7 +410,8 @@ public class Grid: Panel
             double minSize = def.MinWidth;
             double maxSize = Math.Min(def.MaxWidth, MaxDefinitionSize);
 
-            var segment = new GridSegment(0, def.MinWidth, def.MaxWidth, width.GridUnitType, i);
+            var segment = SegmentAt(colSegments, i);
+            segment.Set(0, def.MinWidth, def.MaxWidth, width.GridUnitType, i);
             switch (def.Width.GridUnitType)
             {
                case GridUnitType.Pixel:
@@ -433,13 +436,13 @@ public class Grid: Panel
             segment.Margin = margin;
             segment.Padding = padding;
 
-            colSegments[i] = segment;
          }
       }
 
       if (Children.Count > 0)
       {
-         gridCells = new GridCell[Children.Count];
+         if (gridCells == null || gridCells.Length != Children.Count) gridCells = new GridCell[Children.Count];
+
          int i = 0;
          foreach (var child in Children)
          {
@@ -448,11 +451,10 @@ public class Grid: Panel
             int colspan = Math.Min(GetColumnSpan(child), colCount - col);
             int rowspan = Math.Min(GetRowSpan(child), rowCount - row);
 
-            var cell = new GridCell(row, col, rowspan, colspan, i)
-            {
-               ColumnType = DefineSpanCellType(colSegments, col, colspan),
-               RowType = DefineSpanCellType(rowSegments, row, rowspan)
-            };
+            var cell = gridCells[i] ??= new GridCell();
+            cell.Set(row, col, rowspan, colspan, i);
+            cell.ColumnType = DefineSpanCellType(colSegments, col, colspan);
+            cell.RowType = DefineSpanCellType(rowSegments, row, rowspan);
 
             hasStarRows |= cell.ContainsStarRows;
             hasStarColumns |= cell.ContainsStarColumns;
@@ -471,22 +473,27 @@ public class Grid: Panel
             }
 
             AddCell(cell);
-            gridCells[i] = cell;
             i++;
          }
       }
    }
 
+   // The LISTS are kept and emptied, not thrown away with the dictionary: a grid re-groups its cells on every measure,
+   // and dropping the lists means allocating three new ones per pass, per grid, forever.
    private void ClearCells()
    {
-      cellsDictionary.Clear();
+      foreach (var group in cellsDictionary.Values) group.Clear();
    }
 
+   // Reused whenever the shape has not changed, which is nearly always. Every slot is re-described below, so nothing
+   // survives from the last pass but the objects themselves.
    private void CreateSegments(int rowCount, int colCount)
    {
-      rowSegments = new GridSegment[rowCount];
-      colSegments = new GridSegment[colCount];
+      if (rowSegments == null || rowSegments.Length != rowCount) rowSegments = new GridSegment[rowCount];
+      if (colSegments == null || colSegments.Length != colCount) colSegments = new GridSegment[colCount];
    }
+
+   private static GridSegment SegmentAt(GridSegment[] segments, int index) => segments[index] ??= new GridSegment();
 
    private void AddCell(GridCell gridCell)
    {
@@ -740,8 +747,8 @@ public class Grid: Panel
 
    private Size MeasureGrid(Size availableSize)
    {
-      MeasureCells(0);
-      MeasureCells(1, true);
+      MeasureCells(0, availableSize);
+      MeasureCells(1, availableSize, true);
 
       if (hasStarRows)
       {
@@ -752,8 +759,8 @@ public class Grid: Panel
       {
          CalculateStarSegments(colSegments, availableSize.Width);
       }
-      MeasureCells(1);
-      MeasureCells(2);
+      MeasureCells(1, availableSize);
+      MeasureCells(2, availableSize);
       
       double desiredX = CalculateTotalSize(colSegments);
       double desiredY = CalculateTotalSize(rowSegments);
@@ -772,7 +779,7 @@ public class Grid: Panel
       return new Size(desiredX, desiredY);
    }
 
-   private void MeasureCells(int groupIndex, bool ignoreStarSize = false)
+   private void MeasureCells(int groupIndex, Size availableSize, bool ignoreStarSize = false)
    {
       if (groupIndex > MaxGroupIndex)
          return;
@@ -780,7 +787,7 @@ public class Grid: Panel
       if (!cellsDictionary.ContainsKey(groupIndex)) return;
 
       var list = cellsDictionary[groupIndex];
-      
+
       foreach (var cell in list)
       {
          var row = rowSegments[cell.RowIndex];
@@ -792,26 +799,31 @@ public class Grid: Panel
          {
             childSize.Height = double.PositiveInfinity;
          }
+         else if (ignoreStarSize && cell.ContainsStarRows)
+         {
+            // A star track has no size yet, so the tracks in this range add up to nothing - and nothing is not "no
+            // constraint", it is the tightest one there is. The grid's own space is the honest upper bound: the second,
+            // real pass can only grow the track from here, and the track keeps the LARGER of the two.
+            childSize.Height = availableSize.Height;
+            ignoreMeasuredRow = true;
+         }
          else
          {
             childSize.Height = CalculateSizeForRange(rowSegments, cell.RowIndex, cell.RowSpan);
-            if (ignoreStarSize && cell.ContainsStarRows)
-            {
-               ignoreMeasuredRow = true;
-            }
          }
 
          if (!cell.ContainsStarColumns && cell.ContainsAutoColumns)
          {
             childSize.Width = double.PositiveInfinity;
          }
+         else if (ignoreStarSize && cell.ContainsStarColumns)
+         {
+            childSize.Width = availableSize.Width;
+            ignoreMeasuredColumn = true;
+         }
          else
          {
             childSize.Width = CalculateSizeForRange(colSegments, cell.ColumnIndex, cell.ColSpan);
-            if (ignoreStarSize && cell.ContainsStarColumns)
-            {
-               ignoreMeasuredColumn = true;
-            }
          }
 
          var element = Children[cell.ChildIndex];
@@ -982,7 +994,7 @@ public class Grid: Panel
       //Number of stars for current GridSegment(could be 0 if its not a Star segment)
       public double Stars;
       //Original Definition type
-      public GridUnitType OriginalType { get; }
+      public GridUnitType OriginalType { get; private set; }
       //Definition type calculated at Measured phase (because of span could contain several types merged into one)
       public InnerGridUnitType MeasureType { get; set; }
 
@@ -1000,25 +1012,30 @@ public class Grid: Panel
 
       public Boolean IsPixel => OriginalType == GridUnitType.Pixel;
 
-      public GridSegment(double size, double min, double max, GridUnitType originalType, int index)
+      // Filled rather than constructed: a grid re-describes its tracks on EVERY measure. Every field is written here -
+      // a reused segment keeping one number from the last pass would be a defect nobody could see.
+      public void Set(double size, double min, double max, GridUnitType originalType, int index)
       {
          Min = min;
          Max = max;
          MeasuredSize = size;
          Stars = 0;
          OriginalType = originalType;
+         MeasureType = InnerGridUnitType.None;
          Offset = 0;
+         Margin = 0;
+         Padding = default;
          Index = index;
       }
    }
 
    private class GridCell
    {
-      public readonly int RowIndex;
-      public readonly int ColumnIndex;
-      public readonly int RowSpan;
-      public readonly int ColSpan;
-      public readonly int ChildIndex;
+      public int RowIndex;
+      public int ColumnIndex;
+      public int RowSpan;
+      public int ColSpan;
+      public int ChildIndex;
 
       //Contains combination of types by row and column including span definitions
       public InnerGridUnitType ColumnType;
@@ -1032,7 +1049,8 @@ public class Grid: Panel
 
       public int GroupIndex;
 
-      public GridCell(int rowIndex, int columnIndex, int rowSpan, int colSpan, int childIndex)
+      // Filled rather than constructed - see GridSegment.Set.
+      public void Set(int rowIndex, int columnIndex, int rowSpan, int colSpan, int childIndex)
       {
          RowIndex = rowIndex;
          ColumnIndex = columnIndex;
@@ -1040,6 +1058,8 @@ public class Grid: Panel
          ColSpan = colSpan;
          GroupIndex = -1;
          ChildIndex = childIndex;
+         ColumnType = InnerGridUnitType.None;
+         RowType = InnerGridUnitType.None;
       }
    }
 

@@ -59,8 +59,11 @@
     <StyleInclude Source="{x:Type editor:RadioButtonStyleSet}"/>
     <StyleInclude Source="{x:Type editor:ToggleSwitchStyleSet}"/>
     <StyleInclude Source="{x:Type editor:DropDownStyleSet}"/>
+    <StyleInclude Source="{x:Type editor:ExpanderStyleSet}"/>
+    <StyleInclude Source="{x:Type editor:PropertyGridStyleSet}"/>
     <StyleInclude Source="{x:Type editor:NumericUpDownStyleSet}"/>
     <StyleInclude Source="{x:Type editor:DataPagerStyleSet}"/>
+    <StyleInclude Source="{x:Type editor:DataGridStyleSet}"/>
     <StyleInclude Source="{x:Type editor:ProgressBarStyleSet}"/>
     <StyleInclude Source="{x:Type editor:SliderStyleSet}"/>
     <StyleInclude Source="{x:Type editor:RangeSliderStyleSet}"/>

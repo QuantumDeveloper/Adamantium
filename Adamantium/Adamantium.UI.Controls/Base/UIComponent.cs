@@ -11,7 +11,7 @@ namespace Adamantium.UI.Controls.Base;
 public class UIComponent : FundamentalUIComponent, IUIComponent
 {
     private Size renderSize;
-    
+
     protected bool sizeChanged;
     protected Size previousRenderSize;
 
@@ -56,10 +56,15 @@ public class UIComponent : FundamentalUIComponent, IUIComponent
     public static readonly AdamantiumProperty ZIndexProperty = AdamantiumProperty.Register(nameof(ZIndex),
         typeof(Int32), typeof(UIComponent), new PropertyMetadata(0, PropertyMetadataOptions.AffectsRender, OnZIndexChanged));
 
+    // AffectsRender re-renders this element and nothing else, but a ZIndex change moves it in the paint ORDER - and the
+    // retained order hands out a rank ONCE, at placement. Announced as its own fact, the way the clip is.
     private static void OnZIndexChanged(AdamantiumComponent d, AdamantiumPropertyChangedEventArgs e)
     {
         // Resolved value, not e.NewValue (a trigger exit writes UnsetValue). See OnVisibilityChanged.
-        if (d is UIComponent component) component._zIndex = component.GetValue<int>(ZIndexProperty);
+        if (d is not UIComponent component) return;
+
+        component._zIndex = component.GetValue<int>(ZIndexProperty);
+        VisualTreeNotifications.RaiseZOrderChanged(component);
     }
 
     /// <summary>Whether this component's shapes are drawn with analytic anti-aliasing. On (the default) an edge fades
@@ -83,7 +88,6 @@ public class UIComponent : FundamentalUIComponent, IUIComponent
     public static readonly AdamantiumProperty VisibilityProperty = AdamantiumProperty.Register(nameof(Visibility),
         typeof(Visibility), typeof(UIComponent),
         new PropertyMetadata(Visibility.Visible,
-            PropertyMetadataOptions.BindsTwoWayByDefault |
             PropertyMetadataOptions.AffectsMeasure |
             PropertyMetadataOptions.AffectsRender,
             OnVisibilityChanged));
@@ -144,8 +148,7 @@ public class UIComponent : FundamentalUIComponent, IUIComponent
     // transition switching one on) did nothing until something else happened to force a redraw.
     public static readonly AdamantiumProperty ClipToBoundsProperty = AdamantiumProperty.Register(nameof(ClipToBounds),
         typeof(Boolean), typeof(UIComponent),
-        new PropertyMetadata(false, PropertyMetadataOptions.BindsTwoWayByDefault | PropertyMetadataOptions.AffectsRender,
-            OnClipToBoundsChanged));
+        new PropertyMetadata(false, PropertyMetadataOptions.AffectsRender, OnClipToBoundsChanged));
 
     // AffectsRender alone only re-renders THIS element, and a clip owner usually draws nothing of its own - so the frame
     // kept the scissors the last walk recorded and the change was invisible until something else forced a re-record.
@@ -231,11 +234,11 @@ public class UIComponent : FundamentalUIComponent, IUIComponent
 
     public static readonly AdamantiumProperty IsEnabledProperty = AdamantiumProperty.Register(nameof(IsEnabled),
         typeof(Boolean), typeof(UIComponent),
-        new PropertyMetadata(true, PropertyMetadataOptions.BindsTwoWayByDefault));
+        new PropertyMetadata(true));
 
     public static readonly AdamantiumProperty OpacityProperty = AdamantiumProperty.Register(nameof(Opacity),
         typeof(Double), typeof(UIComponent),
-        new PropertyMetadata(1.0, PropertyMetadataOptions.AffectsPaint | PropertyMetadataOptions.BindsTwoWayByDefault, OnOpacityChanged));
+        new PropertyMetadata(1.0, PropertyMetadataOptions.AffectsPaint, OnOpacityChanged));
 
     // Opacity composites DOWN the visual tree, but it does NOT re-bake the subtree: the value rides an opacity SLOT in
     // the transform table, and the shaders that read it compose it at draw time. So only THIS element is marked - the
@@ -256,7 +259,7 @@ public class UIComponent : FundamentalUIComponent, IUIComponent
 
     public static readonly AdamantiumProperty SelfOpacityProperty = AdamantiumProperty.Register(nameof(SelfOpacity),
         typeof(Double), typeof(UIComponent),
-        new PropertyMetadata(1.0, PropertyMetadataOptions.AffectsPaint | PropertyMetadataOptions.BindsTwoWayByDefault, OnSelfOpacityChanged));
+        new PropertyMetadata(1.0, PropertyMetadataOptions.AffectsPaint, OnSelfOpacityChanged));
 
     // SelfOpacity fades ONLY this element's own draws, NOT its subtree (unlike Opacity). So a change re-bakes just this
     // element (AffectsPaint already marked it) - descendants' baked alpha never included it. Only the field mirror to keep.
@@ -474,6 +477,7 @@ public class UIComponent : FundamentalUIComponent, IUIComponent
     {
         System.Threading.Interlocked.Increment(ref LiveComponents);
         RenderId = Guid.NewGuid();
+
         // A visual root (e.g. a window) has no parent, so SetVisualParent never attaches it. Seed RootVisual to
         // itself here so the root reports IsAttachedToVisualTree = true.
         if (this is IRootVisualComponent root) RootVisual = root;
