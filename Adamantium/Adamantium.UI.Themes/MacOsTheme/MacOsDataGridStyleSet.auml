@@ -298,6 +298,42 @@
         </Setter>
     </Style>
 
+    <!-- The handle that opens a record's long form - see the Fluent set for why the sign is a PART. -->
+    <Style Selector="DataGridRowDetailsToggle">
+        <Setter Property="Background" Value="{ObservableResource SolidBackgroundFillColorTertiary}"/>
+        <Setter Property="Foreground" Value="{ObservableResource TextFillColorSecondary}"/>
+        <Setter Property="FontSize" Value="{ResourceReference FontSizeBody}"/>
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="DataGridRowDetailsToggle">
+                    <Border x:Name="ToggleBg"
+                            Background="{TemplateBinding Background}"
+                            BorderBrush="{ObservableResource DataGridLineColor}"
+                            BorderThickness="0 0 1 1">
+                        <TextBlock x:Name="Sign" Text="+"
+                                   HorizontalAlignment="Center" VerticalAlignment="Center"
+                                   Foreground="{TemplateBinding Foreground}"
+                                   FontSize="{TemplateBinding FontSize}"/>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <PropertyTrigger Property="IsOpen" Value="true">
+                            <Setter TargetName="Sign" Property="Text" Value="−"/>
+                        </PropertyTrigger>
+                        <PropertyTrigger Property="IsBlank" Value="true">
+                            <Setter TargetName="Sign" Property="Text" Value=""/>
+                            <Setter Property="Cursor" Value="Arrow"/>
+                        </PropertyTrigger>
+                        <PropertyTrigger Property="IsMouseOver" Value="true">
+                            <Setter TargetName="ToggleBg" Property="Background"
+                                    Value="{ObservableResource SubtleFillColorSecondary}"/>
+                        </PropertyTrigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
     <Style Selector="DataGridCell">
         <Setter Property="Foreground" Value="{ObservableResource TextFillColorPrimary}"/>
         <Setter Property="FontSize" Value="{ResourceReference FontSizeBody}"/>

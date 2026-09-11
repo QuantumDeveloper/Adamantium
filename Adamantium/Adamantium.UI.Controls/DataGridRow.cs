@@ -47,6 +47,17 @@ public class DataGridRow : Panel
         private set => SetValue(IsGroupProperty, value);
     }
 
+    /// <summary>This row is the PANEL a record opened under itself rather than a record of its own - so a theme can
+    /// leave the rules, the stripe and the hover off it: it is not a row anybody points at.</summary>
+    public static readonly AdamantiumProperty IsRowDetailsProperty = AdamantiumProperty.Register(nameof(IsRowDetails),
+        typeof(bool), typeof(DataGridRow), new PropertyMetadata(false, PropertyMetadataOptions.AffectsRender));
+
+    public bool IsRowDetails
+    {
+        get => GetValue<bool>(IsRowDetailsProperty);
+        private set => SetValue(IsRowDetailsProperty, value);
+    }
+
     /// <summary>The grid this row belongs to, for the columns and the shared widths.</summary>
     public TreeDataGrid Owner { get; internal set; }
 
@@ -65,6 +76,8 @@ public class DataGridRow : Panel
     private DataGridGroupHeader _groupHeader;
     private readonly Dictionary<int, DataGridFooterCell> _groupTotals = new();
     private DataGridRowHeader _number;
+    private ContentPresenter _details;
+    private DataGridRowDetailsToggle _detailsToggle;
 
     /// <summary>This row's place in the visible order, from 1 - what the number strip shows.</summary>
     public int Number { get; private set; }
@@ -78,6 +91,7 @@ public class DataGridRow : Panel
         Follow(row?.Node);
         Row = row;
         IsGroup = row?.Node is DataGridGroup;
+        IsRowDetails = row is { IsDetails: true };
 
         // A group row takes NO stripe of the zebra. The stripes count the rows of the data, so a caption that landed on
         // one band or the other by where it happened to fall in the flat list read as a mistake - and the theme gives a
@@ -127,9 +141,26 @@ public class DataGridRow : Panel
         var expander = Owner?.ExpanderColumn;
         var depth = Row?.Depth ?? 0;
 
+        // WHAT this row stands for, decided BEFORE any of it is built. Building a backdrop here for SyncDetails to drop
+        // below is a child ADDED AND REMOVED on every measure, and each of those invalidates the row that is measuring:
+        // the row never goes valid, so the whole realized set re-measures on every pass of a table nobody is touching.
+        // Measured at seven measures a frame per panel and sixty milliseconds of layout AT REST. The strip carrying the
+        // toggle counts as pinned leading, so a table with panels always had a pinned zone to build - the feature paid
+        // this from the moment it was switched on, with no frozen column anywhere.
+        var panel = Row?.Node is DataGridRowDetails;
+
         // The ZONES FIRST: a backdrop is painted BETWEEN two sets of siblings, and the retained paint order ranks a
         // child when it is placed.
-        SyncFrozenBackdrop();
+        if (!panel) SyncFrozenBackdrop();
+        SyncDetailsToggle();
+
+        // A PANEL row has no cells and no number: it is not a record, it is the record above it said at length, and a
+        // number of its own would make the record after it look like it had skipped one.
+        if (SyncDetails())
+        {
+            if (_number != null) _number.Visibility = Visibility.Collapsed;
+            return;
+        }
 
         // A GROUP row has no cells at all: it belongs to no column, so there is nothing for a column to say about it.
         // It IS still one of the rows on screen, so it keeps its ordinal - numbers that skipped the group headers would
@@ -163,6 +194,9 @@ public class DataGridRow : Panel
             if (!_cells.TryGetValue(i, out var cell))
             {
                 cell = _pool.Count > 0 ? _pool.Pop() : NewCell();
+                // A cell pooled on the way INTO a details panel was taken out of the row, not merely hidden, so coming
+                // back means being put back. Pooling for a column leaving the window sideways still only hides.
+                if (cell.VisualParent != this) Children.Add(cell);
                 cell.Visibility = Visibility.Visible;
                 _cells[i] = cell;
             }
@@ -226,6 +260,82 @@ public class DataGridRow : Panel
 
     // Returns whether this row IS a group. Everything a group row shows lives here: the header, and one total per
     // column that asked for one, placed at that column's offset so a sum stands under the numbers it is a sum of.
+    // The panel row: one presenter over the whole row, built from the table's template against the record the panel
+    // belongs to. Everything a record's row wears - its cells, its number, the pinned backdrop - goes away with it:
+    // this row shows one thing, and a pinned band running under a free-form panel would cut it in two.
+    private bool SyncDetails()
+    {
+        if (Row?.Node is not DataGridRowDetails details)
+        {
+            DropDetails();
+            return false;
+        }
+
+        // TAKEN OUT, not hidden - the same rule the group's totals are held to, and for the same reason. This row is
+        // recycled between standing for a record and standing for a whole PANEL, which is the biggest swap of parts a
+        // row makes, and a part left hidden inside it keeps its place in the drawn set while it is not in the drawing.
+        // That is what left panels with their tab strip cut in half or gone.
+        foreach (var pair in _cells)
+        {
+            pair.Value.Visibility = Visibility.Collapsed;
+            Children.Remove(pair.Value);
+            _pool.Push(pair.Value);
+        }
+
+        _cells.Clear();
+        DropGroupHeader();
+        HideGroupTotals();
+        DropBackdrops();
+
+        if (_details == null)
+        {
+            _details = new ContentPresenter();
+            Children.Add(_details);
+        }
+
+        // ONLY when it changed. This runs on every measure of the row, and writing the same template and the same item
+        // back each time re-dirties the presenter, which re-dirties the row, which measures again - measured at seven
+        // measures a frame per panel and sixty milliseconds of layout on a table standing still.
+        var template = Owner?.RowDetailsTemplate;
+        if (!ReferenceEquals(_details.ContentTemplate, template)) _details.ContentTemplate = template;
+        if (!ReferenceEquals(_details.Content, details.Item)) _details.Content = details.Item;
+        return true;
+    }
+
+    // ...and out again on the way back to being a record.
+    private void DropDetails()
+    {
+        if (_details == null) return;
+
+        _details.Content = null;
+        Children.Remove(_details);
+        _details = null;
+    }
+
+    private void DropGroupHeader()
+    {
+        if (_groupHeader == null) return;
+
+        _groupHeader.MouseLeftButtonDown -= OnGroupPressed;
+        Children.Remove(_groupHeader);
+        _groupHeader = null;
+    }
+
+    private void DropBackdrops()
+    {
+        if (_frozenBackdrop != null)
+        {
+            Children.Remove(_frozenBackdrop);
+            _frozenBackdrop = null;
+        }
+
+        if (_rightBackdrop != null)
+        {
+            Children.Remove(_rightBackdrop);
+            _rightBackdrop = null;
+        }
+    }
+
     private bool SyncGroup()
     {
         if (Group is not { } group)
@@ -323,6 +433,41 @@ public class DataGridRow : Panel
 
         Owner.ToggleRow(Row);
         e.Handled = true;
+    }
+
+    // The handle that opens a record's panel, in a column of its own at the very head of the row - ahead of the numbers,
+    // as the only thing standing further left than the table itself. Like the number strip it is NOT in Columns: it
+    // belongs to the table rather than to the data, and putting it there would shift every index the page declared.
+    private void SyncDetailsToggle()
+    {
+        if (Owner?.RowDetailsTemplate == null)
+        {
+            if (_detailsToggle != null) _detailsToggle.Visibility = Visibility.Collapsed;
+            return;
+        }
+
+        if (_detailsToggle == null)
+        {
+            _detailsToggle = new DataGridRowDetailsToggle { ZIndex = 3 };
+            _detailsToggle.MouseLeftButtonDown += OnDetailsTogglePressed;
+            Children.Add(_detailsToggle);
+        }
+
+        _detailsToggle.Visibility = Visibility.Visible;
+
+        // A group's caption and a panel row are not records, so there is nothing under them to open. The strip keeps its
+        // width there and shows nothing - a column that closed up under some rows would make the left edge ragged.
+        _detailsToggle.IsBlank = IsGroup || IsRowDetails;
+        _detailsToggle.IsOpen = !_detailsToggle.IsBlank && Owner.IsRowDetailsOpen(Item);
+    }
+
+    private void OnDetailsTogglePressed(object sender, MouseButtonEventArgs e)
+    {
+        if (_detailsToggle is { IsBlank: false } && Owner != null)
+        {
+            Owner.ToggleRowDetails(Item);
+            e.Handled = true;
+        }
     }
 
     // The strip is pinned like a frozen column and drawn over what scrolls under it, so it is opaque by its theme and
@@ -523,6 +668,32 @@ public class DataGridRow : Panel
         // line HERE rather than only when the row is bound. Cheap when nothing moved: a dictionary lookup per column.
         SyncCells();
 
+        if (_detailsToggle is { Visibility: Visibility.Visible })
+        {
+            _detailsToggle.Measure(new Size(Owner.RowDetailsToggleWidth, availableSize.Height));
+        }
+
+        // The panel takes what is left of the VIEW after the strips - it belongs to no column, so the columns' total
+        // width is not its business, and the part of the row that is off screen is not either. Its HEIGHT is asked
+        // unbounded and reported back: what a panel comes to is its content's business, and the pass that placed the
+        // rows under it had to guess. The guess is corrected on the next pass, as an Auto column's width is.
+        if (IsRowDetails)
+        {
+            var strips = Owner.LeftStripsLeading;
+            var seen = Owner.ViewportWidth;
+            var room = Math.Max(0, (seen > 0 ? seen : availableSize.Width) - strips);
+            var of = (Row.Node as DataGridRowDetails)?.Item;
+            if (_details != null)
+            {
+                _details.Measure(new Size(room, double.PositiveInfinity));
+                Owner.ReportRowDetailsHeight(of, _details.DesiredSize.Height);
+            }
+
+            // What the CONTENT came to, not what the table guessed: this row carries no fixed height, so its own desired
+            // size is the one honest answer and the stack is told the same number through the report above.
+            return new Size(Owner.ColumnsWidth, _details?.DesiredSize.Height ?? 0);
+        }
+
         // A group row spans the table rather than dividing into columns, so its caption takes the run the totals leave
         // it and its totals are measured against their own columns. The SAME run the arrange will use, scroll and all:
         // text is trimmed to the width it was MEASURED at, so a caption measured wide and arranged narrow simply drew
@@ -593,6 +764,19 @@ public class DataGridRow : Panel
         // to the right - so it is not pushed against the scroll a second time.
         var right = Owner?.RightPinShift ?? 0;
 
+        // The panel stands STILL while the table scrolls sideways, and takes the whole VIEWPORT rather than the whole
+        // content: it belongs to no column, so a panel that slid away with the columns would be a record's long form
+        // that has to be scrolled back to, and one laid out over the full content width would be mostly off screen.
+        if (IsRowDetails)
+        {
+            var strips = Owner?.LeftStripsLeading ?? 0;
+            var seen = Owner?.ViewportWidth ?? finalSize.Width;
+            if (seen <= 0) seen = finalSize.Width;
+            _detailsToggle?.Arrange(new Rect(offset, 0, Owner?.RowDetailsToggleWidth ?? 0, finalSize.Height));
+            _details?.Arrange(new Rect(offset + strips, 0, Math.Max(0, seen - strips), finalSize.Height));
+            return finalSize;
+        }
+
         // The group's caption stands STILL while the table scrolls sideways: it names the rows under it, and a name
         // that slides out of view names nothing. Its totals keep their columns, as any total must.
         if (Group != null)
@@ -640,9 +824,15 @@ public class DataGridRow : Panel
             _rightBackdrop.Arrange(new Rect(zone, 0, Owner.RightFrozenWidth, finalSize.Height));
         }
 
+        // The toggles stand furthest left of all, and the numbers begin where they end.
+        if (_detailsToggle is { Visibility: Visibility.Visible })
+        {
+            _detailsToggle.Arrange(new Rect(offset, 0, Owner.RowDetailsToggleWidth, finalSize.Height));
+        }
+
         if (_number is { Visibility: Visibility.Visible })
         {
-            _number.Arrange(new Rect(offset, 0, Owner.RowNumberWidth, finalSize.Height));
+            _number.Arrange(new Rect(offset + Owner.DetailsStripLeading, 0, Owner.RowNumberWidth, finalSize.Height));
         }
 
         return finalSize;

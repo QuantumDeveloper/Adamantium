@@ -15,6 +15,7 @@ internal sealed class TreeFlattener
     private readonly Func<object, IEnumerable> _childrenOf;
     private readonly Func<object, bool> _isExpanded;
     private readonly Func<object, bool> _isSelected;
+    private readonly Func<object, object> _detailsOf;
     private readonly Dictionary<TreeRow, Subscription> _subs = new();
     private IEnumerable _roots;
     private Subscription _rootsSub;
@@ -22,11 +23,15 @@ internal sealed class TreeFlattener
     // isExpanded / isSelected let a (re)build RESTORE a node's persisted state (a node the view-model still marks
     // expanded/selected, e.g. after a tab switch recreated the view): an expanded node's row is built already-open with its
     // subtree spliced in, a selected node's row built already-selected. Null probes = never restore (build starts blank).
-    public TreeFlattener(Func<object, IEnumerable> childrenOf, Func<object, bool> isExpanded = null, Func<object, bool> isSelected = null)
+    // detailsOf answers "does this node show a panel under itself, and what is it" - a row of its own, spliced right
+    // after the node's, at the node's depth. Null = this tree has no such thing (the TreeView), and nothing changes.
+    public TreeFlattener(Func<object, IEnumerable> childrenOf, Func<object, bool> isExpanded = null,
+        Func<object, bool> isSelected = null, Func<object, object> detailsOf = null)
     {
         _childrenOf = childrenOf;
         _isExpanded = isExpanded ?? (static _ => false);
         _isSelected = isSelected ?? (static _ => false);
+        _detailsOf = detailsOf ?? (static _ => null);
     }
 
     /// <summary>The visible rows in display order - the virtualized list binds to this.</summary>
@@ -90,7 +95,15 @@ internal sealed class TreeFlattener
         }
 
         Subscribe(row, children);
-        Rows.InsertMany(index + 1, BuildRows(children, row.Depth + 1));
+        Rows.InsertMany(AfterDetailsOf(index), BuildRows(children, row.Depth + 1));
+    }
+
+    // Where a row's children begin: after the row, and after the details panel it may have open - the panel belongs to
+    // the row itself, so children spliced in front of it would stand between a record and its own long form.
+    private int AfterDetailsOf(int rowIndex)
+    {
+        var next = rowIndex + 1;
+        return next < Rows.Count && Rows[next].IsDetails ? next + 1 : next;
     }
 
     /// <summary>Close a branch: drop the contiguous run of deeper rows that follows it - its whole VISIBLE subtree -
@@ -111,8 +124,9 @@ internal sealed class TreeFlattener
         }
 
         var end = SubtreeEnd(index, row.Depth);
-        UnsubscribeRange(index + 1, end);
-        Rows.RemoveMany(index + 1, end - index - 1);
+        var from = AfterDetailsOf(index);
+        UnsubscribeRange(from, end);
+        Rows.RemoveMany(from, end - from);
     }
 
     // ---- Children observability ---------------------------------------------------------------------------------
@@ -182,9 +196,10 @@ internal sealed class TreeFlattener
         }
 
         var end = SubtreeEnd(index, parent.Depth);
-        UnsubscribeRange(index + 1, end);
-        Rows.RemoveMany(index + 1, end - index - 1);
-        Rows.InsertMany(index + 1, BuildRows(_childrenOf(parent.Node), parent.Depth + 1));
+        var from = AfterDetailsOf(index);
+        UnsubscribeRange(from, end);
+        Rows.RemoveMany(from, end - from);
+        Rows.InsertMany(from, BuildRows(_childrenOf(parent.Node), parent.Depth + 1));
     }
 
     // ---- Geometry over the flat list ----------------------------------------------------------------------------
@@ -193,6 +208,14 @@ internal sealed class TreeFlattener
     private int SubtreeEnd(int rowIndex, int depth)
     {
         var i = rowIndex + 1;
+
+        // The row's OWN details panel comes first and stands at the row's depth, not below it - so the test that
+        // follows would stop dead on it and a collapse would take nothing away at all.
+        if (i < Rows.Count && Rows[i].IsDetails)
+        {
+            i++;
+        }
+
         while (i < Rows.Count && Rows[i].Depth > depth)
         {
             i++;
@@ -210,6 +233,14 @@ internal sealed class TreeFlattener
         var seen = 0;
         for (; i < Rows.Count; i++)
         {
+            // A details panel is not a child of anything - it is the row above it, said at length - and it stands at
+            // that row's depth. Read as structure it would be counted as a sibling, and the parent's own panel would
+            // read as leaving the parent's subtree on the very first step.
+            if (Rows[i].IsDetails)
+            {
+                continue;
+            }
+
             var depth = Rows[i].Depth;
             if (parent != null && depth <= parent.Depth)
             {
@@ -239,6 +270,11 @@ internal sealed class TreeFlattener
         var i = parent == null ? 0 : Rows.IndexOf(parent) + 1;
         for (; i < Rows.Count; i++)
         {
+            if (Rows[i].IsDetails)
+            {
+                continue;   // not structure - see FlatIndexForChild
+            }
+
             var depth = Rows[i].Depth;
             if (parent != null && depth <= parent.Depth)
             {
@@ -276,6 +312,12 @@ internal sealed class TreeFlattener
             var hasChildren = HasChildren(item);
             var row = new TreeRow(item, depth, hasChildren) { IsSelected = _isSelected(item) };
             list.Add(row);
+
+            // BEFORE the children and AFTER the row: the panel belongs to the record above it, so it has to sit against
+            // that record and not after a subtree that may be a thousand rows long. At the OWNER'S depth, because it is
+            // the same record said at length - not a step further into the tree.
+            if (_detailsOf(item) is { } details) list.Add(new TreeRow(details, depth, false) { IsDetails = true });
+
             if (hasChildren && _isExpanded(item))
             {
                 row.IsExpanded = true;

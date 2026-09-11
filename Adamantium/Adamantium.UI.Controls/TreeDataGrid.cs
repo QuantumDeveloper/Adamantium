@@ -1,15 +1,13 @@
-using System;
 using System.Collections;
-using System.Collections.Generic;
 using System.Collections.Specialized;
 using System.Text;
 using Adamantium.UI.Controls.Base;
 using Adamantium.UI.Core.Media;
-using Adamantium.Mathematics;
 using Adamantium.UI.Core;
 using Adamantium.UI.Controls.Panels;
 using Adamantium.UI.Core.Input;
 using Adamantium.UI.Core.RoutedEvents;
+using Adamantium.UI.Core.Templates;
 
 namespace Adamantium.UI.Controls;
 
@@ -241,11 +239,14 @@ public partial class TreeDataGrid : Selector
         return null;
     }
 
+    // A branch opening or shutting MOVES every row below it, and the details panels' exceptions are indexes into that
+    // list - so they are found again here, where the list changed, and nowhere else.
     internal void ToggleRow(TreeRow row)
     {
         if (row is not { HasChildren: true }) return;
         _flattener.Toggle(row);
         RememberGroup(row);
+        RebuildRowExceptions();
         RefreshRealizedRows();
     }
 
@@ -254,6 +255,7 @@ public partial class TreeDataGrid : Selector
         if (row is not { HasChildren: true } || row.IsExpanded) return;
         _flattener.Expand(row);
         RememberGroup(row);
+        RebuildRowExceptions();
         RefreshRealizedRows();
     }
 
@@ -262,6 +264,7 @@ public partial class TreeDataGrid : Selector
         if (row is not { IsExpanded: true }) return;
         _flattener.Collapse(row);
         RememberGroup(row);
+        RebuildRowExceptions();
         RefreshRealizedRows();
     }
 
@@ -332,9 +335,10 @@ public partial class TreeDataGrid : Selector
         // grouping ten thousand rows by Region and Batch makes 495 batch groups, and closing one only uncovered the
         // next open one, five hundred times over. A group the user HAS opened comes back open: that is what
         // IsGroupOpen answers, by path.
-        _flattener = new TreeFlattener(ShapedChildrenOf, IsGroupOpen, static _ => false);
+        _flattener = new TreeFlattener(ShapedChildrenOf, IsGroupOpen, static _ => false, DetailsFor);
         _shapedRoots = Group(Shape(_roots));
         _flattener.SetRoots(_shapedRoots);
+        RebuildRowExceptions();
         Items.SetSource(_flattener.Rows);
         if (!sameRows) RefreshTotals();
 
@@ -518,6 +522,149 @@ public partial class TreeDataGrid : Selector
 
         if (row.IsExpanded) _openGroups.Add(group.Path);
         else _openGroups.Remove(group.Path);
+    }
+
+    // WHICH RECORDS SHOW THEIR PANEL, by the record itself - not by row number, which moves the moment a group opens or
+    // a sort runs, and not by path, which a record has none of. Reference identity is what a record IS here.
+    private readonly HashSet<object> _openDetails = new();
+
+    private object DetailsFor(object node) =>
+        RowDetailsTemplate != null && _openDetails.Contains(node) ? new DataGridRowDetails(node) : null;
+
+    /// <summary>Whether this record is showing the panel under itself.</summary>
+    public bool IsRowDetailsOpen(object item) => item != null && _openDetails.Contains(item);
+
+    /// <summary>Shows or hides the panel under a record. Does nothing without a <see cref="RowDetailsTemplate"/>: there
+    /// would be nothing to put in it, and an empty band opening under a row is a table that looks broken.</summary>
+    public void ToggleRowDetails(object item)
+    {
+        if (item == null || RowDetailsTemplate == null) return;
+
+        // Shutting one FORGETS its height: the panel is rebuilt from the template when it opens again, and a remembered
+        // number would place the new one at the old one's size for a pass.
+        if (!_openDetails.Remove(item)) _openDetails.Add(item);
+        else _detailsHeights.Remove(item);
+
+        RebuildFlattener(sameRows: true);
+    }
+
+    // Where the details rows sit and how much taller than a row each one stands - the panel's uniform stack plus these
+    // few exceptions. Rebuilt whenever the flat list is, because an index is only meaningful against one list.
+    private readonly List<(int Index, double Extra)> _rowExceptions = new();
+
+    internal IReadOnlyList<(int Index, double Extra)> RowExtentExceptions => _rowExceptions;
+
+    // The exceptions ARE the panels, in ascending order, so counting the ones above a row is a short walk over the
+    // handful that are open rather than over the rows.
+    private int DetailsRowsBefore(int index)
+    {
+        var count = 0;
+        for (var i = 0; i < _rowExceptions.Count && _rowExceptions[i].Index < index; i++) count++;
+        return count;
+    }
+
+    // What each open panel MEASURED, by the record it belongs to. Kept apart from the flat list because a panel's height
+    // is a property of its content, not of where the row happens to sit: a sort moves the row and the panel is the same
+    // height it was.
+    private readonly Dictionary<object, double> _detailsHeights = new();
+
+    /// <summary>How tall a record's panel stands: what it measured, or <see cref="RowDetailsHeight"/> until it has.
+    /// The default is the FIRST GUESS rather than the answer - a panel is placed before it is built, and the stack has
+    /// to be told some number to put the rows below it at.</summary>
+    public double HeightOfRowDetails(object item) =>
+        item != null && _detailsHeights.TryGetValue(item, out var measured) ? measured : RowDetailsHeight;
+
+    // A realized panel reporting what its content came to - the same shape as the number strip reporting its width, and
+    // for the same reason: what a thing takes cannot be known before it is built, and the pass that placed it ran first.
+    // BOTH ways, unlike the strip: a tab switched inside a panel makes it shorter as readily as taller, and a height
+    // that only ever grew would leave a band of nothing under the short one.
+    /// <summary>What a built panel came to. Public because it is the seam a test drives: a tab switched inside a panel
+    /// is exactly this call, and reaching it through a real layout pass would test the tab control instead.</summary>
+    public void ReportRowDetailsHeight(object item, double height)
+    {
+        if (item == null || height <= 0) return;
+        if (_detailsHeights.TryGetValue(item, out var known) && Math.Abs(known - height) < 0.5) return;
+
+        _detailsHeights[item] = height;
+        RefreshRowExceptionHeights();
+        _detailsHeightChanged = true;
+        InvalidateMeasure();
+    }
+
+    // The report is made from INSIDE the rows panel's own measure, and a virtualizing panel mutes its invalidation for
+    // the length of that pass - so telling it there is telling nobody. The flag carries the news out to the end of this
+    // grid's measure, where the panel is no longer measuring and can be asked again, exactly as a re-grown Auto column
+    // is handled below.
+    private bool _detailsHeightChanged;
+
+    // WHERE the panels are. A walk over every row, so it runs only when the flat list itself changed - a rebuild, a
+    // branch opened or shut - because that is the only thing that can move an index. Ten thousand rows walked on every
+    // measure is what a panel reporting its height used to cost: eight open panels, twice a frame, and the scroll
+    // stuttered.
+    private void RebuildRowExceptions()
+    {
+        _rowExceptions.Clear();
+        if (_openDetails.Count == 0 || Rows == null) return;
+
+        for (var i = 0; i < Rows.Count; i++)
+        {
+            if (Rows[i].Node is DataGridRowDetails details)
+                _rowExceptions.Add((i, HeightOfRowDetails(details.Item) - RowHeight));
+        }
+    }
+
+    // ...and HOW TALL they are, which changes without anything moving (a tab switched inside one). The rows are where
+    // they were, so this re-reads the few exceptions in place instead of looking for them again.
+    private void RefreshRowExceptionHeights()
+    {
+        var rows = Rows;
+        if (rows == null) return;
+
+        for (var i = 0; i < _rowExceptions.Count; i++)
+        {
+            var at = _rowExceptions[i].Index;
+            if (at >= 0 && at < rows.Count && rows[at].Node is DataGridRowDetails details)
+                _rowExceptions[i] = (at, HeightOfRowDetails(details.Item) - RowHeight);
+        }
+    }
+
+    /// <summary>Shuts every open panel.</summary>
+    public void CollapseAllRowDetails()
+    {
+        if (_openDetails.Count == 0) return;
+
+        _openDetails.Clear();
+        RebuildFlattener(sameRows: true);
+    }
+
+    /// <summary>What a record's panel is built from, bound against the record itself. Null (the default) means the table
+    /// has no such panel at all and no row offers to open one.</summary>
+    public static readonly AdamantiumProperty RowDetailsTemplateProperty = AdamantiumProperty.Register(
+        nameof(RowDetailsTemplate), typeof(DataTemplate), typeof(TreeDataGrid),
+        new PropertyMetadata(null, PropertyMetadataOptions.AffectsMeasure, OnRowDetailsTemplateChanged));
+
+    /// <summary>How tall that panel stands. One number for every panel, because the rows are virtualized against a
+    /// uniform pitch and a panel that measured itself would have to be measured before it was built.</summary>
+    public static readonly AdamantiumProperty RowDetailsHeightProperty = AdamantiumProperty.Register(
+        nameof(RowDetailsHeight), typeof(Double), typeof(TreeDataGrid),
+        new PropertyMetadata(160.0, PropertyMetadataOptions.AffectsMeasure));
+
+    public DataTemplate RowDetailsTemplate
+    {
+        get => GetValue<DataTemplate>(RowDetailsTemplateProperty);
+        set => SetValue(RowDetailsTemplateProperty, value);
+    }
+
+    public Double RowDetailsHeight
+    {
+        get => GetValue<Double>(RowDetailsHeightProperty);
+        set => SetValue(RowDetailsHeightProperty, value);
+    }
+
+    // Taking the template away shuts every panel with it: the rows would otherwise stand open over nothing.
+    private static void OnRowDetailsTemplateChanged(AdamantiumComponent d, AdamantiumPropertyChangedEventArgs e)
+    {
+        if (d is TreeDataGrid { RowDetailsTemplate: null } grid) grid.CollapseAllRowDetails();
     }
 
     /// <summary>Opens every group down to <paramref name="depth"/> levels and shuts the rest: 0 folds the table to its
@@ -1364,6 +1511,26 @@ public partial class TreeDataGrid : Selector
     // and the pass in which it was still being discovered is exactly when the numbers were drawn over the first column.
     internal double NumberStripLeading => ShowRowNumbers ? RowNumberWidth : 0;
 
+    /// <summary>How wide the column of details toggles is. One number rather than a measured one: every toggle holds the
+    /// same sign, so there is nothing to discover.</summary>
+    public static readonly AdamantiumProperty RowDetailsToggleWidthProperty = AdamantiumProperty.Register(
+        nameof(RowDetailsToggleWidth), typeof(Double), typeof(TreeDataGrid),
+        new PropertyMetadata(28.0, PropertyMetadataOptions.AffectsMeasure));
+
+    public Double RowDetailsToggleWidth
+    {
+        get => GetValue<Double>(RowDetailsToggleWidthProperty);
+        set => SetValue(RowDetailsToggleWidthProperty, value);
+    }
+
+    // The toggles appear with the TEMPLATE and go with it: a column of handles that open nothing is a column that lies,
+    // and asking a page to switch on both the template and the column would be asking it twice for one decision.
+    internal double DetailsStripLeading => RowDetailsTemplate != null ? Math.Max(0, RowDetailsToggleWidth) : 0;
+
+    // Everything standing to the LEFT of the first column - the toggles, then the numbers. The width pass is given this
+    // one number, because the columns only need to know how much of the row is already spoken for.
+    internal double LeftStripsLeading => DetailsStripLeading + NumberStripLeading;
+
     // Only ever GROWS within a scroll, exactly as an Auto column does: recomputing it downwards as rows come and go
     // makes the whole table breathe sideways under the pointer.
     internal void ReportRowNumberWidth(double desired)
@@ -1410,6 +1577,10 @@ public partial class TreeDataGrid : Selector
     private int _firstColumn;
     private int _lastColumn = -1;
     private double _viewportWidth;
+
+    // How wide the table can be SEEN, which is not how wide it is. Anything that belongs to no column - a record's
+    // details panel - is laid out against this, so it fills the view instead of the whole scrollable content.
+    internal double ViewportWidth => _scroll?.ViewportSize.Width ?? _viewportWidth;
 
     /// <summary>The selected cells, as rectangles. Settable from a view-model, which is the point: highlighting search
     /// hits or bad values, and restoring a selection on the way back to a tab, are things a grid normally cannot be
@@ -1914,7 +2085,7 @@ public partial class TreeDataGrid : Selector
         // ONE width pass for the whole grid, before anything is measured against it: the header and every row read these
         // same numbers. Two calculations are how a table's header and body drift apart.
         ColumnsWidth = DataGridColumnLayout.Arrange(Columns, availableSize.Width, out var frozen, out var pinnedRight,
-            NumberStripLeading);
+            LeftStripsLeading);
         FrozenWidth = frozen;
         RightFrozenWidth = pinnedRight;
         UpdateColumnWindow(availableSize.Width);
@@ -1927,11 +2098,22 @@ public partial class TreeDataGrid : Selector
         {
             _autoWidthGrew = false;
             ColumnsWidth = DataGridColumnLayout.Arrange(Columns, availableSize.Width, out var regrown,
-                out var regrownRight, NumberStripLeading);
+                out var regrownRight, LeftStripsLeading);
             FrozenWidth = regrown;
             RightFrozenWidth = regrownRight;
             UpdateColumnWindow(availableSize.Width);
             desired = base.MeasureOverride(availableSize);
+        }
+
+        // A panel measured to a different height than the stack had reserved for it. Telling the stack is all that
+        // happens here - it lays the rows out again on the NEXT pass. Re-running the measure now instead would measure
+        // every open panel a second time in the same frame, and a panel is a whole templated subtree: measured on the
+        // stand with eight of them open, layout went to 60 ms a pass. One frame at the previous height is not worth
+        // doubling every frame.
+        if (_detailsHeightChanged)
+        {
+            _detailsHeightChanged = false;
+            (ItemsHostPanel as IMeasurableComponent)?.InvalidateMeasure();
         }
 
         return desired;
@@ -1949,8 +2131,16 @@ public partial class TreeDataGrid : Selector
         var index = flat != null && Rows != null ? Rows.IndexOf(flat) : -1;
         var band = AlternationCount > 0 && index >= 0 ? index % AlternationCount : 0;
 
-        row.Height = RowHeight;
-        row.Attach(this, flat, band, index + 1);
+        // Every row takes the row height - except a panel, which takes NO fixed height at all. A fixed one makes the
+        // container a MEASURE BOUNDARY, and a boundary is exactly what a panel must not be: something changing inside it
+        // (a tab switched to a taller one) would then never reach the row, the row would never re-measure, and the table
+        // would go on reserving the height the panel used to want. Measured on the stand - the chart drew clipped.
+        row.Height = flat?.Node is DataGridRowDetails ? Double.NaN : RowHeight;
+
+        // The panels are NOT counted. A panel is the record above it said at length, so a number spent on one makes the
+        // record after it look as though a row had gone missing - on the stand, opening the first record's panel
+        // renumbered the second one 3.
+        row.Attach(this, flat, band, index + 1 - DetailsRowsBefore(index));
     }
 
     protected internal override void ClearContainer(IUIComponent container)
