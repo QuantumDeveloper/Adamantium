@@ -23,6 +23,10 @@
                       SelectionUnit="{Binding SelectionUnit}"
                       AlternationCount="{Binding AlternationCount}"
                       AlternationBrush="{Binding SelectedBrush, ElementName=TintPicker}"
+                      ShowGroupPanel="{Binding ShowGroupPanel}"
+                      ShowSearchPanel="{Binding ShowSearchPanel}"
+                      SearchMatchBrush="{Binding SearchMatchBrush}"
+                      SearchCurrentMatchBrush="{Binding SearchCurrentMatchBrush}"
                       Indent="16"
                       ExpanderColumnIndex="2">
             <!-- EVERY column type, so each one's editor can be seen: text, drop-down, check box and a fully templated
@@ -32,9 +36,13 @@
                      The refusal is an ordinary binding, read off the row. -->
                 <!-- FrozenSide is an ordinary bindable property of the column, and the column stands in the grid's
                      logical tree - so a check box on this page pins it with no code behind anything. -->
+                <!-- Aggregate is a property OF THE COLUMN, so the strip of totals and a group's header both read the
+                     same statement of what this column adds up to. -->
                 <DataGridTextColumn Header="Code" Binding="{Binding Code}" Width="110" SortMemberPath="Code"
                                     IsReadOnlyBinding="{Binding IsLocked}"
-                                    FrozenSide="{Binding CodeSide}"/>
+                                    FrozenSide="{Binding CodeSide}"
+                                    Aggregate="{Binding CodeAggregate}"
+                                    AggregateFormat="{Binding CodeAggregateFormat}"/>
 
                 <!-- The choices come straight from the view-model - the column binds to it like any element would. -->
                 <DataGridDropDownColumn Header="Owner" Binding="{Binding Owner}" Width="100" SortMemberPath="Owner"
@@ -46,7 +54,11 @@
 
                 <DataGridCheckBoxColumn Header="Done" Binding="{Binding Done}" Width="60" SortMemberPath="Done"/>
 
-                <DataGridTextColumn Header="Size" Binding="{Binding Size}" Width="80" SortMemberPath="Size"/>
+                <!-- ...and the format is the column's too. It is bound rather than written out here BECAUSE it is the
+                     column's and not the function's: a fixed "Σ {0:N0}" went on saying Σ over an average. -->
+                <DataGridTextColumn Header="Size" Binding="{Binding Size}" Width="80" SortMemberPath="Size"
+                                    Aggregate="{Binding SizeAggregate}"
+                                    AggregateFormat="{Binding SizeAggregateFormat}"/>
 
                 <!-- Read-only BY THE COLUMN, which is the other way to refuse an edit: Code refuses one cell at a time
                      instead. Both are honoured by the same BeginEdit. -->
@@ -109,6 +121,50 @@
                           IsChecked="{Binding PinRegion, Mode=TwoWay}"/>
                 <CheckBox Content="Pin Status right" Margin="0,0,0,6"
                           IsChecked="{Binding PinStatus, Mode=TwoWay}"/>
+
+                <TextBlock Text="SEARCH" FontSize="11" Margin="0,10,0,6"
+                           Foreground="{ObservableResource TextFillColorSecondary}"/>
+                <!-- The strip runs the search on Enter and on its button, not per keystroke: one pass reads every
+                     shown column of every row. The arrows step through what it found, opening whatever holds it. -->
+                <CheckBox Content="Search panel" Margin="0,0,0,4"
+                          IsChecked="{Binding ShowSearchPanel, Mode=TwoWay}"/>
+                <TextBlock Text="Type and press Enter; the arrows walk the matches. Escape or × closes the strip."
+                           FontSize="11" Margin="0,0,0,8" TextWrapping="WrapByWords"
+                           Foreground="{ObservableResource TextFillColorSecondary}"/>
+
+                <!-- The washes are the TABLE'S to name, exactly as the rules are - and naming them here overrides the
+                     theme. Saying NOTHING (leaving both null) is what hands them back to the theme, and that state
+                     cannot be driven from this panel: a binding never pushes null to its target by design, so a switch
+                     that emptied these would simply never be heard. Switch the theme variant to see the other side. -->
+                <TextBlock Text="Match colours" Margin="0,0,0,4"/>
+                <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                    <ColorPickerButton Width="72" Height="24" Margin="0,0,8,0"
+                                       SelectedColor="{Binding SearchMatchColour, Mode=TwoWay}"/>
+                    <ColorPickerButton Width="72" Height="24"
+                                       SelectedColor="{Binding SearchCurrentColour, Mode=TwoWay}"/>
+                </StackPanel>
+                <TextBlock Text="Found, and the one being looked at. Keep the alpha down - it is a wash over the cell, not a plate."
+                           FontSize="11" Margin="0,0,0,8" TextWrapping="WrapByWords"
+                           Foreground="{ObservableResource TextFillColorSecondary}"/>
+
+                <TextBlock Text="GROUPING" FontSize="11" Margin="0,10,0,6"
+                           Foreground="{ObservableResource TextFillColorSecondary}"/>
+                <!-- With the strip on, drag any column header UP into it to group by that column; click a chip there to
+                     take the column back out. Groups nest in the order the chips stand in. -->
+                <CheckBox Content="Grouping panel" Margin="0,0,0,6"
+                          IsChecked="{Binding ShowGroupPanel, Mode=TwoWay}"/>
+
+                <TextBlock Text="TOTALS" FontSize="11" Margin="0,10,0,6"
+                           Foreground="{ObservableResource TextFillColorSecondary}"/>
+                <TextBlock Text="Size column" Margin="0,0,0,4"/>
+                <DropDown Margin="0,0,0,6"
+                          ItemsSource="{Binding AggregateChoices}"
+                          SelectedItem="{Binding SizeAggregate, Mode=TwoWay}"/>
+                <CheckBox Content="Count rows in Code" Margin="0,0,0,4"
+                          IsChecked="{Binding CountRows, Mode=TwoWay}"/>
+                <TextBlock Text="Totals stand under the table and in every group's header." FontSize="11"
+                           Margin="0,0,0,8" TextWrapping="WrapByWords"
+                           Foreground="{ObservableResource TextFillColorSecondary}"/>
 
                 <TextBlock Text="ROWS" FontSize="11" Margin="0,10,0,6"
                            Foreground="{ObservableResource TextFillColorSecondary}"/>

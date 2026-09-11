@@ -3,8 +3,10 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
+using Adamantium.Mathematics;
 using Adamantium.MVVM;
 using Adamantium.UI.Controls;
+using Adamantium.UI.Core.Media;
 
 namespace Adamantium.Game.Sandbox.ViewModels;
 
@@ -158,5 +160,61 @@ public partial class DataGridViewModel : TabPageViewModel
     public IReadOnlyList<DataGridGridLines> GridLineChoices { get; } =
     [
         DataGridGridLines.All, DataGridGridLines.Horizontal, DataGridGridLines.Vertical, DataGridGridLines.None
+    ];
+
+    /// <summary>Whether the strip a header is dropped into to group by it is shown.</summary>
+    [Bindable] private bool _showGroupPanel;
+
+    /// <summary>Whether the strip that searches the table is shown.</summary>
+    [Bindable] private bool _showSearchPanel;
+
+    // Red, green, blue, ALPHA - and the alpha is the whole point: a wash lets the check box and the text under it
+    // through, a plate swallows them. Starting away from the theme's yellow so that what this page names, and what it
+    // would have got by saying nothing, cannot be mistaken for each other.
+    [Bindable, Affects(nameof(SearchMatchBrush))]
+    private Color _searchMatchColour = new(0x21, 0xC8, 0x6E, 0x59);
+
+    [Bindable, Affects(nameof(SearchCurrentMatchBrush))]
+    private Color _searchCurrentColour = new(0x21, 0xC8, 0x6E, 0xA6);
+
+    /// <summary>What a found cell is washed with. A page that says nothing here leaves the wash to the theme - but that
+    /// state cannot be reached FROM a binding, which never pushes null to its target, so this one always names a colour
+    /// and the theme's own is seen by switching the theme.</summary>
+    public Brush SearchMatchBrush => new SolidColorBrush(SearchMatchColour);
+
+    /// <summary>...and the cell the search is standing on.</summary>
+    public Brush SearchCurrentMatchBrush => new SolidColorBrush(SearchCurrentColour);
+
+    /// <summary>What the Size column adds up to. Every aggregate is here to be tried: a sum is what a quantity wants,
+    /// an average what a rate does.</summary>
+    [Bindable, Affects(nameof(SizeAggregateFormat))] private DataGridAggregate _sizeAggregate = DataGridAggregate.Sum;
+
+    /// <summary>How that total is written. It FOLLOWS the function, because the sign in front of a number says what
+    /// the number is: a fixed "Σ" went on claiming a sum over an average and over a count.</summary>
+    public string SizeAggregateFormat => SizeAggregate switch
+    {
+        DataGridAggregate.Sum => "Σ {0:N0}",
+        DataGridAggregate.Average => "avg {0:N1}",
+        DataGridAggregate.Min => "min {0:N0}",
+        DataGridAggregate.Max => "max {0:N0}",
+        DataGridAggregate.Count => "{0:N0} rows",
+        _ => null
+    };
+
+    [Bindable, Affects(nameof(CodeAggregate))] private bool _countRows = true;
+
+    /// <summary>Counting a text column is the one aggregate that means the same thing whatever is in it - how many
+    /// rows there are - which is why it is the one offered on Code.</summary>
+    public DataGridAggregate CodeAggregate => CountRows ? DataGridAggregate.Count : DataGridAggregate.None;
+
+    /// <summary>A total has to SAY what it is. A bare "10000" under a column of codes reads as nothing at all - the
+    /// format is where that is said, and it is bound rather than written in the markup because a literal starting with
+    /// a brace is read as a markup extension.</summary>
+    public string CodeAggregateFormat => "{0:N0} rows";
+
+    public IReadOnlyList<DataGridAggregate> AggregateChoices { get; } =
+    [
+        DataGridAggregate.Sum, DataGridAggregate.Average, DataGridAggregate.Min, DataGridAggregate.Max,
+        DataGridAggregate.Count, DataGridAggregate.None
     ];
 }

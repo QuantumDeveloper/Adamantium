@@ -1,3 +1,4 @@
+using System;
 using Adamantium.UI.Controls.Text;
 using Adamantium.UI.Core.Input;
 using NUnit.Framework;
@@ -167,13 +168,14 @@ public class TextBoxTests
         Assert.That(tb.Text, Is.EqualTo(string.Empty));
     }
 
-    /// <summary>The caret has to stand where the LETTERS are. The layout places a line's baseline Baseline*scale below
-    /// the line top and the ink spans ascent..descent around it, so the line BOX and the ink are two different boxes
-    /// (Segoe UI at 12: box 0..13.6, ink 4.5..15.8). A caret built from the box sat a couple of pixels above the text.
-    /// Measured against a quantity computed by different code - the surface height, which reserves the last line's true
-    /// ink bottom - so it stays a check rather than a restatement of the formula.</summary>
+    /// <summary>The caret has to stand where the LETTERS are, and the letters are anchored to two reference lines the
+    /// glyph pipeline rounds to whole pixels (the ascender line and the baseline) so that same-height glyphs share exact
+    /// rows. A caret on any other band cannot line up with them: cut to the font's ascent..descent it started a pixel
+    /// below the tops of the digits and hung four pixels under their feet - measured on the stand, and the offset reads
+    /// as a caret that slipped down. The surface height is computed by different code (it reserves the line's true ink
+    /// bottom, descent included), so it stays a check rather than a restatement of the formula.</summary>
     [Test]
-    public void Caret_StandsOnTheLinesInk_NotOnItsLineBox()
+    public void Caret_SpansTheGlyphBand_OnWholePixels()
     {
         var tb = new TextBox { Text = "Agy" };   // a cap, an ascender and a descender: the full ink extent
         var surface = tb.MeasureSurface(double.PositiveInfinity);
@@ -181,10 +183,33 @@ public class TextBoxTests
 
         Assert.Multiple(() =>
         {
-            Assert.That(caret.Bottom, Is.EqualTo(surface.Height).Within(0.01),
-                "caret must reach the bottom of the line's ink, descenders included");
+            Assert.That(caret.Y, Is.EqualTo(Math.Round(caret.Y)),
+                "the caret's top must be the whole row the glyph pipeline rounds the ascender line to");
+            Assert.That(caret.Bottom, Is.EqualTo(Math.Round(caret.Bottom)),
+                "the caret's bottom must be the whole row the glyph pipeline rounds the baseline to");
             Assert.That(caret.Y, Is.GreaterThan(0),
-                "caret must start at the ascent line, which sits below the top of the line box");
+                "the caret starts at the ascender line, which sits below the top of the line box");
+            Assert.That(caret.Bottom, Is.LessThan(surface.Height),
+                "the caret ends at the baseline; the surface reserves the descent BELOW it");
+        });
+    }
+
+    /// <summary>And the band is the same whatever the line happens to hold. Taking it from the glyphs' own rectangles
+    /// lines the caret up with the text just as well, but then a field showing "a" gets a caret as tall as an x and one
+    /// showing "A" a taller one - it would resize as you type.</summary>
+    [Test]
+    public void CaretBand_DoesNotDependOnWhatTheLineHolds()
+    {
+        var caps = new TextBox { Text = "AGY" }.CaretRect(0);
+        var small = new TextBox { Text = "aoe" }.CaretRect(0);
+        var empty = new TextBox().CaretRect(0);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(small.Y, Is.EqualTo(caps.Y).Within(0.01));
+            Assert.That(small.Height, Is.EqualTo(caps.Height).Within(0.01));
+            Assert.That(empty.Y, Is.EqualTo(caps.Y).Within(0.01));
+            Assert.That(empty.Height, Is.EqualTo(caps.Height).Within(0.01));
         });
     }
 }

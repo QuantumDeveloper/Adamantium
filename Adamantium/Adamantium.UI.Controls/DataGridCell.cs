@@ -24,6 +24,29 @@ public class DataGridCell : ContentControl
     public static readonly AdamantiumProperty IsActiveProperty = AdamantiumProperty.Register(nameof(IsActive),
         typeof(bool), typeof(DataGridCell), new PropertyMetadata(false, PropertyMetadataOptions.AffectsRender));
 
+    /// <summary>This cell holds what the search panel is looking for.</summary>
+    public static readonly AdamantiumProperty IsSearchMatchProperty = AdamantiumProperty.Register(
+        nameof(IsSearchMatch), typeof(bool), typeof(DataGridCell),
+        new PropertyMetadata(false, PropertyMetadataOptions.AffectsRender));
+
+    /// <summary>...and it is the ONE the search is looking at. Set apart from the rest, the way a browser sets the
+    /// current hit apart from the others it found.</summary>
+    public static readonly AdamantiumProperty IsCurrentSearchMatchProperty = AdamantiumProperty.Register(
+        nameof(IsCurrentSearchMatch), typeof(bool), typeof(DataGridCell),
+        new PropertyMetadata(false, PropertyMetadataOptions.AffectsRender));
+
+    public bool IsSearchMatch
+    {
+        get => GetValue<bool>(IsSearchMatchProperty);
+        set => SetValue(IsSearchMatchProperty, value);
+    }
+
+    public bool IsCurrentSearchMatch
+    {
+        get => GetValue<bool>(IsCurrentSearchMatchProperty);
+        set => SetValue(IsCurrentSearchMatchProperty, value);
+    }
+
     /// <summary>Selected as part of a range. Separate from <see cref="IsActive"/>, as in a spreadsheet: the active cell
     /// sits inside the selection and moves through it without clearing it.</summary>
     public bool IsSelected
@@ -110,6 +133,30 @@ public class DataGridCell : ContentControl
     public static readonly AdamantiumProperty GridLineBrushProperty = AdamantiumProperty.Register(
         nameof(GridLineBrush), typeof(Brush), typeof(DataGridCell),
         new PropertyMetadata(null, PropertyMetadataOptions.AffectsRender));
+
+    /// <summary>What a cell the search found is washed with. The theme sets it; a grid that names its own
+    /// <see cref="TreeDataGrid.SearchMatchBrush"/> overrides it, exactly as it does the grid lines.</summary>
+    public static readonly AdamantiumProperty SearchMatchBrushProperty = AdamantiumProperty.Register(
+        nameof(SearchMatchBrush), typeof(Brush), typeof(DataGridCell),
+        new PropertyMetadata(null, PropertyMetadataOptions.AffectsRender));
+
+    /// <summary>...and the cell the search is ON. A WASH, never a plate: a cell holds a check box and a meaning, and a
+    /// solid colour swallows both.</summary>
+    public static readonly AdamantiumProperty SearchCurrentBrushProperty = AdamantiumProperty.Register(
+        nameof(SearchCurrentBrush), typeof(Brush), typeof(DataGridCell),
+        new PropertyMetadata(null, PropertyMetadataOptions.AffectsRender));
+
+    public Brush SearchMatchBrush
+    {
+        get => GetValue<Brush>(SearchMatchBrushProperty);
+        set => SetValue(SearchMatchBrushProperty, value);
+    }
+
+    public Brush SearchCurrentBrush
+    {
+        get => GetValue<Brush>(SearchCurrentBrushProperty);
+        set => SetValue(SearchCurrentBrushProperty, value);
+    }
 
     public bool ShowsVerticalLine
     {
@@ -289,9 +336,25 @@ public class DataGridCell : ContentControl
             IsActive = row == grid.ActiveRow && columnIndex == grid.ActiveColumn;
         }
 
-        // Only when the grid names one: writing null here would be a LOCAL value, and a local value outranks the
-        // theme's - so a table that says nothing about its rules would rub out the colour the theme chose for them.
-        if (grid?.GridLinesBrush is { } rules) GridLineBrush = rules;
+        // The search is held by ITEM, not by row number - the numbers move when a group opens - so a cell asks with
+        // the item it is showing, and a cell built after the search was run is painted like the rest.
+        IsSearchMatch = grid?.IsSearchMatch(item, columnIndex) ?? false;
+        IsCurrentSearchMatch = grid?.IsCurrentSearchMatch(item, columnIndex) ?? false;
+
+        // A brush the grid names wins over the theme's, and one it stops naming HANDS THE COLOUR BACK. Writing null
+        // would not do that: null is a local value like any other, and a local value outranks the theme - the cell
+        // would be left painted in nothing. Clearing the local slot is what lets the theme's own setter be seen again,
+        // and it has to be done on the way out too: these carriers are recycled, so a cell that once took the grid's
+        // colour would otherwise keep it for every row it is ever reused for.
+        Adopt(GridLineBrushProperty, grid?.GridLinesBrush);
+        Adopt(SearchMatchBrushProperty, grid?.SearchMatchBrush);
+        Adopt(SearchCurrentBrushProperty, grid?.SearchCurrentMatchBrush);
+    }
+
+    private void Adopt(AdamantiumProperty property, Brush brush)
+    {
+        if (brush != null) SetValue(property, brush);
+        else ClearValue(property);
     }
 
     /// <summary>Content is PUSHED RIGHT by <see cref="Indent"/> - that shift is the whole of what depth looks like in a

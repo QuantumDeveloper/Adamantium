@@ -30,30 +30,56 @@
                             BorderThickness="{TemplateBinding BorderThickness}"
                             CornerRadius="{TemplateBinding CornerRadius}"
                             ClipToBounds="True">
-                        <Grid RowDefinitions="Auto,*">
+                        <Grid RowDefinitions="Auto,Auto,Auto,*,Auto">
+                            <!-- The search strip, at the very top - see the macOS set. -->
+                            <DataGridSearchPanel x:Name="PART_SearchPanel" Grid.Row="0" Visibility="Collapsed"/>
+
+                            <!-- The grouping strip, above the headers - see the macOS set. -->
+                            <DataGridGroupPanel x:Name="PART_GroupPanel" Grid.Row="1" Visibility="Collapsed"/>
+
                             <!-- The header band is OUTSIDE the scroller: it must not scroll away vertically. Sideways
                                  it follows by hand, from the same offset the rows use. -->
-                            <Border Grid.Row="0"
+                            <Border Grid.Row="2"
                                     Background="{ObservableResource SolidBackgroundFillColorTertiary}"
                                     BorderBrush="{ObservableResource DataGridLineColor}"
                                     BorderThickness="0 0 0 1">
                                 <DataGridHeadersPresenter x:Name="PART_Headers" Height="22"/>
                             </Border>
 
-                            <ScrollViewer Grid.Row="1" x:Name="PART_ScrollHost"
+                            <ScrollViewer Grid.Row="3" x:Name="PART_ScrollHost"
                                           CanContentScroll="True"
                                           HorizontalScrollBarVisibility="Auto"
                                           VerticalScrollBarVisibility="Auto">
                                 <ItemsPresenter x:Name="PART_ItemsPresenter"/>
                             </ScrollViewer>
 
+                            <!-- The totals, outside the vertical scroller - see the macOS set. -->
+                            <Border x:Name="PART_FooterBand" Grid.Row="4" Visibility="Collapsed"
+                                    Background="{ObservableResource SolidBackgroundFillColorTertiary}"
+                                    BorderBrush="{ObservableResource DataGridLineColor}"
+                                    BorderThickness="0 1 0 0">
+                                <DataGridFooterPresenter x:Name="PART_Footer" Height="20"/>
+                            </Border>
+
                             <!-- Where a dragged column would land - see Fluent's set. -->
-                            <Border x:Name="PART_DropIndicator" Grid.Row="0" Grid.RowSpan="2"
+                            <Border x:Name="PART_DropIndicator" Grid.Row="2" Grid.RowSpan="2"
                                     Width="2" HorizontalAlignment="Left" VerticalAlignment="Stretch"
                                     IsHitTestVisible="False" Visibility="Collapsed"
                                     Background="{TemplateBinding DropIndicatorBrush}"/>
                         </Grid>
                     </Border>
+
+                    <ControlTemplate.Triggers>
+                        <PropertyTrigger Property="ShowSearchPanel" Value="true">
+                            <Setter TargetName="PART_SearchPanel" Property="Visibility" Value="Visible"/>
+                        </PropertyTrigger>
+                        <PropertyTrigger Property="ShowGroupPanel" Value="true">
+                            <Setter TargetName="PART_GroupPanel" Property="Visibility" Value="Visible"/>
+                        </PropertyTrigger>
+                        <PropertyTrigger Property="HasTotals" Value="true">
+                            <Setter TargetName="PART_FooterBand" Property="Visibility" Value="Visible"/>
+                        </PropertyTrigger>
+                    </ControlTemplate.Triggers>
                 </ControlTemplate>
             </Setter.Value>
         </Setter>
@@ -168,6 +194,11 @@
         <Setter Property="Background" Value="{ObservableResource SolidBackgroundFillColorSecondary}"/>
     </Style>
 
+    <!-- A group row takes the band's colour, not a stripe of the zebra - see the macOS set. -->
+    <Style Selector="DataGridRow[IsGroup=true]">
+        <Setter Property="Background" Value="{ObservableResource SolidBackgroundFillColorTertiary}"/>
+    </Style>
+
     <!-- The number strip and its corner - see Fluent's set for why it is opaque. -->
     <Style Selector="DataGridRowHeader">
         <Setter Property="Background" Value="{ObservableResource SolidBackgroundFillColorTertiary}"/>
@@ -215,6 +246,8 @@
         <Setter Property="VerticalContentAlignment" Value="Center"/>
         <!-- The theme's own rules - see Fluent's set. -->
         <Setter Property="GridLineBrush" Value="{ObservableResource DataGridLineColor}"/>
+        <Setter Property="SearchMatchBrush" Value="{ObservableResource DataGridSearchMatchColor}"/>
+        <Setter Property="SearchCurrentBrush" Value="{ObservableResource DataGridSearchCurrentColor}"/>
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="DataGridCell">
@@ -271,9 +304,20 @@
                         </PropertyTrigger>
                         <!-- A WASH, and the content keeps its own colours: a cell holds controls and meanings, and a
                              plate of accent swallows both. -->
+                        <!-- FOUND by the search - see the macOS set. -->
+                        <PropertyTrigger Property="IsSearchMatch" Value="true">
+                            <Setter TargetName="CellBorder" Property="Background"
+                                    Value="{TemplateBinding SearchMatchBrush}"/>
+                        </PropertyTrigger>
                         <PropertyTrigger Property="IsSelected" Value="true">
                             <Setter TargetName="CellBorder" Property="Background"
                                     Value="{ThemeResource AccentFillColorSelection}"/>
+                        </PropertyTrigger>
+
+                        <!-- ...and the one the search is ON wins even over that - see the macOS set. -->
+                        <PropertyTrigger Property="IsCurrentSearchMatch" Value="true">
+                            <Setter TargetName="CellBorder" Property="Background"
+                                    Value="{TemplateBinding SearchCurrentBrush}"/>
                         </PropertyTrigger>
                         <!-- The ACTIVE cell is outlined, not filled: it sits inside the selection and has to be told
                              apart from it. -->
@@ -349,6 +393,201 @@
                             <Button Grid.Column="1" x:Name="PART_Clear" Content="Clear Filter" Margin="4 0 0 0"/>
                         </Grid>
                     </StackPanel>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- The strip that searches the table - see the macOS set for what each part is for. -->
+    <Style Selector="DataGridSearchPanel">
+        <Setter Property="Background" Value="{ObservableResource SolidBackgroundFillColorSecondary}"/>
+        <Setter Property="BorderBrush" Value="{ObservableResource DataGridLineColor}"/>
+        <Setter Property="BorderThickness" Value="0 0 0 1"/>
+        <Setter Property="Padding" Value="6 4"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="DataGridSearchPanel">
+                    <Border Background="{TemplateBinding Background}"
+                            BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}"
+                            Padding="{TemplateBinding Padding}">
+                        <Grid ColumnDefinitions="*,Auto,Auto,Auto,Auto,Auto">
+                            <TextBox Grid.Column="0" x:Name="PART_Text" MinWidth="140"/>
+                            <ContentControl Grid.Column="1" x:Name="PART_Count"
+                                            VerticalAlignment="Center" Margin="8 0"
+                                            FontSize="{ResourceReference FontSizeCaption}"
+                                            Foreground="{ObservableResource TextFillColorTertiary}"/>
+                            <Button Grid.Column="2" x:Name="PART_Previous" Content="↑" MinWidth="26"
+                                    ToolTipService.ToolTip="Previous match"/>
+                            <Button Grid.Column="3" x:Name="PART_Next" Content="↓" MinWidth="26" Margin="4 0 0 0"
+                                    ToolTipService.ToolTip="Next match"/>
+                            <Button Grid.Column="4" x:Name="PART_Find" Content="Find" Margin="6 0 0 0"/>
+                            <!-- Closed from inside the strip - see the macOS set. -->
+                            <Button Grid.Column="5" x:Name="PART_Close" Content="×" MinWidth="24" Margin="6 0 0 0"
+                                    ToolTipService.ToolTip="Close the search"/>
+                        </Grid>
+                    </Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- The grouping strip and the tokens in it - see the macOS set for what each part is for. -->
+    <Style Selector="DataGridGroupPanel">
+        <Setter Property="Background" Value="{ObservableResource SolidBackgroundFillColorSecondary}"/>
+        <Setter Property="BorderBrush" Value="{ObservableResource DataGridLineColor}"/>
+        <Setter Property="BorderThickness" Value="0 0 0 1"/>
+        <Setter Property="Padding" Value="6 4"/>
+        <Setter Property="MinHeight" Value="26"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="DataGridGroupPanel">
+                    <Border x:Name="PanelBg"
+                            Background="{TemplateBinding Background}"
+                            BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}"
+                            Padding="{TemplateBinding Padding}">
+                        <Grid ColumnDefinitions="*,Auto">
+                            <TextBlock Grid.Column="0" x:Name="PART_Hint"
+                                       Text="Drag a column header here to group by it"
+                                       VerticalAlignment="Center"
+                                       FontSize="{ResourceReference FontSizeCaption}"
+                                       Foreground="{ObservableResource TextFillColorTertiary}"/>
+                            <StackPanel Grid.Column="0" x:Name="PART_Chips"
+                                        Orientation="Horizontal" VerticalAlignment="Center"/>
+
+                            <!-- Folding the whole table - see the macOS set. -->
+                            <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                                <Button x:Name="PART_ExpandAll" Content="Expand all" Visibility="Collapsed"
+                                        FontSize="{ResourceReference FontSizeCaption}" Padding="8 0" Margin="4 0 0 0"/>
+                                <Button x:Name="PART_CollapseAll" Content="Collapse all" Visibility="Collapsed"
+                                        FontSize="{ResourceReference FontSizeCaption}" Padding="8 0" Margin="4 0 0 0"/>
+                            </StackPanel>
+
+                            <!-- Where a carried chip would land - see the macOS set. -->
+                            <Border Grid.Column="0" x:Name="PART_DropMark"
+                                    Width="2" HorizontalAlignment="Left" VerticalAlignment="Stretch"
+                                    IsHitTestVisible="False" Visibility="Collapsed"
+                                    Background="{ThemeResource AccentFillColorDefault}"/>
+                        </Grid>
+                    </Border>
+
+                    <ControlTemplate.Triggers>
+                        <PropertyTrigger Property="IsDropTarget" Value="true">
+                            <Setter TargetName="PanelBg" Property="Background"
+                                    Value="{ThemeResource AccentFillColorSelection}"/>
+                        </PropertyTrigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style Selector="DataGridGroupChip">
+        <Setter Property="Background" Value="{ObservableResource CardBackgroundFillColorDefault}"/>
+        <Setter Property="Foreground" Value="{ObservableResource TextFillColorPrimary}"/>
+        <Setter Property="FontSize" Value="{ResourceReference FontSizeCaption}"/>
+        <Setter Property="Margin" Value="0 0 4 0"/>
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="DataGridGroupChip">
+                    <Border x:Name="ChipBg"
+                            Background="{TemplateBinding Background}"
+                            BorderBrush="{ObservableResource ControlStrokeColorDefault}"
+                            BorderThickness="{ResourceReference StrokeThin}"
+                            CornerRadius="{ResourceReference CornerRadiusSmall}" Padding="6 1"
+                            ToolTipService.ToolTip="Drag to change the nesting">
+                        <StackPanel Orientation="Horizontal">
+                            <ContentPresenter x:Name="PART_ContentPresenter"
+                                    VerticalAlignment="Center"
+                                    Foreground="{TemplateBinding Foreground}"
+                                    FontSize="{TemplateBinding FontSize}"
+                                    Content="{TemplateBinding Content}"/>
+                            <!-- The × is a PART - see the macOS set. -->
+                            <Border x:Name="PART_Remove" Margin="4 0 0 0" Padding="3 0"
+                                    CornerRadius="{ResourceReference CornerRadiusSmall}"
+                                    Background="Transparent" ToolTipService.ToolTip="Remove from the grouping">
+                                <TextBlock x:Name="RemoveGlyph" Text="×" VerticalAlignment="Center"
+                                           Foreground="{ObservableResource TextFillColorTertiary}"/>
+                            </Border>
+                        </StackPanel>
+                    </Border>
+
+                    <ControlTemplate.Triggers>
+                        <PropertyTrigger Property="IsMouseOver" Value="true">
+                            <Setter TargetName="ChipBg" Property="Background"
+                                    Value="{ObservableResource SubtleFillColorSecondary}"/>
+                        </PropertyTrigger>
+                        <!-- Picked up - see the macOS set. -->
+                        <PropertyTrigger Property="IsDragging" Value="true">
+                            <Setter TargetName="ChipBg" Property="Opacity" Value="0.6"/>
+                        </PropertyTrigger>
+                        <PropertyTrigger SourceName="PART_Remove" Property="IsMouseOver" Value="true">
+                            <Setter TargetName="PART_Remove" Property="Background"
+                                    Value="{ObservableResource SubtleFillColorSecondary}"/>
+                            <Setter TargetName="RemoveGlyph" Property="Foreground"
+                                    Value="{ObservableResource TextFillColorPrimary}"/>
+                        </PropertyTrigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- The group row and a total. NOT tinted - see the macOS set. -->
+    <Style Selector="DataGridGroupHeader">
+        <Setter Property="Foreground" Value="{ObservableResource TextFillColorPrimary}"/>
+        <Setter Property="FontSize" Value="{ResourceReference FontSizeBody}"/>
+        <Setter Property="Padding" Value="{ResourceReference PaddingRow}"/>
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="DataGridGroupHeader">
+                    <Border Background="Transparent" Padding="{TemplateBinding Padding}">
+                        <!-- A GRID, not a StackPanel, so the caption has an edge to trim against - see the macOS set. -->
+                        <Grid ColumnDefinitions="Auto,*">
+                            <Image Grid.Column="0" x:Name="Expander"
+                                   Source="{ResourceReference ChevronRightIcon}"
+                                   Width="9" Height="9" Margin="0 0 5 0"
+                                   VerticalAlignment="Center"/>
+                            <ContentPresenter Grid.Column="1"
+                                    x:Name="PART_ContentPresenter"
+                                    VerticalAlignment="Center"
+                                    TextTrimming="CharEllipses"
+                                    Foreground="{TemplateBinding Foreground}"
+                                    FontSize="{TemplateBinding FontSize}"
+                                    Content="{TemplateBinding Content}"/>
+                        </Grid>
+                    </Border>
+
+                    <ControlTemplate.Triggers>
+                        <PropertyTrigger Property="IsExpanded" Value="true">
+                            <Setter TargetName="Expander" Property="Source" Value="{ResourceReference ChevronDownIcon}"/>
+                        </PropertyTrigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- A total is set apart by COLOUR - see the macOS set. -->
+    <Style Selector="DataGridFooterCell">
+        <Setter Property="Foreground" Value="{ThemeResource AccentFillColorDefault}"/>
+        <Setter Property="FontSize" Value="{ResourceReference FontSizeCaption}"/>
+        <Setter Property="Padding" Value="{ResourceReference PaddingRow}"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="DataGridFooterCell">
+                    <Border Background="Transparent" Padding="{TemplateBinding Padding}">
+                        <ContentPresenter x:Name="PART_ContentPresenter"
+                                HorizontalAlignment="Right"
+                                VerticalAlignment="Center"
+                                TextTrimming="CharEllipses"
+                                Foreground="{TemplateBinding Foreground}"
+                                FontSize="{TemplateBinding FontSize}"
+                                Content="{TemplateBinding Content}"/>
+                    </Border>
                 </ControlTemplate>
             </Setter.Value>
         </Setter>

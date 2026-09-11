@@ -123,7 +123,7 @@ public partial class TreeDataGrid : Selector
         if (d is not TreeDataGrid grid) return;
 
         grid.RefreshRealizedRows();
-        grid.RefreshHeaders();
+        grid.RefreshStrips();
     }
 
     public Int32 AlternationCount
@@ -193,9 +193,26 @@ public partial class TreeDataGrid : Selector
     private static void OnExpanderColumnChanged(AdamantiumComponent d, AdamantiumPropertyChangedEventArgs e) =>
         (d as TreeDataGrid)?.InvalidateColumns();
 
-    /// <summary>The column <see cref="ExpanderColumnIndex"/> names, clamped to what exists.</summary>
-    public DataGridColumn ExpanderColumn =>
-        Columns.Count == 0 ? null : Columns[Math.Clamp(ExpanderColumnIndex, 0, Columns.Count - 1)];
+    /// <summary>The column <see cref="ExpanderColumnIndex"/> names, clamped to what exists. If that column is not shown
+    /// - the table is grouped by it - the expander moves to the first column that IS, or the tree could not be opened
+    /// at all.</summary>
+    public DataGridColumn ExpanderColumn
+    {
+        get
+        {
+            if (Columns.Count == 0) return null;
+
+            var named = Columns[Math.Clamp(ExpanderColumnIndex, 0, Columns.Count - 1)];
+            if (named.IsShown) return named;
+
+            foreach (var column in Columns)
+            {
+                if (column.IsShown) return column;
+            }
+
+            return null;
+        }
+    }
 
     /// <summary>Opens or closes the row showing <paramref name="item"/> - one range edit for the whole child run.
     /// Addressed by ITEM, not by container: under virtualization the row being opened often has none.</summary>
@@ -228,6 +245,7 @@ public partial class TreeDataGrid : Selector
     {
         if (row is not { HasChildren: true }) return;
         _flattener.Toggle(row);
+        RememberGroup(row);
         RefreshRealizedRows();
     }
 
@@ -235,6 +253,7 @@ public partial class TreeDataGrid : Selector
     {
         if (row is not { HasChildren: true } || row.IsExpanded) return;
         _flattener.Expand(row);
+        RememberGroup(row);
         RefreshRealizedRows();
     }
 
@@ -242,6 +261,7 @@ public partial class TreeDataGrid : Selector
     {
         if (row is not { IsExpanded: true }) return;
         _flattener.Collapse(row);
+        RememberGroup(row);
         RefreshRealizedRows();
     }
 
@@ -299,13 +319,24 @@ public partial class TreeDataGrid : Selector
     /// the data changed in a way the collection did not announce.</summary>
     public void Refresh() => RebuildFlattener();
 
-    private void RebuildFlattener()
+    // sameRows: the caller is only REORDERING what the table already holds. A total over a set does not care what order
+    // the set is in, and working one out costs a reading of the column per row - measured at 25 ms per aggregating
+    // column over ten thousand rows, paid by every sort for nothing. False by default: adding or removing a row is the
+    // case that must never silently keep a stale total.
+    private void RebuildFlattener(bool sameRows = false)
     {
         _flattener?.Clear();
         _rawChildren = ChildrenSelector ?? TreeChildResolver.ForPath(ChildrenPath);
-        _flattener = new TreeFlattener(ShapedChildrenOf, static _ => false, static _ => false);
-        _flattener.SetRoots(Shape(_roots));
+        // EVERYTHING starts shut, a group exactly like a branch. Open was tried and is wrong: a table is grouped in
+        // order to FOLD it, and an open group is the table back again with captions in it. Measured on the stand -
+        // grouping ten thousand rows by Region and Batch makes 495 batch groups, and closing one only uncovered the
+        // next open one, five hundred times over. A group the user HAS opened comes back open: that is what
+        // IsGroupOpen answers, by path.
+        _flattener = new TreeFlattener(ShapedChildrenOf, IsGroupOpen, static _ => false);
+        _shapedRoots = Group(Shape(_roots));
+        _flattener.SetRoots(_shapedRoots);
         Items.SetSource(_flattener.Rows);
+        if (!sameRows) RefreshTotals();
 
         // The columns' Auto widths described the OLD data. Measuring them again against the rows on screen now is the
         // point of the reset - see DataGridColumnLayout.RecordMeasured.
@@ -330,14 +361,22 @@ public partial class TreeDataGrid : Selector
         SortColumn = column is { CanSort: true } ? column : null;
         SortDescending = descending;
         ResetAutoWidths();
-        RebuildFlattener();
+        RebuildFlattener(sameRows: true);
 
         // The header strip reads the sort state in its MEASURE (that is where it syncs), so a sort that leaves the
         // widths alone never reaches it: the arrow appeared only when something else happened to re-measure the strip.
-        RefreshHeaders();
+        RefreshStrips();
     }
 
-    private void RefreshHeaders() => (_headers as IMeasurableComponent)?.InvalidateMeasure();
+    // EVERY strip that follows the columns sideways, not just the header band. Both it and the strip of totals sit
+    // OUTSIDE the rows' scroller and carry the offset themselves, so both have to be told when that offset moves -
+    // told only the headers, the totals stayed at the offset they were last measured at and stood under the wrong
+    // columns the moment the table was scrolled.
+    private void RefreshStrips()
+    {
+        (_headers as IMeasurableComponent)?.InvalidateMeasure();
+        (_footer as IMeasurableComponent)?.InvalidateMeasure();
+    }
 
     /// <summary>Keeps only rows the predicate accepts - AND their ancestors, because a match nobody can reach is not a
     /// match. An ancestor kept this way is a signpost, not a result.</summary>
@@ -367,7 +406,7 @@ public partial class TreeDataGrid : Selector
     {
         ResetAutoWidths();
         RebuildFlattener();
-        RefreshHeaders();
+        RefreshStrips();
     }
 
     /// <summary>Drops one column's filter and re-runs the rest.</summary>
@@ -405,12 +444,8 @@ public partial class TreeDataGrid : Selector
     /// <summary>What a column stands for on one row - the one value sorting, filtering and copying all read. The
     /// column's own binding answers, so it is what the cell shows; a template column states a
     /// <see cref="DataGridColumn.SortMemberPath"/> instead.</summary>
-    private object ValueOf(DataGridColumn column, object node)
-    {
-        if (column.Binding != null) return column.Read(column.Binding, node);
-
-        return column.SortMemberPath is { Length: > 0 } path ? TreeChildResolver.ForValuePath(path)(node) : null;
-    }
+    private object ValueOf(DataGridColumn column, object node) =>
+        column.Binding != null ? column.Read(column.Binding, node) : column.ReadPath(node);
 
     private Dictionary<DataGridColumn, DataGridColumnFilter> _columnFilters;
 
@@ -428,7 +463,630 @@ public partial class TreeDataGrid : Selector
         }
     }
 
-    private IEnumerable ShapedChildrenOf(object node) => Shape(_rawChildren(node));
+    /// <summary>The columns the rows are grouped by, outermost first; empty means no grouping. Filled by dropping a
+    /// header into the grouping strip, or through <see cref="GroupBy"/>.</summary>
+    public DataGridGroupDescriptions GroupDescriptions { get; } = new();
+
+    /// <summary>Groups the rows by a column, or removes it from the grouping when it is already there - what dropping a
+    /// header into the grouping panel does.</summary>
+    public void GroupBy(DataGridColumn column)
+    {
+        if (column == null) return;
+
+        if (!GroupDescriptions.Remove(column)) GroupDescriptions.Add(column);
+        RebuildFlattener();
+        _groupPanel?.Sync();
+    }
+
+    /// <summary>Moves a column to another place in the grouping - what carrying its chip along the strip does. The
+    /// order of <see cref="GroupDescriptions"/> IS the nesting, so this is how deep a column groups.</summary>
+    public void MoveGrouping(int from, int to)
+    {
+        if (from < 0 || from >= GroupDescriptions.Count || to < 0 || to >= GroupDescriptions.Count || from == to) return;
+
+        var column = GroupDescriptions[from];
+        GroupDescriptions.RemoveAt(from);
+        GroupDescriptions.Insert(to, column);
+
+        // The nesting changed, so every path did: what was open was open in a grouping that no longer exists.
+        _openGroups.Clear();
+        RebuildFlattener();
+        _groupPanel?.Sync();
+    }
+
+    /// <summary>Ungroups everything.</summary>
+    public void ClearGrouping()
+    {
+        if (GroupDescriptions.Count == 0) return;
+
+        GroupDescriptions.Clear();
+        _openGroups.Clear();
+        RebuildFlattener();
+        _groupPanel?.Sync();
+    }
+
+    // WHICH GROUPS STAND OPEN, by path rather than by object. A sort, a filter or a regrouping builds every group
+    // afresh, so remembering the objects would forget the user's work every time the table was re-shaped - open a
+    // group, sort a column, and it shut again.
+    private readonly HashSet<string> _openGroups = new();
+
+    private bool IsGroupOpen(object node) => node is DataGridGroup group && _openGroups.Contains(group.Path);
+
+    private void RememberGroup(TreeRow row)
+    {
+        if (row?.Node is not DataGridGroup group) return;
+
+        if (row.IsExpanded) _openGroups.Add(group.Path);
+        else _openGroups.Remove(group.Path);
+    }
+
+    /// <summary>Opens every group down to <paramref name="depth"/> levels and shuts the rest: 0 folds the table to its
+    /// outermost captions, <see cref="GroupDescriptions"/>.Count opens all of it.
+    /// <para>A table grouped two or three columns deep is not something anyone opens by hand - ten thousand rows by
+    /// region and batch make 495 captions.</para></summary>
+    public void ExpandGroupsTo(int depth)
+    {
+        if (GroupDescriptions.Count == 0) return;
+
+        _openGroups.Clear();
+        foreach (var group in AllGroups())
+        {
+            if (group.Level < depth) _openGroups.Add(group.Path);
+        }
+
+        RebuildFlattener(sameRows: true);
+    }
+
+    /// <summary>Opens every group, however deep.</summary>
+    public void ExpandAllGroups() => ExpandGroupsTo(GroupDescriptions.Count);
+
+    /// <summary>Shuts every group, leaving the outermost captions.</summary>
+    public void CollapseAllGroups() => ExpandGroupsTo(0);
+
+    private IEnumerable _shapedRoots;
+
+    // Groups are built ONCE, over the shaped (filtered, sorted) items, and handed to the flattener as its roots. From
+    // there nothing else in the control knows about grouping: a group is a node with children, so expanding one is the
+    // same splice as expanding a branch and the virtualizer realizes its header like any other row.
+    private IEnumerable Group(IEnumerable source)
+    {
+        if (source == null || GroupDescriptions.Count == 0) return source;
+
+        return BuildGroups(source, 0, string.Empty);
+    }
+
+    // U+001F, the ASCII unit separator - invisible in an editor, and the one character a key's TEXT cannot contain, so
+    // "Iberia" inside "B-01" can never read as the same path as some other pairing of the two.
+    private const string GroupPathSeparator = "";
+
+    private List<object> BuildGroups(IEnumerable source, int level, string parentPath)
+    {
+        var column = GroupDescriptions[level];
+        var order = new List<object>();
+        var byKey = new Dictionary<string, DataGridGroup>();
+
+        foreach (var item in source)
+        {
+            var key = ValueOf(column, item);
+            // Keyed by the value's TEXT, which is what the header shows and what the filter list already keys by - two
+            // rows that read the same in the table belong in one group whatever their boxes say.
+            var id = DataGridColumnFilter.Text(key);
+
+            if (!byKey.TryGetValue(id, out var group))
+            {
+                group = new DataGridGroup(column, key, level, parentPath + GroupPathSeparator + id);
+                byKey[id] = group;
+                order.Add(group);
+            }
+
+            group.Add(item);
+        }
+
+        if (level + 1 < GroupDescriptions.Count)
+        {
+            foreach (DataGridGroup group in order)
+            {
+                group.Replace(BuildGroups(new List<object>(group.Items), level + 1, group.Path));
+            }
+        }
+
+        return order;
+    }
+
+    private IEnumerable ShapedChildrenOf(object node) =>
+        node is DataGridGroup group ? group.Children : Shape(_rawChildren(node));
+
+    /// <summary>Whether any column asks for a total. The footer band exists exactly when one does - a strip that is
+    /// always there and always empty is a strip nobody wanted - so the theme hangs the band on this.</summary>
+    public static readonly AdamantiumProperty HasTotalsProperty = AdamantiumProperty.Register(nameof(HasTotals),
+        typeof(bool), typeof(TreeDataGrid),
+        new PropertyMetadata(false, PropertyMetadataOptions.AffectsMeasure));
+
+    /// <summary>Whether the strip that a header is dropped into to group by it is shown.</summary>
+    public static readonly AdamantiumProperty ShowGroupPanelProperty = AdamantiumProperty.Register(
+        nameof(ShowGroupPanel), typeof(bool), typeof(TreeDataGrid),
+        new PropertyMetadata(false, PropertyMetadataOptions.AffectsMeasure, OnShowGroupPanelChanged));
+
+    // TAKING THE STRIP AWAY UNGROUPS. The strip is where a grouping is shown and where it is undone, so hiding it over
+    // a grouped table would stand the table in groups with nothing saying why and no way back. Only this TRANSITION
+    // does it: a page that never shows the strip and groups from code is left alone, because nothing ever turns off.
+    private static void OnShowGroupPanelChanged(AdamantiumComponent d, AdamantiumPropertyChangedEventArgs e)
+    {
+        if (d is TreeDataGrid { ShowGroupPanel: false } grid) grid.ClearGrouping();
+    }
+
+    public bool HasTotals
+    {
+        get => GetValue<bool>(HasTotalsProperty);
+        private set => SetValue(HasTotalsProperty, value);
+    }
+
+    public bool ShowGroupPanel
+    {
+        get => GetValue<bool>(ShowGroupPanelProperty);
+        set => SetValue(ShowGroupPanelProperty, value);
+    }
+
+    private bool AnyColumnAggregates()
+    {
+        foreach (var column in Columns)
+        {
+            if (column.Aggregate != DataGridAggregate.None) return true;
+        }
+
+        return false;
+    }
+
+    private readonly DataGridSearch _search = new();
+
+    /// <summary>What the search panel is looking for. Setting it does NOT search - <see cref="Search"/> does, because
+    /// one pass reads every shown column of every row and that is not something to spend on each keystroke: measured
+    /// at some 380 ms over ten thousand rows and thirteen columns. TWO-WAY by default: the strip's own field writes
+    /// here, so a page binding it and never learning what was typed would be the binding lying about the control.</summary>
+    public static readonly AdamantiumProperty SearchTextProperty = AdamantiumProperty.Register(nameof(SearchText),
+        typeof(String), typeof(TreeDataGrid),
+        new PropertyMetadata(null, PropertyMetadataOptions.BindsTwoWayByDefault));
+
+    /// <summary>Whether the strip that searches the table is shown. TWO-WAY by default for the same reason: the strip
+    /// closes ITSELF from its own button, and a one-way binding would leave the switch that opened it standing on.</summary>
+    public static readonly AdamantiumProperty ShowSearchPanelProperty = AdamantiumProperty.Register(
+        nameof(ShowSearchPanel), typeof(bool), typeof(TreeDataGrid),
+        new PropertyMetadata(false, PropertyMetadataOptions.AffectsMeasure | PropertyMetadataOptions.BindsTwoWayByDefault,
+            OnShowSearchPanelChanged));
+
+    public String SearchText
+    {
+        get => GetValue<String>(SearchTextProperty);
+        set => SetValue(SearchTextProperty, value);
+    }
+
+    public bool ShowSearchPanel
+    {
+        get => GetValue<bool>(ShowSearchPanelProperty);
+        set => SetValue(ShowSearchPanelProperty, value);
+    }
+
+    // Taking the strip away calls the search off, for the same reason taking the grouping strip away ungroups: what it
+    // paints over the table would otherwise stay with nothing left to explain or undo it.
+    private static void OnShowSearchPanelChanged(AdamantiumComponent d, AdamantiumPropertyChangedEventArgs e)
+    {
+        if (d is TreeDataGrid { ShowSearchPanel: false } grid) grid.ClearSearch();
+    }
+
+    /// <summary>What a cell the search found is washed with, or null to leave it to the theme. A WASH, never a plate:
+    /// a cell holds a check box and a meaning, and a solid colour swallows both.</summary>
+    public static readonly AdamantiumProperty SearchMatchBrushProperty = AdamantiumProperty.Register(
+        nameof(SearchMatchBrush), typeof(Brush), typeof(TreeDataGrid),
+        new PropertyMetadata(null, PropertyMetadataOptions.AffectsRender, OnSearchBrushChanged));
+
+    /// <summary>...and what the cell the search is ON is washed with.</summary>
+    public static readonly AdamantiumProperty SearchCurrentMatchBrushProperty = AdamantiumProperty.Register(
+        nameof(SearchCurrentMatchBrush), typeof(Brush), typeof(TreeDataGrid),
+        new PropertyMetadata(null, PropertyMetadataOptions.AffectsRender, OnSearchBrushChanged));
+
+    public Brush SearchMatchBrush
+    {
+        get => GetValue<Brush>(SearchMatchBrushProperty);
+        set => SetValue(SearchMatchBrushProperty, value);
+    }
+
+    public Brush SearchCurrentMatchBrush
+    {
+        get => GetValue<Brush>(SearchCurrentMatchBrushProperty);
+        set => SetValue(SearchCurrentMatchBrushProperty, value);
+    }
+
+    // The cells take their colours when they are attached, so the ones already built have to be told.
+    private static void OnSearchBrushChanged(AdamantiumComponent d, AdamantiumPropertyChangedEventArgs e) =>
+        (d as TreeDataGrid)?.RefreshRealizedRows();
+
+    /// <summary>How many cells hold what is being searched for.</summary>
+    public int MatchCount => _search.Count;
+
+    /// <summary>Which match is being looked at, from 1; 0 when none is.</summary>
+    public int CurrentMatch => _search.Current;
+
+    /// <summary>Runs the search over what the table HOLDS - every shown column of every row behind the current shape,
+    /// open or shut - and goes to the first match. A cell inside a closed group counts, and stepping onto it opens
+    /// that group: a count that only covered what happens to be unfolded would be a count of the screen, not of the
+    /// table.</summary>
+    public void Search()
+    {
+        var sought = SearchText;
+        _search.Begin(sought);
+
+        // A RUN of its own, so a search started while another is still walking simply takes over: the old one sees a
+        // number that is no longer its and stops where it stands.
+        _searchRun++;
+        _searchAt = 0;
+        _searchItems = null;
+
+        if (string.IsNullOrEmpty(sought))
+        {
+            RefreshSearchVisuals();
+            return;
+        }
+
+        var items = new List<object>();
+        CollectItems(_shapedRoots, items);
+        _searchItems = items;
+
+        // OFF THE INTERFACE'S THREAD when every column it has to read can be read there - see
+        // DataGridColumn.ReadsWithoutTheUI. Matches come back in batches, so the table lights up while the walk is
+        // still going. When some column needs its binding, the walk stays on the loop and is spread over its turns
+        // instead: the binding engine belongs to that thread and cannot be taken off it.
+        if (SearchReadsWithoutTheUI()) WalkSearchAway(_searchRun, items);
+        else WalkSearch(_searchRun);
+    }
+
+    private bool SearchReadsWithoutTheUI()
+    {
+        foreach (var column in Columns)
+        {
+            if (!column.IsShown || !column.IsSearchable) continue;
+            if (!column.ReadsWithoutTheUI) return false;
+        }
+
+        return true;
+    }
+
+    /// <summary>Whether a search is still walking the table.</summary>
+    public bool IsSearching => _searchItems != null;
+
+    // How many rows one turn of the search reads. Small enough that a turn is a few milliseconds: the whole pass over
+    // ten thousand rows takes some 380 ms, and a window that stops answering for that long reads as a hang.
+    private const int SearchChunk = 256;
+
+    private int _searchRun;
+    private int _searchAt;
+    private List<object> _searchItems;
+
+    // The walk runs on a THREAD OF ITS OWN and sends what it finds back to the loop in batches, so the table lights
+    // up while it is still going. What it reads are plain getters on the application's own objects - no part of the
+    // interface is touched from here, which is the whole reason this is allowed.
+    private void WalkSearchAway(int run, List<object> items)
+    {
+        var loop = UIAppContext.Current?.Dispatcher;
+        if (loop == null)
+        {
+            // Nothing to come back to - a test, a grid built by hand. Then it is simply done here and now.
+            WalkSearch(run);
+            return;
+        }
+
+        var sought = _search.Text;
+        var columns = SearchableColumns();
+
+        Task.Run(() =>
+        {
+            var batch = new List<(object Item, int Column)>();
+
+            for (var at = 0; at < items.Count; at++)
+            {
+                if (run != _searchRun) return;   // a newer search took over
+
+                var item = items[at];
+                foreach (var (index, column) in columns)
+                {
+                    if (DataGridSearch.Matches(DataGridColumnFilter.Text(column.ReadWithoutTheUI(item)), sought))
+                    {
+                        batch.Add((item, index));
+                    }
+                }
+
+                if (batch.Count == 0 || (at + 1) % SearchChunk != 0) continue;
+
+                var found = batch;
+                batch = new List<(object, int)>();
+                loop.Post(() => TakeSearchBatch(run, found, false));
+            }
+
+            var last = batch;
+            loop.Post(() => TakeSearchBatch(run, last, true));
+        });
+    }
+
+    private List<(int Index, DataGridColumn Column)> SearchableColumns()
+    {
+        var columns = new List<(int, DataGridColumn)>();
+        for (var i = 0; i < Columns.Count; i++)
+        {
+            if (Columns[i].IsShown && Columns[i].IsSearchable) columns.Add((i, Columns[i]));
+        }
+
+        return columns;
+    }
+
+    // What the walk found, taken on the LOOP: the search state and everything painted from it belong to this thread.
+    private void TakeSearchBatch(int run, List<(object Item, int Column)> found, bool last)
+    {
+        if (run != _searchRun) return;
+
+        var hadNone = _search.Count == 0;
+        foreach (var (item, column) in found) _search.Add(item, column);
+
+        // The FIRST match is shown the moment it arrives, not when the walk ends.
+        if (hadNone && _search.Count > 0)
+        {
+            _search.Step(1);
+            GoToMatch();
+        }
+
+        if (last) _searchItems = null;
+        RefreshSearchVisuals();
+    }
+
+    // The pass is spread over the UI LOOP, one chunk per turn, when some column has to be read through its BINDING:
+    // the binding engine belongs to that thread and cannot be taken off it. With no loop to spread over - a test, a
+    // grid built by hand - it is done here and now instead.
+    private void WalkSearch(int run)
+    {
+        if (run != _searchRun) return;
+
+        var loop = UIAppContext.Current?.Dispatcher;
+
+        do
+        {
+            SearchOneChunk();
+        }
+        while (_searchItems != null && loop == null);
+
+        if (_searchItems != null) loop.Post(() => WalkSearch(run));
+    }
+
+    private void SearchOneChunk()
+    {
+        var sought = _search.Text;
+        var stop = Math.Min(_searchAt + SearchChunk, _searchItems.Count);
+        var hadNone = _search.Count == 0;
+
+        for (; _searchAt < stop; _searchAt++)
+        {
+            var item = _searchItems[_searchAt];
+            for (var i = 0; i < Columns.Count; i++)
+            {
+                var column = Columns[i];
+                if (!column.IsShown || !column.IsSearchable) continue;
+
+                // The SAME reading the walk on its own thread does: cheap where that is the same answer, through the
+                // binding where it is not. One rule, so the two passes can never find different things.
+                var value = column.ReadsWithoutTheUI ? column.ReadWithoutTheUI(item) : ValueOf(column, item);
+                if (DataGridSearch.Matches(DataGridColumnFilter.Text(value), sought)) _search.Add(item, i);
+            }
+        }
+
+        // The FIRST match is shown the moment it is found, not when the walk ends: a hit on the first screen should
+        // not wait behind ten thousand rows that are read after it.
+        if (hadNone && _search.Count > 0)
+        {
+            _search.Step(1);
+            GoToMatch();
+        }
+
+        if (_searchAt >= _searchItems.Count) _searchItems = null;
+        RefreshSearchVisuals();
+    }
+
+    /// <summary>Forgets the search and the paint that goes with it.</summary>
+    public void ClearSearch()
+    {
+        if (_search.Count == 0 && _search.Current == 0) return;
+
+        _search.Clear();
+        RefreshSearchVisuals();
+    }
+
+    /// <summary>Steps to the next match and shows it, wrapping round at the end.</summary>
+    public void FindNext() => StepSearch(1);
+
+    /// <summary>Steps to the previous match and shows it, wrapping round at the start.</summary>
+    public void FindPrevious() => StepSearch(-1);
+
+    private void StepSearch(int by)
+    {
+        if (!_search.Step(by)) return;
+
+        GoToMatch();
+        RefreshSearchVisuals();
+    }
+
+    // The rows carry the paint, the strip carries the count - both have to be told, and told in one place, or the
+    // strip goes on saying "3 of 47" over a table that is no longer showing any of them.
+    private void RefreshSearchVisuals()
+    {
+        RefreshRealizedRows();
+        _searchPanel?.Sync();
+    }
+
+    // Puts the current match on screen: opens whatever groups hold it, then takes the keyboard to it - which is what
+    // scrolls the rows, since the cell the keyboard is on is the cell the table keeps in view.
+    private void GoToMatch()
+    {
+        if (_search.At is not { } at) return;
+
+        var row = RowIndexOf(at.Item);
+        if (row < 0)
+        {
+            RevealItem(at.Item);
+            row = RowIndexOf(at.Item);
+        }
+
+        if (row < 0) return;
+
+        SelectCell(row, at.Column);
+        ScrollIntoView(row, at.Column);
+    }
+
+    /// <summary>Scrolls the least it can so a cell is fully in view. By INDEX, not by container: the row a search
+    /// landed on is usually thousands of rows away and has no element at all - which is exactly when it is needed.
+    /// <para>The rows stand at a uniform step, so where one is takes no walk to work out.</para></summary>
+    public void ScrollIntoView(int row, int column = -1)
+    {
+        if (_scroll == null || row < 0) return;
+
+        var height = RowHeight > 0 ? RowHeight : 1;
+        var x = _scroll.ScrollOffset.X;
+        var width = 1.0;
+
+        // The column too, when one is named: a match in a column that is off to the right is not shown by scrolling
+        // down to its row. A PINNED column needs no scrolling - it is never off screen.
+        if (column >= 0 && column < Columns.Count && Columns[column] is { IsFrozen: false } wanted)
+        {
+            x = wanted.Offset;
+            width = wanted.ActualWidth;
+        }
+
+        _scroll.BringIntoView(new Rect(x, row * height, width, height));
+    }
+
+    private int RowIndexOf(object item)
+    {
+        var rows = Rows;
+        if (rows == null) return -1;
+
+        for (var i = 0; i < rows.Count; i++)
+        {
+            if (ReferenceEquals(rows[i].Node, item)) return i;
+        }
+
+        return -1;
+    }
+
+    // Opens the chain of groups that holds an item, outermost first. A match inside a shut group is still a match, and
+    // a Find that could not reach it would be counting things it cannot show.
+    private void RevealItem(object item)
+    {
+        if (GroupDescriptions.Count == 0) return;
+
+        var level = _shapedRoots;
+        while (level != null)
+        {
+            DataGridGroup holding = null;
+            foreach (var node in level)
+            {
+                if (node is DataGridGroup group && group.Items.Contains(item))
+                {
+                    holding = group;
+                    break;
+                }
+            }
+
+            if (holding == null) break;
+
+            _openGroups.Add(holding.Path);
+            level = holding.Children;
+        }
+
+        RebuildFlattener(sameRows: true);
+    }
+
+    /// <summary>Whether this cell holds what is being searched for - what a realized cell paints itself from.</summary>
+    internal bool IsSearchMatch(object item, int column) => _search.Holds(item, column);
+
+    /// <summary>Whether this cell is the match being looked at.</summary>
+    internal bool IsCurrentSearchMatch(object item, int column) => _search.IsCurrent(item, column);
+
+    private readonly Dictionary<DataGridColumn, object> _totals = new();
+
+    /// <summary>Re-reads every column's total. Worked out ONCE per shape - a walk of the data per frame is what a
+    /// footer must never cost - and again when a column changes what it asks for.</summary>
+    public void RefreshTotals()
+    {
+        _totals.Clear();
+
+        foreach (var group in AllGroups()) group.ForgetTotals();
+
+        HasTotals = AnyColumnAggregates();
+
+        if (HasTotals)
+        {
+            var items = new List<object>();
+            CollectItems(_shapedRoots, items);
+
+            foreach (var column in Columns)
+            {
+                if (column.Aggregate == DataGridAggregate.None) continue;
+
+                _totals[column] = DataGridAggregates.Compute(column.Aggregate, Values(column, items));
+            }
+        }
+
+        _footer?.Sync();
+        RefreshRealizedRows();
+    }
+
+    /// <summary>This column's total over the whole table, or null when it asks for none.</summary>
+    public object TotalFor(DataGridColumn column) =>
+        column != null && _totals.TryGetValue(column, out var total) ? total : null;
+
+    /// <summary>This column's total within one group - the number its header shows.</summary>
+    public object TotalFor(DataGridColumn column, DataGridGroup group)
+    {
+        if (column == null || group == null || column.Aggregate == DataGridAggregate.None) return null;
+
+        return group.TotalFor(column, (c, g) => DataGridAggregates.Compute(c.Aggregate, Values(c, g.Items)));
+    }
+
+    private IEnumerable<object> Values(DataGridColumn column, IEnumerable<object> items)
+    {
+        foreach (var item in items) yield return ValueOf(column, item);
+    }
+
+    // The rows of the TOP level behind the current shape - groups looked through, tree children NOT. A total counts what
+    // the table holds rather than what is on screen, so a collapsed group changes nothing; but a branch's children
+    // belong to that branch, and counting them here would make the table's total disagree with the sum of its groups'
+    // (measured: 58000 against 5 x 2000) and would double-count any hierarchy that rolls up into its parent.
+    private void CollectItems(IEnumerable source, List<object> into)
+    {
+        if (source == null) return;
+
+        foreach (var node in source)
+        {
+            if (node is DataGridGroup group)
+            {
+                CollectItems(group.Children, into);
+                continue;
+            }
+
+            into.Add(node);
+        }
+    }
+
+    private IEnumerable<DataGridGroup> AllGroups()
+    {
+        if (_shapedRoots == null || GroupDescriptions.Count == 0) yield break;
+
+        var pending = new Stack<object>();
+        foreach (var node in _shapedRoots) pending.Push(node);
+
+        while (pending.Count > 0)
+        {
+            if (pending.Pop() is not DataGridGroup group) continue;
+
+            yield return group;
+            foreach (var child in group.Children) pending.Push(child);
+        }
+    }
 
     private IEnumerable Shape(IEnumerable source)
     {
@@ -444,13 +1102,21 @@ public partial class TreeDataGrid : Selector
         }
 
         // Sorted by the SAME value the cells show and the filters test - one reading of a column, never two.
-        if (SortColumn is { } column)
-        {
-            items.Sort((a, b) => Compare(ValueOf(column, a), ValueOf(column, b)) * (SortDescending ? -1 : 1));
-        }
+        if (SortColumn is not { } column) return items;
 
-        return items;
+        // The READINGS are sorted, not the rows: a comparison sort asks 2n log n times, and reading a column is not
+        // free - it re-points a live binding at the row. Measured at 3900 readings for 256 rows where 256 will do, and
+        // 889 ms to sort ten thousand.
+        var rows = items.ToArray();
+        var keys = new object[rows.Length];
+        for (var i = 0; i < rows.Length; i++) keys[i] = ValueOf(column, rows[i]);
+
+        Array.Sort(keys, rows, SortDescending ? Descending : Ascending);
+        return rows;
     }
+
+    private static readonly IComparer<object> Ascending = Comparer<object>.Create(Compare);
+    private static readonly IComparer<object> Descending = Comparer<object>.Create(static (a, b) => Compare(b, a));
 
     // A node survives the filter if it matches, or if anything under it does - otherwise the match would be unreachable.
     private bool Keep(object node)
@@ -509,7 +1175,7 @@ public partial class TreeDataGrid : Selector
             if (index >= 0) ExpanderColumnIndex = index;
         }
 
-        RefreshHeaders();
+        RefreshStrips();
     }
 
     private void OnColumnsChanged(object sender, NotifyCollectionChangedEventArgs e)
@@ -551,7 +1217,9 @@ public partial class TreeDataGrid : Selector
         }
 
         if (widest <= 0) return;
-        column.Width = new GridLength(Math.Clamp(widest, column.MinWidth, column.MaxWidth));
+        // At the slot the width already sits in - see the resize in DataGridHeadersPresenter.
+        column.SetCurrentValue(DataGridColumn.WidthProperty,
+            new GridLength(Math.Clamp(widest, column.MinWidth, column.MaxWidth)));
         column.ResetMeasuredWidth();
         InvalidateColumns();
     }
@@ -564,19 +1232,53 @@ public partial class TreeDataGrid : Selector
         RefreshRealizedRows();
         InvalidateMeasure();
         (ItemsHostPanel as IMeasurableComponent)?.InvalidateMeasure();
+
+        // EVERY strip placed by the width pass, not just the headers: each one measures its parts at the columns'
+        // widths, and a measure nobody invalidates never runs. The strip of totals kept the width it had, so a widened
+        // column left its total trimmed to an ellipsis.
         (_headers as IMeasurableComponent)?.InvalidateMeasure();
+        (_footer as IMeasurableComponent)?.InvalidateMeasure();
     }
 
     private DataGridHeadersPresenter _headers;
+    private DataGridFooterPresenter _footer;
+    private DataGridGroupPanel _groupPanel;
+    private DataGridSearchPanel _searchPanel;
     private MeasurableUIComponent _dropIndicator;
     private ScrollViewer _scroll;
 
     internal void AdoptHeaders(DataGridHeadersPresenter headers) => _headers = headers;
 
+    internal void AdoptFooter(DataGridFooterPresenter footer) => _footer = footer;
+
+    internal void AdoptGroupPanel(DataGridGroupPanel panel) => _groupPanel = panel;
+
+    internal void AdoptSearchPanel(DataGridSearchPanel panel) => _searchPanel = panel;
+
+    /// <summary>Whether <paramref name="point"/>, given in <paramref name="from"/>'s space, is over the grouping strip -
+    /// what the header band asks before it decides whether a dropped column is being MOVED or being grouped by.</summary>
+    internal bool IsOverGroupPanel(IUIComponent from, Vector2 point)
+    {
+        if (_groupPanel == null || !ShowGroupPanel || from == null) return false;
+
+        var local = from.TranslatePoint(point, _groupPanel);
+        var size = _groupPanel.RenderSize;
+        return local.X >= 0 && local.Y >= 0 && local.X <= size.Width && local.Y <= size.Height;
+    }
+
+    /// <summary>Marks the grouping strip as the place a carried header would land, or takes the mark off it.</summary>
+    internal void MarkGroupPanelTarget(bool over)
+    {
+        if (_groupPanel != null) _groupPanel.IsDropTarget = over;
+    }
+
     public override void OnApplyTemplate()
     {
         base.OnApplyTemplate();
         if (GetTemplateChild("PART_Headers") is DataGridHeadersPresenter headers) headers.Owner = this;
+        if (GetTemplateChild("PART_Footer") is DataGridFooterPresenter footer) footer.Owner = this;
+        if (GetTemplateChild("PART_GroupPanel") is DataGridGroupPanel groupPanel) groupPanel.Owner = this;
+        if (GetTemplateChild("PART_SearchPanel") is DataGridSearchPanel searchPanel) searchPanel.Owner = this;
 
         _dropIndicator = GetTemplateChild("PART_DropIndicator") as MeasurableUIComponent;
 
@@ -660,7 +1362,7 @@ public partial class TreeDataGrid : Selector
     // What the WIDTH PASS is given: the measured width while the strip is shown, nought while it is not. The measured
     // number is kept either way, so switching the strip off and on again does not have to discover it a second time -
     // and the pass in which it was still being discovered is exactly when the numbers were drawn over the first column.
-    private double NumberStripLeading => ShowRowNumbers ? RowNumberWidth : 0;
+    internal double NumberStripLeading => ShowRowNumbers ? RowNumberWidth : 0;
 
     // Only ever GROWS within a scroll, exactly as an Auto column does: recomputing it downwards as rows come and go
     // makes the whole table breathe sideways under the pointer.
@@ -684,7 +1386,7 @@ public partial class TreeDataGrid : Selector
         // keeping the measured number is what lets the strip come back at the right size on the FIRST pass.
         grid.ResetAutoWidths();
         grid.InvalidateRealizedRows();
-        grid.RefreshHeaders();
+        grid.RefreshStrips();
     }
 
     /// <summary>How far the columns are scrolled sideways.</summary>
@@ -702,7 +1404,7 @@ public partial class TreeDataGrid : Selector
     {
         if (d is not TreeDataGrid grid) return;
         grid.RefreshRealizedRows();
-        grid.RefreshHeaders();
+        grid.RefreshStrips();
     }
 
     private int _firstColumn;
@@ -952,7 +1654,8 @@ public partial class TreeDataGrid : Selector
     }
 
     /// <summary>The grid owns the keys that drive editing: F2 opens the active cell, Escape leaves an edit without
-    /// writing. Enter never reaches here - the editor claims it and asks for the commit itself.</summary>
+    /// writing - and, with nothing open, takes the search strip away. Enter never reaches here - the editor claims it
+    /// and asks for the commit itself.</summary>
     protected override void OnKeyDown(KeyEventArgs e)
     {
         base.OnKeyDown(e);
@@ -968,6 +1671,15 @@ public partial class TreeDataGrid : Selector
 
             case Key.Escape when IsEditing:
                 CancelEdit();
+                e.Handled = true;
+                break;
+
+            // AFTER the edit case, and that order is the whole rule: Escape leaves the innermost thing you are in, so an
+            // open editor goes first and the strip only when there is no editor left to leave. The key reaches here from
+            // the search field too - it travels up through every element, and the field does not claim it - so one case
+            // covers both "focus is in the strip" and "focus is in the table".
+            case Key.Escape when ShowSearchPanel:
+                SetCurrentValue(ShowSearchPanelProperty, false);
                 e.Handled = true;
                 break;
 
@@ -1136,7 +1848,10 @@ public partial class TreeDataGrid : Selector
     internal bool IsColumnRealized(int index)
     {
         if (index < 0 || index >= Columns.Count) return false;
-        if (Columns[index].IsFrozen) return true;
+
+        var column = Columns[index];
+        if (!column.IsShown) return false;
+        if (column.IsFrozen) return true;
         return index >= _firstColumn && index <= _lastColumn;
     }
 
@@ -1175,8 +1890,17 @@ public partial class TreeDataGrid : Selector
             last = Math.Max(last, i);
         }
 
+        var wasFirst = _firstColumn;
+        var wasLast = _lastColumn;
         _firstColumn = Math.Max(0, first - 1);
         _lastColumn = Math.Min(Columns.Count - 1, last + 1);
+
+        // A row builds its cells from this window IN ITS OWN MEASURE, and the window is moved HERE - in the grid's.
+        // A row measured before this ran has last pass's window, and nothing else would ever tell it otherwise: on the
+        // stand, scrolling sideways left the rows holding the columns that had just gone off the left and none of the
+        // ones that had come in from the right. Resizing any column put it right, which is what said the rows were
+        // stale rather than misplaced - it is the only other thing that re-syncs them.
+        if (_firstColumn != wasFirst || _lastColumn != wasLast) InvalidateRealizedRows();
     }
 
     protected override Size MeasureOverride(Size availableSize)

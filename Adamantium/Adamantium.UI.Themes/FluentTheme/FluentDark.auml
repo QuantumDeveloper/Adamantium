@@ -45,6 +45,10 @@
          beneath shows through the hairline. This is ControlStrokeColorDefault already composited over the table's own
          CardBackgroundFillColorDefault, so the table looks the same and stops being see-through. -->
     <PaletteColor Key="DataGridLineColor" Color="#3B3B3B"/>
+    <!-- What a search hit is washed with - see the macOS dark palette. -->
+    <PaletteColor Key="DataGridSearchMatchColor" Color="#59FCE100"/>
+    <!-- ...and the cell the search is ON - see the macOS dark palette. -->
+    <PaletteColor Key="DataGridSearchCurrentColor" Color="#A6FCE100"/>
     <PaletteColor Key="ControlStrokeColorSecondary" Color="#18FFFFFF"/>
     <PaletteColor Key="TextFillColorPrimary" Color="#FFFFFF"/>
     <PaletteColor Key="TextFillColorSecondary" Color="#C5FFFFFF"/>
