@@ -2,6 +2,7 @@
 using Adamantium.Core.Collections;
 using Adamantium.UI.Core;
 using Adamantium.UI.Core.Graphics;
+using Adamantium.UI.Core.Input;
 using Adamantium.UI.Core.Media;
 using Adamantium.UI.Core.Resources;
 using Adamantium.UI.Core.RoutedEvents;
@@ -367,12 +368,28 @@ public class UIComponent : FundamentalUIComponent, IUIComponent
     // the property exists on EVERY node the inheritance walks - including non-input ones like Popup - otherwise propagating
     // it into their subtree throws "not registered" on them.
     public static readonly AdamantiumProperty CursorProperty = AdamantiumProperty.Register(nameof(Cursor),
-        typeof(Cursor), typeof(UIComponent), new PropertyMetadata(Cursor.Default, PropertyMetadataOptions.Inherits));
+        typeof(Cursor), typeof(UIComponent),
+        new PropertyMetadata(Cursor.Default, PropertyMetadataOptions.Inherits, OnCursorChanged));
 
     public Cursor Cursor
     {
         get => GetValue<Cursor>(CursorProperty);
         set => SetValue(CursorProperty, value);
+    }
+
+    // The pointer is handed to the platform on MouseEnter (InputUIComponent.OnMouseEnter), which is enough only while a
+    // cursor belongs to a whole element. It does not for anything that decides from WHERE INSIDE itself the pointer is -
+    // a column separator, a splitter, a resize grip: those change their cursor with no enter to carry it, and what the
+    // screen showed was whatever the last crossing applied. The grid's header showed the resize cursor several pixels
+    // past the separator, so a press there reordered the column instead of resizing it - the pointer lied about what
+    // the press would do. Only the element UNDER the pointer may speak, and the inheritance walk goes parent -> child,
+    // so the deepest one speaks last and wins.
+    private static void OnCursorChanged(AdamantiumComponent component, AdamantiumPropertyChangedEventArgs e)
+    {
+        if (component is UIComponent { } element and IInputComponent { IsMouseOver: true })
+        {
+            Mouse.Cursor = element.Cursor;
+        }
     }
 
     #endregion

@@ -122,4 +122,40 @@ public class InputHitTestTests
             Assert.That(visualHit, Is.SameAs(border), "the designer's visual hit-test also selects the Border");
         });
     }
+
+    private static void PointAt(IObservableComponent component) =>
+        component.RaiseEvent(new MouseEventArgs(Mouse.PrimaryDevice, InputModifiers.None, 0)
+        { RoutedEvent = Mouse.MouseEnterEvent });
+
+    // A cursor that changes while the pointer STANDS STILL has to reach the screen. Anything that decides its cursor
+    // from where inside itself the pointer is - a column separator, a splitter, a resize grip - changes it without any
+    // enter to carry it, and the pointer then lies about what a press will do: the grid's header showed the resize
+    // cursor several pixels past the separator, and the press there reordered the column instead.
+    [Test]
+    public void ACursorChangedUnderAStillPointer_ReachesTheScreen()
+    {
+        var border = new Border { Width = 100, Height = 50 };
+        PointAt(border);
+
+        border.Cursor = Cursors.SizeEWE;
+        Assert.That(Mouse.Cursor, Is.EqualTo(Cursors.SizeEWE), "the element under the pointer says what the pointer is");
+
+        border.Cursor = Cursors.Arrow;
+        Assert.That(Mouse.Cursor, Is.EqualTo(Cursors.Arrow), "and it goes back without waiting for the next enter");
+    }
+
+    // ...but only the element the pointer is ON may speak. Otherwise any control anywhere - a row realized off screen,
+    // a template part being built - would grab the cursor while the pointer is nowhere near it.
+    [Test]
+    public void ACursorChangedAwayFromThePointer_ChangesNothing()
+    {
+        var hovered = new Border();
+        PointAt(hovered);
+        hovered.Cursor = Cursors.Hand;
+
+        var elsewhere = new Border();
+        elsewhere.Cursor = Cursors.SizeNS;
+
+        Assert.That(Mouse.Cursor, Is.EqualTo(Cursors.Hand), "the pointer is still over the first one");
+    }
 }

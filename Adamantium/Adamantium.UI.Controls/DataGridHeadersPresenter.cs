@@ -50,7 +50,7 @@ public class DataGridHeadersPresenter : Panel
     private int _pressed = -1;
     private int _dragging = -1;
     private int _dropTarget = -1;
-    private double _pressFrom;
+    private Vector2 _pressAt;
     private DataGridRowHeader _corner;
 
     /// <summary>The corner above the number strip, or null while the table shows no numbers.</summary>
@@ -95,7 +95,8 @@ public class DataGridHeadersPresenter : Panel
         _leaving.Clear();
         foreach (var pair in _headers)
         {
-            if (pair.Key >= count) _leaving.Add(pair.Key);
+            // A column the table is GROUPED BY leaves the strip with the rest of it - see DataGridColumn.IsShown.
+            if (pair.Key >= count || !columns[pair.Key].IsShown) _leaving.Add(pair.Key);
         }
 
         foreach (var index in _leaving)
@@ -106,6 +107,8 @@ public class DataGridHeadersPresenter : Panel
 
         for (var i = 0; i < count; i++)
         {
+            if (!columns[i].IsShown) continue;
+
             if (!_headers.TryGetValue(i, out var header))
             {
                 header = new DataGridColumnHeader();
@@ -151,15 +154,8 @@ public class DataGridHeadersPresenter : Panel
         {
             if (pair.Key >= columns.Count) continue;
 
-            // The strip carries the sideways offset itself; a FROZEN header is simply not subject to it.
             var column = columns[pair.Key];
-            // The strip carries the sideways offset itself, so a LEFT-pinned header is simply not subject to it; a
-            // RIGHT-pinned one is slid back from the content's end by the grid's shift, which already carries the
-            // scroll - so the strip's own offset has to come off it again.
-            var x = column.IsFrozenLeft ? column.Offset
-                : column.IsFrozenRight ? column.Offset + Owner.RightPinShift - offset
-                : column.Offset - offset;
-            pair.Value.Arrange(new Rect(x, 0, column.ActualWidth, finalSize.Height));
+            pair.Value.Arrange(new Rect(ScreenXOf(column, offset), 0, column.ActualWidth, finalSize.Height));
         }
 
         if (_corner is { Visibility: Visibility.Visible })
@@ -171,17 +167,34 @@ public class DataGridHeadersPresenter : Panel
         return finalSize;
     }
 
+    // Where a column's header actually stands in the strip. The strip carries the sideways offset itself, so a
+    // LEFT-pinned header is simply not subject to it; a RIGHT-pinned one is slid back from the content's end by the
+    // grid's shift, which already carries the scroll - so the strip's own offset comes off it again. ONE description,
+    // used by the arrange and by both hit-tests: a pointer that worked the placement out differently from the layout
+    // answered for whatever column happened to be that far along the content.
+    private double ScreenXOf(DataGridColumn column, double offset) =>
+        column.IsFrozenLeft ? column.Offset
+        : column.IsFrozenRight ? column.Offset + Owner.RightPinShift - offset
+        : column.Offset - offset;
+
     /// <summary>The column whose right-hand separator is under <paramref name="x"/>, or -1.</summary>
     internal int SeparatorAt(double x)
     {
         var columns = Owner?.Columns;
         if (columns == null) return -1;
 
-        x += Owner.HorizontalOffset;   // the strip is drawn shifted; the columns' own numbers are not
-        for (var i = 0; i < columns.Count; i++)
+        var offset = Owner.HorizontalOffset;
+        for (var pinned = 0; pinned < 2; pinned++)
         {
-            var edge = columns[i].Offset + columns[i].ActualWidth;
-            if (Math.Abs(x - edge) <= GripWidth / 2) return i;
+            for (var i = 0; i < columns.Count; i++)
+            {
+                // PINNED headers first: they are drawn over what scrolls beneath them, so they are also what the
+                // pointer reaches there.
+                if (columns[i].IsFrozen != (pinned == 0)) continue;
+
+                var edge = ScreenXOf(columns[i], offset) + columns[i].ActualWidth;
+                if (Math.Abs(x - edge) <= GripWidth / 2) return i;
+            }
         }
 
         return -1;
@@ -225,7 +238,13 @@ public class DataGridHeadersPresenter : Panel
         // The press is only REMEMBERED here. Sorting happens on release, because the same press may turn out to be the
         // start of a drag - a header that sorted on the way down would sort every time a column was moved.
         _pressed = header;
-        _pressFrom = x;
+        _pressAt = e.GetPosition(this);
+
+        // CAPTURED from the press, not from the threshold: a header carried UP into the grouping strip leaves this
+        // strip before it has travelled far enough to count as a drag, and without the capture the moves that would
+        // have started it go to whatever is up there instead. Measured - eight moves, then LEAVE, and the gesture
+        // simply stopped until the pointer came back.
+        CaptureMouse();
         e.Handled = true;
     }
 
@@ -240,13 +259,16 @@ public class DataGridHeadersPresenter : Panel
 
             if (_dragging >= 0)
             {
-                UpdateReorder(x);
+                UpdateReorder(x, Owner.IsOverGroupPanel(this, e.GetPosition(this)));
                 return;
             }
 
-            if (_pressed >= 0 && Math.Abs(x - _pressFrom) > DragThreshold && Owner.Columns[_pressed].CanUserReorder)
+            // HOW FAR the pointer has travelled, not how far ALONG the strip: a header dragged straight up into the
+            // grouping panel moves no distance in x at all, and a threshold that only watched x left that gesture
+            // doing nothing until the hand happened to waver sideways.
+            if (_pressed >= 0 && (e.GetPosition(this) - _pressAt).Length() > DragThreshold
+                && Owner.Columns[_pressed].CanUserReorder)
             {
-                CaptureMouse();
                 BeginReorder(_pressed, x);
                 return;
             }
@@ -259,7 +281,9 @@ public class DataGridHeadersPresenter : Panel
 
         var column = Owner.Columns[_resizing];
         var wanted = _startWidth + (e.GetPosition(this).X - _resizeFrom);
-        column.Width = new GridLength(Math.Max(column.MinWidth, wanted));
+        // At the slot the width already sits in, not a fresh Local one: a page can bind a column's width, and a Local
+        // write outranks Binding for good - one drag and that binding would never be heard from again.
+        column.SetCurrentValue(DataGridColumn.WidthProperty, new GridLength(Math.Max(column.MinWidth, wanted)));
         Owner.InvalidateColumns();
     }
 
@@ -276,8 +300,8 @@ public class DataGridHeadersPresenter : Panel
 
         if (_dragging >= 0)
         {
-            EndReorder(e.GetPosition(this).X);
-            ReleaseMouseCapture();
+            var at = e.GetPosition(this);
+            EndReorder(at.X, Owner.IsOverGroupPanel(this, at));
         }
         else if (_pressed >= 0 && Owner != null && _pressed < Owner.Columns.Count && Owner.Columns[_pressed].CanSort)
         {
@@ -286,6 +310,8 @@ public class DataGridHeadersPresenter : Panel
             Owner.SortBy(column, descending);
         }
 
+        // The press took the capture, so the press gives it back - whether it turned into a drag or stayed a click.
+        if (_pressed >= 0) ReleaseMouseCapture();
         _pressed = -1;
     }
 
@@ -326,26 +352,51 @@ public class DataGridHeadersPresenter : Panel
     internal void BeginReorder(int column, double x)
     {
         _dragging = column;
-        Cursor = Cursors.SizeAll;
+
+        // An OVERRIDE, not this strip's own cursor: a carried header spends the drag OVER SOMETHING ELSE - the grouping
+        // strip above, the rows below - and a per-element cursor is only ever applied for the element the pointer is
+        // actually on. Set here it showed up only once the button came back up and the pointer settled on the strip.
+        Mouse.OverrideCursor = Cursors.SizeAll;
         MarkDragged(_dragging, true);
         ShowDropLine(DropTargetAt(x));
     }
 
-    /// <summary>Moves the drop mark to where the pointer is now.</summary>
-    internal void UpdateReorder(double x) => ShowDropLine(DropTargetAt(x));
+    /// <summary>Moves the drop mark to where the pointer is now. Over the grouping strip there IS no place among the
+    /// columns, so the mark comes off the rows and goes onto the strip instead.</summary>
+    internal void UpdateReorder(double x, bool overGroupPanel = false)
+    {
+        Owner?.MarkGroupPanelTarget(overGroupPanel);
 
-    /// <summary>Drops the carried column where the mark stands.</summary>
-    internal void EndReorder(double x)
+        if (overGroupPanel)
+        {
+            HideDropLine();
+            return;
+        }
+
+        ShowDropLine(DropTargetAt(x));
+    }
+
+    /// <summary>Drops the carried column where the mark stands - among the columns, or into the grouping strip.</summary>
+    internal void EndReorder(double x, bool intoGroupPanel = false)
     {
         if (_dragging < 0) return;
 
-        var target = DropTargetAt(x);
         MarkDragged(_dragging, false);
-        Owner?.MoveColumn(_dragging, target > _dragging ? target - 1 : target);
+        Owner?.MarkGroupPanelTarget(false);
+
+        if (intoGroupPanel)
+        {
+            Owner?.GroupBy(Owner.Columns[_dragging]);
+        }
+        else
+        {
+            var target = DropTargetAt(x);
+            Owner?.MoveColumn(_dragging, target > _dragging ? target - 1 : target);
+        }
 
         _dragging = -1;
         HideDropLine();
-        Cursor = Cursors.Arrow;
+        Mouse.OverrideCursor = null;
     }
 
     private void MarkDragged(int index, bool dragging)
@@ -364,10 +415,16 @@ public class DataGridHeadersPresenter : Panel
         var columns = Owner?.Columns;
         if (columns == null) return -1;
 
-        x += Owner.HorizontalOffset;
-        for (var i = 0; i < columns.Count; i++)
+        var offset = Owner.HorizontalOffset;
+        for (var pinned = 0; pinned < 2; pinned++)
         {
-            if (x >= columns[i].Offset && x < columns[i].Offset + columns[i].ActualWidth) return i;
+            for (var i = 0; i < columns.Count; i++)
+            {
+                if (columns[i].IsFrozen != (pinned == 0)) continue;
+
+                var at = ScreenXOf(columns[i], offset);
+                if (x >= at && x < at + columns[i].ActualWidth) return i;
+            }
         }
 
         return -1;

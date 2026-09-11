@@ -255,8 +255,8 @@ public abstract class TextBoxBase : Control
     private double _lineHeight;
     private double _glyphLineHeight;           // real single-line ink extent (ascent+descent+gap) - reserves the LAST
                                                // line's descent so hanging tails (g y p q j) aren't clipped by the control
-    private double _inkTopInLine;              // ascent line, measured from the line's top: where the glyphs of that line
-    private double _inkHeight;                 // actually start, and how tall they are (ascent+descent)
+    private double _baselineInLine;            // the two reference lines the glyph pipeline anchors ink to, measured
+    private double _ascenderRise;              // from the line's top: the baseline, and how far the ascender sits above it
 
     // Caret model, rebuilt on every (re)shape. For each of the TextLength+1 caret slots (slot i = caret BEFORE character
     // i; slot TextLength = the end) its text-local X and visual line index. Built from the shaped glyphs (one per
@@ -325,12 +325,12 @@ public abstract class TextBoxBase : Control
         // field's tails overflow _lineHeight and the control's clip cuts them. Reserve the TRUE bottom of the last line's
         // ink - its baseline (Baseline*scale) plus the descent below it - never less than the line advance.
         _glyphLineHeight = Math.Max(_lineHeight, (iFont.Baseline + Math.Abs(iFont.Descender)) * lgScale);
-        // Where that line's GLYPHS are, which is not where the line BOX is: ProcessText puts the baseline
-        // Baseline*scale below the line top and the ink spans ascent..descent around it. For Segoe UI at 12 the line box
-        // is 0..13.6 while the ink is 4.5..15.8 - so anything drawn on the box (the caret, the selection) sits a couple
-        // of pixels ABOVE the text it is supposed to mark. Both are derived from here instead.
-        _inkTopInLine = (iFont.Baseline - iFont.Ascender) * lgScale;
-        _inkHeight = (iFont.Ascender + Math.Abs(iFont.Descender)) * lgScale;
+        // The two SHARED reference lines CalculateGlyphPosition anchors every glyph to - the baseline (Baseline*scale
+        // below the line top, NOT the ascent: this font's Baseline is ~the full line box) and the ascender line above
+        // it. Each is rounded to a whole pixel there so same-height glyphs share exact rows, and anything drawn ON the
+        // text has to sit on those same rounded rows or it can never line up with it.
+        _baselineInLine = iFont.Baseline * lgScale;
+        _ascenderRise = iFont.Ascender * lgScale;
 
         var text = Text ?? string.Empty;
         var wrapping = TextWrapping;
@@ -409,13 +409,22 @@ public abstract class TextBoxBase : Control
     // aren't clipped by the control's bottom edge (the em-based advance can be shorter than ascent+descent).
     private double ContentHeight => (_lineCount - 1) * _lineHeight + _glyphLineHeight;
 
-    // Text-local caret rect (before the scroll offset) sitting BEFORE character index: X from the caret model, Y from the
-    // line index. It spans the line's INK (ascent to descent), not its line box - a caret marks where the letters are.
+    // Text-local caret rect (before the scroll offset) sitting BEFORE character index: X from the caret model, Y from
+    // the line's own two reference lines - the ascender line down to the baseline, each rounded exactly as
+    // CalculateGlyphPosition rounds it, so the caret starts on the row the caps and digits start on and ends on the row
+    // they sit on. The font's ascent-to-descent band is NOT that: for the default face the ascent barely clears the cap
+    // height while the descent hangs three pixels under the baseline, so a caret cut to it sat a pixel below the tops of
+    // the digits and four pixels under their feet - measured on screen, and it reads as a caret that slipped down.
+    // Descenders hang below it, as they hang below the baseline they are measured from.
     internal Rect CaretRect(int index)
     {
         EnsureLayout();
         index = Math.Clamp(index, 0, _caretX.Length - 1);
-        return new Rect(_caretX[index], _caretLine[index] * _lineHeight + _inkTopInLine, CaretWidth, _inkHeight);
+
+        var line = _caretLine[index];
+        var baseline = line * _lineHeight + _baselineInLine;
+        var top = Math.Round(baseline - _ascenderRise);
+        return new Rect(_caretX[index], top, CaretWidth, Math.Round(baseline) - top);
     }
 
     private int CaretLineOf(int index)
@@ -870,7 +879,11 @@ public abstract class TextBoxBase : Control
         var stripH = FloatStripHeight();
         var textAreaH = size.Height - stripH;
         var vOffset = !AcceptsNewLines && ContentHeight < textAreaH ? (textAreaH - ContentHeight) / 2 : 0;
-        var oy = stripH + vOffset;
+        // WHOLE pixels. The glyph pipeline snaps the vertical origin it is handed (it rounds the baseline and the
+        // ascender line to whole rows), so a fractional offset moves the caret and the selection while leaving the text
+        // where it was: centring a 15.8-tall line in a 17.4-tall surface handed the text 0.8 it silently dropped and the
+        // caret 0.8 it kept, and the caret drew a visible row below the letters. One snapped origin for all three.
+        var oy = Math.Floor(stripH + vOffset);
         _textOy = oy;
 
         // Selection highlight (behind the text) - one rect per spanned visual line.
@@ -894,15 +907,7 @@ public abstract class TextBoxBase : Control
         if (IsFocused && _caretVisible && !_caretSuppressed)
         {
             var c = CaretRect(CaretIndex);
-            // WHO CENTRED THE TEXT decides this. When the surface has slack, vOffset already centred the line inside it
-            // and the caret rides along correctly. When it has none - the surface is exactly the content and the FIELD
-            // centres it from outside - the line's internal leading is still in there, sitting above the ink, and the
-            // caret placed on it hangs that much below the letters. Half of the leading is what puts the band back on
-            // the text; the other half is the space the ink already leaves above itself.
-            // HALF of the LEADING, never half of c.Y: that value is the line's offset plus the leading, and halving it
-            // whole would halve the line offset too and put every caret past the first line on the wrong row.
-            var leading = vOffset > 0 ? 0 : _inkTopInLine / 2;
-            session.DrawRectangle(CaretBrush, new Rect(ox + c.X, oy + c.Y - leading, CaretWidth, c.Height));
+            session.DrawRectangle(CaretBrush, new Rect(ox + c.X, oy + c.Y, CaretWidth, c.Height));
         }
     }
 

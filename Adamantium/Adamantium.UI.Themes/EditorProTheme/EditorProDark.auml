@@ -38,6 +38,10 @@
     <PaletteColor Key="ControlStrokeColorDefault" Color="#1FFFFFFF"/>
     <!-- The table's rules, OPAQUE - see FluentDark for why a rule content scrolls under cannot be translucent. -->
     <PaletteColor Key="DataGridLineColor" Color="#393E44"/>
+    <!-- What a search hit is washed with - see the macOS dark palette. -->
+    <PaletteColor Key="DataGridSearchMatchColor" Color="#59E8C15C"/>
+    <!-- ...and the cell the search is ON - see the macOS dark palette. -->
+    <PaletteColor Key="DataGridSearchCurrentColor" Color="#A6E8C15C"/>
     <PaletteColor Key="ControlStrokeColorSecondary" Color="#2EFFFFFF"/>
 
     <PaletteColor Key="OnAccentOverlayPointerOver" Color="#33FFFFFF"/>

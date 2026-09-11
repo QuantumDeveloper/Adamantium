@@ -36,6 +36,17 @@ public class DataGridRow : Panel
         set => SetValue(AlternationIndexProperty, value);
     }
 
+    /// <summary>This row stands for a GROUP rather than for a record. A theme gives it its own colour through this -
+    /// a caption is a header for the rows under it, not one of them.</summary>
+    public static readonly AdamantiumProperty IsGroupProperty = AdamantiumProperty.Register(nameof(IsGroup),
+        typeof(bool), typeof(DataGridRow), new PropertyMetadata(false, PropertyMetadataOptions.AffectsRender));
+
+    public bool IsGroup
+    {
+        get => GetValue<bool>(IsGroupProperty);
+        private set => SetValue(IsGroupProperty, value);
+    }
+
     /// <summary>The grid this row belongs to, for the columns and the shared widths.</summary>
     public TreeDataGrid Owner { get; internal set; }
 
@@ -51,6 +62,8 @@ public class DataGridRow : Panel
     private INotifyPropertyChanged _followed;
     private Decorators.Border _frozenBackdrop;
     private Decorators.Border _rightBackdrop;
+    private DataGridGroupHeader _groupHeader;
+    private readonly Dictionary<int, DataGridFooterCell> _groupTotals = new();
     private DataGridRowHeader _number;
 
     /// <summary>This row's place in the visible order, from 1 - what the number strip shows.</summary>
@@ -64,13 +77,18 @@ public class DataGridRow : Panel
         Owner = owner;
         Follow(row?.Node);
         Row = row;
-        AlternationIndex = alternationIndex;
+        IsGroup = row?.Node is DataGridGroup;
+
+        // A group row takes NO stripe of the zebra. The stripes count the rows of the data, so a caption that landed on
+        // one band or the other by where it happened to fall in the flat list read as a mistake - and the theme gives a
+        // group its own colour anyway, which the pinned zone then follows like any other row colour.
+        AlternationIndex = IsGroup ? 0 : alternationIndex;
         Number = number;
 
         // An app-chosen tint wins; with none set the value is CLEARED rather than overwritten, so the theme's own
         // striping applies again instead of being masked by a local write nothing can take back.
         var tint = owner?.AlternationBrush;
-        if (tint != null && alternationIndex != 0) Background = tint;
+        if (!IsGroup && tint != null && AlternationIndex != 0) Background = tint;
         else ClearValue(BackgroundProperty);
 
         SyncCells();
@@ -112,6 +130,15 @@ public class DataGridRow : Panel
         // The ZONES FIRST: a backdrop is painted BETWEEN two sets of siblings, and the retained paint order ranks a
         // child when it is placed.
         SyncFrozenBackdrop();
+
+        // A GROUP row has no cells at all: it belongs to no column, so there is nothing for a column to say about it.
+        // It IS still one of the rows on screen, so it keeps its ordinal - numbers that skipped the group headers would
+        // read as rows gone missing.
+        if (SyncGroup())
+        {
+            SyncNumber();
+            return;
+        }
 
         // Cells whose column left the window go back to the pool; the ones entering take them. Frozen columns never
         // leave - they are the point of being frozen.
@@ -160,6 +187,142 @@ public class DataGridRow : Panel
         }
 
         SyncNumber();
+    }
+
+    /// <summary>The group this row stands for, or null on an ordinary row.</summary>
+    public DataGridGroup Group => Row?.Node as DataGridGroup;
+
+    // How far in a nested group's caption sits. Worked out HERE and applied by the arrange, so the step a group takes
+    // is the same step a branch of the tree takes and there is one description of it.
+    private double GroupIndent => (Group?.Level ?? 0) * (Owner?.Indent ?? 0);
+
+    // The run of the row the caption gets. It begins where the PINNED ZONE ends: that zone is a column's lane, and a
+    // caption drawn across it reads as that column's text. It stops at the first TOTAL,
+    // because a caption and a number drawn in the same place are two things and one of them is unreadable. A total in
+    // a column at the caption's own start pushes the caption past it instead: the number belongs to that column and
+    // the caption to no column at all. Columns are walked in their layout order, which is the order the caption has to
+    // give way in.
+    private Rect CaptionRun(DataGridColumns columns, double offset, double right)
+    {
+        var start = offset + (Owner?.FrozenWidth ?? 0) + GroupIndent;
+        var end = Owner?.ColumnsWidth ?? 0;
+
+        for (var i = 0; i < columns.Count; i++)
+        {
+            if (!_groupTotals.ContainsKey(i)) continue;
+
+            var column = columns[i];
+            var at = column.IsFrozenLeft ? column.Offset + offset
+                : column.IsFrozenRight ? column.Offset + right
+                : column.Offset;
+
+            if (at + column.ActualWidth <= start) continue;
+            if (at <= start) start = at + column.ActualWidth;
+            else end = Math.Min(end, at);
+        }
+
+        return new Rect(start, 0, Math.Max(0, end - start), 0);
+    }
+
+    // Returns whether this row IS a group. Everything a group row shows lives here: the header, and one total per
+    // column that asked for one, placed at that column's offset so a sum stands under the numbers it is a sum of.
+    private bool SyncGroup()
+    {
+        if (Group is not { } group)
+        {
+            if (_groupHeader != null) _groupHeader.Visibility = Visibility.Collapsed;
+            HideGroupTotals();
+            return false;
+        }
+
+        // Back to the POOL, not merely hidden: a container is recycled between a group row and a data row, and a cell
+        // left in _cells is never shown again - only a cell taken from the pool is turned back on.
+        foreach (var pair in _cells)
+        {
+            pair.Value.Visibility = Visibility.Collapsed;
+            _pool.Push(pair.Value);
+        }
+
+        _cells.Clear();
+
+        if (_groupHeader == null)
+        {
+            _groupHeader = new DataGridGroupHeader();
+            _groupHeader.MouseLeftButtonDown += OnGroupPressed;
+            Children.Add(_groupHeader);
+        }
+
+        _groupHeader.Visibility = Visibility.Visible;
+        _groupHeader.GroupName = group.Column?.Header?.ToString();
+        _groupHeader.Key = group.Key;
+        _groupHeader.Count = group.Count;
+        _groupHeader.IsExpanded = Row?.IsExpanded ?? false;
+
+        SyncGroupTotals(group);
+        return true;
+    }
+
+    private void SyncGroupTotals(DataGridGroup group)
+    {
+        var columns = Owner?.Columns;
+        var count = columns?.Count ?? 0;
+
+        _leaving.Clear();
+        foreach (var pair in _groupTotals)
+        {
+            if (pair.Key >= count || !Owner.IsColumnRealized(pair.Key)
+                || columns[pair.Key].Aggregate == DataGridAggregate.None) _leaving.Add(pair.Key);
+        }
+
+        foreach (var index in _leaving) DropGroupTotal(index);
+
+        for (var i = 0; i < count; i++)
+        {
+            if (!Owner.IsColumnRealized(i)) continue;
+
+            var column = columns[i];
+            if (column.Aggregate == DataGridAggregate.None) continue;
+
+            if (!_groupTotals.TryGetValue(i, out var cell))
+            {
+                cell = new DataGridFooterCell { HasTotal = true, IsHitTestVisible = false };
+                _groupTotals[i] = cell;
+                Children.Add(cell);
+            }
+
+            // The cells' own rule: a pinned total is drawn OVER the zone's backdrop, a scrolling one under it.
+            cell.ZIndex = column.IsFrozen ? 2 : 0;
+            cell.Content = DataGridTotals.Text(column, Owner.TotalFor(column, group));
+        }
+    }
+
+    // TAKEN OUT of the row, not hidden inside it. A row is recycled between standing for a group and standing for a
+    // record over and over, and a part that comes and goes has to come and go: hiding these left the drawn set holding
+    // children that were no longer in it, and whole runs of rows stopped being painted at all (measured on the stand -
+    // grouping with totals, scroll away and back, and twenty-seven rows of twenty-nine drew nothing).
+    private void DropGroupTotal(int index)
+    {
+        if (!_groupTotals.TryGetValue(index, out var cell)) return;
+
+        _groupTotals.Remove(index);
+        Children.Remove(cell);
+    }
+
+    private void HideGroupTotals()
+    {
+        if (_groupTotals.Count == 0) return;
+
+        _leaving.Clear();
+        foreach (var pair in _groupTotals) _leaving.Add(pair.Key);
+        foreach (var index in _leaving) DropGroupTotal(index);
+    }
+
+    private void OnGroupPressed(object sender, MouseButtonEventArgs e)
+    {
+        if (Row == null || Owner == null) return;
+
+        Owner.ToggleRow(Row);
+        e.Handled = true;
     }
 
     // The strip is pinned like a frozen column and drawn over what scrolls under it, so it is opaque by its theme and
@@ -211,6 +374,15 @@ public class DataGridRow : Panel
     private void OnNumberPressed(object sender, MouseButtonEventArgs e)
     {
         if (Owner == null || Number <= 0) return;
+
+        // A group's number stands for the group, and there are no cells behind it to take: pressing it opens and closes
+        // the group, which is the only thing that row can do.
+        if (Group != null)
+        {
+            Owner.ToggleRow(Row);
+            e.Handled = true;
+            return;
+        }
 
         // The modifiers carried BY THE EVENT - see OnMouseLeftButtonDown for why the keyboard is not re-read here.
         var shift = (e.Modifiers & (InputModifiers.LeftShift | InputModifiers.RightShift)) != 0;
@@ -270,6 +442,9 @@ public class DataGridRow : Panel
 
     /// <summary>What paints the LEFT pinned zone, or null while nothing is pinned there.</summary>
     internal Decorators.Border FrozenBackdrop => _frozenBackdrop;
+
+    /// <summary>This row's group caption, or null while it has never stood for a group.</summary>
+    internal DataGridGroupHeader GroupCaption => _groupHeader;
 
     protected override void OnMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
@@ -348,6 +523,30 @@ public class DataGridRow : Panel
         // line HERE rather than only when the row is bound. Cheap when nothing moved: a dictionary lookup per column.
         SyncCells();
 
+        // A group row spans the table rather than dividing into columns, so its caption takes the run the totals leave
+        // it and its totals are measured against their own columns. The SAME run the arrange will use, scroll and all:
+        // text is trimmed to the width it was MEASURED at, so a caption measured wide and arranged narrow simply drew
+        // over whatever stood beside it - on the stand, the group's own total.
+        if (Group != null)
+        {
+            var run = CaptionRun(columns, Owner.HorizontalOffset, Owner.RightPinShift);
+            _groupHeader.Measure(new Size(run.Width, availableSize.Height));
+
+            foreach (var pair in _groupTotals)
+            {
+                if (pair.Key >= columns.Count) continue;
+
+                pair.Value.Measure(new Size(columns[pair.Key].ActualWidth, availableSize.Height));
+            }
+
+            if (_number is { Visibility: Visibility.Visible })
+            {
+                _number.Measure(new Size(Owner.RowNumberWidth, availableSize.Height));
+            }
+
+            return new Size(Owner.ColumnsWidth, _groupHeader.DesiredSize.Height);
+        }
+
         // Each cell is measured AT its column's width - that is what gives a text cell an edge to trim against instead
         // of asking for the length it would like. What each cell WOULD have liked is reported back for the Auto columns.
         double height = 0;
@@ -393,15 +592,37 @@ public class DataGridRow : Panel
         // the grid's one number for the whole zone. That number ALREADY carries the scroll - it is what is off-screen
         // to the right - so it is not pushed against the scroll a second time.
         var right = Owner?.RightPinShift ?? 0;
-        foreach (var pair in _cells)
-        {
-            if (pair.Key >= columns.Count) continue;
 
-            var column = columns[pair.Key];
-            var x = column.IsFrozenLeft ? column.Offset + offset
-                : column.IsFrozenRight ? column.Offset + right
-                : column.Offset;
-            pair.Value.Arrange(new Rect(x, 0, column.ActualWidth, finalSize.Height));
+        // The group's caption stands STILL while the table scrolls sideways: it names the rows under it, and a name
+        // that slides out of view names nothing. Its totals keep their columns, as any total must.
+        if (Group != null)
+        {
+            var run = CaptionRun(columns, offset, right);
+            _groupHeader.Arrange(new Rect(run.X, 0, run.Width, finalSize.Height));
+
+            foreach (var pair in _groupTotals)
+            {
+                if (pair.Key >= columns.Count) continue;
+
+                var totalColumn = columns[pair.Key];
+                var at = totalColumn.IsFrozenLeft ? totalColumn.Offset + offset
+                    : totalColumn.IsFrozenRight ? totalColumn.Offset + right
+                    : totalColumn.Offset;
+                pair.Value.Arrange(new Rect(at, 0, totalColumn.ActualWidth, finalSize.Height));
+            }
+        }
+        else
+        {
+            foreach (var pair in _cells)
+            {
+                if (pair.Key >= columns.Count) continue;
+
+                var column = columns[pair.Key];
+                var x = column.IsFrozenLeft ? column.Offset + offset
+                    : column.IsFrozenRight ? column.Offset + right
+                    : column.Offset;
+                pair.Value.Arrange(new Rect(x, 0, column.ActualWidth, finalSize.Height));
+            }
         }
 
         // The zone travels with the scroll exactly as the cells in it do, so it always stands under them and over

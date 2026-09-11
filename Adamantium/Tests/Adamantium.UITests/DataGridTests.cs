@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Globalization;
 using System.Linq;
 using Adamantium.Mathematics;
 using Adamantium.UI.Controls;
@@ -25,6 +26,8 @@ public class DataGridTests
         public string Name { get; set; }
         public string Note { get; init; }
         public bool Locked { get; init; }
+        public string Region { get; init; }
+        public int Size { get; init; }
         public ObservableCollection<Row> Children { get; } = new();
     }
 
@@ -73,7 +76,8 @@ public class DataGridTests
     private static List<Row> Flat(int count) =>
         Enumerable.Range(1, count).Select(i => new Row
         {
-            Name = $"Item {i}", Note = $"Note {i}", Locked = i % 2 == 0
+            Name = $"Item {i}", Note = $"Note {i}", Locked = i % 2 == 0,
+            Region = i % 2 == 0 ? "north" : "south", Size = i
         }).ToList();
 
     [Test]
@@ -888,6 +892,36 @@ public class DataGridTests
         Assert.That(grid.CellFor(0, 0).GridLineBrush, Is.EqualTo(Brushes.Green));
     }
 
+    // The search washes are the grid's to name the same way - and giving the name up has to HAND THE COLOUR BACK. The
+    // cells are recycled carriers: a colour written into one and never taken out again would follow it onto every row
+    // it is later reused for, and no theme setter could be seen through it.
+    [Test]
+    public void SearchWashes_TakeTheBrushTheGridNames_AndGiveItBack()
+    {
+        var grid = SelectableGrid(2);
+        Relayout(grid);
+        // At Style priority, which is where a theme's setter actually lands - a plain assignment here would write the
+        // very slot the grid writes, and the test would be measuring itself.
+        grid.CellFor(0, 0).SetValue(DataGridCell.SearchMatchBrushProperty, Brushes.Blue, ValuePriority.Style);
+
+        grid.SearchMatchBrush = Brushes.Green;
+        grid.SearchCurrentMatchBrush = Brushes.Red;
+        Relayout(grid);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(grid.CellFor(0, 0).SearchMatchBrush, Is.EqualTo(Brushes.Green));
+            Assert.That(grid.CellFor(0, 0).SearchCurrentBrush, Is.EqualTo(Brushes.Red));
+        });
+
+        grid.SearchMatchBrush = null;
+        grid.SearchCurrentMatchBrush = null;
+        Relayout(grid);
+
+        Assert.That(grid.CellFor(0, 0).SearchMatchBrush, Is.EqualTo(Brushes.Blue),
+            "the colour from below is visible again, not the one the grid stopped naming");
+    }
+
     // The rules are a THICKNESS on the cell's own border, so the four visibility states have to come out as the four
     // thicknesses - a right edge for the column rule, a bottom edge for the row rule.
     [TestCase(DataGridGridLines.All, 1.0, 1.0)]
@@ -1600,6 +1634,10 @@ public class DataGridTests
         var mark = grid.GetTemplateChild("PART_DropIndicator") as Border;
         Assert.Multiple(() =>
         {
+            // An OVERRIDE while the drag runs: the carried header spends it over something else, and a per-element
+            // cursor is only ever applied for the element the pointer is actually on - set on the strip, it appeared
+            // only once the button came back up.
+            Assert.That(Mouse.OverrideCursor, Is.EqualTo(Cursors.SizeAll), "the pointer says a column is being carried");
             Assert.That(HeaderOf(headers, 0).IsDragging, Is.True, "the header says it is being carried");
             Assert.That(mark, Is.Not.Null, "and a mark stands where the column would land");
             Assert.That(mark.Visibility, Is.EqualTo(Visibility.Visible));
@@ -1616,6 +1654,7 @@ public class DataGridTests
         {
             Assert.That(mark.Visibility, Is.EqualTo(Visibility.Collapsed), "and it goes when the drag does");
             Assert.That(HeaderOf(headers, 0).IsDragging, Is.False);
+            Assert.That(Mouse.OverrideCursor, Is.Null, "and the pointer is given back");
         });
     }
 
@@ -2193,6 +2232,1139 @@ public class DataGridTests
             Assert.That(grid.RowNumberWidth, Is.EqualTo(0));
             Assert.That(NumberOf(grid, 0), Is.Null);
             Assert.That(headers.Corner, Is.Null);
+        });
+    }
+
+    private sealed class CountingRow
+    {
+        public static int Reads;
+        private readonly string _name;
+
+        public CountingRow(string name) => _name = name;
+
+        public string Name
+        {
+            get
+            {
+                Reads++;
+                return _name;
+            }
+        }
+    }
+
+    // A sort must read each row's column ONCE, not twice per comparison. Reading through the binding is not cheap - it
+    // re-points a live binding at the row - and n log n of them is what made sorting ten thousand rows stall visibly.
+    [Test]
+    public void Sorting_ReadsEachRowOnce_NotTwicePerComparison()
+    {
+        var grid = Grid(new DataGridTextColumn { Binding = new Binding("Name"), Width = new GridLength(100) });
+        var rows = Enumerable.Range(1, 256).Select(i => new CountingRow($"Item {i:0000}")).ToList();
+        grid.ItemsSource = rows;
+
+        CountingRow.Reads = 0;
+        grid.SortBy(grid.Columns[0], descending: true);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(grid.Rows[0].Node, Is.SameAs(rows[^1]), "it really did sort");
+            Assert.That(CountingRow.Reads, Is.EqualTo(rows.Count), "one reading of the column per row, and no more");
+        });
+    }
+
+    // A sort reorders and nothing else, so it does not re-total - but the numbers must still be the ones the table
+    // holds, and a filter after it must still move them.
+    [Test]
+    public void SortingKeepsTheTotals_AndAFilterStillMovesThem()
+    {
+        var grid = GroupableGrid(4);
+        grid.Columns[1].Aggregate = DataGridAggregate.Sum;
+
+        grid.SortBy(grid.Columns[1], descending: true);
+        Assert.That(grid.TotalFor(grid.Columns[1]), Is.EqualTo(10.0), "the same rows, in another order");
+
+        grid.SetFilter(item => ((Row)item).Size > 2);
+        Assert.That(grid.TotalFor(grid.Columns[1]), Is.EqualTo(7.0), "and a filter is not a reorder");
+    }
+
+    // The grip is found where the header actually STANDS, not where the column's own numbers put it. A pinned header
+    // does not move with the scroll, so working its place out by subtracting the offset pointed the pointer at whatever
+    // column happened to be that far along the content - and the press there moved a column instead of resizing one.
+    [Test]
+    public void ThePinnedSeparator_StaysUnderThePointerWhileTheRestScroll()
+    {
+        var grid = Grid(
+            new DataGridTextColumn { Binding = new Binding("Name"), Width = new GridLength(100) },
+            new DataGridTextColumn { Binding = new Binding("Note"), Width = new GridLength(100) },
+            new DataGridTextColumn { Binding = new Binding("Region"), Width = new GridLength(100) });
+        grid.Columns[0].FrozenSide = DataGridFrozenSide.Left;
+        grid.ItemsSource = Flat(3);
+        Relayout(grid, width: 200);
+
+        var headers = Headers(grid);
+        Assert.That(headers.SeparatorAt(100), Is.EqualTo(0), "unscrolled, the pinned edge is where it is drawn");
+
+        grid.HorizontalOffset = 40;
+        headers.Measure(new Size(200, 26));
+        headers.Arrange(new Rect(0, 0, 200, 26));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(headers.SeparatorAt(100), Is.EqualTo(0), "and it has not moved: a pinned column never does");
+            Assert.That(headers.SeparatorAt(160), Is.EqualTo(1), "while the columns that scroll came 40 closer");
+        });
+    }
+
+    // A row builds its cells from the column WINDOW, and the window is moved by the GRID's measure. A row that was
+    // measured before that ran holds the window from before the scroll, and nothing else ever tells it otherwise: on
+    // the stand, scrolling sideways left the rows holding the columns that had gone off the left and none of the ones
+    // that had come in from the right - and resizing any column put it right, which is what said they were stale.
+    [Test]
+    public void AColumnWindowThatMoved_TellsTheRowsItDid()
+    {
+        var columns = Enumerable.Range(0, 6)
+            .Select(_ => (DataGridColumn)new DataGridTextColumn
+            {
+                Binding = new Binding("Name"), Width = new GridLength(100)
+            }).ToArray();
+
+        var grid = Grid(columns);
+        grid.ItemsSource = Flat(3);
+        Relayout(grid, width: 220);
+
+        var row = (DataGridRow)grid.ItemContainerGenerator.ContainerFromIndex(0);
+        Assert.That(row.CellAt(5), Is.Null, "the far column is outside the window to begin with");
+
+        // Measured CLEAN against the window as it stands, and only then does the scroll happen.
+        grid.HorizontalOffset = 300;
+        row.Measure(new Size(220, 28));
+        Assert.That(((IMeasurableComponent)row).IsMeasureValid, Is.True);
+
+        grid.Measure(new Size(220, 200));
+
+        Assert.That(((IMeasurableComponent)row).IsMeasureValid, Is.False,
+            "the grid's measure moved the window, so the rows that build from it are stale");
+    }
+
+    // A search counts what the TABLE holds, not what the screen happens to show: every shown column of every row
+    // behind the current shape. The count is of cells, because that is what gets painted and stepped through.
+    [Test]
+    public void Searching_FindsEveryCellThatHoldsIt()
+    {
+        var grid = GroupableGrid(6);
+        grid.SearchText = "north";
+
+        grid.Search();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(grid.MatchCount, Is.EqualTo(3), "three rows carry that region, one cell each");
+            Assert.That(grid.CurrentMatch, Is.EqualTo(1), "and the first is the one being looked at");
+        });
+    }
+
+    // A search looks at the VALUE, so a column that does not show its value as words must be left out of it: a check
+    // box reads as "False", and searching for "al" lit up every unticked box in the table - pointing at text nobody
+    // can see anywhere on screen.
+    [Test]
+    public void Searching_SkipsAColumnThatShowsNoWords()
+    {
+        var grid = Grid(
+            new DataGridTextColumn { Binding = new Binding("Name"), Width = new GridLength(100) },
+            new DataGridCheckBoxColumn { Binding = new Binding("Locked"), Width = new GridLength(60) });
+        grid.ItemsSource = Flat(4);
+
+        grid.SearchText = "al";
+        grid.Search();
+
+        Assert.That(grid.MatchCount, Is.EqualTo(0), "\"False\" holds \"al\", and that is not a match anyone can see");
+    }
+
+    private sealed class Shouting : IValueConverter
+    {
+        public object Convert(object value, Type targetType, object parameter, CultureInfo culture) =>
+            value?.ToString()?.ToUpperInvariant();
+
+        public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture) => value;
+    }
+
+    // A search must find what the cell SHOWS. A column whose binding transforms its value cannot be read the cheap way
+    // - the cheap way reads the property, and the property is not what is on screen - so it is read through the
+    // binding however much that costs. Measured: a reading through a binding is some 3 µs against 0.3 µs without it,
+    // which is exactly the temptation this guards against.
+    [Test]
+    public void Searching_ReadsAConvertedColumnThroughItsBinding()
+    {
+        var shouting = new DataGridTextColumn
+        {
+            Binding = new Binding("Name") { Converter = new Shouting() }, Width = new GridLength(100)
+        };
+
+        var grid = Grid(shouting);
+        grid.ItemsSource = Flat(4);
+
+        Assert.That(shouting.ReadsWithoutTheUI, Is.False, "a converter is exactly what the cheap reading cannot do");
+
+        grid.SearchText = "ITEM 2";
+        grid.Search();
+        Assert.That(grid.MatchCount, Is.EqualTo(1), "what the cell shows is found");
+    }
+
+    // Case is not what a reader is searching for.
+    [Test]
+    public void Searching_IgnoresCase()
+    {
+        var grid = GroupableGrid(6);
+        grid.SearchText = "NORTH";
+
+        grid.Search();
+
+        Assert.That(grid.MatchCount, Is.EqualTo(3));
+    }
+
+    // A column the table is GROUPED BY is not in the table, so it is not searched either - its value is in the
+    // caption, and counting it would count cells nobody can see.
+    [Test]
+    public void Searching_SkipsAColumnThatLeftTheTable()
+    {
+        var grid = GroupableGrid(6);
+        grid.SearchText = "north";
+        grid.Search();
+        Assert.That(grid.MatchCount, Is.EqualTo(3));
+
+        grid.GroupBy(grid.Columns[0]);
+        grid.Search();
+
+        Assert.That(grid.MatchCount, Is.EqualTo(0), "the Region column is the grouping now");
+    }
+
+    // Next and previous WRAP: a Find Next that stops at the last match leaves the reader scrolling back by hand.
+    [Test]
+    public void SteppingThroughMatches_WrapsRound()
+    {
+        var grid = GroupableGrid(6);
+        grid.SearchText = "north";
+        grid.Search();
+
+        grid.FindNext();
+        grid.FindNext();
+        Assert.That(grid.CurrentMatch, Is.EqualTo(3), "stepped to the last");
+
+        grid.FindNext();
+        Assert.That(grid.CurrentMatch, Is.EqualTo(1), "and round to the first");
+
+        grid.FindPrevious();
+        Assert.That(grid.CurrentMatch, Is.EqualTo(3), "and back round the other way");
+    }
+
+    // A match inside a SHUT group is still a match, and stepping onto it opens the group that holds it - a count that
+    // covered only what happens to be unfolded would be a count of the screen, not of the table.
+    [Test]
+    public void SteppingOntoAMatchInsideAShutGroup_OpensIt()
+    {
+        var grid = GroupableGrid(6);
+
+        // Grouped by REGION, searched in Name: grouping by the column being searched would hide it, and the search
+        // would honestly find nothing.
+        grid.GroupBy(grid.Columns[0]);
+        Assert.That(grid.Rows.All(r => r.Node is DataGridGroup), Is.True, "everything is folded away");
+
+        grid.SearchText = "Item 4";
+        grid.Search();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(grid.MatchCount, Is.EqualTo(1), "the row is found though nothing shows it");
+            Assert.That(grid.Rows.Any(r => r.Node is Row { Name: "Item 4" }), Is.True, "and its group was opened");
+        });
+    }
+
+    // The paint is held by ITEM, so a cell built after the search - scrolled into view, or realized when a group was
+    // opened - is painted like the rest. Held by row number it would have moved the moment a group opened.
+    [Test]
+    public void AMatchedCell_PaintsItselfWhenItIsBuilt()
+    {
+        var grid = GroupableGrid(6);
+        grid.SearchText = "north";
+        grid.Search();
+        Relayout(grid);
+
+        var matched = Enumerable.Range(0, 6)
+            .Select(i => grid.ItemContainerGenerator.ContainerFromIndex(i) as DataGridRow)
+            .Select(r => r?.CellAt(0))
+            .Where(c => c is { IsSearchMatch: true })
+            .ToList();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(matched.Count, Is.EqualTo(3), "every matched cell on screen says so");
+            Assert.That(matched.Count(c => c.IsCurrentSearchMatch), Is.EqualTo(1), "and exactly one is the current");
+        });
+    }
+
+    // Taking the strip away calls the search off, for the same reason taking the grouping strip away ungroups: what it
+    // painted over the table would otherwise stay with nothing left to explain or undo it.
+    [Test]
+    public void HidingTheSearchStrip_CallsTheSearchOff()
+    {
+        var grid = GroupableGrid(6);
+        grid.ShowSearchPanel = true;
+        grid.SearchText = "north";
+        grid.Search();
+        Assert.That(grid.MatchCount, Is.EqualTo(3));
+
+        grid.ShowSearchPanel = false;
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(grid.MatchCount, Is.EqualTo(0));
+            Assert.That(grid.CurrentMatch, Is.EqualTo(0));
+        });
+    }
+
+    private sealed class PanelSwitch : System.ComponentModel.INotifyPropertyChanged
+    {
+        private bool _shown;
+
+        public bool Shown
+        {
+            get => _shown;
+            set { _shown = value; PropertyChanged?.Invoke(this, new System.ComponentModel.PropertyChangedEventArgs(nameof(Shown))); }
+        }
+
+        public event System.ComponentModel.PropertyChangedEventHandler PropertyChanged;
+    }
+
+    // The strip closes ITSELF, from its own button, so the switch that opened it has to hear about it. A page binds the
+    // switch with a plain {Binding} and never says Mode - that resolves to what the PROPERTY declares, which is why the
+    // property declares TwoWay. Left one-way, the strip went away and the checkbox stayed on.
+    // And the close has to write the way PART_Close writes: SetCurrentValue, at the binding's own slot. The plain CLR
+    // setter writes Local, which outranks Binding for good - the strip then closed once and the switch could never open
+    // it again, because every later push landed in a slot the local write masks.
+    [Test]
+    public void TheSearchStripClosingItself_ReachesTheSourceItWasOpenedFrom()
+    {
+        var switcher = new PanelSwitch { Shown = true };
+        var grid = GroupableGrid(6);
+        grid.DataContext = switcher;
+        grid.SetBinding(nameof(TreeDataGrid.ShowSearchPanel), new Binding(nameof(PanelSwitch.Shown)));
+        Assert.That(grid.ShowSearchPanel, Is.True, "the binding pushes the source on connect");
+
+        grid.SetCurrentValue(TreeDataGrid.ShowSearchPanelProperty, false);   // what PART_Close does
+
+        Assert.That(switcher.Shown, Is.False, "the source learns the strip closed itself");
+
+        switcher.Shown = true;          // and the switch has to be able to open it again
+        BindingUpdateQueue.Flush();
+        Assert.That(grid.ShowSearchPanel, Is.True, "nothing was left masking the binding");
+    }
+
+    private static void PressKey(TreeDataGrid grid, Key key) =>
+        grid.RaiseEvent(new KeyEventArgs(KeyboardDevice.CurrentDevice, key, InputModifiers.None, 0)
+        {
+            RoutedEvent = Keyboard.KeyDownEvent
+        });
+
+    // Escape takes the strip away, from the table or from the strip's own field - the key travels up through every
+    // element and the field never claims it, so the grid is the one place that has to answer for both.
+    [Test]
+    public void Escape_TakesTheSearchStripAway()
+    {
+        var grid = GroupableGrid(6);
+        grid.ShowSearchPanel = true;
+
+        PressKey(grid, Key.Escape);
+
+        Assert.That(grid.ShowSearchPanel, Is.False);
+    }
+
+    // And it leaves the INNERMOST thing first: with a cell open, Escape belongs to the editor and the strip stays.
+    [Test]
+    public void Escape_LeavesTheEditorBeforeTheStrip()
+    {
+        var grid = SelectableGrid();
+        grid.ShowSearchPanel = true;
+        Assert.That(grid.BeginEdit(1, 0), Is.True, "a cell has to be open for the order to mean anything");
+
+        PressKey(grid, Key.Escape);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(grid.IsEditing, Is.False, "the editor is what Escape left");
+            Assert.That(grid.ShowSearchPanel, Is.True, "and the strip is still there");
+        });
+
+        PressKey(grid, Key.Escape);
+        Assert.That(grid.ShowSearchPanel, Is.False, "the next one takes the strip");
+    }
+
+    private static TreeDataGrid GroupableGrid(int rows = 6)
+    {
+        var grid = Grid(
+            new DataGridTextColumn { Binding = new Binding("Region"), Width = new GridLength(100) },
+            new DataGridTextColumn { Binding = new Binding("Size"), Width = new GridLength(100) },
+            new DataGridTextColumn { Binding = new Binding("Name"), Width = new GridLength(100) });
+        grid.ItemsSource = Flat(rows);
+        return grid;
+    }
+
+    // A group is a NODE with children, so everything the tree already does applies to it: it is one row, the rows under
+    // it are its children, and the flattener splices them the way it splices a branch. Nothing about grouping needed a
+    // second mechanism.
+    [Test]
+    public void Grouping_PutsAHeaderOverEachSetOfRowsAndKeepsThemUnderIt()
+    {
+        var grid = GroupableGrid();
+
+        grid.GroupBy(grid.Columns[0]);
+        grid.ExpandRow(grid.Rows[0]);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(grid.Rows[0].Node, Is.InstanceOf<DataGridGroup>(), "a group leads its rows");
+            Assert.That(((DataGridGroup)grid.Rows[0].Node).Count, Is.EqualTo(3), "and knows how many it has");
+            Assert.That(grid.Rows[1].Node, Is.InstanceOf<Row>(), "opened, its rows are spliced in under it");
+            Assert.That(grid.Rows[1].Depth, Is.EqualTo(1), "one level in, as a branch's children are");
+        });
+    }
+
+    // A table is grouped in order to FOLD it, so grouping shows the CAPTIONS and nothing else until one is opened.
+    // Groups that came up open were the table back again with captions in it: closing one only uncovered the next open
+    // one, and over ten thousand rows there were hundreds of them.
+    [Test]
+    public void Grouping_ShowsTheCaptionsAndNothingUnderThem()
+    {
+        var grid = GroupableGrid(6);
+
+        grid.GroupBy(grid.Columns[0]);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(grid.Rows.Count, Is.EqualTo(2), "two groups over six rows, and six rows folded away");
+            Assert.That(grid.Rows.All(r => r.Node is DataGridGroup), Is.True);
+            Assert.That(grid.Rows.All(r => !r.IsExpanded), Is.True);
+        });
+
+        grid.ExpandRow(grid.Rows[0]);
+        Assert.That(grid.Rows.Count, Is.EqualTo(5), "opening one brings back its three");
+    }
+
+    // Closing a group takes its rows off the table, exactly as closing a branch does - and the same ToggleRow does it,
+    // whether the press came from the caption, the number or the expander.
+    [Test]
+    public void ClosingAGroup_TakesItsRowsAway()
+    {
+        var grid = GroupableGrid(4);
+        grid.GroupBy(grid.Columns[0]);
+        grid.ExpandRow(grid.Rows[0]);
+        Assert.That(grid.Rows.Count, Is.EqualTo(4));
+
+        grid.ToggleRow(grid.Rows[0]);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(grid.Rows.Count, Is.EqualTo(2), "one group shut takes its two rows with it");
+            Assert.That(grid.Rows[0].Node, Is.InstanceOf<DataGridGroup>());
+            Assert.That(grid.Rows[1].Node, Is.InstanceOf<DataGridGroup>(), "the other group is now next");
+        });
+    }
+
+    // Grouping by a second column nests: the outer group's children are groups of their own, and only the innermost
+    // hold rows. The order of GroupDescriptions is the order of the nesting, and each level opens on its own.
+    [Test]
+    public void GroupingByTwoColumns_Nests()
+    {
+        var grid = GroupableGrid(4);
+
+        grid.GroupBy(grid.Columns[0]);
+        grid.GroupBy(grid.Columns[2]);
+        grid.ExpandRow(grid.Rows[0]);
+
+        var outer = (DataGridGroup)grid.Rows[0].Node;
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(outer.Level, Is.EqualTo(0));
+            Assert.That(grid.Rows[1].Node, Is.InstanceOf<DataGridGroup>(), "the outer group holds groups");
+            Assert.That(((DataGridGroup)grid.Rows[1].Node).Level, Is.EqualTo(1));
+            Assert.That(grid.Rows[1].IsExpanded, Is.False, "each level opens on its own, one press at a time");
+        });
+
+        grid.ExpandRow(grid.Rows[1]);
+        Assert.That(grid.Rows[2].Node, Is.InstanceOf<Row>(), "and the inner one holds the rows");
+    }
+
+    // A group the user opened comes back open after the table is re-shaped. Every group is built afresh by a sort or a
+    // filter, so remembering the OBJECTS forgot the user's work every time: open a group, sort a column, and it shut.
+    [Test]
+    public void AnOpenedGroup_IsStillOpenAfterASort()
+    {
+        var grid = GroupableGrid(6);
+        grid.GroupBy(grid.Columns[0]);
+        var opened = (DataGridGroup)grid.Rows[0].Node;
+        grid.ExpandRow(grid.Rows[0]);
+        var open = grid.Rows.Count;
+
+        grid.SortBy(grid.Columns[1], descending: true);
+
+        // BY KEY, not by place: what order the groups themselves come in is a separate question (plan item 2a), and
+        // this one is only about whether the group the user opened is still open.
+        var again = grid.Rows.First(r => r.Node is DataGridGroup group && Equals(group.Key, opened.Key));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(again.IsExpanded, Is.True, "the group the user opened is open again");
+            Assert.That(grid.Rows.Count, Is.EqualTo(open), "and only that one");
+        });
+    }
+
+    // ...and a group the user SHUT stays shut, or the memory would only ever grow one way.
+    [Test]
+    public void AClosedGroup_IsStillClosedAfterASort()
+    {
+        var grid = GroupableGrid(6);
+        grid.GroupBy(grid.Columns[0]);
+        grid.ExpandRow(grid.Rows[0]);
+        grid.CollapseRow(grid.Rows[0]);
+
+        grid.SortBy(grid.Columns[1], descending: true);
+
+        Assert.That(grid.Rows.Count, Is.EqualTo(2), "two captions and nothing under them");
+    }
+
+    // Two columns deep there are hundreds of captions, so folding the table is a command of its own - and it takes a
+    // DEPTH, which is what "leave only the first level open" means.
+    [Test]
+    public void FoldingTheWholeTable_TakesADepth()
+    {
+        var grid = GroupableGrid(4);
+        grid.GroupBy(grid.Columns[0]);
+        grid.GroupBy(grid.Columns[2]);
+
+        grid.ExpandAllGroups();
+        var all = grid.Rows.Count;
+
+        grid.ExpandGroupsTo(1);
+        var outerOnly = grid.Rows.Count;
+
+        grid.CollapseAllGroups();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(all, Is.EqualTo(10), "two groups, four inner groups, four rows");
+            Assert.That(outerOnly, Is.EqualTo(6), "the outer two open, the inner four shut");
+            Assert.That(grid.Rows.Count, Is.EqualTo(2), "and shut, only the outermost captions are left");
+        });
+    }
+
+    // Grouping by a column that is already grouped by takes it back OUT - one call, so the chip in the panel and the
+    // header dropped into it are the same gesture in both directions.
+    [Test]
+    public void GroupingByTheSameColumnTwice_Ungroups()
+    {
+        var grid = GroupableGrid(4);
+
+        grid.GroupBy(grid.Columns[0]);
+        grid.GroupBy(grid.Columns[0]);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(grid.GroupDescriptions.Count, Is.EqualTo(0));
+            Assert.That(grid.Rows.Count, Is.EqualTo(4), "and the rows are a flat table again");
+            Assert.That(grid.Rows[0].Node, Is.InstanceOf<Row>());
+        });
+    }
+
+    // The order of the chips IS the nesting, so carrying one along the strip is how a column changes how deep it
+    // groups - and the rows have to come out re-nested, not merely re-labelled.
+    [Test]
+    public void CarryingAChip_ChangesHowDeepItsColumnGroups()
+    {
+        var grid = GroupableGrid(4);
+        var outer = grid.Columns[0];
+        var inner = grid.Columns[2];
+        grid.GroupBy(outer);
+        grid.GroupBy(inner);
+
+        grid.MoveGrouping(1, 0);
+
+        grid.ExpandRow(grid.Rows[0]);
+        var top = (DataGridGroup)grid.Rows[0].Node;
+        var under = (DataGridGroup)grid.Rows[1].Node;
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(grid.GroupDescriptions[0], Is.SameAs(inner), "the carried column is outermost now");
+            Assert.That(top.Column, Is.SameAs(inner), "and the groups really are built that way round");
+            Assert.That(under.Column, Is.SameAs(outer));
+        });
+    }
+
+    // The × is drawn as the way out of the grouping, so it has to be the only thing that takes a column out. A chip
+    // that ungrouped wherever it was pressed made its own × decoration, and surprised anyone who meant to move it.
+    [Test]
+    public void PressingAChip_UngroupsOnlyThroughItsCross()
+    {
+        var grid = GroupableGrid(4);
+        grid.GroupBy(grid.Columns[0]);
+        grid.GroupBy(grid.Columns[2]);
+
+        var panel = GroupPanel(grid);
+        var chip = ChipsOf(panel)[0];
+        var cross = CrossOf(chip);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(cross, Is.Not.Null, "the chip has a × of its own");
+            Assert.That(chip.PressedRemove(cross), Is.True, "a press that landed on it takes the column out");
+            Assert.That(chip.PressedRemove(chip), Is.False, "a press anywhere else on the chip takes nothing out");
+        });
+    }
+
+    private static IUIComponent CrossOf(DataGridGroupChip chip)
+    {
+        var pending = new Stack<IUIComponent>();
+        pending.Push(chip);
+        while (pending.Count > 0)
+        {
+            var node = pending.Pop();
+            if (node is Adamantium.UI.Controls.Base.UIComponent { Name: "PART_Remove" }) return node;
+            foreach (var child in node.VisualChildren) pending.Push(child);
+        }
+
+        return null;
+    }
+
+    // Carrying a chip and pressing one are the SAME press: the strip owns both, so a chip cannot ungroup itself on the
+    // way to another place in the order.
+    [Test]
+    public void AChipCarriedAcross_DoesNotAlsoUngroupItself()
+    {
+        var grid = GroupableGrid(4);
+        grid.GroupBy(grid.Columns[0]);
+        grid.GroupBy(grid.Columns[2]);
+
+        var panel = GroupPanel(grid);
+        Assert.That(panel.DropTargetAt(0), Is.EqualTo(0), "dropped at the left edge, it lands first");
+
+        panel.BeginCarry(1, 200);
+        panel.EndCarry(0);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(grid.GroupDescriptions.Count, Is.EqualTo(2), "both columns are still grouped by");
+            Assert.That(grid.GroupDescriptions[0], Is.SameAs(grid.Columns[2]), "and the carried one moved");
+        });
+    }
+
+    private static DataGridGroupPanel GroupPanel(TreeDataGrid grid)
+    {
+        var panel = new DataGridGroupPanel { Owner = grid };
+        panel.Template = new ControlTemplate(() =>
+        {
+            var root = new Adamantium.UI.Controls.Panels.Grid();
+            var chips = new StackPanel { Orientation = Orientation.Horizontal };
+            var mark = new Border { Width = 2, Visibility = Visibility.Collapsed };
+            root.Children.Add(chips);
+            root.Children.Add(mark);
+
+            var result = new TemplateResult { RootComponent = root };
+            result.RegisterName("PART_Chips", chips);
+            result.RegisterName("PART_DropMark", mark);
+            return result;
+        });
+
+        // The first pass applies the template, and only then does the strip have a chips panel to build into. A chip
+        // has no size of its own without a theme, so it is given one and laid out again: the gesture is answered
+        // against WHERE the chips are.
+        ((IMeasurableComponent)panel).InvalidateMeasure();
+        panel.Measure(new Size(400, 30));
+        panel.Arrange(new Rect(0, 0, 400, 30));
+
+        foreach (var chip in ChipsOf(panel))
+        {
+            chip.Width = 100;
+            chip.Height = 20;
+            chip.Template = ChipTemplate();
+            for (IUIComponent node = chip; node != null; node = node.VisualParent)
+                (node as IMeasurableComponent)?.InvalidateMeasure();
+        }
+
+        panel.Measure(new Size(400, 30));
+        panel.Arrange(new Rect(0, 0, 400, 30));
+        return panel;
+    }
+
+    // A chip has no template without a theme, and the rule under test is about one of its PARTS.
+    private static ControlTemplate ChipTemplate() => new(() =>
+    {
+        var root = new Adamantium.UI.Controls.Panels.Grid();
+        var cross = new Border { Name = "PART_Remove", Width = 10 };
+        root.Children.Add(cross);
+
+        var result = new TemplateResult { RootComponent = root };
+        result.RegisterName("PART_Remove", cross);
+        return result;
+    });
+
+    private static List<DataGridGroupChip> ChipsOf(IUIComponent root)
+    {
+        var found = new List<DataGridGroupChip>();
+        var pending = new Stack<IUIComponent>();
+        pending.Push(root);
+        while (pending.Count > 0)
+        {
+            var node = pending.Pop();
+            if (node is DataGridGroupChip chip) found.Add(chip);
+            foreach (var child in node.VisualChildren) pending.Push(child);
+        }
+
+        return found;
+    }
+
+    // A header carried into the grouping strip GROUPS instead of moving: the same drag has two endings, and which one
+    // it gets is decided by where it was let go.
+    [Test]
+    public void AHeaderDroppedIntoTheGroupingStrip_GroupsInsteadOfMoving()
+    {
+        var grid = GroupableGrid(4);
+        var headers = Headers(grid);
+        var order = grid.Columns[0];
+
+        headers.BeginReorder(0, 10);
+        headers.EndReorder(250, intoGroupPanel: true);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(grid.GroupDescriptions.Count, Is.EqualTo(1), "it grouped");
+            Assert.That(grid.GroupDescriptions[0], Is.SameAs(order));
+            Assert.That(grid.Columns[0], Is.SameAs(order), "and it did NOT also move");
+        });
+    }
+
+    // A total counts the rows of its own level: shut or open changes nothing, and a BRANCH's children are counted by
+    // that branch, not by the table. Counting them here made the table's total disagree with the sum of its groups' -
+    // on the stand, 58000 against five groups of 2000.
+    [Test]
+    public void ATotal_CountsItsOwnLevel_WhateverIsOpen()
+    {
+        var grid = GroupableGrid(4);
+        var parent = (Row)grid.Rows[0].Node;
+        parent.Children.Add(new Row { Name = "Child", Region = "north", Size = 100 });
+        grid.ChildrenPath = "Children";
+        grid.Refresh();
+
+        grid.Columns[1].Aggregate = DataGridAggregate.Sum;
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(grid.HasTotals, Is.True, "the footer band exists exactly while a column asks for a total");
+            Assert.That(grid.TotalFor(grid.Columns[1]), Is.EqualTo(10.0), "1+2+3+4, and NOT the branch's own 100");
+            Assert.That(grid.TotalFor(grid.Columns[0]), Is.Null, "a column that asks for none has none");
+        });
+
+        grid.ExpandRow(grid.Rows[0]);
+        Assert.That(grid.TotalFor(grid.Columns[1]), Is.EqualTo(10.0), "and opening the branch does not change it");
+    }
+
+    // What the table totals is what its groups total between them - one population, counted once, however it is cut up.
+    [Test]
+    public void TheTableTotal_IsWhatItsGroupsTotalBetweenThem()
+    {
+        var grid = GroupableGrid(6);
+        grid.Columns[1].Aggregate = DataGridAggregate.Count;
+        grid.GroupBy(grid.Columns[0]);
+
+        var groups = grid.Rows.Select(r => r.Node).OfType<DataGridGroup>().ToList();
+        var counted = groups.Sum(g => (int)grid.TotalFor(grid.Columns[1], g));
+
+        Assert.That(counted, Is.EqualTo(grid.TotalFor(grid.Columns[1])), "the parts add up to the whole");
+    }
+
+    // A filtered-out row is not part of the total: the shape is what the table HOLDS, and a filter changes it.
+    [Test]
+    public void ATotal_LeavesOutWhatTheFilterRemoved()
+    {
+        var grid = GroupableGrid(4);
+        grid.Columns[1].Aggregate = DataGridAggregate.Sum;
+        Assert.That(grid.TotalFor(grid.Columns[1]), Is.EqualTo(10.0));
+
+        grid.SetFilter(item => ((Row)item).Size > 2);
+
+        Assert.That(grid.TotalFor(grid.Columns[1]), Is.EqualTo(7.0), "3+4, the two rows the filter left");
+    }
+
+    // Every aggregate over one column, so each one is pinned to a number rather than to "it computed something".
+    [Test]
+    public void TheAggregates_EachAnswerForTheirOwnQuestion()
+    {
+        var grid = GroupableGrid(4);
+        var column = grid.Columns[1];
+
+        column.Aggregate = DataGridAggregate.Count;
+        Assert.That(grid.TotalFor(column), Is.EqualTo(4));
+
+        column.Aggregate = DataGridAggregate.Min;
+        Assert.That(grid.TotalFor(column), Is.EqualTo(1.0));
+
+        column.Aggregate = DataGridAggregate.Max;
+        Assert.That(grid.TotalFor(column), Is.EqualTo(4.0));
+
+        column.Aggregate = DataGridAggregate.Average;
+        Assert.That(grid.TotalFor(column), Is.EqualTo(2.5));
+    }
+
+    // A group's total counts ITS rows only - that is the whole point of a total in a group's header.
+    [Test]
+    public void AGroupsTotal_CountsOnlyItsOwnRows()
+    {
+        var grid = GroupableGrid(4);
+        grid.Columns[1].Aggregate = DataGridAggregate.Sum;
+        grid.GroupBy(grid.Columns[0]);
+
+        var south = (DataGridGroup)grid.Rows[0].Node;
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(south.Key, Is.EqualTo("south"));
+            Assert.That(grid.TotalFor(grid.Columns[1], south), Is.EqualTo(4.0), "rows 1 and 3");
+            Assert.That(grid.TotalFor(grid.Columns[1]), Is.EqualTo(10.0), "while the table's own total is all four");
+        });
+    }
+
+    // A total is worked out ONCE per shape and remembered: a walk of the data per frame is what a footer must never
+    // cost. Changing the shape is what forgets it.
+    [Test]
+    public void AGroupsTotal_IsWorkedOutOnceAndForgottenWhenTheShapeChanges()
+    {
+        var grid = GroupableGrid(4);
+        grid.Columns[1].Aggregate = DataGridAggregate.Sum;
+        grid.GroupBy(grid.Columns[0]);
+
+        var group = (DataGridGroup)grid.Rows[0].Node;
+        var first = grid.TotalFor(grid.Columns[1], group);
+
+        Assert.That(grid.TotalFor(grid.Columns[1], group), Is.SameAs(first), "asked twice, worked out once");
+
+        grid.SetFilter(item => ((Row)item).Size > 2);
+
+        var regrouped = (DataGridGroup)grid.Rows[0].Node;
+        Assert.That(grid.TotalFor(grid.Columns[1], regrouped), Is.EqualTo(3.0), "and the new shape has its own");
+    }
+
+    // The strip of totals is placed by the SAME numbers the rows and the header are - the grid's one width pass - so a
+    // total can never stand under another column.
+    [Test]
+    public void TheFooterStrip_StandsOnTheColumnsItTotals()
+    {
+        var grid = GroupableGrid(4);
+        grid.Columns[1].Aggregate = DataGridAggregate.Sum;
+        Relayout(grid);
+
+        var footer = new DataGridFooterPresenter { Owner = grid };
+        footer.Measure(new Size(400, 24));
+        footer.Arrange(new Rect(0, 0, 400, 24));
+
+        var cells = footer.VisualChildren.OfType<DataGridFooterCell>().ToList();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(cells.Count, Is.EqualTo(3), "one place per column, total or not");
+            Assert.That(cells[1].Bounds.X, Is.EqualTo(grid.Columns[1].Offset), "and each stands on its own column");
+            Assert.That(cells[1].Content, Is.EqualTo("10"), "with the number written out");
+            Assert.That(cells[0].Content, Is.Null, "a column with no total leaves its place blank");
+        });
+    }
+
+    // A column being resized has to carry the strip of totals with it. The strip measures its cells at the columns'
+    // widths, but a measure that is not invalidated never runs: widening a column left its total trimmed to an ellipsis
+    // in the width it used to have.
+    [Test]
+    public void TheFooterStrip_FollowsAColumnBeingResized()
+    {
+        var grid = GroupableGrid(4);
+        grid.Columns[1].Aggregate = DataGridAggregate.Sum;
+        Relayout(grid);
+
+        var footer = new DataGridFooterPresenter { Owner = grid };
+        footer.Measure(new Size(400, 24));
+        footer.Arrange(new Rect(0, 0, 400, 24));
+
+        var cell = footer.VisualChildren.OfType<DataGridFooterCell>().ElementAt(1);
+        Assert.That(cell.Bounds.Width, Is.EqualTo(100), "it starts at its column's width");
+
+        grid.Columns[1].Width = new GridLength(180);
+        grid.InvalidateColumns();
+        Relayout(grid);
+
+        footer.Measure(new Size(400, 24));
+        footer.Arrange(new Rect(0, 0, 400, 24));
+
+        Assert.That(cell.Bounds.Width, Is.EqualTo(180), "and follows the column that was widened");
+    }
+
+    // The strip of totals sits OUTSIDE the rows' scroller and carries the sideways offset itself, so it has to be told
+    // when that offset moves. Told only the header band, the totals stayed where they were last measured and stood
+    // under the wrong columns the moment the table was scrolled.
+    [Test]
+    public void TheFooterStrip_FollowsTheColumnsSideways()
+    {
+        var grid = GroupableGrid(4);
+        grid.Columns[1].Aggregate = DataGridAggregate.Sum;
+        Relayout(grid, width: 200);
+
+        var footer = new DataGridFooterPresenter { Owner = grid };
+        footer.Measure(new Size(200, 24));
+        footer.Arrange(new Rect(0, 0, 200, 24));
+
+        var cell = footer.VisualChildren.OfType<DataGridFooterCell>().ElementAt(1);
+        Assert.That(cell.Bounds.X, Is.EqualTo(100), "unscrolled, it stands on its column");
+
+        grid.HorizontalOffset = 60;
+
+        // TOLD, before anything measures it again: nothing else in a scroll invalidates this strip, and a strip that
+        // is never invalidated is never re-placed - that is the whole defect, not the arithmetic below.
+        Assert.That(((IMeasurableComponent)footer).IsMeasureValid, Is.False, "the strip was told the columns moved");
+
+        footer.Measure(new Size(200, 24));
+        footer.Arrange(new Rect(0, 0, 200, 24));
+
+        Assert.That(cell.Bounds.X, Is.EqualTo(40), "and it moves with them");
+    }
+
+    // The format belongs to the COLUMN, so a sum is written the way that column's values are.
+    [Test]
+    public void ATotal_IsWrittenTheWayItsColumnAsksFor()
+    {
+        var grid = GroupableGrid(4);
+        var column = grid.Columns[1];
+        column.Aggregate = DataGridAggregate.Sum;
+        column.AggregateFormat = "Σ {0:N0}";
+
+        var footer = new DataGridFooterPresenter { Owner = grid };
+        footer.Measure(new Size(400, 24));
+
+        var cell = footer.VisualChildren.OfType<DataGridFooterCell>().ElementAt(1);
+        Assert.That(cell.Content, Is.EqualTo("Σ 10"));
+    }
+
+    // The caption and a total drawn in the same place are two things and one of them is unreadable - measured on the
+    // stand, "Region: Iberia (2000)" with the Code column's count of 2000 written over its first word. The caption
+    // gives way: it starts after a total standing where it would begin, and stops where the next one starts.
+    [Test]
+    public void TheGroupsCaption_GivesWayToTheTotalsOnItsRow()
+    {
+        var grid = Grid(
+            new DataGridTextColumn { Binding = new Binding("Name"), Width = new GridLength(100) },
+            new DataGridTextColumn { Binding = new Binding("Note"), Width = new GridLength(100) },
+            new DataGridTextColumn { Binding = new Binding("Size"), Width = new GridLength(100) },
+            new DataGridTextColumn { Binding = new Binding("Region"), Width = new GridLength(100) });
+        grid.ItemsSource = Flat(4);
+        grid.Columns[0].Aggregate = DataGridAggregate.Count;
+        grid.Columns[2].Aggregate = DataGridAggregate.Count;
+
+        // Grouped by the LAST column, so the two totals keep a column between them for the caption to stand in - the
+        // column the table is grouped by leaves the table entirely.
+        grid.GroupBy(grid.Columns[3]);
+        Relayout(grid, width: 400);
+
+        var caption = (grid.ItemContainerGenerator.ContainerFromIndex(0) as DataGridRow)?.GroupCaption;
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(caption, Is.Not.Null);
+            Assert.That(caption.Bounds.X, Is.EqualTo(100), "it begins after the total that stood where it would");
+            Assert.That(caption.Bounds.Width, Is.EqualTo(100), "and stops where the next total begins");
+        });
+    }
+
+    // The zebra counts the rows of the DATA. A caption stands in the same flat list, so it used to take whichever
+    // stripe its place happened to fall on and the group headers came out half light, half dark - a table that looks
+    // like it made a mistake. It takes no stripe at all now, and its own colour from the theme.
+    [Test]
+    public void AGroupRow_TakesNoStripeOfTheZebra()
+    {
+        var grid = GroupableGrid(4);
+        grid.AlternationCount = 2;
+        grid.GroupBy(grid.Columns[0]);
+        grid.ExpandRow(grid.Rows[0]);
+        grid.ExpandRow(grid.Rows[3]);
+        Relayout(grid);
+
+        var rows = Enumerable.Range(0, 6)
+            .Select(i => grid.ItemContainerGenerator.ContainerFromIndex(i) as DataGridRow).ToList();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(rows[0].IsGroup, Is.True, "the first row stands for a group");
+            Assert.That(rows[3].IsGroup, Is.True, "and so does the one that starts the next");
+            Assert.That(rows[0].AlternationIndex, Is.EqualTo(0), "a caption takes no stripe");
+            Assert.That(rows[3].AlternationIndex, Is.EqualTo(0), "whatever place it fell on");
+            Assert.That(rows[1].AlternationIndex, Is.Not.EqualTo(rows[2].AlternationIndex),
+                "while the rows under it still alternate");
+        });
+    }
+
+    // A part that comes and goes has to COME AND GO. A group's totals were hidden instead of removed when the container
+    // went back to standing for a record, and the drawn set went on holding children that had left it: after scrolling
+    // away and back, twenty-seven rows of twenty-nine were painted blank on the stand.
+    [Test]
+    public void AGroupsTotals_LeaveTheRowWhenItStopsStandingForAGroup()
+    {
+        var grid = GroupableGrid(4);
+        grid.Columns[1].Aggregate = DataGridAggregate.Sum;
+        grid.GroupBy(grid.Columns[0]);
+        grid.ExpandRow(grid.Rows[0]);
+        Relayout(grid);
+
+        var groupRow = grid.ItemContainerGenerator.ContainerFromIndex(0) as DataGridRow;
+        Assert.That(TotalsIn(groupRow), Is.EqualTo(1), "the group row carries the one column's total");
+
+        grid.ClearGrouping();
+        Relayout(grid);
+
+        var dataRow = grid.ItemContainerGenerator.ContainerFromIndex(0) as DataGridRow;
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(dataRow?.Group, Is.Null, "the same container stands for a record now");
+            Assert.That(TotalsIn(dataRow), Is.EqualTo(0), "and no total is left inside it, hidden or otherwise");
+        });
+    }
+
+    private static int TotalsIn(DataGridRow row) =>
+        row == null ? -1 : ((IUIComponent)row).VisualChildren.OfType<DataGridFooterCell>().Count();
+
+    // The strip is where a grouping is shown and where it is undone, so taking it away ungroups. Hidden over a grouped
+    // table, it left the table standing in groups with nothing saying why and no way back.
+    [Test]
+    public void HidingTheGroupingStrip_Ungroups()
+    {
+        var grid = GroupableGrid(4);
+        grid.ShowGroupPanel = true;
+        grid.GroupBy(grid.Columns[0]);
+        Assert.That(grid.Rows[0].Node, Is.InstanceOf<DataGridGroup>());
+
+        grid.ShowGroupPanel = false;
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(grid.GroupDescriptions.Count, Is.EqualTo(0));
+            Assert.That(grid.Rows.Count, Is.EqualTo(4), "the table is flat again");
+            Assert.That(grid.Rows[0].Node, Is.InstanceOf<Row>());
+        });
+    }
+
+    // ...but a page that never shows the strip and groups from code is left alone: nothing ever turns off.
+    [Test]
+    public void GroupingWithoutTheStrip_IsLeftAlone()
+    {
+        var grid = GroupableGrid(4);
+
+        grid.GroupBy(grid.Columns[0]);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(grid.ShowGroupPanel, Is.False, "no strip was ever asked for");
+            Assert.That(grid.GroupDescriptions.Count, Is.EqualTo(1), "and the grouping stands");
+            Assert.That(grid.Rows[0].Node, Is.InstanceOf<DataGridGroup>());
+        });
+    }
+
+    // A column the table is GROUPED BY leaves the table: its value is the same on every row of a group and already
+    // stands in that group's caption, so keeping it repeated one value down the whole table - and, worse, it went on
+    // scrolling under the caption and its own total landed on top of it.
+    [Test]
+    public void TheGroupedColumn_LeavesTheTable()
+    {
+        var grid = GroupableGrid(4);
+        var grouped = grid.Columns[0];
+        Relayout(grid, width: 400);
+        var full = grid.ColumnsWidth;
+
+        grid.GroupBy(grouped);
+        Relayout(grid, width: 400);
+
+        var row = grid.ItemContainerGenerator.ContainerFromIndex(1) as DataGridRow;
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(grouped.IsShown, Is.False);
+            Assert.That(grouped.ActualWidth, Is.EqualTo(0), "it takes no width");
+            Assert.That(grid.ColumnsWidth, Is.EqualTo(full - 100), "so the table is one column narrower");
+            Assert.That(row?.CellAt(0), Is.Null, "and no row builds a cell for it");
+        });
+
+        grid.ClearGrouping();
+        Relayout(grid, width: 400);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(grouped.IsShown, Is.True, "ungrouping gives it back");
+            Assert.That(grid.ColumnsWidth, Is.EqualTo(full));
+        });
+    }
+
+    // The expander cannot live on a column that left the table, or the tree could not be opened at all.
+    [Test]
+    public void TheExpander_MovesOffAColumnThatWasGroupedBy()
+    {
+        var grid = GroupableGrid(4);
+        grid.ExpanderColumnIndex = 0;
+        Assert.That(grid.ExpanderColumn, Is.SameAs(grid.Columns[0]));
+
+        grid.GroupBy(grid.Columns[0]);
+
+        Assert.That(grid.ExpanderColumn, Is.SameAs(grid.Columns[1]), "it moves to the first column still shown");
+    }
+
+    // The pinned zone is a COLUMN's lane, and a caption drawn across it reads as that column's text. So the caption
+    // begins where that zone ends, whatever else is going on.
+    [Test]
+    public void TheGroupsCaption_BeginsWhereThePinnedZoneEnds()
+    {
+        var grid = GroupableGrid(4);
+        grid.Columns[0].FrozenSide = DataGridFrozenSide.Left;
+        grid.GroupBy(grid.Columns[2]);
+        Relayout(grid, width: 400);
+
+        var row = grid.ItemContainerGenerator.ContainerFromIndex(0) as DataGridRow;
+        var caption = row?.GroupCaption;
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(caption, Is.Not.Null);
+            Assert.That(grid.FrozenWidth, Is.EqualTo(100), "one pinned column and no number strip");
+            Assert.That(caption.Bounds.X, Is.EqualTo(100), "the caption starts after it, not across it");
+        });
+    }
+
+    // A group row belongs to no column, so it holds no cells at all - and the container it is recycled from has to give
+    // them back to the pool, or the next data row it becomes comes up empty.
+    [Test]
+    public void AGroupRow_HoldsNoCells_AndGivesThemBackWhenItStopsBeingOne()
+    {
+        var grid = GroupableGrid(4);
+        grid.GroupBy(grid.Columns[0]);
+        Relayout(grid);
+
+        var groupRow = grid.ItemContainerGenerator.ContainerFromIndex(0) as DataGridRow;
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(groupRow?.Group, Is.Not.Null, "the first row stands for a group");
+            Assert.That(groupRow.CellAt(0), Is.Null, "and holds no cell of any column");
+        });
+
+        grid.ClearGrouping();
+        Relayout(grid);
+
+        var dataRow = grid.ItemContainerGenerator.ContainerFromIndex(0) as DataGridRow;
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(dataRow?.Group, Is.Null);
+            Assert.That(dataRow.CellAt(0), Is.Not.Null, "the container is a data row again");
+            Assert.That(dataRow.CellAt(0).Visibility, Is.EqualTo(Visibility.Visible), "with its cells shown");
         });
     }
 }

@@ -127,9 +127,10 @@ public class MergedFluentThemeTests
         var theme = new Fluent();
 
         // The two palette files had 35 brushes each, under identical keys. Nothing may be lost in the merge: a missing
-        // key does not fail loudly, it paints nothing. Plus DataGridLineColor, added since - the table's rules have to
-        // be OPAQUE, and every other stroke in the palette is deliberately not.
-        Assert.That(theme.Palette.Count, Is.EqualTo(36));
+        // key does not fail loudly, it paints nothing. Plus three added since: DataGridLineColor - the table's rules
+        // have to be OPAQUE, and every other stroke in the palette is deliberately not - and the two washes the search
+        // paints with, one for a cell it found and a denser one for the cell it is on.
+        Assert.That(theme.Palette.Count, Is.EqualTo(38));
     }
 
     [Test]
@@ -219,9 +220,10 @@ public class MergedFluentThemeTests
         var theme = new Fluent();
 
         // 35 brushes + 4 colours = the 39 keys each of the two palette files declared, plus every key added since -
-        // AcrylicFillColorDefault and DataGridLineColor. Counting only the brushes is what let four keys go missing
-        // unnoticed the first time, so the total is what is guarded; growing it is a deliberate edit here.
-        Assert.That(theme.Palette.Count + theme.RawColors.Count, Is.EqualTo(41));
+        // AcrylicFillColorDefault, DataGridLineColor and the two search washes. Counting only the brushes is what let
+        // four keys go missing unnoticed the first time, so the total is what is guarded; growing it is a deliberate
+        // edit here.
+        Assert.That(theme.Palette.Count + theme.RawColors.Count, Is.EqualTo(43));
     }
 
     [Test]

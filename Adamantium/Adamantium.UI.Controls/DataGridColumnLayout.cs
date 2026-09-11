@@ -24,6 +24,15 @@ internal static class DataGridColumnLayout
 
         foreach (var column in columns)
         {
+            // A column that is not shown takes no width and no share of the stars - see DataGridColumn.IsShown. It
+            // still gets an offset below, so anything holding an index keeps finding it where the columns around it
+            // are; it is simply a column of zero width that nothing realizes.
+            if (!column.IsShown)
+            {
+                column.ActualWidth = 0;
+                continue;
+            }
+
             var width = column.Width;
             if (width.IsStar)
             {
@@ -41,7 +50,7 @@ internal static class DataGridColumnLayout
         var remainder = double.IsInfinity(available) ? 0 : Math.Max(0, available - fixedAndAuto);
         foreach (var column in columns)
         {
-            if (!column.Width.IsStar) continue;
+            if (!column.Width.IsStar || !column.IsShown) continue;
             var share = starWeight > 0 ? remainder * Math.Max(0.0001, column.Width.Value) / starWeight : 0;
             column.ActualWidth = Clamp(column, share);
         }

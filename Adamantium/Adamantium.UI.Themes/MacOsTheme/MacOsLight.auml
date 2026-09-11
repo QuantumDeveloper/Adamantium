@@ -45,6 +45,10 @@
     <PaletteColor Key="ControlStrokeColorDefault" Color="#1F000000"/>
     <!-- The table's rules, OPAQUE - see FluentDark. -->
     <PaletteColor Key="DataGridLineColor" Color="#E0E0E0"/>
+    <!-- What a search hit is washed with - see the dark palette. -->
+    <PaletteColor Key="DataGridSearchMatchColor" Color="#66FFCC00"/>
+    <!-- ...and the cell the search is ON - see the dark palette. -->
+    <PaletteColor Key="DataGridSearchCurrentColor" Color="#B3FFCC00"/>
     <PaletteColor Key="ControlStrokeColorSecondary" Color="#2E000000"/>
 
     <!-- The UNSET surface of a selection control - see MacOsDark for why it is one key and its own. The light side had

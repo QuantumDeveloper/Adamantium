@@ -1,7 +1,4 @@
-using System;
 using System.Collections;
-using System.Collections.Generic;
-using Adamantium.Mathematics;
 using Adamantium.UI.Controls.Panels;
 using Adamantium.UI.Controls.Primitives;
 using Adamantium.UI.Controls.Text;
@@ -65,7 +62,35 @@ public abstract class DataGridColumn : FundamentalUIComponent
     public static readonly AdamantiumProperty CanSortProperty = AdamantiumProperty.Register(nameof(CanSort),
         typeof(bool), typeof(DataGridColumn), new PropertyMetadata(true));
 
-    /// <summary>Stays put while the rest scroll sideways. Frozen columns are laid out in their own zone at the left.</summary>
+    /// <summary>What this column's total says - in the footer under the table and in the header of every group.
+    /// <see cref="DataGridAggregate.None"/> leaves the column blank there.</summary>
+    public static readonly AdamantiumProperty AggregateProperty = AdamantiumProperty.Register(nameof(Aggregate),
+        typeof(DataGridAggregate), typeof(DataGridColumn),
+        new PropertyMetadata(DataGridAggregate.None, OnTotalsChanged));
+
+    /// <summary>How the total is written out - <c>"{0:N0}"</c>, <c>"Total: {0:C}"</c>. Unset prints the value itself.
+    /// Kept apart from the cells' own format: a sum of money and one of its parts are rarely written the same way.</summary>
+    public static readonly AdamantiumProperty AggregateFormatProperty = AdamantiumProperty.Register(
+        nameof(AggregateFormat), typeof(String), typeof(DataGridColumn), new PropertyMetadata(null, OnTotalsChanged));
+
+    public DataGridAggregate Aggregate
+    {
+        get => GetValue<DataGridAggregate>(AggregateProperty);
+        set => SetValue(AggregateProperty, value);
+    }
+
+    public String AggregateFormat
+    {
+        get => GetValue<String>(AggregateFormatProperty);
+        set => SetValue(AggregateFormatProperty, value);
+    }
+
+    // A total is not layout: nothing moves, the numbers under the table are simply out of date.
+    private static void OnTotalsChanged(AdamantiumComponent d, AdamantiumPropertyChangedEventArgs e)
+    {
+        if (d is DataGridColumn column) column.Owner?.RefreshTotals();
+    }
+
     /// <summary>Which edge this column is pinned to, if any. A pinned column LEAVES its neighbours and joins the zone
     /// at that edge, in declaration order - the zone is a place in the layout, not a prefix of what was declared.</summary>
     public static readonly AdamantiumProperty FrozenSideProperty = AdamantiumProperty.Register(nameof(FrozenSide),
@@ -252,6 +277,57 @@ public abstract class DataGridColumn : FundamentalUIComponent
     /// <summary>The grid this column was added to, or null while it stands alone.</summary>
     protected internal TreeDataGrid Owner => LogicalParent as TreeDataGrid;
 
+    /// <summary>Whether this column's value can be read WITHOUT the interface: a plain <c>{Binding Path}</c> with
+    /// nothing that could transform it IS the property, so a cached getter off the item gives the same answer the
+    /// binding would - measured at tens of nanoseconds against some three microseconds through a binding.
+    /// <para>Anything that could make the cell show something ELSE - a converter, a StringFormat, a source of its own,
+    /// an element or a multi-binding - is NOT this, and must be read through the binding: a search that reads a value
+    /// the cell does not show points at text nobody can see.</para></summary>
+    protected internal bool ReadsWithoutTheUI =>
+        SortMemberPath is { Length: > 0 }
+        || (Binding is Binding
+            {
+                Converter: null, StringFormat: null, Source: null, ElementName: null,
+                Path.Path: { Length: > 0 }
+            });
+
+    /// <summary>What this column stands for on one row, read the cheap way when that is the SAME answer - see
+    /// <see cref="ReadsWithoutTheUI"/>. Safe off the interface's thread, which is what lets a search walk a long table
+    /// without holding the window.</summary>
+    protected internal object ReadWithoutTheUI(object item)
+    {
+        if (item == null) return null;
+        if (SortMemberPath is { Length: > 0 }) return ReadPath(item);
+
+        return Binding is Binding plain ? PathReader(plain.Path.Path)(item) : null;
+    }
+
+    private Func<object, object> _bindingReader;
+    private string _bindingReaderPath;
+
+    // The reader is made ONCE per path: building one splits the path and makes a closure, and a search asks per row.
+    private Func<object, object> PathReader(string path)
+    {
+        if (!string.Equals(_bindingReaderPath, path, StringComparison.Ordinal))
+        {
+            _bindingReaderPath = path;
+            _bindingReader = TreeChildResolver.ForValuePath(path);
+        }
+
+        return _bindingReader;
+    }
+
+    /// <summary>Whether a text search looks in this column. It looks at the VALUE, so a column that does not show its
+    /// value as words must say so: a check box reads as "False", and searching for "al" lit up every unticked box in
+    /// the table - pointing at text nobody can see.</summary>
+    protected internal virtual bool IsSearchable => true;
+
+    /// <summary>Whether this column stands in the table at all. A column the table is GROUPED BY does not: its value is
+    /// the same on every row of a group and is already written in that group's caption, so leaving it in repeats one
+    /// value down the whole table and takes the room the caption needs.
+    /// <para>Derived, never stored: a flag mirroring the grouping is a flag that goes stale.</para></summary>
+    public bool IsShown => Owner?.GroupDescriptions.Contains(this) != true;
+
     /// <summary>Writes an edited value into one item through this column's binding, converting on the way. False when
     /// the binding refuses it - a one-way column is a column to read.</summary>
     protected internal bool Write(object item, object value)
@@ -273,6 +349,26 @@ public abstract class DataGridColumn : FundamentalUIComponent
         _reader ??= new BoundValue();
         _reader.PointAt(item, binding);
         return _reader.Value;
+    }
+
+    private Func<object, object> _pathReader;
+    private string _readerPath;
+
+    /// <summary>What <see cref="SortMemberPath"/> reads off one row - how a column with no binding of its own, a
+    /// templated one above all, still says what it stands for.</summary>
+    protected internal object ReadPath(object item)
+    {
+        if (item == null || SortMemberPath is not { Length: > 0 } path) return null;
+
+        // The reader is made ONCE per path: building one splits the path and allocates a closure, and a sort or a
+        // filter asks per row.
+        if (!string.Equals(_readerPath, path, StringComparison.Ordinal))
+        {
+            _readerPath = path;
+            _pathReader = TreeChildResolver.ForValuePath(path);
+        }
+
+        return _pathReader(item);
     }
 }
 
@@ -311,6 +407,9 @@ public class DataGridCheckBoxColumn : DataGridColumn
 
     protected internal override DataTemplate EditingTemplate =>
         CellEditingTemplate ?? (_defaultEditor ??= DataGridEditors.Box(live: true));
+
+    // This column shows a BOX, not words. Its value reads as "False", and a search for "al" found every one of them.
+    protected internal override bool IsSearchable => false;
 
     protected internal override void PrepareEditor(IUIComponent editor, object item, object value)
     {

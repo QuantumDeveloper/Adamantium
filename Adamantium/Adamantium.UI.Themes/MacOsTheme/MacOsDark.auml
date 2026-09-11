@@ -65,6 +65,12 @@
     <PaletteColor Key="ControlStrokeColorDefault" Color="#1FFFFFFF"/>
     <!-- The table's rules, OPAQUE - see FluentDark. -->
     <PaletteColor Key="DataGridLineColor" Color="#404042"/>
+    <!-- What a search HIT is washed with. Translucent, because a cell holds controls and meanings - a check box, a
+         state painted red - and a solid plate swallows both; the cell the search is ON takes the solid caution colour
+         instead, which is what sets it apart from the rest of what was found. -->
+    <PaletteColor Key="DataGridSearchMatchColor" Color="#59FFD60A"/>
+    <!-- ...and the cell the search is ON. Denser, but still a WASH: a solid plate swallowed the check box under it. -->
+    <PaletteColor Key="DataGridSearchCurrentColor" Color="#A6FFD60A"/>
     <PaletteColor Key="ControlStrokeColorSecondary" Color="#2EFFFFFF"/>
 
     <!-- The UNSET surface of a selection control - the switch's groove, the empty checkbox, the empty radio. One key,
