@@ -1,5 +1,3 @@
-using System;
-using Adamantium.Mathematics;
 using Adamantium.UI.Controls.Panels;
 using Adamantium.UI.Core;
 
@@ -27,6 +25,12 @@ public class DataGridRowsPresenter : StackPanel
     }
 
     private TreeDataGrid _owner;
+
+    /// <summary>The rows that are not rows: a record's details panel stands at its own height while everything else
+    /// takes the row height. There are a handful of them at most - a table is opened at three records, not ten
+    /// thousand - which is why the stack stays uniform arithmetic with a short list of exceptions rather than a walk.</summary>
+    protected override IReadOnlyList<(int Index, double Extra)> ItemExtentExceptions =>
+        Owner?.RowExtentExceptions;
 
     protected override Size MeasureVirtualized(Size availableSize, Vector2 offset)
     {

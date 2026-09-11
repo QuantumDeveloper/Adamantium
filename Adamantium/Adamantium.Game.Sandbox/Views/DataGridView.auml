@@ -27,8 +27,56 @@
                       ShowSearchPanel="{Binding ShowSearchPanel}"
                       SearchMatchBrush="{Binding SearchMatchBrush}"
                       SearchCurrentMatchBrush="{Binding SearchCurrentMatchBrush}"
+                      RowDetailsHeight="120"
                       Indent="16"
                       ExpanderColumnIndex="2">
+            <!-- The record's LONG FORM, opened by the handle in the column ahead of everything. It is a row of the same
+                 flat list, so ten thousand records with three panels open build three panels - and the template is the
+                 page's own, bound against the record like any other. -->
+            <TreeDataGrid.RowDetailsTemplate>
+                <DataTemplate>
+                    <Border Padding="12" Margin="8"
+                            CornerRadius="{ResourceReference CornerRadiusSmall}"
+                            Background="{ObservableResource CardBackgroundFillColorDefault}"
+                            BorderBrush="{ObservableResource ControlStrokeColorDefault}"
+                            BorderThickness="1">
+                        <!-- THREE TABS OF THREE HEIGHTS, on purpose: the panel is as tall as what is in it, so switching
+                             a tab re-measures it and the rows below move. That is the case a fixed height cannot show. -->
+                        <TabControl>
+                            <TabItem Header="Details">
+                                <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto" Margin="4">
+                                    <TextBlock Grid.Row="0" Grid.Column="0" Text="Name" Margin="0,0,16,4"
+                                               Foreground="{ObservableResource TextFillColorSecondary}"/>
+                                    <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding Name}" Margin="0,0,0,4"/>
+                                    <TextBlock Grid.Row="1" Grid.Column="0" Text="Owner" Margin="0,0,16,4"
+                                               Foreground="{ObservableResource TextFillColorSecondary}"/>
+                                    <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding Owner}" Margin="0,0,0,4"/>
+                                    <TextBlock Grid.Row="2" Grid.Column="0" Text="Region" Margin="0,0,16,4"
+                                               Foreground="{ObservableResource TextFillColorSecondary}"/>
+                                    <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding Region}" Margin="0,0,0,4"/>
+                                    <TextBlock Grid.Row="3" Grid.Column="0" Text="Checksum" Margin="0,0,16,0"
+                                               Foreground="{ObservableResource TextFillColorSecondary}"/>
+                                    <TextBlock Grid.Row="3" Grid.Column="1" Text="{Binding Checksum}"/>
+                                </Grid>
+                            </TabItem>
+                            <TabItem Header="Note">
+                                <TextBlock Margin="4" TextWrapping="WrapByWords"
+                                           Text="{Binding Name}"/>
+                            </TabItem>
+                            <TabItem Header="Chart">
+                                <StackPanel Orientation="Horizontal" Margin="4" Spacing="6" VerticalAlignment="Bottom">
+                                    <Border Width="26" Height="150" Background="{ThemeResource AccentFillColorDefault}"/>
+                                    <Border Width="26" Height="90" Background="{ThemeResource AccentFillColorDefault}"/>
+                                    <Border Width="26" Height="210" Background="{ThemeResource AccentFillColorDefault}"/>
+                                    <Border Width="26" Height="120" Background="{ThemeResource AccentFillColorDefault}"/>
+                                    <Border Width="26" Height="60" Background="{ThemeResource AccentFillColorDefault}"/>
+                                </StackPanel>
+                            </TabItem>
+                        </TabControl>
+                    </Border>
+                </DataTemplate>
+            </TreeDataGrid.RowDetailsTemplate>
+
             <!-- EVERY column type, so each one's editor can be seen: text, drop-down, check box and a fully templated
                  one. Double-click any cell (or press F2) to open its editor. -->
             <TreeDataGrid.Columns>

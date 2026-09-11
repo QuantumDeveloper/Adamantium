@@ -37,6 +37,66 @@ public class StackPanel : VirtualizingPanel
    /// </summary>
    private double Pitch => _itemExtent + Math.Max(0, Spacing);
 
+   /// <summary>Items that do NOT take the uniform extent, as (index, how much taller than the rest), in ascending index
+   /// order. Null - the usual answer - means every item takes the same slot and all the arithmetic below is a
+   /// multiplication. A host with a handful of odd ones out (a table showing a record's details panel under three of ten
+   /// thousand rows) answers with those three, and the cost of knowing where the n-th item sits stays a binary search
+   /// over the exceptions rather than a walk over the items.</summary>
+   protected virtual IReadOnlyList<(int Index, double Extra)> ItemExtentExceptions => null;
+
+   // How much taller everything BEFORE this slot is than the uniform stack would make it. The exceptions are few and
+   // sorted, so this is a short scan over them - never over the items.
+   private double ExtraBefore(int slot)
+   {
+      var exceptions = ItemExtentExceptions;
+      if (exceptions == null) return 0;
+
+      double extra = 0;
+      for (var i = 0; i < exceptions.Count && exceptions[i].Index < slot; i++) extra += exceptions[i].Extra;
+      return extra;
+   }
+
+   private double ExtraAt(int index)
+   {
+      var exceptions = ItemExtentExceptions;
+      if (exceptions == null) return 0;
+
+      for (var i = 0; i < exceptions.Count; i++)
+      {
+         if (exceptions[i].Index == index) return exceptions[i].Extra;
+         if (exceptions[i].Index > index) break;
+      }
+
+      return 0;
+   }
+
+   private double StartOf(int slot) => slot * Pitch + ExtraBefore(slot);
+
+   private double ExtentAt(int index) => _itemExtent + ExtraAt(index);
+
+   // The inverse of StartOf: which slot the given distance along the stack falls in. Walks the exceptions (few, sorted)
+   // and divides inside the uniform stretch between them, so it stays arithmetic rather than a search over the items.
+   private int SlotAt(double along)
+   {
+      var pitch = Pitch;
+      if (pitch <= 0) return 0;
+
+      var exceptions = ItemExtentExceptions;
+      if (exceptions == null) return (int)Math.Floor(along / pitch);
+
+      double extra = 0;
+      for (var i = 0; i < exceptions.Count; i++)
+      {
+         var start = exceptions[i].Index * pitch + extra;
+         if (along < start) break;   // the answer is in the uniform stretch before this exception
+
+         extra += exceptions[i].Extra;
+         if (along < start + pitch + exceptions[i].Extra) return exceptions[i].Index;
+      }
+
+      return (int)Math.Floor((along - extra) / pitch);
+   }
+
 
    /// <summary>Items stack at a uniform extent, so where the n-th one sits is arithmetic - and stays answerable for an
    /// item that has been virtualized away, which is exactly when someone needs to scroll to it.</summary>
@@ -46,10 +106,11 @@ public class StackPanel : VirtualizingPanel
       if (!IsItemsHost || _itemExtent <= 0 || index < 0) return false;
 
       var vertical = Orientation == Orientation.Vertical;
-      var along = index * Pitch;
+      var along = StartOf(index);
+      var extent = ExtentAt(index);
       rect = vertical
-         ? new Rect(0, along, RenderSize.Width, _itemExtent)
-         : new Rect(along, 0, _itemExtent, RenderSize.Height);
+         ? new Rect(0, along, RenderSize.Width, extent)
+         : new Rect(along, 0, extent, RenderSize.Height);
       return true;
    }
 
@@ -226,10 +287,14 @@ public class StackPanel : VirtualizingPanel
       // extent (count*1), which then mis-clamps the scroll offset. Offset-baked arrange tolerated that (arrange + reported
       // offset stay same-pass consistent); transform-only scroll does NOT (the presenter's translation desyncs from the
       // reported offset across a flip). Re-probe freely on any POSITIVE measure so a real size change still tracks.
-      var probe = (IMeasurableComponent)RealizeInWindow(Math.Clamp(_lastFirst, 0, count - 1));
+      // NEVER an exception: the probe stands for what EVERY item takes, and one of the odd ones out would make the whole
+      // stack as tall as itself - ten thousand rows at a details panel's height.
+      var probeIndex = Math.Clamp(_lastFirst, 0, count - 1);
+      while (ExtraAt(probeIndex) != 0 && probeIndex + 1 < count) probeIndex++;
+      var probe = (IMeasurableComponent)RealizeInWindow(probeIndex);
       probe.Measure(childConstraint);
       var probeExtent = vertical ? probe.DesiredSize.Height : probe.DesiredSize.Width;
-      if (probeExtent > 0) _itemExtent = probeExtent;
+      if (probeExtent > 0 && ExtraAt(probeIndex) == 0) _itemExtent = probeExtent;
 
       // A ScrollViewer measures its content UNCONSTRAINED on the scroll axis to learn the extent, so we get an infinite
       // mainViewport on the first measure after (re)entering a view - before arrange sets the real viewport. Realizing all
@@ -249,9 +314,8 @@ public class StackPanel : VirtualizingPanel
       }
 
       var mainOffset = vertical ? offset.Y : offset.X;
-      var pitch = Pitch;
-      var first = Math.Max(0, (int)Math.Floor(mainOffset / pitch) - Buffer);
-      var last = Math.Min(count - 1, (int)Math.Ceiling((mainOffset + effectiveViewport) / pitch) + Buffer);
+      var first = Math.Max(0, SlotAt(mainOffset) - Buffer);
+      var last = Math.Min(count - 1, SlotAt(mainOffset + effectiveViewport) + 1 + Buffer);
       _lastFirst = first;
 
       // Reconcile the realized set to exactly [first,last]: containers leaving the window are rebound in place to the
@@ -266,8 +330,9 @@ public class StackPanel : VirtualizingPanel
          crossMax = Math.Max(crossMax, vertical ? container.DesiredSize.Width : container.DesiredSize.Height);
       }
 
-      // count pitches less the trailing gap: the last item ends the extent, the gap after it does not exist.
-      var mainExtent = count * pitch - Math.Max(0, Spacing);
+      // count pitches less the trailing gap: the last item ends the extent, the gap after it does not exist. Plus what
+      // the odd ones out add on top - the stack is uniform EXCEPT for them, and the scrollbar has to know it.
+      var mainExtent = count * Pitch + ExtraBefore(count) - Math.Max(0, Spacing);
       return vertical ? new Size(crossMax, mainExtent) : new Size(mainExtent, crossMax);
    }
 
@@ -298,10 +363,9 @@ public class StackPanel : VirtualizingPanel
       _arrangeIndexBuf.AddRange(Owner.ItemContainerGenerator.RealizedIndices);
 
       // SLOT, not index: while a drop gap is open everything from it on moves along by one, opening one item-sized hole.
-      var pitch = Pitch;
       Rect SlotRect(int slot) => vertical
-         ? new Rect(0, slot * pitch, cross, _itemExtent)
-         : new Rect(slot * pitch, 0, _itemExtent, cross);
+         ? new Rect(0, StartOf(slot), cross, ExtentAt(slot))
+         : new Rect(StartOf(slot), 0, ExtentAt(slot), cross);
 
       void ArrangeAt(int index)
       {
@@ -335,7 +399,7 @@ public class StackPanel : VirtualizingPanel
       if (!IsItemsHost || !IsVirtualizing || _itemExtent <= 1) return false;
 
       var main = Math.Max(0, Orientation == Orientation.Vertical ? point.Y : point.X);
-      index = Math.Clamp((int)(main / Pitch), 0, Owner.Items?.Count ?? 0);
+      index = Math.Clamp(SlotAt(main), 0, Owner.Items?.Count ?? 0);
       return true;
    }
 }

@@ -158,10 +158,11 @@ public class DataGridHeadersPresenter : Panel
             pair.Value.Arrange(new Rect(ScreenXOf(column, offset), 0, column.ActualWidth, finalSize.Height));
         }
 
+        // ...and the corner sits over the number strip, which now begins where the details toggles end.
         if (_corner is { Visibility: Visibility.Visible })
         {
             _corner.Measure(new Size(Owner.RowNumberWidth, finalSize.Height));
-            _corner.Arrange(new Rect(0, 0, Owner.RowNumberWidth, finalSize.Height));
+            _corner.Arrange(new Rect(Owner.DetailsStripLeading, 0, Owner.RowNumberWidth, finalSize.Height));
         }
 
         return finalSize;

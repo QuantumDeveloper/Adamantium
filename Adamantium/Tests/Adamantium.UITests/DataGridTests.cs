@@ -2623,6 +2623,178 @@ public class DataGridTests
         Assert.That(grid.ShowSearchPanel, Is.False, "the next one takes the strip");
     }
 
+    private static DataTemplate ADetailsPanel(double height = 120) =>
+        new(() => new TemplateResult { RootComponent = new Border { Height = height } });
+
+    // The panel is as tall as what is IN it, not as tall as the table guessed. The guess is only the first answer - a
+    // panel is placed before it is built - and the stack is told the real one as soon as there is one, in BOTH
+    // directions: a tab switched to a shorter one makes the panel shorter, and a height that only grew would leave a
+    // band of nothing under it.
+    [Test]
+    public void APanelIsAsTallAsItsContent_AndTheStackIsToldWhenThatChanges()
+    {
+        var grid = SelectableGrid(4);
+        grid.RowHeight = 24;
+        grid.RowDetailsHeight = 120;   // the guess, until the panel has measured
+        grid.RowDetailsTemplate = ADetailsPanel(260);
+        var item = grid.Rows[1].Node;
+        grid.ToggleRowDetails(item);
+
+        Assert.That(grid.HeightOfRowDetails(item), Is.EqualTo(120), "the guess stands until the panel is built");
+
+        Relayout(grid, 400, 600);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(grid.HeightOfRowDetails(item), Is.EqualTo(260).Within(1), "and the content's own height replaces it");
+            Assert.That(grid.RowExtentExceptions[0].Extra, Is.EqualTo(236).Within(1), "the stack is told the same number");
+        });
+
+        // What a tab switch does: the same panel, now shorter.
+        grid.ReportRowDetailsHeight(item, 80);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(grid.HeightOfRowDetails(item), Is.EqualTo(80), "shorter is taken as readily as taller");
+            Assert.That(grid.RowExtentExceptions[0].Extra, Is.EqualTo(56).Within(1));
+        });
+    }
+
+    // A table with panels open has to go QUIET when nobody is touching it. It did not: the panel row built a part on
+    // every measure that it dropped again a few lines later, and a child added and removed invalidates the row that is
+    // measuring - so the row never went valid and the whole realized set re-measured on every pass. Asserted on whether
+    // the layout SETTLES rather than on a measure count, because a count only says "a lot", and a lot is also what a
+    // table someone is actually using looks like.
+    [Test]
+    public void APanelOpen_LetsTheTableGoQuiet()
+    {
+        var grid = SelectableGrid(40);
+        grid.RowHeight = 24;
+        grid.RowDetailsTemplate = ADetailsPanel(140);
+
+        var first = grid.Rows[1].Node;
+        var second = grid.Rows[5].Node;
+        grid.ToggleRowDetails(first);
+        grid.ToggleRowDetails(second);
+
+        var manager = LayoutManager.For(grid);
+        for (var i = 0; i < 12; i++)
+        {
+            Relayout(grid, 400, 600);
+            manager.ExecuteLayoutPass();
+        }
+
+        var rows = Enumerable.Range(0, 40)
+            .Select(i => grid.ItemContainerGenerator.ContainerFromIndex(i) as DataGridRow)
+            .Where(row => row is { IsRowDetails: true })
+            .ToList();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(rows, Is.Not.Empty, "no panel was realized, so this proves nothing");
+            Assert.That(rows.All(row => row.IsMeasureValid), Is.True, "a panel row came out of the pass still dirty");
+            Assert.That(manager.IsSettled, Is.True, "the table keeps measuring itself with nobody touching it");
+        });
+    }
+
+    // The panel is a ROW of the same flat list, spliced right after the record it belongs to - not a second list and
+    // not a child of the row. That is what makes it cost nothing new: the virtualizer realizes it as it realizes any
+    // row, and ten thousand records with one panel open build one panel.
+    [Test]
+    public void ARecordsPanel_IsARowOfItsOwn_RightAfterTheRecord()
+    {
+        var grid = SelectableGrid(4);
+        grid.RowDetailsTemplate = ADetailsPanel();
+        var item = grid.Rows[1].Node;
+
+        grid.ToggleRowDetails(item);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(grid.Rows.Count, Is.EqualTo(5), "one row more, not one list more");
+            Assert.That(grid.Rows[2].IsDetails, Is.True, "and it stands right after the record it belongs to");
+            Assert.That(((DataGridRowDetails)grid.Rows[2].Node).Item, Is.SameAs(item));
+            Assert.That(grid.Rows[3].Node, Is.SameAs(grid.Rows[3].Node), "the records after it are still records");
+            Assert.That(grid.Rows[3].IsDetails, Is.False);
+        });
+
+        grid.ToggleRowDetails(item);
+        Assert.That(grid.Rows.Count, Is.EqualTo(4), "and shutting it takes the row away again");
+    }
+
+    // A panel takes no ORDINAL. It is the record above it said at length, so a number spent on one makes the record
+    // after it read as though a row had gone missing - on the stand, opening the first record's panel renumbered the
+    // second one 3.
+    [Test]
+    public void APanel_TakesNoNumberOfItsOwn()
+    {
+        var grid = SelectableGrid(4);
+        grid.ShowRowNumbers = true;
+        grid.RowDetailsTemplate = ADetailsPanel();
+        grid.ToggleRowDetails(grid.Rows[0].Node);
+        Relayout(grid);
+
+        var numbers = grid.ItemContainerGenerator.RealizedIndices
+            .Select(i => grid.ItemContainerGenerator.ContainerFromIndex(i) as DataGridRow)
+            .Where(r => r is { IsRowDetails: false })
+            .Select(r => r.Number)
+            .OrderBy(n => n)
+            .ToArray();
+
+        Assert.That(numbers, Is.EqualTo(new[] { 1, 2, 3, 4 }), "the records count 1..4 with a panel standing among them");
+    }
+
+    // A record's panel and a record's BRANCH are two different questions: a row can show its long form with its
+    // children shut, and open its children with the panel shut. The panel stands at the owner's depth, so every walk
+    // that reads the tree's shape by depth has to know it is not part of that shape - the collapse below took nothing
+    // away at all while it did not.
+    [Test]
+    public void APanelAndABranch_AreOpenedAndShutIndependently()
+    {
+        var (grid, root) = Tree(new DataGridTextColumn { Binding = new Binding("Name"), Width = new GridLength(100) });
+        grid.RowDetailsTemplate = ADetailsPanel();
+
+        grid.ToggleRowDetails(root);
+        grid.Expand(root);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(grid.Rows[1].IsDetails, Is.True, "the panel stays put when the branch opens");
+            Assert.That(grid.Rows.Count, Is.EqualTo(1 + 1 + 2), "the root, its panel, its two children");
+        });
+
+        grid.Collapse(root);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(grid.Rows.Count, Is.EqualTo(1 + 1), "the children went and the panel did not");
+            Assert.That(grid.Rows[1].IsDetails, Is.True);
+        });
+    }
+
+    // The rows are virtualized against a UNIFORM pitch, so a row that stands taller has to be named as an exception to
+    // it - otherwise the scrollbar measures a table that is not there and every row below the panel is drawn where the
+    // hit-test is not.
+    [Test]
+    public void APanelIsNamedToTheStack_AsAnExceptionToTheUniformPitch()
+    {
+        var grid = SelectableGrid(4);
+        grid.RowHeight = 24;
+        grid.RowDetailsHeight = 120;
+        grid.RowDetailsTemplate = ADetailsPanel();
+
+        Assert.That(grid.RowExtentExceptions, Is.Empty, "nothing is out of the ordinary while nothing is open");
+
+        grid.ToggleRowDetails(grid.Rows[1].Node);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(grid.RowExtentExceptions.Count, Is.EqualTo(1));
+            Assert.That(grid.RowExtentExceptions[0].Index, Is.EqualTo(2), "at the panel's place in the flat list");
+            Assert.That(grid.RowExtentExceptions[0].Extra, Is.EqualTo(96), "and by what it stands taller than a row");
+        });
+    }
+
     private static TreeDataGrid GroupableGrid(int rows = 6)
     {
         var grid = Grid(

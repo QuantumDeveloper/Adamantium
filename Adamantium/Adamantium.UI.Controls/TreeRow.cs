@@ -20,6 +20,11 @@ internal sealed class TreeRow
     /// <summary>Indent level: 0 for a root, +1 per nesting step.</summary>
     public int Depth { get; }
 
+    /// <summary>Whether this row is the PANEL a record opens under itself rather than a record of its own. It stands at
+    /// its owner's depth - it is the same record said at length, not a step deeper - so depth alone no longer tells the
+    /// structure apart, and every walk that reads the shape has to know which rows are these.</summary>
+    public bool IsDetails { get; init; }
+
     /// <summary>Whether the node can expand (has children) - drives the expander's visibility. Settable: a lazily-loaded
     /// branch can turn out to have (or not have) children once read.</summary>
     public bool HasChildren { get; set; }
