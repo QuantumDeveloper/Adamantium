@@ -292,7 +292,11 @@ public class BindingExpression : BindingExpressionBase
    {
       if (IsProducer)
       {
-         ProducedValue = ComputeValue(typeof(object));
+         // A producer feeds a trigger's condition or a MultiBinding's converter, and both of those compare against
+         // NULL, not against the engine's unset token. The distinction is the target property's business, and a
+         // producer has none.
+         var produced = ComputeValue(typeof(object));
+         ProducedValue = ReferenceEquals(produced, AdamantiumProperty.UnsetValue) ? null : produced;
          RaiseValueChanged();
       }
       else
@@ -304,15 +308,20 @@ public class BindingExpression : BindingExpressionBase
    // Reads the source value through the (optional) converter. targetType drives the converter's requested type.
    // FallbackValue is used when the binding can't resolve a source/path (WPF semantics); TargetNullValue when the
    // resolved value is null (falling back to FallbackValue if no TargetNullValue is set).
+   // Returns the engine's UNSET token - never a bare null - when there is nothing to say: no source, no such property,
+   // and no fallback either. A null that came from a source that DID resolve is a VALUE and is returned as one; the two
+   // used to arrive as the same null, and the caller could only guess, so it dropped both.
    private object ComputeValue(Type targetType)
    {
       // Empty-path binding: the value is the resolved source object itself (optionally run through the converter).
       if (_bindToSource)
       {
-         var self = Binding.Converter != null ? ConvertCached(ResolvedSource, targetType) : ResolvedSource;
-         return self ?? BindingBase.TargetNullValue ?? BindingBase.FallbackValue;
+         if (ResolvedSource == null)
+            return BindingBase.TargetNullValue ?? BindingBase.FallbackValue ?? AdamantiumProperty.UnsetValue;
+
+         return Binding.Converter != null ? ConvertCached(ResolvedSource, targetType) : ResolvedSource;
       }
-      if (_sourceProperty == null) return BindingBase.FallbackValue;
+      if (_sourceProperty == null) return BindingBase.FallbackValue ?? AdamantiumProperty.UnsetValue;
       var value = _sourceGetter != null ? _sourceGetter(ResolvedSource) : _sourceProperty.GetValue(ResolvedSource);
       if (Binding.Converter != null)
          value = ConvertCached(value, targetType);
@@ -351,8 +360,13 @@ public class BindingExpression : BindingExpressionBase
    {
       if (TargetProperty == null) return;
       var value = ComputeValue(TargetProperty.PropertyType);
-      // No source value and no fallback: leave the target at its default (don't clobber with null).
-      if (value == null) return;
+      // Nothing to say - no source, no path, no fallback: leave the target where it is. A resolved null is NOT that; it
+      // is the source asking for the property's default back, and refusing to carry it meant no page could ever hand
+      // one of the "null = let the theme decide" properties back to the theme from markup.
+      if (ReferenceEquals(value, AdamantiumProperty.UnsetValue)) return;
+      // ...and a property with no way to HOLD nothing cannot be handed one either. A double has no null to go back to,
+      // and the slot would be read as (double)null - the mirror of the rule UpdateSource already applies on the way out.
+      if (value == null && !CanHoldNothing(TargetProperty.PropertyType)) return;
       // Can't make the value fit the target type (e.g. a FallbackValue="50" on an ICommand property)? Leave the target
       // at its default instead of pushing an incompatible value, which would throw in SetValue and abort the whole load.
       if (!TryCoerce(value, TargetProperty.PropertyType, out var coerced)) return;

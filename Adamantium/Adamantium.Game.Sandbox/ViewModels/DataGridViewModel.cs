@@ -168,6 +168,12 @@ public partial class DataGridViewModel : TabPageViewModel
     /// <summary>Whether the strip that searches the table is shown.</summary>
     [Bindable] private bool _showSearchPanel;
 
+    /// <summary>Whether this page names the search colours itself instead of leaving them to the theme. BOTH states are
+    /// the point: saying nothing is what a table does by default, and saying something overrides it - and going back is
+    /// the half that is easy to get wrong, on the control's side and on the binding's.</summary>
+    [Bindable, Affects(nameof(SearchMatchBrush), nameof(SearchCurrentMatchBrush))]
+    private bool _ownSearchColours;
+
     // Red, green, blue, ALPHA - and the alpha is the whole point: a wash lets the check box and the text under it
     // through, a plate swallows them. Starting away from the theme's yellow so that what this page names, and what it
     // would have got by saying nothing, cannot be mistaken for each other.
@@ -177,13 +183,12 @@ public partial class DataGridViewModel : TabPageViewModel
     [Bindable, Affects(nameof(SearchCurrentMatchBrush))]
     private Color _searchCurrentColour = new(0x21, 0xC8, 0x6E, 0xA6);
 
-    /// <summary>What a found cell is washed with. A page that says nothing here leaves the wash to the theme - but that
-    /// state cannot be reached FROM a binding, which never pushes null to its target, so this one always names a colour
-    /// and the theme's own is seen by switching the theme.</summary>
-    public Brush SearchMatchBrush => new SolidColorBrush(SearchMatchColour);
+    /// <summary>What a found cell is washed with - null while the theme owns it, which is exactly what the grid's own
+    /// property means by null.</summary>
+    public Brush SearchMatchBrush => OwnSearchColours ? new SolidColorBrush(SearchMatchColour) : null;
 
     /// <summary>...and the cell the search is standing on.</summary>
-    public Brush SearchCurrentMatchBrush => new SolidColorBrush(SearchCurrentColour);
+    public Brush SearchCurrentMatchBrush => OwnSearchColours ? new SolidColorBrush(SearchCurrentColour) : null;
 
     /// <summary>What the Size column adds up to. Every aggregate is here to be tried: a sum is what a quantity wants,
     /// an average what a rate does.</summary>

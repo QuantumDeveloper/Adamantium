@@ -892,19 +892,37 @@ public class DataGridTests
         Assert.That(grid.CellFor(0, 0).GridLineBrush, Is.EqualTo(Brushes.Green));
     }
 
+    private sealed class Washes : System.ComponentModel.INotifyPropertyChanged
+    {
+        private Brush _match;
+
+        public Brush Match
+        {
+            get => _match;
+            set { _match = value; PropertyChanged?.Invoke(this, new System.ComponentModel.PropertyChangedEventArgs(nameof(Match))); }
+        }
+
+        public event System.ComponentModel.PropertyChangedEventHandler PropertyChanged;
+    }
+
     // The search washes are the grid's to name the same way - and giving the name up has to HAND THE COLOUR BACK. The
     // cells are recycled carriers: a colour written into one and never taken out again would follow it onto every row
     // it is later reused for, and no theme setter could be seen through it.
+    // Driven through a BINDING, because that is how a page drives it and assigning the property in the test does not go
+    // where the real value goes. The version of this test that assigned it directly passed while the stand could not
+    // hand the colour back at all - the binding was dropping the null on the way, and nothing here could see that.
     [Test]
     public void SearchWashes_TakeTheBrushTheGridNames_AndGiveItBack()
     {
+        var washes = new Washes { Match = Brushes.Green };
         var grid = SelectableGrid(2);
+        grid.DataContext = washes;
+        grid.SetBinding(nameof(TreeDataGrid.SearchMatchBrush), new Binding(nameof(Washes.Match)));
         Relayout(grid);
         // At Style priority, which is where a theme's setter actually lands - a plain assignment here would write the
         // very slot the grid writes, and the test would be measuring itself.
         grid.CellFor(0, 0).SetValue(DataGridCell.SearchMatchBrushProperty, Brushes.Blue, ValuePriority.Style);
 
-        grid.SearchMatchBrush = Brushes.Green;
         grid.SearchCurrentMatchBrush = Brushes.Red;
         Relayout(grid);
 
@@ -914,7 +932,15 @@ public class DataGridTests
             Assert.That(grid.CellFor(0, 0).SearchCurrentBrush, Is.EqualTo(Brushes.Red));
         });
 
-        grid.SearchMatchBrush = null;
+        // A SECOND colour, still through the binding: naming one and then naming another has to land too, not only the
+        // first one to arrive.
+        washes.Match = Brushes.Yellow;
+        BindingUpdateQueue.Flush();
+        Relayout(grid);
+        Assert.That(grid.CellFor(0, 0).SearchMatchBrush, Is.EqualTo(Brushes.Yellow));
+
+        washes.Match = null;
+        BindingUpdateQueue.Flush();
         grid.SearchCurrentMatchBrush = null;
         Relayout(grid);
 

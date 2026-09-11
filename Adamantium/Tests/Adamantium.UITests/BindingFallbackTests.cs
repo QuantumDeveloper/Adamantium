@@ -3,6 +3,7 @@ using Adamantium.UI.Controls.Buttons;
 using Adamantium.UI.Controls.Decorators;
 using Adamantium.UI.Core;
 using Adamantium.UI.Core.Data;
+using Adamantium.UI.Core.Media;
 using NUnit.Framework;
 
 namespace Adamantium.UITests;
@@ -87,5 +88,51 @@ public class BindingFallbackTests
         expression.EstablishConnection();
 
         Assert.That(expression.ProducedValue, Is.EqualTo("fb"));
+    }
+
+    private sealed class Painter : System.ComponentModel.INotifyPropertyChanged
+    {
+        private Brush _brush = Brushes.Red;
+
+        public Brush Brush
+        {
+            get => _brush;
+            set { _brush = value; PropertyChanged?.Invoke(this, new System.ComponentModel.PropertyChangedEventArgs(nameof(Brush))); }
+        }
+
+        public event System.ComponentModel.PropertyChangedEventHandler PropertyChanged;
+    }
+
+    // "The path did not resolve" and "the source HOLDS null" are two different answers, and only the first one has
+    // nothing to say. They used to arrive as the same null and both were dropped - so a source could never hand a
+    // property its default back, and every "null means let the theme decide" property (a grid's rules, its search
+    // washes) was one-way in practice: a page could take the theme's colour over but never give it back.
+    [Test]
+    public void ASourceThatHoldsNull_HandsTheTargetItsDefaultBack()
+    {
+        var painter = new Painter();
+        var border = new Border { DataContext = painter };
+        border.SetBinding(nameof(Border.Background), new Binding(nameof(Painter.Brush)));
+        Assert.That(border.Background, Is.EqualTo(Brushes.Red), "the binding carried the brush over");
+
+        painter.Brush = null;
+        BindingUpdateQueue.Flush();
+
+        Assert.That(border.Background, Is.Null, "...and carried the source's null back");
+    }
+
+    // The other half of the same rule: a property with no null to go back to must not be handed one. A double slot
+    // holding null is read as (double)null.
+    [Test]
+    public void APropertyThatCannotHoldNothing_IsNotHandedIt()
+    {
+        var border = new Border { Width = 42, DataContext = new Holder() };
+        border.SetBinding(nameof(border.Width), new Binding(nameof(Holder.Text)));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(border.Width, Is.EqualTo(42));
+            Assert.DoesNotThrow(() => _ = border.Width);
+        });
     }
 }
