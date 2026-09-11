@@ -10,8 +10,10 @@ namespace Adamantium.UI.Core.Data;
 /// </summary>
 internal static class RelativeBindingPipeline
 {
-    /// <summary>Sentinel for "the path could not be resolved" (distinct from a resolved null).</summary>
-    internal static readonly object Unset = new();
+    /// <summary>Sentinel for "the path could not be resolved" (distinct from a resolved null). It is the ENGINE'S own
+    /// unset token, not one of this file's making: a second object meaning the same thing is a second thing to keep in
+    /// step, and every binding path has to agree on what "no value" is.</summary>
+    internal static readonly object Unset = AdamantiumProperty.UnsetValue;
 
     /// <summary>Walk a dotted path off <paramref name="root"/>. The first segment is read from
     /// <paramref name="firstProperty"/> (the root's AdamantiumProperty, when it has one) else by reflection; the rest by
@@ -65,7 +67,12 @@ internal static class RelativeBindingPipeline
         }
 
         if (value == null) value = targetNullValue ?? fallback;
-        if (value == null) return Unset;
+        // A null that came from a path that DID resolve is a value, and it goes to the target. Only an unresolved path
+        // with nothing to fall back on has nothing to say - collapsing the two meant a source could never hand a
+        // property back its default, which is what null means for every "unset it and let the theme decide" property.
+        // A property that cannot HOLD nothing (a bare value type) is the exception: there is no null to give it back.
+        if (value == null)
+            return ReferenceEquals(raw, Unset) || !BindingExpressionBase.CanHoldNothing(targetType) ? Unset : null;
         return BindingExpressionBase.TryCoerce(value, targetType, out var coerced) ? coerced : Unset;
     }
 

@@ -82,6 +82,11 @@ public abstract class BindingExpressionBase
 
    // Strict: false (result=null) when the value can't be made to fit, so the caller skips the assignment instead of
    // pushing something that would throw.
+   /// <summary>Whether a property of this type has a null to be put back into it. A reference type and a Nullable&lt;T&gt;
+   /// do; a bare value type does not, and handing one a null leaves a slot that reads as (double)null.</summary>
+   internal static bool CanHoldNothing(Type type)
+      => type is not { IsValueType: true } || Nullable.GetUnderlyingType(type) != null;
+
    internal static bool TryCoerce(object value, Type targetType, out object result)
    {
       result = value;
