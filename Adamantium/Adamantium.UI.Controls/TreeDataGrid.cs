@@ -1848,12 +1848,76 @@ public partial class TreeDataGrid : Selector
     /// edges. By INDEX, not by walking realized containers - the neighbour at the edge of the window has none.</summary>
     public void MoveActive(int rowStep, int columnStep, bool extend = false)
     {
-        var rowCount = Rows?.Count ?? 0;
+        var rows = Rows;
+        var rowCount = rows?.Count ?? 0;
         if (rowCount == 0 || Columns.Count == 0) return;
 
         var row = ActiveRow < 0 ? 0 : Math.Clamp(ActiveRow + rowStep, 0, rowCount - 1);
         var column = ActiveColumn < 0 ? 0 : Math.Clamp(ActiveColumn + columnStep, 0, Columns.Count - 1);
+
+        // A caption or a details panel holds no cells, so there is nothing there to take: the keyboard takes the ROW.
+        // ActiveColumn is deliberately LEFT WHERE IT WAS - stepping over a caption and carrying on has to land back in
+        // the column you were walking down, and a row that has no columns cannot say which one that was. The selection
+        // survives a SHIFT walk for the same reason the rectangle does: extending over a caption must not cost the block
+        // already taken.
+        if (!HoldsCells(rows[row].Node))
+        {
+            if (!extend) SelectedCells.Clear();
+            ActiveRow = row;
+            RefreshCellSelectionVisuals();
+            ScrollIntoView(row);
+            return;
+        }
+
         SelectCell(row, column, extend);
+
+        // A walk that leaves the table where it was is a walk out of sight: the active cell is the one thing the
+        // keyboard has to keep on screen, and the table is taller and wider than the view by design.
+        ScrollIntoView(row, column);
+    }
+
+    /// <summary>Walks the table with the arrows, Shift extending from the anchor. False for any other key, so the
+    /// caller can go on to its own.
+    /// <para>Sideways on a CAPTION opens and closes it instead of walking columns: there are no columns to walk there,
+    /// and opening a group is the one thing the keyboard has to be able to do to a caption at all. Already open, Right
+    /// walks on into it; already closed, Left walks out of it - so neither key is ever dead.</para></summary>
+    public bool Walk(Key key, bool extend = false)
+    {
+        var rows = Rows;
+        if (rows == null || rows.Count == 0) return false;
+
+        if (ActiveRow >= 0 && ActiveRow < rows.Count && rows[ActiveRow].Node is DataGridGroup)
+        {
+            switch (key)
+            {
+                case Key.RightArrow when !rows[ActiveRow].IsExpanded:
+                    ExpandRow(rows[ActiveRow]);
+                    return true;
+
+                case Key.LeftArrow when rows[ActiveRow].IsExpanded:
+                    CollapseRow(rows[ActiveRow]);
+                    return true;
+
+                // Open already: sideways means IN, which is the row after it. Closed already: OUT, which is the row
+                // before. Walking the columns is what the other rows do and there are no columns here.
+                case Key.RightArrow:
+                    MoveActive(1, 0, extend);
+                    return true;
+
+                case Key.LeftArrow:
+                    MoveActive(-1, 0, extend);
+                    return true;
+            }
+        }
+
+        switch (key)
+        {
+            case Key.UpArrow: MoveActive(-1, 0, extend); return true;
+            case Key.DownArrow: MoveActive(1, 0, extend); return true;
+            case Key.LeftArrow: MoveActive(0, -1, extend); return true;
+            case Key.RightArrow: MoveActive(0, 1, extend); return true;
+            default: return false;
+        }
     }
 
     /// <summary>Takes the whole row - what pressing its number does. A row is a RECTANGLE across every column, which is
@@ -1998,19 +2062,32 @@ public partial class TreeDataGrid : Selector
                 cell.IsActive = index == ActiveRow && column == ActiveColumn;
             }
 
+            // A caption holds no cells, so the keyboard being ON it is the row's own state - there is nothing else here
+            // to carry it, and a walk that showed nothing would be a walk into the dark.
+            row.IsSelected = row.Group != null && index == ActiveRow;
+
             row.RefreshNumberSelection();
         }
     }
 
-    /// <summary>The grid owns the keys that drive editing: F2 opens the active cell, Escape leaves an edit without
-    /// writing - and, with nothing open, takes the search strip away. Enter never reaches here - the editor claims it
-    /// and asks for the commit itself.</summary>
+    /// <summary>The grid owns the keys that drive walking and editing: the arrows move the active cell (Shift extends
+    /// from the anchor), F2 opens it, Escape leaves an edit without writing - and, with nothing open, takes the search
+    /// strip away. Enter never reaches here - the editor claims it and asks for the commit itself.</summary>
     protected override void OnKeyDown(KeyEventArgs e)
     {
         base.OnKeyDown(e);
         if (e.Handled) return;
 
         var control = (e.Modifiers & (InputModifiers.LeftControl | InputModifiers.RightControl)) != 0;
+        var shift = (e.Modifiers & (InputModifiers.LeftShift | InputModifiers.RightShift)) != 0;
+
+        // The four arrows are ONE gesture with four labels, so they are asked as one: a switch of four cases each with
+        // its own guard would say four things about a table that only walks.
+        if (!IsEditing && Walk(e.Key, shift))
+        {
+            e.Handled = true;
+            return;
+        }
 
         switch (e.Key)
         {

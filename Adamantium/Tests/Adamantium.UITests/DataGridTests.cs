@@ -2010,6 +2010,21 @@ public class DataGridTests
 
     // Indent is not a width adjustment: the content has to MOVE, and the cell was shrinking itself without shifting
     // anything, so a child row drew flush against its parent and the hierarchy was invisible.
+    // The shape the themes give a cell: a frame that spans the whole of it, and the content inside a part the depth
+    // moves. Built here because the test grid carries no theme, and the mechanism under test IS that part.
+    private static ControlTemplate CellTemplate() => new(() =>
+    {
+        var inner = new Adamantium.UI.Controls.Panels.Grid { Name = "PART_Indent" };
+        var presenter = new ContentPresenter();
+        inner.Children.Add(presenter);
+
+        var frame = new Border { Child = inner };
+        var result = new TemplateResult { RootComponent = frame };
+        result.RegisterName("PART_Indent", inner);
+        result.RegisterName("PART_ContentPresenter", presenter);
+        return result;
+    });
+
     [Test]
     public void Indent_ShiftsTheContentRight()
     {
@@ -2021,6 +2036,10 @@ public class DataGridTests
 
         var rootRow = grid.ItemContainerGenerator.ContainerFromIndex(0) as DataGridRow;
         var childRow = grid.ItemContainerGenerator.ContainerFromIndex(1) as DataGridRow;
+        rootRow.CellAt(0).Template = CellTemplate();
+        childRow.CellAt(0).Template = CellTemplate();
+        Relayout(grid, childRow.CellAt(0));
+        Relayout(grid, rootRow.CellAt(0));
 
         Assert.Multiple(() =>
         {
@@ -2029,9 +2048,21 @@ public class DataGridTests
         });
     }
 
-    private static double ContentX(DataGridCell cell)
+    // Where the cell's CONTENT starts, in the cell's own coordinates. Not the template's root: the frame spans the whole
+    // cell on purpose - it paints the grid lines and the selection - and what the depth moves is everything inside it.
+    private static double ContentX(DataGridCell cell) => OffsetOf(cell, "PART_Indent", 0);
+
+    private static double OffsetOf(IUIComponent node, string name, double carried)
     {
-        foreach (var child in cell.VisualChildren) return ((IUIComponent)child).Bounds.X;
+        foreach (var child in node.VisualChildren)
+        {
+            var x = carried + child.Bounds.X;
+            if (child is IName named && named.Name == name) return x;
+
+            var found = OffsetOf(child, name, x);
+            if (!double.IsNaN(found)) return found;
+        }
+
         return double.NaN;
     }
 
@@ -4178,6 +4209,99 @@ public class DataGridTests
         grid.ItemsSource = new List<Row> { new() { Name = "<a & b>" } };
 
         Assert.That(Sheet(grid), Does.Contain("&lt;a &amp; b&gt;"));
+    }
+
+    // A caption holds no cells, so there is nothing there to select - the keyboard takes the ROW. Walking must still
+    // REACH it: a caption you cannot stand on is a group you cannot open without the mouse.
+    [Test]
+    public void WalkingOntoACaption_TakesTheRow_AndNoCell()
+    {
+        var grid = GroupableGrid(6);
+        grid.GroupBy(grid.Columns[0]);
+        grid.SelectCell(0, 1);   // the first caption is row 0; put the keyboard somewhere first
+
+        grid.MoveActive(1, 0);   // ...and onto the second caption
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(grid.ActiveRow, Is.EqualTo(1));
+            Assert.That(grid.SelectedCells.IsEmpty, Is.True, "there is no cell on a caption to take");
+        });
+    }
+
+    // The column is REMEMBERED across a caption: you were walking down a column, and the rows under the next caption are
+    // the same table. Losing it would drop you back to the first column every time a fold went by.
+    [Test]
+    public void WalkingOverACaption_ComesBackToTheSameColumn()
+    {
+        var grid = GroupableGrid(6);
+        grid.GroupBy(grid.Columns[0]);
+        grid.ExpandAllGroups();
+        grid.SelectCell(1, 2);   // a record under the first caption, third column
+
+        grid.MoveActive(1, 0);   // down - some rows on, another caption
+        while (grid.Rows[grid.ActiveRow].Node is DataGridGroup) grid.MoveActive(1, 0);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(grid.ActiveColumn, Is.EqualTo(2), "the column survived the caption");
+            Assert.That(grid.SelectedCells.Contains(grid.ActiveRow, 2), Is.True);
+        });
+    }
+
+    // Sideways on a caption is the one thing the keyboard HAS to be able to do to it.
+    [Test]
+    public void SidewaysOnACaption_OpensAndClosesIt()
+    {
+        var grid = GroupableGrid(6);
+        grid.GroupBy(grid.Columns[0]);
+        grid.SelectCell(0, 0);
+
+        Assert.That(grid.Rows.Count, Is.EqualTo(2), "two captions, folded");
+
+        grid.Walk(Key.RightArrow);
+        Assert.That(grid.Rows.Count, Is.EqualTo(5), "the first opened over its three");
+
+        grid.Walk(Key.LeftArrow);
+        Assert.That(grid.Rows.Count, Is.EqualTo(2), "and closed again");
+    }
+
+    // Open already, sideways means IN and OUT rather than a dead key.
+    [Test]
+    public void SidewaysOnAnOpenCaption_StepsInAndBackOut()
+    {
+        var grid = GroupableGrid(6);
+        grid.GroupBy(grid.Columns[0]);
+        grid.ExpandAllGroups();
+        grid.SelectCell(0, 0);
+
+        grid.Walk(Key.RightArrow);
+        Assert.That(grid.ActiveRow, Is.EqualTo(1), "into the first record under it");
+
+        grid.MoveActive(-1, 0);
+        grid.Walk(Key.LeftArrow);
+        Assert.That(grid.ActiveRow, Is.EqualTo(0), "closed, not stepped out - it was open");
+    }
+
+    // Shift is how a block is built, and a caption crossing it must not cost the block already taken.
+    [Test]
+    public void ExtendingOverACaption_KeepsTheBlock()
+    {
+        var grid = GroupableGrid(6);
+        grid.GroupBy(grid.Columns[0]);
+        grid.ExpandAllGroups();
+        grid.SelectCell(1, 1);
+        grid.MoveActive(1, 0, extend: true);
+
+        var before = grid.SelectedCells.TryGetBounds(out var bounds);
+        while (grid.Rows[grid.ActiveRow].Node is not DataGridGroup) grid.MoveActive(1, 0, extend: true);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(before, Is.True);
+            Assert.That(grid.SelectedCells.TryGetBounds(out var after), Is.True, "the block is still there");
+            Assert.That(after.FirstRow, Is.EqualTo(bounds.FirstRow), "anchored where it was");
+        });
     }
 
     // The collection is public and it is the obvious thing to reach for - a view-model restoring a saved grouping writes
