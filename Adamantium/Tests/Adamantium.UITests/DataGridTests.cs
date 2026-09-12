@@ -4180,6 +4180,216 @@ public class DataGridTests
         Assert.That(Sheet(grid), Does.Contain("&lt;a &amp; b&gt;"));
     }
 
+    private static void OnClipboard(string text) => Adamantium.UI.Core.Input.Clipboard.SetText(text);
+
+    [Test]
+    public void Pasting_WritesTheBlock_FromWhereTheSelectionStarts()
+    {
+        var (grid, items) = EditableGrid();
+        grid.SelectCell(0, 0);
+        OnClipboard("first\t10\nsecond\t20");
+
+        Assert.That(grid.PasteSelection(), Is.True);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(items[0].Name, Is.EqualTo("first"));
+            Assert.That(items[0].Count, Is.EqualTo(10), "text becomes the number the property holds");
+            Assert.That(items[1].Name, Is.EqualTo("second"));
+            Assert.That(items[1].Count, Is.EqualTo(20));
+        });
+    }
+
+    // The binding converts, and REFUSES what will not fit - the same refusal an editor gets. The rest of the line still
+    // lands: one bad field is not a reason to drop a record.
+    [Test]
+    public void AValueThePropertyCannotHold_IsRefused_AndTheRestStillLands()
+    {
+        var (grid, items) = EditableGrid();
+        grid.SelectCell(0, 0);
+        OnClipboard("renamed\tnot a number");
+
+        Assert.That(grid.PasteSelection(), Is.True);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(items[0].Name, Is.EqualTo("renamed"));
+            Assert.That(items[0].Count, Is.EqualTo(1), "left as it was");
+        });
+    }
+
+    // The table does NOT grow to take a paste: adding records is its own gesture, with its own refusals.
+    [Test]
+    public void Pasting_StopsAtTheLastRow()
+    {
+        var (grid, items) = EditableGrid();
+        grid.SelectCell(0, 0);
+        OnClipboard("a\t1\nb\t2\nc\t3");
+
+        Assert.That(grid.PasteSelection(), Is.True);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(items.Count, Is.EqualTo(2), "no third record appeared");
+            Assert.That(items[1].Name, Is.EqualTo("b"), "and the third line went nowhere");
+        });
+    }
+
+    [Test]
+    public void AReadOnlyColumn_TakesNothingFromTheClipboard()
+    {
+        var (grid, items) = EditableGrid();
+        grid.Columns[1].IsReadOnly = true;
+        grid.SelectCell(0, 0);
+        OnClipboard("renamed\t99");
+
+        grid.PasteSelection();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(items[0].Name, Is.EqualTo("renamed"));
+            Assert.That(items[0].Count, Is.EqualTo(1));
+        });
+    }
+
+    // However a value arrives, it is the same value arriving - so the hook that refuses one typed refuses one pasted.
+    [Test]
+    public void AValueTheModelRefuses_IsRefusedPastedToo()
+    {
+        var (grid, items) = EditableGrid();
+        grid.CellEditEnding += (_, e) => e.Cancel = e.Value as string == "no";
+        grid.SelectCell(0, 0);
+        OnClipboard("no\t42");
+
+        grid.PasteSelection();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(items[0].Name, Is.EqualTo("one"), "refused");
+            Assert.That(items[0].Count, Is.EqualTo(42), "the cell beside it was not");
+        });
+    }
+
+    [Test]
+    public void Pasting_SelectsWhatLanded()
+    {
+        var (grid, _) = EditableGrid();
+        grid.SelectCell(0, 0);
+        OnClipboard("a\t1\nb\t2");
+
+        grid.PasteSelection();
+
+        Assert.That(grid.SelectedCells.TryGetBounds(out var bounds), Is.True);
+        Assert.That(bounds, Is.EqualTo(new CellRange(0, 0, 1, 1)));
+    }
+
+    // A tab is the format's own punctuation, so a value carrying one has to come back as ONE field - otherwise the
+    // grid's own copy is text its own paste reads wrong.
+    [Test]
+    public void AValueWithATabInIt_SurvivesTheRoundTrip()
+    {
+        var (grid, items) = EditableGrid();
+        items[0].Name = "before\tafter";
+        grid.SelectCell(0, 0);
+        grid.CopySelection();
+
+        grid.SelectCell(1, 0);
+        Assert.That(grid.PasteSelection(), Is.True);
+
+        Assert.That(items[1].Name, Is.EqualTo("before\tafter"));
+    }
+
+    // A caption is the table's own furniture. It consumes no line of the clipboard, so a paste of two lines means the
+    // next two RECORDS however many captions stand between them.
+    [Test]
+    public void Pasting_StepsOverACaption_WithoutSpendingALineOnIt()
+    {
+        var (grid, items) = EditableGrid();
+        items[0].Done = true;
+        grid.Columns.Add(new DataGridCheckBoxColumn { Binding = new Binding("Done"), Width = new GridLength(60) });
+        grid.GroupBy(grid.Columns[2]);
+        grid.ExpandAllGroups();
+
+        Assert.That(grid.Rows[0].Node, Is.InstanceOf<DataGridGroup>(), "a caption leads each of the two groups");
+
+        grid.SelectCell(1, 0);
+        OnClipboard("first\t10\nsecond\t20");
+
+        Assert.That(grid.PasteSelection(), Is.True);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(((Editable)grid.Rows[1].Node).Name, Is.EqualTo("first"));
+            Assert.That(grid.Rows[2].Node, Is.InstanceOf<DataGridGroup>(), "a caption stands between them");
+            Assert.That(((Editable)grid.Rows[3].Node).Name, Is.EqualTo("second"), "which the second line crossed");
+        });
+    }
+
+    // A column the user cannot see takes nothing and consumes nothing: the fields go to the columns that are THERE.
+    [Test]
+    public void Pasting_StepsOverAColumnThatIsNotShown()
+    {
+        var (grid, items) = EditableGrid();
+        grid.Columns.Insert(1, new DataGridTextColumn
+        {
+            Binding = new Binding("Name"), Width = new GridLength(100), IsVisible = false
+        });
+
+        grid.SelectCell(0, 0);
+        OnClipboard("renamed\t77");
+
+        Assert.That(grid.PasteSelection(), Is.True);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(items[0].Name, Is.EqualTo("renamed"));
+            Assert.That(items[0].Count, Is.EqualTo(77), "the second field skipped the hidden column");
+        });
+    }
+
+    // A template column's CELL is handed the row itself, so that the template can bind against it. That is right for
+    // the cell and wrong for the clipboard: what it copied was a type name. The column says what it MEANS through
+    // SortMemberPath - the same answer a sort, a search and the export already get from it.
+    [Test]
+    public void ATemplateColumn_CopiesWhatItStandsFor_NotTheRowItWasHanded()
+    {
+        var (grid, _) = EditableGrid();
+        grid.Columns.Add(new DataGridTemplateColumn { SortMemberPath = "Count", Width = new GridLength(100) });
+        Relayout(grid);
+
+        grid.SelectCell(0, 2);
+
+        Assert.That(grid.GetSelectionAsText(), Is.EqualTo("1"));
+    }
+
+    // With nothing naming what it stands for, the honest answer is nothing at all - the grid does not know, and a type
+    // name dressed up as a value is worse than an empty field.
+    [Test]
+    public void ATemplateColumnWithNothingToSayWhatItMeans_CopiesNothing()
+    {
+        var (grid, _) = EditableGrid();
+        grid.Columns.Add(new DataGridTemplateColumn { Width = new GridLength(100) });
+        Relayout(grid);
+
+        grid.SelectCell(0, 2);
+
+        Assert.That(grid.GetSelectionAsText(), Is.Empty);
+    }
+
+    [Test]
+    public void AnEmptyClipboard_PastesNothing()
+    {
+        var (grid, items) = EditableGrid();
+        grid.SelectCell(0, 0);
+        OnClipboard(string.Empty);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(grid.PasteSelection(), Is.False);
+            Assert.That(items[0].Name, Is.EqualTo("one"));
+        });
+    }
+
     // A cell says where it is by letters and a number, and the letters do not stop at Z. Twenty-seven columns is not an
     // unusual table.
     [Test]
