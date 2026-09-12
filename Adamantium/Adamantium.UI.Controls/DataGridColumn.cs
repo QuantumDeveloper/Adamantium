@@ -163,6 +163,41 @@ public abstract class DataGridColumn : FundamentalUIComponent
         set => SetValue(StateBindingProperty, value);
     }
 
+    /// <summary>A meaning DERIVED from the value rather than read off the record - conditional formatting. Asked only
+    /// where <see cref="StateBinding"/> says nothing, so a record that states its own meaning is never argued with.
+    /// </summary>
+    public static readonly AdamantiumProperty StateRuleProperty = AdamantiumProperty.Register(
+        nameof(StateRule), typeof(DataGridStateRule), typeof(DataGridColumn),
+        new PropertyMetadata(null, OnStateRuleChanged));
+
+    public DataGridStateRule StateRule
+    {
+        get => GetValue<DataGridStateRule>(StateRuleProperty);
+        set => SetValue(StateRuleProperty, value);
+    }
+
+    // Into the column's logical tree, for the reason a validation rule goes there: that is what gives it a DataContext,
+    // and with it {Binding} on its own properties - a threshold read off the page.
+    private static void OnStateRuleChanged(AdamantiumComponent component, AdamantiumPropertyChangedEventArgs e)
+    {
+        if (component is not DataGridColumn column) return;
+
+        if (e.OldValue is DataGridStateRule gone) column.RemoveLogicalChild(gone);
+        if (e.NewValue is DataGridStateRule added) column.AddLogicalChild(added);
+        column.Owner?.RefreshRealizedRows();
+    }
+
+    /// <summary>What a cell of this column means for one row: what the record SAYS it means, and failing that what the
+    /// rule makes of the value.</summary>
+    protected internal object StateFor(object item)
+    {
+        if (item == null) return null;
+
+        if (Read(StateBinding, item) is { } stated) return stated;
+
+        return StateRule is { } rule ? rule.State(ReadWithoutTheUI(item), item) : null;
+    }
+
     public BindingBase IsReadOnlyBinding
     {
         get => GetValue<BindingBase>(IsReadOnlyBindingProperty);

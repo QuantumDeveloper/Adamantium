@@ -426,9 +426,20 @@
                             <Setter TargetName="CellBorder" Property="Padding" Value="0"/>
                         </PropertyTrigger>
                         <!-- What the view-model called an error. A MEANING from the model, a colour from here. -->
+                        <!-- The three meanings a table normally distinguishes. A column states them through
+                             StateBinding or works them out with a StateRule; what they LOOK like is decided here, which
+                             is the whole reason a rule returns a meaning and not a colour. -->
                         <PropertyTrigger Property="State" Value="Error">
                             <Setter TargetName="PART_ContentPresenter" Property="Foreground"
                                     Value="{ObservableResource SystemFillColorCritical}"/>
+                        </PropertyTrigger>
+                        <PropertyTrigger Property="State" Value="Warning">
+                            <Setter TargetName="PART_ContentPresenter" Property="Foreground"
+                                    Value="{ObservableResource SystemFillColorCaution}"/>
+                        </PropertyTrigger>
+                        <PropertyTrigger Property="State" Value="Success">
+                            <Setter TargetName="PART_ContentPresenter" Property="Foreground"
+                                    Value="{ObservableResource SystemFillColorSuccess}"/>
                         </PropertyTrigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
