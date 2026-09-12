@@ -4180,6 +4180,61 @@ public class DataGridTests
         Assert.That(Sheet(grid), Does.Contain("&lt;a &amp; b&gt;"));
     }
 
+    // The collection is public and it is the obvious thing to reach for - a view-model restoring a saved grouping writes
+    // to it, not through GroupBy. It has to MEAN the same thing: nothing followed it before, so the table stayed flat
+    // and the call looked like it had worked.
+    [Test]
+    public void GroupingWrittenStraightIntoTheCollection_GroupsTheTable()
+    {
+        var grid = GroupableGrid(6);
+
+        grid.GroupDescriptions.Add(grid.Columns[0]);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(grid.Rows.Count, Is.EqualTo(2), "two captions over six rows");
+            Assert.That(grid.Rows.All(r => r.Node is DataGridGroup), Is.True);
+            Assert.That(grid.Columns[0].IsShown, Is.False, "and the column moved into the captions");
+        });
+    }
+
+    [Test]
+    public void TakingAColumnBackOutOfTheCollection_UngroupsTheTable()
+    {
+        var grid = GroupableGrid(6);
+        grid.GroupDescriptions.Add(grid.Columns[0]);
+
+        grid.GroupDescriptions.Remove(grid.Columns[0]);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(grid.Rows.Count, Is.EqualTo(6), "the six rows are back");
+            Assert.That(grid.Columns[0].IsShown, Is.True);
+        });
+    }
+
+    // Carrying a chip along the strip is TWO writes to the collection, and the table in between is grouped by a column
+    // on its way somewhere. One regrouping at the end of it, and what comes out is the new nesting - not the half-way
+    // one, and not the old one left standing.
+    [Test]
+    public void ReorderingTheGrouping_TurnsTheNestingAround()
+    {
+        var grid = GroupableGrid(6);
+        grid.GroupBy(grid.Columns[0]);   // Region, two of them
+        grid.GroupBy(grid.Columns[2]);   // Name, one per row
+
+        Assert.That(grid.Rows.Count, Is.EqualTo(2), "outermost is Region to begin with");
+
+        grid.MoveGrouping(0, 1);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(grid.GroupDescriptions[0], Is.SameAs(grid.Columns[2]), "Name is outermost now");
+            Assert.That(grid.Rows.Count, Is.EqualTo(6), "six captions, one per name, and the table folded to them");
+            Assert.That(grid.Rows.All(r => r.Node is DataGridGroup), Is.True);
+        });
+    }
+
     private static void OnClipboard(string text) => Adamantium.UI.Core.Input.Clipboard.SetText(text);
 
     [Test]
