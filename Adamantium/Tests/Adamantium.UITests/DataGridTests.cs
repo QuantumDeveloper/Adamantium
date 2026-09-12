@@ -2,6 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Globalization;
+using System.IO;
+using System.IO.Compression;
 using System.Linq;
 using Adamantium.Mathematics;
 using Adamantium.UI.Controls;
@@ -3983,6 +3985,216 @@ public class DataGridTests
             Assert.That(dataRow?.Group, Is.Null);
             Assert.That(dataRow.CellAt(0), Is.Not.Null, "the container is a data row again");
             Assert.That(dataRow.CellAt(0).Visibility, Is.EqualTo(Visibility.Visible), "with its cells shown");
+        });
+    }
+
+    private sealed class Weighed
+    {
+        public double Weight { get; init; }
+    }
+
+    private static string Csv(TreeDataGrid grid, char separator = ',')
+    {
+        var writer = new StringWriter();
+        grid.ExportCsv(writer, separator);
+        return writer.ToString();
+    }
+
+    // The file ends with a line break, so the split leaves a trailing empty piece that is not a line.
+    private static string[] Lines(string csv)
+    {
+        var lines = csv.Split(new[] { "\r\n" }, StringSplitOptions.None);
+        return lines.Take(lines.Length - 1).ToArray();
+    }
+
+    private static string Sheet(TreeDataGrid grid)
+    {
+        using var stream = new MemoryStream();
+        grid.ExportXlsx(stream);
+        stream.Position = 0;
+
+        using var zip = new ZipArchive(stream, ZipArchiveMode.Read);
+        using var reader = new StreamReader(zip.GetEntry("xl/worksheets/sheet1.xml").Open());
+        return reader.ReadToEnd();
+    }
+
+    private static TreeDataGrid ExportableGrid(int rows = 2)
+    {
+        var grid = Grid(
+            new DataGridTextColumn { Header = "Name", Binding = new Binding("Name"), Width = new GridLength(100), SortMemberPath = "Name" },
+            new DataGridTextColumn { Header = "Note", Binding = new Binding("Note"), Width = new GridLength(100) },
+            new DataGridTextColumn { Header = "Size", Binding = new Binding("Size"), Width = new GridLength(100) });
+        grid.ItemsSource = Flat(rows);
+        return grid;
+    }
+
+    // An export nobody trusts is one that does not match what is on screen.
+    [Test]
+    public void TheFile_CarriesTheColumnsTheUserCanSee_InTheOrderTheyStandIn()
+    {
+        var grid = ExportableGrid();
+        grid.Columns[1].IsVisible = false;
+
+        var lines = Lines(Csv(grid));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(lines[0], Is.EqualTo("Name,Size"), "the hidden one is not in the file either");
+            Assert.That(lines[1], Is.EqualTo("Item 1,1"));
+            Assert.That(lines.Length, Is.EqualTo(3), "a header and the two records");
+        });
+    }
+
+    // The three things that end a field early. A reader that gets these wrong silently shifts every column after them.
+    [Test]
+    public void AFieldThatWouldBreakTheFormat_ComesBackWhole()
+    {
+        var grid = Grid(new DataGridTextColumn { Header = "Name", Binding = new Binding("Name"), Width = new GridLength(100) });
+        grid.ItemsSource = new List<Row>
+        {
+            new() { Name = "Smith, John" },
+            new() { Name = "say \"yes\"" },
+            new() { Name = "two\r\nlines" }
+        };
+
+        Assert.That(Csv(grid), Is.EqualTo("Name\r\n\"Smith, John\"\r\n\"say \"\"yes\"\"\"\r\n\"two\r\nlines\"\r\n"));
+    }
+
+    // A comma is what the format is named after; a spreadsheet whose locale lists with semicolons puts a
+    // comma-separated file in one column. Quoting follows whichever was chosen - a comma in a field is only dangerous
+    // when the comma is the separator.
+    [Test]
+    public void TheSeparator_IsTheCallersToChoose_AndTheQuotingFollowsIt()
+    {
+        var grid = Grid(new DataGridTextColumn { Header = "Name", Binding = new Binding("Name"), Width = new GridLength(100) });
+        grid.ItemsSource = new List<Row> { new() { Name = "Smith, John" } };
+
+        Assert.That(Csv(grid, ';'), Is.EqualTo("Name\r\nSmith, John\r\n"));
+    }
+
+    // A collapsed branch is a fold of the VIEW. If the file followed it, the same table would export differently
+    // depending on which arrows somebody had clicked.
+    [Test]
+    public void TheFile_CarriesTheWholeTree_WhateverIsFoldedAway()
+    {
+        var grid = SortableTree();
+
+        var lines = Lines(Csv(grid));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(grid.Rows.Count, Is.EqualTo(2), "on screen the two roots stand closed");
+            Assert.That(lines.Skip(1), Is.EqualTo(new[] { "B", "B-2", "B-1", "A", "A-1" }), "the file has all five");
+        });
+    }
+
+    [Test]
+    public void TheFile_IsWhatTheTableIsShowing_SortedAndFiltered()
+    {
+        var grid = ExportableGrid(4);
+        grid.SetFilter(item => ((Row)item).Size % 2 == 1);
+        grid.SortBy(grid.Columns[0], descending: true);
+
+        Assert.That(Lines(Csv(grid)).Skip(1).Select(l => l.Split(',')[0]),
+            Is.EqualTo(new[] { "Item 3", "Item 1" }));
+    }
+
+    // Grouping moves a column's value into the captions and the table stops drawing it. A file has no captions, so
+    // taking the column out of the export would drop the very field the table is organised by.
+    [Test]
+    public void AColumnTheTableIsGroupedBy_StillGoesOut_AndTheCaptionsDoNot()
+    {
+        var grid = GroupableGrid(4);
+        grid.Columns[0].Header = "Region";
+        grid.GroupBy(grid.Columns[0]);
+
+        var lines = Lines(Csv(grid));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(grid.Columns[0].IsShown, Is.False, "the table itself has stopped showing it");
+            Assert.That(lines[0].Split(',')[0], Is.EqualTo("Region"), "the file keeps it");
+            Assert.That(lines.Length, Is.EqualTo(5), "four records, and no line for either caption");
+            Assert.That(lines.Skip(1).Count(l => l.StartsWith("south")), Is.EqualTo(2));
+        });
+    }
+
+    // A file is written to be read elsewhere. A number whose decimal separator came from the machine that wrote it is a
+    // number the next machine reads wrong - or, worse, reads as two fields.
+    [Test]
+    public void ANumber_IsWrittenTheSame_WhateverTheMachineIsSetTo()
+    {
+        var was = CultureInfo.CurrentCulture;
+        CultureInfo.CurrentCulture = new CultureInfo("ru-RU");
+        try
+        {
+            var grid = Grid(new DataGridTextColumn { Header = "Weight", Binding = new Binding("Weight"), Width = new GridLength(100) });
+            grid.ItemsSource = new List<Weighed> { new() { Weight = 1.5 } };
+
+            Assert.That(Lines(Csv(grid))[1], Is.EqualTo("1.5"));
+        }
+        finally
+        {
+            CultureInfo.CurrentCulture = was;
+        }
+    }
+
+    // An .xlsx is a zip of XML parts, so writing a real one needs no library at all - only the right parts, each named
+    // by the one above it.
+    [Test]
+    public void TheWorkbook_IsAZipWithThePartsAWorkbookNeeds()
+    {
+        using var stream = new MemoryStream();
+        ExportableGrid().ExportXlsx(stream);
+        stream.Position = 0;
+
+        using var zip = new ZipArchive(stream, ZipArchiveMode.Read);
+
+        Assert.That(zip.Entries.Select(e => e.FullName), Is.EquivalentTo(new[]
+        {
+            "[Content_Types].xml", "_rels/.rels", "xl/workbook.xml",
+            "xl/_rels/workbook.xml.rels", "xl/worksheets/sheet1.xml"
+        }));
+    }
+
+    // The whole reason for writing a workbook rather than a CSV with a different extension: a column of numbers that
+    // arrives as text cannot be summed until somebody converts it.
+    [Test]
+    public void InTheWorkbook_ANumberArrivesAsANumber_AndTextAsText()
+    {
+        var sheet = Sheet(ExportableGrid(1));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(sheet, Does.Contain("<c r=\"C2\"><v>1</v></c>"), "no type at all is what a number looks like");
+            Assert.That(sheet, Does.Contain("r=\"A2\" t=\"inlineStr\""), "and text says what it is");
+        });
+    }
+
+    [Test]
+    public void InTheWorkbook_TextThatWouldBreakTheXml_IsEscaped()
+    {
+        var grid = Grid(new DataGridTextColumn { Header = "Name", Binding = new Binding("Name"), Width = new GridLength(100) });
+        grid.ItemsSource = new List<Row> { new() { Name = "<a & b>" } };
+
+        Assert.That(Sheet(grid), Does.Contain("&lt;a &amp; b&gt;"));
+    }
+
+    // A cell says where it is by letters and a number, and the letters do not stop at Z. Twenty-seven columns is not an
+    // unusual table.
+    [Test]
+    public void InTheWorkbook_TheColumnAfterZ_IsAA()
+    {
+        var grid = WideGrid(28);
+        for (var i = 0; i < grid.Columns.Count; i++) grid.Columns[i].Header = $"C{i}";
+
+        var sheet = Sheet(grid);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(sheet, Does.Contain("r=\"Z1\""));
+            Assert.That(sheet, Does.Contain("r=\"AA1\""));
+            Assert.That(sheet, Does.Contain("r=\"AB1\""));
         });
     }
 }

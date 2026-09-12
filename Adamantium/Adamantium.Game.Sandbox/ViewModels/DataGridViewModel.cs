@@ -6,6 +6,7 @@ using System.Linq;
 using Adamantium.Mathematics;
 using Adamantium.MVVM;
 using Adamantium.UI.Controls;
+using Adamantium.UI.Core;
 using Adamantium.UI.Core.Media;
 
 namespace Adamantium.Game.Sandbox.ViewModels;
@@ -227,6 +228,61 @@ public partial class DataGridViewModel : TabPageViewModel
             System.IO.File.ReadAllText(LayoutFile));
         grid.RestoreColumnState(state);
         LayoutStatus = $"Restored {state?.Columns.Count ?? 0} columns";
+    }
+
+    /// <summary>What the export buttons report - the path, because a demo whose export cannot be OPENED has shown
+    /// nothing.</summary>
+    [Bindable] private string _exportStatus = "Nothing exported yet";
+
+    [Command]
+    private void ExportCsv(object target)
+    {
+        if (target is not TreeDataGrid grid) return;
+
+        var path = Where("table.csv", "csv", new FileType("Comma-separated values", "csv"));
+        if (path == null) return;
+
+        // A BOM, and only because this is a file Excel opens: without one it reads a UTF-8 file as the machine's ANSI
+        // code page and every non-Latin name comes up mangled. The grid writes to a TextWriter precisely so that the
+        // encoding is the application's call and not the control's.
+        using (var writer = new System.IO.StreamWriter(path, false, new System.Text.UTF8Encoding(true)))
+            grid.ExportCsv(writer);
+
+        ExportStatus = path;
+    }
+
+    [Command]
+    private void ExportXlsx(object target)
+    {
+        if (target is not TreeDataGrid grid) return;
+
+        var path = Where("table.xlsx", "xlsx", new FileType("Excel workbook", "xlsx"));
+        if (path == null) return;
+
+        using (var stream = System.IO.File.Create(path))
+            grid.ExportXlsx(stream);
+
+        ExportStatus = path;
+    }
+
+    private string Where(string name, string extension, FileType type)
+    {
+        if (!FileDialog.IsAvailable)
+        {
+            ExportStatus = "No file dialog on this platform";
+            return null;
+        }
+
+        var path = FileDialog.Save(new SaveFileRequest
+        {
+            Title = "Export the table",
+            FileName = name,
+            DefaultExtension = extension,
+            FileTypes = new[] { type }
+        });
+
+        if (path == null) ExportStatus = "Cancelled";
+        return path;
     }
 
     /// <summary>Whether the strip that searches the table is shown.</summary>

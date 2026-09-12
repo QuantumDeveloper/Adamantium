@@ -190,6 +190,21 @@
                 </Grid>
                 <TextBlock Text="{Binding LayoutStatus}" FontSize="11" Margin="0,0,0,8"
                            Foreground="{ObservableResource TextFillColorSecondary}"/>
+                <TextBlock Text="EXPORT" FontSize="11" Margin="0,4,0,6"
+                           Foreground="{ObservableResource TextFillColorSecondary}"/>
+                <!-- What goes out is what is on screen - the visible columns in their order, the rows filtered and
+                     sorted, and the whole depth of the tree whatever is folded. Group first and both files still carry
+                     the grouped column: on screen its value is in the captions, and a file has no captions. -->
+                <Grid ColumnDefinitions="*,*" Margin="0,0,0,4">
+                    <Button Grid.Column="0" Content="Export CSV" Margin="0,0,4,0"
+                            Command="{Binding ExportCsvCommand}"
+                            CommandParameter="{Binding ElementName=Table}"/>
+                    <Button Grid.Column="1" Content="Export XLSX"
+                            Command="{Binding ExportXlsxCommand}"
+                            CommandParameter="{Binding ElementName=Table}"/>
+                </Grid>
+                <TextBlock Text="{Binding ExportStatus}" FontSize="11" Margin="0,0,0,8" TextWrapping="WrapByWords"
+                           Foreground="{ObservableResource TextFillColorSecondary}"/>
                 <!-- Three pins, one on each kind of column: the first, one from the MIDDLE, and one pinned to the
                      other EDGE. A pinned column leaves its neighbours and joins the zone at its side. -->
                 <CheckBox Content="Pin Code left" Margin="0,0,0,6"
