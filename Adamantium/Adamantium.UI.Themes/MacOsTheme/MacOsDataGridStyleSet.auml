@@ -22,28 +22,61 @@
                             BorderThickness="{TemplateBinding BorderThickness}"
                             CornerRadius="{TemplateBinding CornerRadius}"
                             ClipToBounds="True">
-                        <Grid RowDefinitions="Auto,Auto,Auto,*,Auto">
+                        <Grid RowDefinitions="Auto,Auto,Auto,*,Auto" ColumnDefinitions="*,Auto">
                             <!-- The search strip, at the very top: it speaks about the WHOLE table, grouping and all. -->
-                            <DataGridSearchPanel x:Name="PART_SearchPanel" Grid.Row="0" Visibility="Collapsed"/>
+                            <DataGridSearchPanel x:Name="PART_SearchPanel" Grid.Row="0" Grid.ColumnSpan="2"
+                                                 Visibility="Collapsed"/>
 
                             <!-- The grouping strip, ABOVE the headers: a header is carried up out of the band and put
                                  down here, so the place it lands has to be where the gesture is going. Off unless the
                                  table asks for it - a table nobody groups should not spend a strip saying so. -->
-                            <DataGridGroupPanel x:Name="PART_GroupPanel" Grid.Row="1" Visibility="Collapsed"/>
+                            <DataGridGroupPanel x:Name="PART_GroupPanel" Grid.Row="1" Grid.ColumnSpan="2"
+                                                Visibility="Collapsed"/>
 
                             <!-- The header band, and under it the rows. The header is OUTSIDE the vertical scroller on
                                  purpose: it stays put while the rows move under it, which is the whole of what a header
                                  is for. -->
-                            <Border Grid.Row="2"
+                            <Border Grid.Row="2" Grid.Column="0"
                                     Background="{ObservableResource SolidBackgroundFillColorTertiary}"
                                     BorderBrush="{ObservableResource DataGridLineColor}"
                                     BorderThickness="0 0 0 1">
                                 <DataGridHeadersPresenter x:Name="PART_Headers" Height="26"/>
                             </Border>
 
+                            <!-- The rail the chooser's handle stands in - see the Fluent set for why it is a column
+                                 rather than something laid over the band. -->
+                            <Border Grid.Row="2" Grid.RowSpan="2" Grid.Column="1" x:Name="PART_ChooserRail"
+                                    Visibility="Collapsed" Width="22"
+                                    Background="{ObservableResource SolidBackgroundFillColorTertiary}"
+                                    BorderBrush="{ObservableResource DataGridLineColor}"
+                                    BorderThickness="1 0 0 0">
+                                <Border x:Name="PART_ChooserButton" Height="26" VerticalAlignment="Top"
+                                        Background="Transparent" Cursor="Hand"
+                                        ToolTipService.ToolTip="Choose columns">
+                                    <Image Source="{ResourceReference ColumnsIcon}" Width="12" Height="12"
+                                           HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                </Border>
+                            </Border>
+
+                            <!-- Light dismiss - see the Fluent set: this flyout has no buttons, so clicking away is
+                                 the only way out. -->
+                            <Popup x:Name="PART_ChooserPopup" Grid.Row="2" Grid.Column="1"
+                                   KeepOpen="False" IgnoreTargetPress="True"
+                                   Placement="Bottom" FlipToFit="True" VerticalOffset="4">
+                                <Popup.ChildTemplate>
+                                    <ControlTemplate TargetType="Popup">
+                                        <Border Background="{ResourceReference FlyoutSurfaceFill}"
+                                                BorderBrush="{ResourceReference ControlStrokeColorDefault}"
+                                                BorderThickness="1" CornerRadius="10" Padding="10">
+                                            <DataGridColumnChooser x:Name="PART_ColumnChooser"/>
+                                        </Border>
+                                    </ControlTemplate>
+                                </Popup.ChildTemplate>
+                            </Popup>
+
                             <!-- NAMED: the grid follows this scroller sideways - the header strip lives outside it and
                                  has to be moved by hand, and the column window is taken from the same offset. -->
-                            <ScrollViewer Grid.Row="3" x:Name="PART_ScrollHost"
+                            <ScrollViewer Grid.Row="3" Grid.Column="0" x:Name="PART_ScrollHost"
                                           CanContentScroll="True"
                                           HorizontalScrollBarVisibility="Auto"
                                           VerticalScrollBarVisibility="Auto">
@@ -53,7 +86,7 @@
                             <!-- The totals. Outside the vertical scroller for the same reason the header is: a total
                                  belongs to the whole table, so it must not scroll away from it. It DOES follow the
                                  columns sideways, which the strip does for itself. -->
-                            <Border x:Name="PART_FooterBand" Grid.Row="4" Visibility="Collapsed"
+                            <Border x:Name="PART_FooterBand" Grid.Row="4" Grid.ColumnSpan="2" Visibility="Collapsed"
                                     Background="{ObservableResource SolidBackgroundFillColorTertiary}"
                                     BorderBrush="{ObservableResource DataGridLineColor}"
                                     BorderThickness="0 1 0 0">
@@ -61,7 +94,7 @@
                             </Border>
 
                             <!-- Where a dragged column would land - see Fluent's set. -->
-                            <Border x:Name="PART_DropIndicator" Grid.Row="2" Grid.RowSpan="2"
+                            <Border x:Name="PART_DropIndicator" Grid.Row="2" Grid.RowSpan="2" Grid.Column="0"
                                     Width="2" HorizontalAlignment="Left" VerticalAlignment="Stretch"
                                     IsHitTestVisible="False" Visibility="Collapsed"
                                     Background="{TemplateBinding DropIndicatorBrush}"/>
@@ -74,6 +107,9 @@
                         </PropertyTrigger>
                         <PropertyTrigger Property="ShowGroupPanel" Value="true">
                             <Setter TargetName="PART_GroupPanel" Property="Visibility" Value="Visible"/>
+                        </PropertyTrigger>
+                        <PropertyTrigger Property="CanUserChooseColumns" Value="true">
+                            <Setter TargetName="PART_ChooserRail" Property="Visibility" Value="Visible"/>
                         </PropertyTrigger>
                         <!-- The band exists exactly while some column asks for a total - see TreeDataGrid.HasTotals. -->
                         <PropertyTrigger Property="HasTotals" Value="true">
@@ -492,6 +528,23 @@
                                     ToolTipService.ToolTip="Close the search"/>
                         </Grid>
                     </Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- Which columns are shown - see the Fluent set for why it is a list in a flyout and not a strip. -->
+    <Style Selector="DataGridColumnChooser">
+        <Setter Property="MinWidth" Value="160"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="DataGridColumnChooser">
+                    <!-- Capped and scrolled - see the Fluent set. -->
+                    <ScrollViewer MaxHeight="320"
+                                  VerticalScrollBarVisibility="Auto"
+                                  HorizontalScrollBarVisibility="Disabled">
+                        <StackPanel x:Name="PART_Items" Orientation="Vertical"/>
+                    </ScrollViewer>
                 </ControlTemplate>
             </Setter.Value>
         </Setter>

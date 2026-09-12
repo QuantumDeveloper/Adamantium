@@ -106,6 +106,23 @@ public abstract class DataGridColumn : FundamentalUIComponent
         typeof(DataGridFrozenSide), typeof(DataGridColumn),
         new PropertyMetadata(DataGridFrozenSide.None, OnLayoutChanged));
 
+    /// <summary>Whether the user wants this column on screen. The column stays in <see cref="TreeDataGrid.Columns"/>
+    /// either way - hiding is not removing, and everything holding an index (a selection, a sort, a filter) keeps
+    /// finding it where it was. What it stops doing is taking width, a header, a footer and a cell.</summary>
+    public static readonly AdamantiumProperty IsVisibleProperty = AdamantiumProperty.Register(nameof(IsVisible),
+        typeof(bool), typeof(DataGridColumn), new PropertyMetadata(true, OnLayoutChanged));
+
+    /// <summary>Whether the user may hide this column - what a column chooser offers. False for the one column a table
+    /// cannot be read without: a chooser that lets every column go leaves an empty table and no way back.</summary>
+    public static readonly AdamantiumProperty CanUserHideProperty = AdamantiumProperty.Register(nameof(CanUserHide),
+        typeof(bool), typeof(DataGridColumn), new PropertyMetadata(true));
+
+    /// <summary>What names this column in a SAVED arrangement. Position cannot: the whole point of saving is that the
+    /// user moved things. Set it where the obvious names will not do - two columns bound to the same field, or a
+    /// template column with no binding at all.</summary>
+    public static readonly AdamantiumProperty KeyProperty = AdamantiumProperty.Register(nameof(Key),
+        typeof(string), typeof(DataGridColumn), new PropertyMetadata(null));
+
     // Pinning CHANGES THE LAYOUT, and a column is not a visual child of the grid - nothing invalidates on its behalf,
     // so it has to say so itself.
     private static void OnLayoutChanged(AdamantiumComponent d, AdamantiumPropertyChangedEventArgs e)
@@ -234,6 +251,33 @@ public abstract class DataGridColumn : FundamentalUIComponent
         get => GetValue<DataGridFrozenSide>(FrozenSideProperty);
         set => SetValue(FrozenSideProperty, value);
     }
+
+    public bool IsVisible
+    {
+        get => GetValue<bool>(IsVisibleProperty);
+        set => SetValue(IsVisibleProperty, value);
+    }
+
+    public bool CanUserHide
+    {
+        get => GetValue<bool>(CanUserHideProperty);
+        set => SetValue(CanUserHideProperty, value);
+    }
+
+    public string Key
+    {
+        get => GetValue<string>(KeyProperty);
+        set => SetValue(KeyProperty, value);
+    }
+
+    /// <summary>The name this column is saved and found again by: its own <see cref="Key"/>, else the member it sorts
+    /// on, else the path it binds to, else what its header says. Null when a column offers none of those - it then has
+    /// no identity to save, and a saved arrangement passes over it rather than guessing.</summary>
+    protected internal string StateKey =>
+        Key is { Length: > 0 } named ? named
+        : SortMemberPath is { Length: > 0 } sorted ? sorted
+        : Binding is Binding plain && plain.Path?.Path is { Length: > 0 } bound ? bound
+        : Header?.ToString();
 
     /// <summary>Whether this column stands still while the table scrolls, on either edge.</summary>
     public bool IsFrozen => FrozenSide != DataGridFrozenSide.None;
@@ -371,11 +415,13 @@ public abstract class DataGridColumn : FundamentalUIComponent
     /// the table - pointing at text nobody can see.</summary>
     protected internal virtual bool IsSearchable => true;
 
-    /// <summary>Whether this column stands in the table at all. A column the table is GROUPED BY does not: its value is
-    /// the same on every row of a group and is already written in that group's caption, so leaving it in repeats one
-    /// value down the whole table and takes the room the caption needs.
+    /// <summary>Whether this column stands in the table at all - the ONE answer the layout, the headers, the footers
+    /// and the cells all ask. Two different things can say no, and they are not the same question:
+    /// <see cref="IsVisible"/> is the user's choice, and being GROUPED BY is the table's - a column's value is the same
+    /// on every row of its group and already written in that group's caption, so leaving it in repeats one value down
+    /// the whole table and takes the room the caption needs.
     /// <para>Derived, never stored: a flag mirroring the grouping is a flag that goes stale.</para></summary>
-    public bool IsShown => Owner?.GroupDescriptions.Contains(this) != true;
+    public bool IsShown => IsVisible && Owner?.GroupDescriptions.Contains(this) != true;
 
     /// <summary>Writes an edited value into one item through this column's binding, converting on the way. False when
     /// the binding refuses it - a one-way column is a column to read.</summary>

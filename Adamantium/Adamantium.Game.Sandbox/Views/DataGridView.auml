@@ -26,6 +26,7 @@
                       AlternationBrush="{Binding SelectedBrush, ElementName=TintPicker}"
                       ShowGroupPanel="{Binding ShowGroupPanel}"
                       ShowSearchPanel="{Binding ShowSearchPanel}"
+                      CanUserChooseColumns="{Binding CanChooseColumns}"
                       SearchMatchBrush="{Binding SearchMatchBrush}"
                       SearchCurrentMatchBrush="{Binding SearchCurrentMatchBrush}"
                       ValidationErrorBrush="{Binding ValidationErrorBrush}"
@@ -89,6 +90,7 @@
                 <!-- Aggregate is a property OF THE COLUMN, so the strip of totals and a group's header both read the
                      same statement of what this column adds up to. -->
                 <DataGridTextColumn Header="Code" Binding="{Binding Code}" Width="110" SortMemberPath="Code"
+                                    CanUserHide="False"
                                     IsReadOnlyBinding="{Binding IsLocked}"
                                     FrozenSide="{Binding CodeSide}"
                                     Aggregate="{Binding CodeAggregate}"
@@ -169,6 +171,24 @@
                 <TextBlock Text="Grid settings" FontSize="15" Margin="0,0,0,10"/>
 
                 <TextBlock Text="COLUMNS" FontSize="11" Margin="0,4,0,6"
+                           Foreground="{ObservableResource TextFillColorSecondary}"/>
+                <!-- Offers the handle at the right end of the header band; the flyout behind it is where the choosing
+                     happens. Code is not in it: a table of records nobody can identify is not a table, so that column
+                     says CanUserHide="False". -->
+                <CheckBox Content="Let the user choose columns" Margin="0,0,0,6"
+                          IsChecked="{Binding CanChooseColumns, Mode=TwoWay}"/>
+                <!-- The arrangement written to a FILE and read back - what makes choosing columns worth anything.
+                     Hide a column, drag a header, widen one, pin one, sort by one; save; put it all back wrong;
+                     restore. -->
+                <Grid ColumnDefinitions="*,*" Margin="0,0,0,4">
+                    <Button Grid.Column="0" Content="Save layout" Margin="0,0,4,0"
+                            Command="{Binding SaveLayoutCommand}"
+                            CommandParameter="{Binding ElementName=Table}"/>
+                    <Button Grid.Column="1" Content="Restore"
+                            Command="{Binding RestoreLayoutCommand}"
+                            CommandParameter="{Binding ElementName=Table}"/>
+                </Grid>
+                <TextBlock Text="{Binding LayoutStatus}" FontSize="11" Margin="0,0,0,8"
                            Foreground="{ObservableResource TextFillColorSecondary}"/>
                 <!-- Three pins, one on each kind of column: the first, one from the MIDDLE, and one pinned to the
                      other EDGE. A pinned column leaves its neighbours and joins the zone at its side. -->

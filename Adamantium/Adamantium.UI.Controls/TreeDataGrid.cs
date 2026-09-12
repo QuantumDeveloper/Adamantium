@@ -480,6 +480,7 @@ public partial class TreeDataGrid : Selector
         if (!GroupDescriptions.Remove(column)) GroupDescriptions.Add(column);
         RebuildFlattener();
         _groupPanel?.Sync();
+        _columnChooser?.Sync();
     }
 
     /// <summary>Moves a column to another place in the grouping - what carrying its chip along the strip does. The
@@ -496,6 +497,7 @@ public partial class TreeDataGrid : Selector
         _openGroups.Clear();
         RebuildFlattener();
         _groupPanel?.Sync();
+        _columnChooser?.Sync();
     }
 
     /// <summary>Ungroups everything.</summary>
@@ -507,6 +509,7 @@ public partial class TreeDataGrid : Selector
         _openGroups.Clear();
         RebuildFlattener();
         _groupPanel?.Sync();
+        _columnChooser?.Sync();
     }
 
     // WHICH GROUPS STAND OPEN, by path rather than by object. A sort, a filter or a regrouping builds every group
@@ -729,6 +732,17 @@ public partial class TreeDataGrid : Selector
             group.Add(item);
         }
 
+        // BY THE KEY, not by which value happened to turn up first. The loop above meets values in row order, so on a
+        // table sorted by anything else - or by nothing - the captions came out in no order at all (measured on the
+        // stand: Size 3832, 8711, 6609, 523...), and a list of captions nobody can scan is not a fold of the table, it
+        // is a shuffle of it. The SAME comparison the columns sort by, so a group of numbers orders as numbers.
+        // Direction follows the table only when the table is sorted BY THIS COLUMN - then the captions and the rows
+        // under them run the same way; otherwise ascending, which is what a list of labels is expected to be.
+        var descending = ReferenceEquals(SortColumn, column) && SortDescending;
+        order.Sort((a, b) => descending
+            ? Compare(((DataGridGroup)b).Key, ((DataGridGroup)a).Key)
+            : Compare(((DataGridGroup)a).Key, ((DataGridGroup)b).Key));
+
         if (level + 1 < GroupDescriptions.Count)
         {
             foreach (DataGridGroup group in order)
@@ -812,6 +826,21 @@ public partial class TreeDataGrid : Selector
         get => GetValue<bool>(ShowSearchPanelProperty);
         set => SetValue(ShowSearchPanelProperty, value);
     }
+
+    /// <summary>Whether the table offers the user a say in which columns it shows - the handle at the end of the header
+    /// band, and the flyout behind it.
+    /// <para>Only whether it is OFFERED. What the user then chooses is the columns' own <see cref="DataGridColumn.IsVisible"/>
+    /// and outlives both the flyout and this switch: turning the offer off later hides nothing and restores nothing.</para></summary>
+    public static readonly AdamantiumProperty CanUserChooseColumnsProperty = AdamantiumProperty.Register(
+        nameof(CanUserChooseColumns), typeof(bool), typeof(TreeDataGrid),
+        new PropertyMetadata(false, PropertyMetadataOptions.AffectsMeasure));
+
+    public bool CanUserChooseColumns
+    {
+        get => GetValue<bool>(CanUserChooseColumnsProperty);
+        set => SetValue(CanUserChooseColumnsProperty, value);
+    }
+
 
     // Taking the strip away calls the search off, for the same reason taking the grouping strip away ungroups: what it
     // paints over the table would otherwise stay with nothing left to explain or undo it.
@@ -1337,6 +1366,82 @@ public partial class TreeDataGrid : Selector
         RefreshStrips();
     }
 
+    /// <summary>Everything the user did to the columns, as one value to save: what is shown, in what order, how wide,
+    /// what is pinned, what it is sorted by. A column with no <see cref="DataGridColumn.StateKey"/> is passed over -
+    /// there is nothing to find it by again.</summary>
+    public DataGridColumnsState CaptureColumnState()
+    {
+        var state = new DataGridColumnsState
+        {
+            SortKey = SortColumn?.StateKey,
+            SortDescending = SortDescending
+        };
+
+        for (var i = 0; i < Columns.Count; i++)
+        {
+            var column = Columns[i];
+            if (column.StateKey is not { Length: > 0 } key) continue;
+
+            state.Columns.Add(new DataGridColumnState
+            {
+                Key = key,
+                Order = i,
+                IsVisible = column.IsVisible,
+                WidthValue = column.Width.Value,
+                WidthKind = column.Width.GridUnitType,
+                FrozenSide = column.FrozenSide
+            });
+        }
+
+        return state;
+    }
+
+    /// <summary>Puts a saved arrangement back on. The table it is applied to need not be the one it came from: a column
+    /// the state does not name is LEFT AS IT IS and follows the ones it does know, and a name the table no longer has
+    /// is passed over. That is what lets a saved layout survive a release that added or dropped a column, instead of
+    /// being thrown away whole the first time the table changes.</summary>
+    public void RestoreColumnState(DataGridColumnsState state)
+    {
+        if (state?.Columns == null || Columns.Count == 0) return;
+
+        var byKey = new Dictionary<string, DataGridColumn>(StringComparer.Ordinal);
+        foreach (var column in Columns)
+            if (column.StateKey is { Length: > 0 } key) byKey[key] = column;
+
+        // WHAT each column is, before WHERE it stands: the order pass below moves objects around, and reading a
+        // property off a column that has just been moved is the kind of thing that works until the day it does not.
+        var wanted = new List<DataGridColumn>();
+        foreach (var saved in state.Columns.OrderBy(s => s.Order))
+        {
+            if (saved.Key == null || !byKey.TryGetValue(saved.Key, out var column)) continue;
+
+            column.IsVisible = saved.IsVisible;
+            column.Width = new GridLength(saved.WidthValue, saved.WidthKind);
+            column.FrozenSide = saved.FrozenSide;
+            wanted.Add(column);
+        }
+
+        // ...then the order. The columns the state knows take the order it remembers; the ones it does not keep the
+        // order they already had, after them.
+        foreach (var column in Columns)
+            if (!wanted.Contains(column)) wanted.Add(column);
+
+        var carrier = ExpanderColumn;
+        Columns.Clear();
+        foreach (var column in wanted) Columns.Add(column);
+        if (carrier != null)
+        {
+            var index = Columns.IndexOf(carrier);
+            if (index >= 0) ExpanderColumnIndex = index;
+        }
+
+        SortBy(state.SortKey is { Length: > 0 } sortKey && byKey.TryGetValue(sortKey, out var sortColumn)
+            ? sortColumn
+            : null, state.SortDescending);
+
+        RefreshStrips();
+    }
+
     private void OnColumnsChanged(object sender, NotifyCollectionChangedEventArgs e)
     {
         // A column JOINS the grid's logical tree - that is what gives it a DataContext, and with it {Binding},
@@ -1397,6 +1502,10 @@ public partial class TreeDataGrid : Selector
         // column left its total trimmed to an ellipsis.
         (_headers as IMeasurableComponent)?.InvalidateMeasure();
         (_footer as IMeasurableComponent)?.InvalidateMeasure();
+
+        // ...and the strip that OFFERS the columns: a column hidden from anywhere else - a page's binding, the code
+        // behind a menu - has to tick down on it too, or the switch and the table say different things.
+        _columnChooser?.Sync();
     }
 
     private DataGridHeadersPresenter _headers;
@@ -1413,6 +1522,34 @@ public partial class TreeDataGrid : Selector
     internal void AdoptGroupPanel(DataGridGroupPanel panel) => _groupPanel = panel;
 
     internal void AdoptSearchPanel(DataGridSearchPanel panel) => _searchPanel = panel;
+
+    internal void AdoptColumnChooser(DataGridColumnChooser chooser) => _columnChooser = chooser;
+
+    private DataGridColumnChooser _columnChooser;
+    private Popup _chooserPopup;
+    private InputUIComponent _chooserButton;
+
+    /// <summary>Opens the flyout that says which columns are shown, and returns it - offered to whoever else wants it
+    /// (a shortcut, a context menu), exactly as a column header offers its filter.</summary>
+    public DataGridColumnChooser OpenColumnChooser()
+    {
+        if (_chooserPopup == null) return null;
+
+        // Opening BUILDS the flyout's content - it is deferred until first use - so the strip inside can only be
+        // reached afterwards. Asking the grid's own template for it finds nothing.
+        _chooserPopup.IsOpen = true;
+        var chooser = _chooserPopup.FindContentChild("PART_ColumnChooser") as DataGridColumnChooser;
+        if (chooser != null) chooser.Owner = this;
+        return chooser;
+    }
+
+    private void OnChooserButtonPressed(object sender, MouseButtonEventArgs e)
+    {
+        if (!CanUserChooseColumns) return;
+
+        OpenColumnChooser();
+        e.Handled = true;
+    }
 
     /// <summary>Whether <paramref name="point"/>, given in <paramref name="from"/>'s space, is over the grouping strip -
     /// what the header band asks before it decides whether a dropped column is being MOVED or being grouped by.</summary>
@@ -1439,6 +1576,15 @@ public partial class TreeDataGrid : Selector
         if (GetTemplateChild("PART_GroupPanel") is DataGridGroupPanel groupPanel) groupPanel.Owner = this;
         if (GetTemplateChild("PART_SearchPanel") is DataGridSearchPanel searchPanel) searchPanel.Owner = this;
 
+        _chooserPopup = GetTemplateChild("PART_ChooserPopup") as Popup;
+        if (_chooserButton != null) _chooserButton.MouseLeftButtonDown -= OnChooserButtonPressed;
+        _chooserButton = GetTemplateChild("PART_ChooserButton") as InputUIComponent;
+        if (_chooserButton != null) _chooserButton.MouseLeftButtonDown += OnChooserButtonPressed;
+
+        // Said HERE rather than in the template: a flyout with no target is placed against whatever slot the template
+        // gave the Popup itself, which put the list in the middle of the table. The handle is what it belongs to.
+        if (_chooserPopup != null) _chooserPopup.PlacementTarget = _chooserButton as UIComponent;
+
         _dropIndicator = GetTemplateChild("PART_DropIndicator") as MeasurableUIComponent;
 
         if (_scroll != null) _scroll.ScrollChanged -= OnScrolled;
@@ -1451,6 +1597,11 @@ public partial class TreeDataGrid : Selector
         base.OnRemoveTemplate();
         if (_scroll != null) _scroll.ScrollChanged -= OnScrolled;
         _scroll = null;
+
+        if (_chooserButton != null) _chooserButton.MouseLeftButtonDown -= OnChooserButtonPressed;
+        _chooserButton = null;
+        _chooserPopup = null;
+        _columnChooser = null;
     }
 
     // The rows scroll sideways inside their scroller; the HEADER strip is outside it (it must not scroll away
