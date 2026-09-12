@@ -235,6 +235,12 @@
         <Setter Property="Background" Value="{ObservableResource SolidBackgroundFillColorTertiary}"/>
     </Style>
 
+    <!-- The keyboard standing ON a caption. A caption holds no cells, so no cell can carry the active look and the ROW
+         has to - the same wash the cells take, over the whole of it. -->
+    <Style Selector="DataGridRow[IsGroup=true][IsSelected=true]">
+        <Setter Property="Background" Value="{ThemeResource AccentFillColorSelection}"/>
+    </Style>
+
     <!-- The number strip and its corner - see Fluent's set for why it is opaque. -->
     <Style Selector="DataGridRowHeader">
         <Setter Property="Background" Value="{ObservableResource SolidBackgroundFillColorTertiary}"/>
@@ -331,7 +337,9 @@
                             BorderBrush="{TemplateBinding GridLineBrush}"
                             BorderThickness="{TemplateBinding GridLineThickness}"
                             Padding="{TemplateBinding Padding}">
-                        <Grid ColumnDefinitions="Auto,*">
+                        <!-- PART_Indent: depth pushes the CONTENT right, never the border above it - that one paints
+                             the grid lines and the selection, and shifting it left a hole at the start of the cell. -->
+                        <Grid x:Name="PART_Indent" ColumnDefinitions="Auto,*">
                             <!-- The expander's STRIP, on the carrier column only: reserved even where there is nothing
                                  to open, so the rows of one level line up. -->
                             <Border Grid.Column="0" x:Name="PART_Expander"

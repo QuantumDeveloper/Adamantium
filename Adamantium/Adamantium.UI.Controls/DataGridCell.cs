@@ -1,5 +1,6 @@
 using System;
 using Adamantium.Mathematics;
+using Adamantium.UI.Controls.Base;
 using Adamantium.UI.Controls.Text;
 using Adamantium.UI.Core;
 using Adamantium.UI.Core.Input;
@@ -76,7 +77,11 @@ public class DataGridCell : ContentControl
     /// what lets the hierarchy start at the third column instead of the first.</summary>
     public static readonly AdamantiumProperty IndentProperty = AdamantiumProperty.Register(nameof(Indent),
         typeof(Double), typeof(DataGridCell),
-        new PropertyMetadata(0.0, PropertyMetadataOptions.AffectsMeasure | PropertyMetadataOptions.AffectsArrange));
+        new PropertyMetadata(0.0, PropertyMetadataOptions.AffectsMeasure | PropertyMetadataOptions.AffectsArrange,
+            OnIndentChanged));
+
+    private static void OnIndentChanged(AdamantiumComponent d, AdamantiumPropertyChangedEventArgs e) =>
+        (d as DataGridCell)?.ApplyIndent();
 
     public static readonly AdamantiumProperty ShowsExpanderProperty = AdamantiumProperty.Register(nameof(ShowsExpander),
         typeof(bool), typeof(DataGridCell),
@@ -413,28 +418,28 @@ public class DataGridCell : ContentControl
     /// <summary>Content is PUSHED RIGHT by <see cref="Indent"/> - that shift is the whole of what depth looks like in a
     /// tree table. The cell keeps its column's width whatever its content wants: the grid decided the widths once for
     /// everyone.</summary>
-    protected override Size MeasureOverride(Size availableSize)
-    {
-        var indent = Math.Max(0, Indent);
-        var inner = new Size(Math.Max(0, availableSize.Width - indent), availableSize.Height);
-        var desired = base.MeasureOverride(inner);
-
-        // The clip is asked for HERE, once the content has answered: it is needed only when the content wants more room
-        // than the column gives it - an editor with a standalone control's MinWidth, a template that will not shrink.
-        return new Size(desired.Width + indent, desired.Height);
-    }
+    protected override Size MeasureOverride(Size availableSize) => base.MeasureOverride(availableSize);
 
     protected override Size ArrangeOverride(Size finalSize)
     {
-        var indent = Math.Max(0, Math.Min(Indent, finalSize.Width));
         foreach (var visual in VisualChildren)
         {
-            if (visual is IMeasurableComponent child)
-                child.Arrange(new Rect(indent, 0, finalSize.Width - indent, finalSize.Height));
+            if (visual is IMeasurableComponent child) child.Arrange(new Rect(0, 0, finalSize.Width, finalSize.Height));
         }
 
         if (_pendingEditorFocus) AttachEditor();
         return finalSize;
+    }
+
+    // The depth shifts the CONTENT, and only the content. Shifting the whole of the template moved its ROOT with it -
+    // and the root is where the frame lives, the grid lines and the selection wash - so the one column that carries the
+    // expander began after an unpainted band: a selected cell there started past a hole, and under grouping, where every
+    // record sits a level or two deep, the hole was the width of the nesting.
+    private void ApplyIndent()
+    {
+        // MarginLeft, not Margin: it is an override of ONE side, so whatever margin the template authored for this part
+        // stays its own and the depth never fights it.
+        if (_indent != null) _indent.MarginLeft = Math.Max(0, Indent);
     }
 
     /// <summary>Where the expander sits, in this cell's own coordinates - the strip just left of the content. Empty when
@@ -459,8 +464,12 @@ public class DataGridCell : ContentControl
         if (_expander != null) _expander.MouseLeftButtonDown -= OnExpanderPressed;
         _expander = GetTemplateChild("PART_Expander") as IInputComponent;
         if (_expander != null) _expander.MouseLeftButtonDown += OnExpanderPressed;
+
+        _indent = GetTemplateChild("PART_Indent") as MeasurableUIComponent;
+        ApplyIndent();   // a fresh template starts flat, and the depth it is standing at is already known
     }
 
+    private MeasurableUIComponent _indent;
     private IInputComponent _expander;
     private IInputComponent _editor;
     private bool _pendingEditorFocus;

@@ -238,6 +238,12 @@
         <Setter Property="Background" Value="{ObservableResource SolidBackgroundFillColorTertiary}"/>
     </Style>
 
+    <!-- The keyboard standing ON a caption. A caption holds no cells, so no cell can carry the active look and the ROW
+         has to - the same wash the cells take, over the whole of it. -->
+    <Style Selector="DataGridRow[IsGroup=true][IsSelected=true]">
+        <Setter Property="Background" Value="{ThemeResource AccentFillColorSelection}"/>
+    </Style>
+
     <!-- The filter flyout: the values to tick, then the conditions, then the two buttons that actually change the
          table. Nothing applies while it is being filled in - a filter is composed and then run. -->
     <Style Selector="DataGridFilterView">
@@ -391,7 +397,9 @@
                             BorderBrush="{TemplateBinding GridLineBrush}"
                             BorderThickness="{TemplateBinding GridLineThickness}"
                             Padding="{TemplateBinding Padding}">
-                            <Grid ColumnDefinitions="Auto,*">
+                            <!-- PART_Indent: depth pushes the CONTENT right, never the border above it - that one paints
+                                 the grid lines and the selection, and shifting it left a hole at the start of the cell. -->
+                            <Grid x:Name="PART_Indent" ColumnDefinitions="Auto,*">
                             <!-- The expander's STRIP, on the carrier column only: a fixed 16 wide, which is exactly the
                                  area the grid hit-tests (DataGridCell.ExpanderRect). Reserved even when the row has no
                                  children, so the rows of one level line up; only the triangle inside comes and goes. -->
