@@ -192,6 +192,43 @@ public partial class DataGridViewModel : TabPageViewModel
     /// <summary>Whether the strip a header is dropped into to group by it is shown.</summary>
     [Bindable] private bool _showGroupPanel;
 
+    /// <summary>Whether the table offers a say in which columns it shows - the handle at the end of the header band.
+    /// Only the OFFER: what the user then chooses is the columns' own state and outlives this switch.</summary>
+    [Bindable] private bool _canChooseColumns;
+
+    /// <summary>Where this page keeps the saved arrangement. A FILE, not a field: the whole point of saving the
+    /// columns is that the choice outlives the run, and a demo that only remembered it in memory would demonstrate
+    /// nothing - including whether the state object can actually be written at all.</summary>
+    private static string LayoutFile =>
+        System.IO.Path.Combine(System.IO.Path.GetTempPath(), "adamantium-datagrid-layout.json");
+
+    [Bindable] private string _layoutStatus = "Nothing saved yet";
+
+    [Command]
+    private void SaveLayout(object target)
+    {
+        if (target is not TreeDataGrid grid) return;
+
+        var json = System.Text.Json.JsonSerializer.Serialize(grid.CaptureColumnState());
+        System.IO.File.WriteAllText(LayoutFile, json);
+        LayoutStatus = $"Saved {json.Length} bytes";
+    }
+
+    [Command]
+    private void RestoreLayout(object target)
+    {
+        if (target is not TreeDataGrid grid || !System.IO.File.Exists(LayoutFile))
+        {
+            LayoutStatus = "Nothing saved yet";
+            return;
+        }
+
+        var state = System.Text.Json.JsonSerializer.Deserialize<DataGridColumnsState>(
+            System.IO.File.ReadAllText(LayoutFile));
+        grid.RestoreColumnState(state);
+        LayoutStatus = $"Restored {state?.Columns.Count ?? 0} columns";
+    }
+
     /// <summary>Whether the strip that searches the table is shown.</summary>
     [Bindable] private bool _showSearchPanel;
 

@@ -892,6 +892,324 @@ public class DataGridTests
         Assert.That(grid.CellFor(0, 0).GridLineBrush, Is.EqualTo(Brushes.Green));
     }
 
+    // ---- Group order ---------------------------------------------------------------------------------------------
+
+    // Captions run in KEY order, not in the order the values happened to turn up. Built by first encounter, a table
+    // sorted by anything else gave a list of captions in no order at all - and a fold nobody can scan is a shuffle.
+    [Test]
+    public void GroupCaptions_RunInKeyOrder_WhateverTheRowsAreSortedBy()
+    {
+        var size = new DataGridTextColumn { Binding = new Binding("Size"), SortMemberPath = "Size" };
+        var name = new DataGridTextColumn { Binding = new Binding("Name"), SortMemberPath = "Name" };
+        var grid = Grid(size, name);
+        grid.ItemsSource = new List<Row>
+        {
+            new() { Name = "d", Size = 30 }, new() { Name = "c", Size = 10 },
+            new() { Name = "b", Size = 20 }, new() { Name = "a", Size = 10 }
+        };
+
+        grid.SortBy(name);              // sorted by something that is NOT the grouping column
+        grid.GroupBy(size);
+
+        var captions = grid.Rows.Where(r => r.Node is DataGridGroup)
+            .Select(r => ((DataGridGroup)r.Node).Key).ToArray();
+
+        Assert.That(captions, Is.EqualTo(new object[] { 10, 20, 30 }),
+            "and as NUMBERS - the same comparison the columns sort by, not their text");
+    }
+
+    // ...and they follow the table when the table is sorted by the very column it is grouped by: captions and the rows
+    // under them running opposite ways is the one arrangement nobody asked for.
+    [Test]
+    public void GroupCaptions_TurnAround_WhenTheTableIsSortedByThatColumnDescending()
+    {
+        var region = new DataGridTextColumn { Binding = new Binding("Region"), SortMemberPath = "Region" };
+        var grid = Grid(region);
+        grid.ItemsSource = new List<Row>
+        {
+            new() { Region = "north" }, new() { Region = "south" }, new() { Region = "east" }
+        };
+
+        grid.GroupBy(region);
+        grid.SortBy(region, descending: true);
+
+        var captions = grid.Rows.Where(r => r.Node is DataGridGroup)
+            .Select(r => ((DataGridGroup)r.Node).Key.ToString()).ToArray();
+
+        Assert.That(captions, Is.EqualTo(new[] { "south", "north", "east" }));
+    }
+
+    // ---- The chooser itself ---------------------------------------------------------------------------------------
+
+    private static DataGridColumnChooser Chooser(TreeDataGrid grid)
+    {
+        var chooser = new DataGridColumnChooser { Owner = grid };
+        chooser.Template = new ControlTemplate(() =>
+        {
+            var items = new StackPanel { Orientation = Orientation.Vertical };
+            var result = new TemplateResult { RootComponent = items };
+            result.RegisterName("PART_Items", items);
+            return result;
+        });
+
+        // The first pass applies the template, and only then is there a panel to build the switches into.
+        ((IMeasurableComponent)chooser).InvalidateMeasure();
+        chooser.Measure(new Size(200, 400));
+        chooser.Arrange(new Rect(0, 0, 200, 400));
+        return chooser;
+    }
+
+    private static List<CheckBox> SwitchesOf(DataGridColumnChooser chooser) =>
+        (chooser.GetTemplateChild("PART_Items") as Panel)?.Children.OfType<CheckBox>().ToList() ?? new List<CheckBox>();
+
+    // EVERY column gets a switch, including the one that may not be hidden - that one comes ticked and DISABLED. Left
+    // out, it simply is not in the list, and from the outside that reads as a list with something missing rather than
+    // as a rule; the first question it got was "where is Code?".
+    [Test]
+    public void TheChooser_OffersEveryColumn_AndTheOneThatIsNotYoursComesLocked()
+    {
+        var locked = new DataGridTextColumn { Header = "Code", Binding = new Binding("Name"), CanUserHide = false };
+        var free = new DataGridTextColumn { Header = "Note", Binding = new Binding("Note") };
+        var grid = Grid(locked, free);
+        grid.ItemsSource = Flat(2);
+
+        var switches = SwitchesOf(Chooser(grid));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(switches.Count, Is.EqualTo(2), "both columns are offered");
+            Assert.That(switches[0].IsChecked, Is.True, "the locked one is shown as shown");
+            Assert.That(switches[0].IsEnabled, Is.False, "...and as not yours to change");
+            Assert.That(switches[1].IsEnabled, Is.True);
+        });
+    }
+
+    // A column the table is GROUPED BY is a different matter and really is absent: it is not hidden, it has moved into
+    // the group captions, and offering to show it would be offering something that cannot happen.
+    [Test]
+    public void TheChooser_LeavesOutAColumnTheTableIsGroupedBy()
+    {
+        var region = new DataGridTextColumn { Header = "Region", Binding = new Binding("Region") };
+        var grid = Grid(new DataGridTextColumn { Header = "Name", Binding = new Binding("Name") }, region);
+        grid.ItemsSource = Flat(4);
+        grid.GroupBy(region);
+
+        var switches = SwitchesOf(Chooser(grid));
+
+        Assert.That(switches.Count, Is.EqualTo(1), "only the column that is still a column of the table");
+        Assert.That(switches[0].Content, Is.EqualTo("Name"));
+    }
+
+    // The switch is the column: turning it off hides the column, turning it back on brings it back.
+    [Test]
+    public void TurningASwitchOff_HidesThatColumn()
+    {
+        var note = new DataGridTextColumn { Header = "Note", Binding = new Binding("Note") };
+        var grid = Grid(new DataGridTextColumn { Header = "Name", Binding = new Binding("Name") }, note);
+        grid.ItemsSource = Flat(2);
+        var switches = SwitchesOf(Chooser(grid));
+
+        switches[1].IsChecked = false;
+        Assert.That(note.IsVisible, Is.False);
+
+        switches[1].IsChecked = true;
+        Assert.That(note.IsVisible, Is.True);
+    }
+
+    // ...and a switch that is not the user's changes nothing even when something writes to it: the rule lives in the
+    // control, not only in whether the theme let the pointer reach it.
+    [Test]
+    public void ASwitchThatIsNotYours_ChangesNothing_EvenWrittenTo()
+    {
+        var locked = new DataGridTextColumn { Header = "Code", Binding = new Binding("Name"), CanUserHide = false };
+        var grid = Grid(locked);
+        grid.ItemsSource = Flat(2);
+        var switches = SwitchesOf(Chooser(grid));
+
+        switches[0].IsChecked = false;
+
+        Assert.That(locked.IsVisible, Is.True, "the column a table cannot be read without stays");
+    }
+
+    // ---- The saved arrangement ----------------------------------------------------------------------------------
+
+    // What the user did to the columns comes back whole. Saving it is what makes choosing them worth anything: without
+    // it the same columns are hidden again on every run.
+    [Test]
+    public void AnArrangement_ComesBackAsItWasSaved()
+    {
+        var name = new DataGridTextColumn { Binding = new Binding("Name"), Width = new GridLength(100) };
+        var note = new DataGridTextColumn { Binding = new Binding("Note"), Width = new GridLength(100) };
+        var region = new DataGridTextColumn { Binding = new Binding("Region"), Width = new GridLength(100) };
+        var grid = Grid(name, note, region);
+        grid.ItemsSource = Flat(4);
+
+        note.IsVisible = false;
+        region.Width = new GridLength(250);
+        region.FrozenSide = DataGridFrozenSide.Left;
+        grid.MoveColumn(2, 0);              // Region first
+        grid.SortBy(name, descending: true);
+
+        var saved = grid.CaptureColumnState();
+
+        // Everything back the way it was NOT: a restore that happens to agree with the current state proves nothing.
+        note.IsVisible = true;
+        region.Width = new GridLength(60);
+        region.FrozenSide = DataGridFrozenSide.None;
+        grid.MoveColumn(0, 2);
+        grid.SortBy(null);
+
+        grid.RestoreColumnState(saved);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(note.IsVisible, Is.False, "what was hidden is hidden again");
+            Assert.That(region.Width.Value, Is.EqualTo(250), "and what was widened keeps its width");
+            Assert.That(region.FrozenSide, Is.EqualTo(DataGridFrozenSide.Left), "...and its pin");
+            Assert.That(grid.Columns.IndexOf(region), Is.Zero, "...and its place");
+            Assert.That(grid.SortColumn, Is.SameAs(name), "the sort is part of the arrangement");
+            Assert.That(grid.SortDescending, Is.True);
+        });
+    }
+
+    // A saved arrangement outlives the table changing under it. Thrown away whole at the first added column, it would
+    // be worthless: a release that adds one field would cost every user their layout.
+    [Test]
+    public void AnArrangement_SurvivesAColumnAddedOrDroppedSinceItWasSaved()
+    {
+        var name = new DataGridTextColumn { Binding = new Binding("Name"), Width = new GridLength(100) };
+        var gone = new DataGridTextColumn { Binding = new Binding("Note"), Width = new GridLength(100) };
+        var grid = Grid(name, gone);
+        grid.ItemsSource = Flat(4);
+
+        gone.IsVisible = false;
+        grid.MoveColumn(1, 0);
+        var saved = grid.CaptureColumnState();
+
+        // The release the layout was saved before: one column is gone, one is new.
+        grid.Columns.Remove(gone);
+        var added = new DataGridTextColumn { Binding = new Binding("Region"), Width = new GridLength(80) };
+        grid.Columns.Add(added);
+
+        grid.RestoreColumnState(saved);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(grid.Columns.Count, Is.EqualTo(2), "a name the table no longer has is passed over");
+            Assert.That(grid.Columns.IndexOf(name), Is.Zero, "what it does know is put where it was");
+            Assert.That(added.IsVisible, Is.True, "a column it never heard of is left as it is");
+            Assert.That(grid.Columns.IndexOf(added), Is.EqualTo(1), "...and follows the ones it does know");
+        });
+    }
+
+    // The whole point of the state object is that it can be WRITTEN. "Plain values any serializer can take" is a claim,
+    // and a claim about a type is a test: a round trip through a real serializer, not through the object itself.
+    [Test]
+    public void AnArrangement_SurvivesBeingWrittenOutAndReadBack()
+    {
+        var name = new DataGridTextColumn { Binding = new Binding("Name"), Width = new GridLength(140) };
+        var note = new DataGridTextColumn { Binding = new Binding("Note"), Width = GridLength.Star };
+        var grid = Grid(name, note);
+        grid.ItemsSource = Flat(2);
+
+        note.IsVisible = false;
+        name.FrozenSide = DataGridFrozenSide.Left;
+        grid.SortBy(name, descending: true);
+
+        var json = System.Text.Json.JsonSerializer.Serialize(grid.CaptureColumnState());
+        var read = System.Text.Json.JsonSerializer.Deserialize<DataGridColumnsState>(json);
+
+        note.IsVisible = true;
+        name.FrozenSide = DataGridFrozenSide.None;
+        grid.SortBy(null);
+
+        grid.RestoreColumnState(read);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(note.IsVisible, Is.False);
+            Assert.That(note.Width.IsStar, Is.True, "a star width is a star again, not the number 1");
+            Assert.That(name.Width.Value, Is.EqualTo(140));
+            Assert.That(name.FrozenSide, Is.EqualTo(DataGridFrozenSide.Left));
+            Assert.That(grid.SortColumn, Is.SameAs(name));
+            Assert.That(grid.SortDescending, Is.True);
+        });
+    }
+
+    // No key, no memory - and said out loud rather than guessed at. A column with nothing to name it is passed over on
+    // the way out, so nothing claims to remember it on the way back in.
+    [Test]
+    public void AColumnWithNothingToNameIt_IsNotSaved()
+    {
+        var named = new DataGridTextColumn { Binding = new Binding("Name"), Width = new GridLength(100) };
+        var anonymous = new DataGridTemplateColumn { Width = new GridLength(50) };
+        var grid = Grid(named, anonymous);
+        grid.ItemsSource = Flat(2);
+
+        var saved = grid.CaptureColumnState();
+
+        Assert.That(saved.Columns.Count, Is.EqualTo(1), "only the one that can be found again");
+        Assert.That(saved.Columns[0].Key, Is.EqualTo("Name"));
+    }
+
+    // ---- Choosing columns: hiding is not removing --------------------------------------------------------------
+
+    // A hidden column takes no width and no cell, and everything holding its INDEX still finds it where it was: the
+    // column stays in the collection, so a selection, a sort and a filter all survive it being turned off and on.
+    [Test]
+    public void AHiddenColumn_TakesNoRoomAndNoCell_ButKeepsItsPlace()
+    {
+        var first = new DataGridTextColumn { Binding = new Binding("Name"), Width = new GridLength(100) };
+        var middle = new DataGridTextColumn { Binding = new Binding("Note"), Width = new GridLength(100) };
+        var last = new DataGridTextColumn { Binding = new Binding("Region"), Width = new GridLength(100) };
+        var grid = Grid(first, middle, last);
+        grid.ItemsSource = Flat(3);
+        Relayout(grid);
+
+        middle.IsVisible = false;
+        Relayout(grid);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(middle.ActualWidth, Is.Zero, "a column nobody sees takes no width");
+            Assert.That(last.Offset, Is.EqualTo(100).Within(0.5), "and the one after it closes the gap");
+            Assert.That(grid.CellFor(0, 1), Is.Null, "no cell is built for it");
+            Assert.That(grid.Columns.IndexOf(last), Is.EqualTo(2), "hiding is not removing - the indices stand");
+        });
+
+        middle.IsVisible = true;
+        Relayout(grid);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(middle.ActualWidth, Is.EqualTo(100).Within(0.5), "and it comes back at the width it had");
+            Assert.That(grid.CellFor(0, 1), Is.Not.Null);
+        });
+    }
+
+    // The two reasons a column is not on screen are NOT the same, and IsShown is the one answer everything asks.
+    [Test]
+    public void GroupingByAColumn_HidesIt_WithoutTouchingWhatTheUserChose()
+    {
+        var column = new DataGridTextColumn { Binding = new Binding("Region"), Width = new GridLength(100) };
+        var grid = Grid(new DataGridTextColumn { Binding = new Binding("Name"), Width = new GridLength(100) }, column);
+        grid.ItemsSource = Flat(4);
+        Relayout(grid);
+
+        grid.GroupBy(column);
+        Relayout(grid);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(column.IsShown, Is.False, "a column the table is grouped by has moved into the captions");
+            Assert.That(column.IsVisible, Is.True, "...but the user never asked for it to be hidden");
+        });
+
+        grid.ClearGrouping();
+        Relayout(grid);
+        Assert.That(column.IsShown, Is.True, "and ungrouping brings it back without anyone re-ticking anything");
+    }
+
     // ---- Validation: a value the column will not accept, and a record that complains about itself ----------------
 
     private sealed class NoBlanks : DataGridValidationRule
@@ -2890,6 +3208,12 @@ public class DataGridTests
         });
     }
 
+    // The group whose caption says this - what a test that is about a group's CONTENT should ask for. Its place among
+    // the captions is a different question, with its own tests.
+    private static DataGridGroup GroupNamed(TreeDataGrid grid, string key) =>
+        grid.Rows.Select(r => r.Node).OfType<DataGridGroup>()
+            .First(g => string.Equals(g.Key?.ToString(), key, StringComparison.Ordinal));
+
     private static TreeDataGrid GroupableGrid(int rows = 6)
     {
         var grid = Grid(
@@ -3314,11 +3638,12 @@ public class DataGridTests
         grid.Columns[1].Aggregate = DataGridAggregate.Sum;
         grid.GroupBy(grid.Columns[0]);
 
-        var south = (DataGridGroup)grid.Rows[0].Node;
+        // BY ITS KEY, not by its place. This test is about what a total counts; taking the group at row 0 tied it to
+        // the order groups happen to be built in, and it broke the day that order became the KEY's.
+        var south = GroupNamed(grid, "south");
 
         Assert.Multiple(() =>
         {
-            Assert.That(south.Key, Is.EqualTo("south"));
             Assert.That(grid.TotalFor(grid.Columns[1], south), Is.EqualTo(4.0), "rows 1 and 3");
             Assert.That(grid.TotalFor(grid.Columns[1]), Is.EqualTo(10.0), "while the table's own total is all four");
         });
@@ -3333,14 +3658,14 @@ public class DataGridTests
         grid.Columns[1].Aggregate = DataGridAggregate.Sum;
         grid.GroupBy(grid.Columns[0]);
 
-        var group = (DataGridGroup)grid.Rows[0].Node;
+        var group = GroupNamed(grid, "south");
         var first = grid.TotalFor(grid.Columns[1], group);
 
         Assert.That(grid.TotalFor(grid.Columns[1], group), Is.SameAs(first), "asked twice, worked out once");
 
         grid.SetFilter(item => ((Row)item).Size > 2);
 
-        var regrouped = (DataGridGroup)grid.Rows[0].Node;
+        var regrouped = GroupNamed(grid, "south");
         Assert.That(grid.TotalFor(grid.Columns[1], regrouped), Is.EqualTo(3.0), "and the new shape has its own");
     }
 

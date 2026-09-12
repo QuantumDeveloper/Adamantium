@@ -109,8 +109,14 @@
             <Setter TargetName="Box" Property="Background" Value="{ThemeResource AccentFillColorSecondary}"/>
             <Setter TargetName="Box" Property="BorderBrush" Value="{ThemeResource AccentFillColorSecondary}"/>
         </MultiTrigger>
+        <!-- ...and the MARKER with them. Dimming only the box and the label left a full-contrast white tick sitting on
+             a grey box, which reads as an ordinary ticked box in a muted palette rather than as one nobody can touch -
+             the state was drawn half-done. The border goes too: a crisp outline says "press me" as loudly as the tick. -->
         <PropertyTrigger Property="IsEnabled" Value="false">
             <Setter TargetName="Box" Property="Background" Value="{ResourceReference ControlFillColorDisabled}"/>
+            <Setter TargetName="Box" Property="BorderBrush" Value="{ResourceReference ControlStrokeColorDefault}"/>
+            <Setter TargetName="CheckGlyph" Property="Stroke" Value="{ObservableResource TextFillColorDisabled}"/>
+            <Setter TargetName="IndeterminateGlyph" Property="Background" Value="{ObservableResource TextFillColorDisabled}"/>
             <Setter TargetName="PART_ContentPresenter" Property="Foreground" Value="{ObservableResource TextFillColorDisabled}"/>
         </PropertyTrigger>
     </Style>

@@ -26,22 +26,61 @@
                             BorderThickness="{TemplateBinding BorderThickness}"
                             CornerRadius="{TemplateBinding CornerRadius}"
                             ClipToBounds="True">
-                        <Grid RowDefinitions="Auto,Auto,Auto,*,Auto">
+                        <Grid RowDefinitions="Auto,Auto,Auto,*,Auto" ColumnDefinitions="*,Auto">
                             <!-- The search strip, at the very top - see the macOS set. -->
-                            <DataGridSearchPanel x:Name="PART_SearchPanel" Grid.Row="0" Visibility="Collapsed"/>
+                            <DataGridSearchPanel x:Name="PART_SearchPanel" Grid.Row="0" Grid.ColumnSpan="2"
+                                                 Visibility="Collapsed"/>
 
                             <!-- The grouping strip, above the headers - see the macOS set. -->
-                            <DataGridGroupPanel x:Name="PART_GroupPanel" Grid.Row="1" Visibility="Collapsed"/>
+                            <DataGridGroupPanel x:Name="PART_GroupPanel" Grid.Row="1" Grid.ColumnSpan="2"
+                                                Visibility="Collapsed"/>
 
-                            <Border Grid.Row="2"
+                            <Border Grid.Row="2" Grid.Column="0"
                                     Background="{ObservableResource SolidBackgroundFillColorTertiary}"
                                     BorderBrush="{ObservableResource DataGridLineColor}"
                                     BorderThickness="0 0 0 1">
                                 <DataGridHeadersPresenter x:Name="PART_Headers" Height="32"/>
                             </Border>
 
+                            <!-- THE RAIL the chooser's handle stands in. A COLUMN of its own, spanning the header band
+                                 and the rows, rather than something laid over the band: laid over, it covered whichever
+                                 column happened to be last, and with it that column's own sort arrow and filter funnel -
+                                 a new affordance eating an existing one. A column costs 22px, and only when the table
+                                 offers the chooser at all. -->
+                            <Border Grid.Row="2" Grid.RowSpan="2" Grid.Column="1" x:Name="PART_ChooserRail"
+                                    Visibility="Collapsed" Width="22"
+                                    Background="{ObservableResource SolidBackgroundFillColorTertiary}"
+                                    BorderBrush="{ObservableResource DataGridLineColor}"
+                                    BorderThickness="1 0 0 0">
+                                <Border x:Name="PART_ChooserButton" Height="32" VerticalAlignment="Top"
+                                        Background="Transparent" Cursor="Hand"
+                                        ToolTipService.ToolTip="Choose columns">
+                                    <Image Source="{ResourceReference ColumnsIcon}" Width="12" Height="12"
+                                           HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                </Border>
+                            </Border>
+
+                            <!-- LIGHT DISMISS. KeepOpen defaults to "stays until closed explicitly", which suits a
+                                 flyout with its own Apply and Cancel - the column filter is one. This one has no
+                                 buttons at all: every switch takes effect at once, so the way out is clicking away,
+                                 and without this there is no way out. IgnoreTargetPress so a press on the handle that
+                                 opened it does not close and reopen it in the same gesture. -->
+                            <Popup x:Name="PART_ChooserPopup" Grid.Row="2" Grid.Column="1"
+                                   KeepOpen="False" IgnoreTargetPress="True"
+                                   Placement="Bottom" FlipToFit="True" VerticalOffset="4">
+                                <Popup.ChildTemplate>
+                                    <ControlTemplate TargetType="Popup">
+                                        <Border Background="{ResourceReference FlyoutSurfaceFill}"
+                                                BorderBrush="{ResourceReference ControlStrokeColorDefault}"
+                                                BorderThickness="1" CornerRadius="8" Padding="10">
+                                            <DataGridColumnChooser x:Name="PART_ColumnChooser"/>
+                                        </Border>
+                                    </ControlTemplate>
+                                </Popup.ChildTemplate>
+                            </Popup>
+
                             <!-- NAMED - the grid follows it sideways; see the macOS set. -->
-                            <ScrollViewer Grid.Row="3" x:Name="PART_ScrollHost"
+                            <ScrollViewer Grid.Row="3" Grid.Column="0" x:Name="PART_ScrollHost"
                                           CanContentScroll="True"
                                           HorizontalScrollBarVisibility="Auto"
                                           VerticalScrollBarVisibility="Auto">
@@ -49,7 +88,7 @@
                             </ScrollViewer>
 
                             <!-- The totals, outside the vertical scroller - see the macOS set. -->
-                            <Border x:Name="PART_FooterBand" Grid.Row="4" Visibility="Collapsed"
+                            <Border x:Name="PART_FooterBand" Grid.Row="4" Grid.ColumnSpan="2" Visibility="Collapsed"
                                     Background="{ObservableResource SolidBackgroundFillColorTertiary}"
                                     BorderBrush="{ObservableResource DataGridLineColor}"
                                     BorderThickness="0 1 0 0">
@@ -59,7 +98,7 @@
                             <!-- Where a dragged column would land, from the header band down through the rows: what the
                                  user is aiming at is a place among the DATA. Spans both rows for that reason, and the
                                  control moves it by its left margin. -->
-                            <Border x:Name="PART_DropIndicator" Grid.Row="2" Grid.RowSpan="2"
+                            <Border x:Name="PART_DropIndicator" Grid.Row="2" Grid.RowSpan="2" Grid.Column="0"
                                     Width="2" HorizontalAlignment="Left" VerticalAlignment="Stretch"
                                     IsHitTestVisible="False" Visibility="Collapsed"
                                     Background="{TemplateBinding DropIndicatorBrush}"/>
@@ -72,6 +111,11 @@
                         </PropertyTrigger>
                         <PropertyTrigger Property="ShowGroupPanel" Value="true">
                             <Setter TargetName="PART_GroupPanel" Property="Visibility" Value="Visible"/>
+                        </PropertyTrigger>
+                        <!-- The handle appears only when the table offers the chooser at all: a button that opens
+                             nothing is worse than no button. -->
+                        <PropertyTrigger Property="CanUserChooseColumns" Value="true">
+                            <Setter TargetName="PART_ChooserRail" Property="Visibility" Value="Visible"/>
                         </PropertyTrigger>
                         <PropertyTrigger Property="HasTotals" Value="true">
                             <Setter TargetName="PART_FooterBand" Property="Visibility" Value="Visible"/>
@@ -459,6 +503,26 @@
                                     ToolTipService.ToolTip="Close the search"/>
                         </Grid>
                     </Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- Which columns are shown: one switch per column, DOWN the flyout rather than across a strip. A strip of them
+         above the headers costs vertical room permanently and wraps to five lines on the wide table the feature exists
+         for; a list in a flyout costs nothing until it is asked for. -->
+    <Style Selector="DataGridColumnChooser">
+        <Setter Property="MinWidth" Value="160"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="DataGridColumnChooser">
+                    <!-- Capped and scrolled: a table with forty columns would otherwise open a list taller than the
+                         window, with the switches at both ends off screen. -->
+                    <ScrollViewer MaxHeight="320"
+                                  VerticalScrollBarVisibility="Auto"
+                                  HorizontalScrollBarVisibility="Disabled">
+                        <StackPanel x:Name="PART_Items" Orientation="Vertical"/>
+                    </ScrollViewer>
                 </ControlTemplate>
             </Setter.Value>
         </Setter>

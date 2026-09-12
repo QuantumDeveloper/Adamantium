@@ -110,8 +110,12 @@
             <Setter TargetName="Box" Property="Background" Value="{ThemeResource AccentFillColorTertiary}"/>
             <Setter TargetName="Box" Property="BorderBrush" Value="{ThemeResource AccentFillColorTertiary}"/>
         </MultiTrigger>
+        <!-- The MARKER goes with the rest - see the Fluent set: a full-contrast tick on a dimmed box reads as a
+             perfectly ordinary ticked box. -->
         <PropertyTrigger Property="IsEnabled" Value="false">
             <Setter TargetName="Box" Property="Background" Value="{ResourceReference ControlFillColorDisabled}"/>
+            <Setter TargetName="Box" Property="BorderBrush" Value="{ResourceReference ControlStrokeColorDefault}"/>
+            <Setter TargetName="CheckGlyph" Property="Stroke" Value="{ObservableResource TextFillColorDisabled}"/>
             <Setter TargetName="PART_ContentPresenter" Property="Foreground" Value="{ObservableResource TextFillColorDisabled}"/>
         </PropertyTrigger>
     </Style>
