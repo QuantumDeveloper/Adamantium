@@ -421,6 +421,16 @@ public partial class TreeDataGrid : Selector
         ApplyFilters();
     }
 
+    /// <summary>Drops every column filter at once. What the funnels set is only undoable through the funnels, so
+    /// whatever takes them away has to undo it.</summary>
+    public void ClearColumnFilters()
+    {
+        if (_columnFilters is not { Count: > 0 }) return;
+
+        _columnFilters.Clear();
+        ApplyFilters();
+    }
+
     /// <summary>Every value this column holds, in the order first seen, taken from the WHOLE source and not from the
     /// rows on screen - a value list that showed only what is visible would be a list of what you already have.
     /// <para>Rows hidden by OTHER columns' filters are still counted: the point of the list is to get them back.</para></summary>
@@ -856,6 +866,31 @@ public partial class TreeDataGrid : Selector
         set => SetValue(CanUserChooseColumnsProperty, value);
     }
 
+    /// <summary>Whether the headers offer their filter funnels at all. On by default - a table you cannot narrow is a
+    /// report - and turned off here for a table that is narrowed some other way, or not at all, rather than by saying so
+    /// on every column in turn.
+    /// <para>The column's own <see cref="DataGridColumn.CanUserFilter"/> still answers for itself: this one can only
+    /// take the funnel away, never give it to a column that refused it.</para></summary>
+    public static readonly AdamantiumProperty CanUserFilterColumnsProperty = AdamantiumProperty.Register(
+        nameof(CanUserFilterColumns), typeof(bool), typeof(TreeDataGrid),
+        new PropertyMetadata(true, PropertyMetadataOptions.AffectsMeasure, OnCanUserFilterColumnsChanged));
+
+    public bool CanUserFilterColumns
+    {
+        get => GetValue<bool>(CanUserFilterColumnsProperty);
+        set => SetValue(CanUserFilterColumnsProperty, value);
+    }
+
+    // Taking the funnels away CLEARS what they set: a filter nobody can see is a table narrowed for a reason the user
+    // has no way to find or undo - the same rule as taking the search strip or the grouping panel away.
+    private static void OnCanUserFilterColumnsChanged(AdamantiumComponent d, AdamantiumPropertyChangedEventArgs e)
+    {
+        if (d is not TreeDataGrid grid) return;
+
+        if (e.NewValue is false) grid.ClearColumnFilters();
+        grid.InvalidateColumns();
+    }
+
 
     // Taking the strip away calls the search off, for the same reason taking the grouping strip away ungroups: what it
     // paints over the table would otherwise stay with nothing left to explain or undo it.
@@ -897,6 +932,62 @@ public partial class TreeDataGrid : Selector
     {
         get => GetValue<Brush>(ValidationErrorBrushProperty);
         set => SetValue(ValidationErrorBrushProperty, value);
+    }
+
+    /// <summary>A rule over the whole RECORD - for what no single cell can answer: a "from" later than a "to", parts
+    /// that must add up. The mark goes on the ROW, because the fault belongs to none of the cells involved.
+    /// <para>The record's own <see cref="System.ComponentModel.INotifyDataErrorInfo"/> is asked FIRST, with no property
+    /// name - which is how that interface says "this record", not "this field".</para></summary>
+    public static readonly AdamantiumProperty RowValidationRuleProperty = AdamantiumProperty.Register(
+        nameof(RowValidationRule), typeof(DataGridRowValidationRule), typeof(TreeDataGrid),
+        new PropertyMetadata(null, OnRowValidationRuleChanged));
+
+    public DataGridRowValidationRule RowValidationRule
+    {
+        get => GetValue<DataGridRowValidationRule>(RowValidationRuleProperty);
+        set => SetValue(RowValidationRuleProperty, value);
+    }
+
+    // A rule JOINS the grid's logical tree, for the reason a column does: that is what gives it a DataContext, and with
+    // it {Binding} on its own properties.
+    private static void OnRowValidationRuleChanged(AdamantiumComponent d, AdamantiumPropertyChangedEventArgs e)
+    {
+        if (d is not TreeDataGrid grid) return;
+
+        if (e.OldValue is DataGridRowValidationRule gone) grid.RemoveLogicalChild(gone);
+        if (e.NewValue is DataGridRowValidationRule added) grid.AddLogicalChild(added);
+        grid.RefreshRealizedRows();
+    }
+
+    /// <summary>What the table does with a value its rules refuse - see <see cref="DataGridValidationMode"/>. Marking
+    /// by default: trapping someone in a cell is the harsher of the two, and a table that does it without being asked
+    /// is a table that cannot be left.</summary>
+    public static readonly AdamantiumProperty ValidationModeProperty = AdamantiumProperty.Register(
+        nameof(ValidationMode), typeof(DataGridValidationMode), typeof(TreeDataGrid),
+        new PropertyMetadata(DataGridValidationMode.Mark));
+
+    public DataGridValidationMode ValidationMode
+    {
+        get => GetValue<DataGridValidationMode>(ValidationModeProperty);
+        set => SetValue(ValidationModeProperty, value);
+    }
+
+    /// <summary>What is wrong with a record taken as a whole, or null when nothing is. Its own report first - a
+    /// <see cref="System.ComponentModel.INotifyDataErrorInfo"/> asked with NO property name is being asked about the
+    /// record - then the rule the table names.</summary>
+    internal string ValidateRow(object item)
+    {
+        if (item == null) return null;
+
+        if (item is System.ComponentModel.INotifyDataErrorInfo reporter)
+        {
+            foreach (var error in reporter.GetErrors(null) ?? System.Array.Empty<object>())
+            {
+                if (error?.ToString() is { Length: > 0 } text) return text;
+            }
+        }
+
+        return RowValidationRule is { } rule ? rule.Validate(item) : null;
     }
 
     // The cells take their colours when they are attached, so the ones already built have to be told.
@@ -1782,6 +1873,16 @@ public partial class TreeDataGrid : Selector
         var rowCount = Rows?.Count ?? 0;
         if (row < 0 || row >= rowCount || column < 0 || column >= Columns.Count) return;
 
+        // Leaving a cell IS leaving its editor, so a refused value has to be answered HERE as well as on the commit.
+        // Asked only at the funnel every gesture passes through - a press, a drag, an arrow key - because a block
+        // honoured by some of them and not others is a table with two current cells at once. Focus goes back to the
+        // editor: the pointer took it on its way out, and an open editor without the caret cannot be answered.
+        if (IsEditing && (row != EditingRow || column != EditingColumn) && !CommitEdit())
+        {
+            CellFor(EditingRow, EditingColumn)?.FocusEditor();
+            return;
+        }
+
         // In FullRow the click still lands on a cell - it just takes the whole row. Answered HERE, at the one funnel
         // every gesture passes through (a press, a drag, an arrow key), so the mode cannot hold for some of them.
         if (SelectionUnit == DataGridSelectionUnit.FullRow)
@@ -2198,6 +2299,17 @@ public partial class TreeDataGrid : Selector
         CellEditEnding?.Invoke(this, args);
         if (args.Cancel) return false;
 
+        // BLOCKING asks the rule BEFORE the write, because after it the record holds the very value that is refused and
+        // there would be nothing left to refuse. The cell keeps the message for as long as it holds on: an editor that
+        // will not let go and does not say why is a table that has simply stopped working.
+        if (ValidationMode == DataGridValidationMode.Block
+            && column.Refuses(args.Value, item) is { Length: > 0 } refused)
+        {
+            var held = CellFor(EditingRow, EditingColumn);
+            if (held != null) held.Refusal = refused;
+            return false;
+        }
+
         if (!WriteThroughColumn(column, item, args.Value)) return false;
 
         EndEdit();
@@ -2213,6 +2325,11 @@ public partial class TreeDataGrid : Selector
 
     private void EndEdit()
     {
+        // The refusal was about an editor that is closing: leaving it behind would mark a cell for a value it no longer
+        // holds, and the next row recycled onto that carrier would inherit the complaint.
+        var held = CellFor(EditingRow, EditingColumn);
+        if (held != null) held.Refusal = null;
+
         EditingRow = -1;
         EditingColumn = -1;
         IsEditing = false;

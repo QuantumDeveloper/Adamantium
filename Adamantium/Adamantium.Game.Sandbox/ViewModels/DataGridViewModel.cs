@@ -125,7 +125,11 @@ public partial class DataGridViewModel : TabPageViewModel
                 Name = $"Assembly {i} - a name long enough to need trimming",
                 Size = random.Next(1, 9999),
                 Status = Statuses[i % Statuses.Length],
-                Done = i % 3 == 0
+                // Every FOURTH, not every third: stepping in time with the status meant "done" only ever landed on an
+                // "ok" record, so the one thing a row rule is here to show - a record that is done AND filed as an
+                // error - could not occur at all until somebody ticked a box by hand. Out of step, it turns up on one
+                // row in twelve, starting at the eighth.
+                Done = i % 4 == 0
             };
             Fill(node, i);
 
@@ -196,6 +200,11 @@ public partial class DataGridViewModel : TabPageViewModel
     /// <summary>Whether the table offers a say in which columns it shows - the handle at the end of the header band.
     /// Only the OFFER: what the user then chooses is the columns' own state and outlives this switch.</summary>
     [Bindable] private bool _canChooseColumns;
+
+    /// <summary>Whether the headers offer their funnels at all. On, because a table you cannot narrow is a report -
+    /// turning it off here is for seeing what a table without filtering looks like, and that switching it off gives
+    /// back the rows the funnels had hidden.</summary>
+    [Bindable] private bool _canFilterColumns = true;
 
     /// <summary>Where this page keeps the saved arrangement. A FILE, not a field: the whole point of saving the
     /// columns is that the choice outlives the run, and a demo that only remembered it in memory would demonstrate
@@ -326,6 +335,14 @@ public partial class DataGridViewModel : TabPageViewModel
     [Bindable] private int _sizeFloor = 500;
 
     [Bindable] private int _sizeCeiling = 9000;
+
+    /// <summary>Whether a refused value keeps the editor open. Both answers are on this page because the right one is
+    /// the application's: a form being filled in has to let a half-finished record stand, a ledger must not take a
+    /// figure that cannot be true.</summary>
+    [Bindable, Affects(nameof(ValidationMode))] private bool _blockOnInvalid;
+
+    public DataGridValidationMode ValidationMode =>
+        BlockOnInvalid ? DataGridValidationMode.Block : DataGridValidationMode.Mark;
 
     /// <summary>What the Size column adds up to. Every aggregate is here to be tried: a sum is what a quantity wants,
     /// an average what a rate does.</summary>

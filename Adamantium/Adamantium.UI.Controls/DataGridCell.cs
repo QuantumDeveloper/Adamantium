@@ -406,8 +406,27 @@ public class DataGridCell : ContentControl
         // Asked here, with everything else a cell learns on the way in, so a row scrolled back into view is marked the
         // same as one that never left. A cell being EDITED is left alone: the value under the editor is the old one,
         // and marking it red while the user is still typing the replacement reads as a complaint about the typing.
-        ValidationError = IsEditing ? null : column?.Validate(item);
+        ValidationError = IsEditing ? Refusal : column?.Validate(item);
     }
+
+    /// <summary>Why the editor will not let go, while the table is BLOCKING - see
+    /// <see cref="TreeDataGrid.ValidationMode"/>. The one thing an editing cell is marked for: the complaint is not
+    /// about the typing, it is about the table refusing to take what was typed.</summary>
+    internal string Refusal
+    {
+        get => _refusal;
+        set
+        {
+            _refusal = value;
+            if (IsEditing) ValidationError = value;
+        }
+    }
+
+    private string _refusal;
+
+    // Focus follows the pointer out of a refused editor before anything can object, so it is put back: an editor that
+    // is still open and no longer has the caret is an editor the user cannot answer.
+    internal void FocusEditor() => _editor?.Focus();
 
     private void Adopt(AdamantiumProperty property, Brush brush)
     {

@@ -4359,6 +4359,239 @@ public class DataGridTests
         });
     }
 
+    private sealed class Span
+    {
+        public string Name { get; set; }
+        public int From { get; set; }
+        public int To { get; set; }
+    }
+
+    // The thing no cell can answer: neither number is wrong on its own, only the pair is.
+    private sealed class OrderedSpan : DataGridRowValidationRule
+    {
+        public override string Validate(object item) =>
+            item is Span { From: var from, To: var to } && from > to ? "from is after to" : null;
+    }
+
+    private sealed class Faulted : System.ComponentModel.INotifyDataErrorInfo
+    {
+        public string Name { get; set; }
+        public string Fault { get; set; }
+
+        public bool HasErrors => Fault != null;
+        public event EventHandler<System.ComponentModel.DataErrorsChangedEventArgs> ErrorsChanged;
+
+        // NO property name is how this interface says "the record", not "this field".
+        public System.Collections.IEnumerable GetErrors(string propertyName) =>
+            string.IsNullOrEmpty(propertyName) && Fault != null ? new[] { Fault } : Array.Empty<string>();
+    }
+
+    private static (TreeDataGrid grid, List<Span> items) SpanGrid()
+    {
+        var items = new List<Span>
+        {
+            new() { Name = "sound", From = 1, To = 9 },
+            new() { Name = "backwards", From = 9, To = 1 }
+        };
+
+        var grid = Grid(
+            new DataGridTextColumn { Binding = new Binding("From"), Width = new GridLength(80) },
+            new DataGridTextColumn { Binding = new Binding("To"), Width = new GridLength(80) });
+        grid.ItemsSource = items;
+        grid.RowValidationRule = new OrderedSpan();
+        Relayout(grid);
+        return (grid, items);
+    }
+
+    private static DataGridRow RowAt(TreeDataGrid grid, int index) =>
+        grid.ItemContainerGenerator.ContainerFromIndex(index) as DataGridRow;
+
+    // 10c. Neither "from" nor "to" is wrong by itself, so neither cell can be marked: the fault is the record's.
+    [Test]
+    public void ARecordThatIsWrongAsAWhole_MarksTheROW_AndNoCell()
+    {
+        var (grid, _) = SpanGrid();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(RowAt(grid, 0).HasValidationError, Is.False, "this one is in order");
+            Assert.That(RowAt(grid, 1).HasValidationError, Is.True);
+            Assert.That(RowAt(grid, 1).ValidationError, Is.EqualTo("from is after to"));
+            Assert.That(RowAt(grid, 1).CellAt(0).HasValidationError, Is.False,
+                "no cell is at fault - that is the whole point of a row rule");
+            Assert.That(RowAt(grid, 1).CellAt(1).HasValidationError, Is.False);
+        });
+    }
+
+    // Put right, the mark has to go. An error nobody re-asks is an error that outlives what caused it.
+    [Test]
+    public void PuttingTheRecordRight_TakesTheMarkOff()
+    {
+        var (grid, items) = SpanGrid();
+        items[1].To = 20;
+        grid.RefreshRealizedRows();
+
+        Assert.That(RowAt(grid, 1).HasValidationError, Is.False);
+    }
+
+    // The record's own report is asked FIRST, and with no property name - which is how INotifyDataErrorInfo says "this
+    // record" rather than "this field".
+    [Test]
+    public void ARecordReportingAFaultOfItsOwn_MarksTheRow()
+    {
+        var grid = Grid(new DataGridTextColumn { Binding = new Binding("Name"), Width = new GridLength(100) });
+        grid.ItemsSource = new List<Faulted>
+        {
+            new() { Name = "fine" },
+            new() { Name = "broken", Fault = "the parts do not add up" }
+        };
+        Relayout(grid);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(RowAt(grid, 0).HasValidationError, Is.False);
+            Assert.That(RowAt(grid, 1).ValidationError, Is.EqualTo("the parts do not add up"));
+        });
+    }
+
+    // 10d. MARKING is the default: the value is taken and the cell says what is wrong with it. Nothing traps anyone.
+    [Test]
+    public void Marking_TakesTheValue_AndSaysWhatIsWrongWithIt()
+    {
+        var (grid, items) = EditableGrid();
+        grid.Columns[1].ValidationRule = new AtMost { Limit = 10 };
+
+        Assert.That(grid.BeginEdit(0, 1), Is.True);
+        grid.CellFor(0, 1).EditedValue = "99";
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(grid.CommitEdit(), Is.True, "the editor closes");
+            Assert.That(items[0].Count, Is.EqualTo(99), "and the value is taken");
+            Assert.That(grid.IsEditing, Is.False);
+        });
+    }
+
+    // BLOCKING is the other answer: the write is refused and the editor keeps what was typed, with the reason on it.
+    [Test]
+    public void Blocking_RefusesTheWrite_AndWillNotLeaveTheCell()
+    {
+        var (grid, items) = EditableGrid();
+        grid.ValidationMode = DataGridValidationMode.Block;
+        grid.Columns[1].ValidationRule = new AtMost { Limit = 10 };
+
+        Assert.That(grid.BeginEdit(0, 1), Is.True);
+        grid.CellFor(0, 1).EditedValue = "99";
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(grid.CommitEdit(), Is.False, "it will not let go");
+            Assert.That(grid.IsEditing, Is.True, "and the editor is still open");
+            Assert.That(items[0].Count, Is.EqualTo(1), "nothing was written");
+            Assert.That(grid.CellFor(0, 1).ValidationError, Is.EqualTo("over 10"),
+                "and it says why - an editor that holds on in silence is a table that has stopped working");
+        });
+    }
+
+    // Leaving the cell IS leaving the editor. Refusing the commit and letting the selection walk away would not be a
+    // refusal at all - it would be two current cells at once.
+    [Test]
+    public void Blocking_WillNotLetTheSelectionLeaveEither()
+    {
+        var (grid, items) = EditableGrid();
+        grid.ValidationMode = DataGridValidationMode.Block;
+        grid.Columns[1].ValidationRule = new AtMost { Limit = 10 };
+
+        grid.SelectCell(0, 1);
+        grid.BeginEdit(0, 1);
+        grid.CellFor(0, 1).EditedValue = "99";
+
+        grid.SelectCell(1, 0);   // a click somewhere else
+        grid.MoveActive(1, 0);   // ...and an arrow key
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(grid.ActiveRow, Is.EqualTo(0), "the selection stayed");
+            Assert.That(grid.ActiveColumn, Is.EqualTo(1));
+            Assert.That(grid.IsEditing, Is.True, "and so did the editor");
+            Assert.That(items[0].Count, Is.EqualTo(1));
+        });
+    }
+
+    [Test]
+    public void Blocking_LetsGoOnceTheValueIsAcceptable()
+    {
+        var (grid, items) = EditableGrid();
+        grid.ValidationMode = DataGridValidationMode.Block;
+        grid.Columns[1].ValidationRule = new AtMost { Limit = 10 };
+
+        grid.BeginEdit(0, 1);
+        grid.CellFor(0, 1).EditedValue = "99";
+        grid.CommitEdit();
+
+        grid.CellFor(0, 1).EditedValue = "7";
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(grid.CommitEdit(), Is.True);
+            Assert.That(items[0].Count, Is.EqualTo(7));
+            Assert.That(grid.IsEditing, Is.False);
+        });
+    }
+
+    private sealed class AtMost : DataGridValidationRule
+    {
+        public int Limit { get; set; }
+
+        public override string Validate(object value, object item) =>
+            int.TryParse(value?.ToString(), out var number) && number > Limit ? $"over {Limit}" : null;
+    }
+
+    // Saying it on every column in turn is the same statement made N times, and the one that gets forgotten on the
+    // column added next release.
+    [Test]
+    public void TurningFilteringOffForTheTable_TakesEveryFunnelAway()
+    {
+        var grid = GroupableGrid(4);
+        var headers = Headers(grid);
+
+        Assert.That(HeaderOf(headers, 0).CanFilter, Is.True, "on by default - a table you cannot narrow is a report");
+
+        grid.CanUserFilterColumns = false;
+        headers.Measure(new Size(400, 26));
+        headers.Arrange(new Rect(0, 0, 400, 26));
+
+        Assert.That(HeaderOf(headers, 0).CanFilter, Is.False);
+    }
+
+    // The table can only take the funnel AWAY: a column that refused one does not get it back because the table allows
+    // them in general.
+    [Test]
+    public void AColumnThatRefusedItsFunnel_DoesNotGetOneFromTheTable()
+    {
+        var grid = GroupableGrid(4);
+        grid.Columns[0].CanUserFilter = false;
+        var headers = Headers(grid);
+
+        Assert.That(HeaderOf(headers, 0).CanFilter, Is.False);
+    }
+
+    // What the funnels set is only undoable through the funnels, so taking them away has to undo it - otherwise the
+    // table stays narrowed for a reason nobody can find.
+    [Test]
+    public void TakingTheFunnelsAway_ClearsWhatTheySet()
+    {
+        var grid = GroupableGrid(6);
+        grid.FilterFor(grid.Columns[0]).Included = new HashSet<string> { "north" };
+        grid.ApplyFilters();
+
+        Assert.That(grid.Rows.Count, Is.LessThan(6), "narrowed");
+
+        grid.CanUserFilterColumns = false;
+
+        Assert.That(grid.Rows.Count, Is.EqualTo(6), "and given back");
+    }
+
     private static void OnClipboard(string text) => Adamantium.UI.Core.Input.Clipboard.SetText(text);
 
     [Test]

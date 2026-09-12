@@ -27,9 +27,11 @@
                       ShowGroupPanel="{Binding ShowGroupPanel}"
                       ShowSearchPanel="{Binding ShowSearchPanel}"
                       CanUserChooseColumns="{Binding CanChooseColumns}"
+                      CanUserFilterColumns="{Binding CanFilterColumns}"
                       SearchMatchBrush="{Binding SearchMatchBrush}"
                       SearchCurrentMatchBrush="{Binding SearchCurrentMatchBrush}"
                       ValidationErrorBrush="{Binding ValidationErrorBrush}"
+                      ValidationMode="{Binding ValidationMode}"
                       RowDetailsHeight="120"
                       Indent="16"
                       ExpanderColumnIndex="2">
@@ -79,6 +81,12 @@
                     </Border>
                 </DataTemplate>
             </TreeDataGrid.RowDetailsTemplate>
+
+            <!-- A rule over the whole RECORD: neither "done" nor "error" is a wrong value on its own, only the pair is,
+                 so the mark goes on the row and on none of its cells. -->
+            <TreeDataGrid.RowValidationRule>
+                <val:FinishedIsNotAnErrorRule/>
+            </TreeDataGrid.RowValidationRule>
 
             <!-- EVERY column type, so each one's editor can be seen: text, drop-down, check box and a fully templated
                  one. Double-click any cell (or press F2) to open its editor. -->
@@ -177,6 +185,11 @@
                      says CanUserHide="False". -->
                 <CheckBox Content="Let the user choose columns" Margin="0,0,0,6"
                           IsChecked="{Binding CanChooseColumns, Mode=TwoWay}"/>
+                <!-- Every funnel at once, instead of saying CanUserFilter="False" on each column in turn. Switching it
+                     off also CLEARS what the funnels set: a table left narrowed with no way to see why is worse than
+                     one that cannot be narrowed at all. -->
+                <CheckBox Content="Let the user filter columns" Margin="0,0,0,6"
+                          IsChecked="{Binding CanFilterColumns, Mode=TwoWay}"/>
                 <!-- The arrangement written to a FILE and read back - what makes choosing columns worth anything.
                      Hide a column, drag a header, widen one, pin one, sort by one; save; put it all back wrong;
                      restore. -->
@@ -254,6 +267,12 @@
                 <TextBlock Text="Size is accepted between these; the Status cell of a record filed as an error is marked by the record itself."
                            FontSize="11" Margin="0,0,0,6" TextWrapping="WrapByWords"
                            Foreground="{ObservableResource TextFillColorSecondary}"/>
+                <!-- The third source, and the only one no cell can answer: a record marked done AND filed as an error
+                     contradicts itself, so the whole ROW is washed. Tick a Done box on an error row to see it. -->
+                <!-- And what the table does with a value it refuses. Off: take it and mark it. On: keep the editor and
+                     say why - try typing 99999 into Size. -->
+                <CheckBox Content="Refuse to leave an invalid cell" Margin="0,0,0,6"
+                          IsChecked="{Binding BlockOnInvalid, Mode=TwoWay}"/>
                 <!-- One above the other: side by side, two spinners and their labels do not fit this panel and the
                      second one loses its buttons off the edge. -->
                 <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto" Margin="0,0,0,6">
