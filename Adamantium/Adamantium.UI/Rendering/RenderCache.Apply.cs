@@ -216,6 +216,11 @@ public partial class RenderCache
             _nodeCache.Clear();
         }
 
+        // WHICH viewport cuts an element is derived from the snapshot this packet is about to change - the ClipToBounds
+        // flags and the render parent chain - so it is dropped on every packet, and not on every frame: nothing about it
+        // depends on where anything moved to.
+        _clipOwnerCache.Clear();
+
         // Fold this packet's layout delta into the applier's snapshot replica - the only thing the draw pass reads for a
         // component's transform/size/clip. A full walk resets it and carries the whole scene.
         if (packet.SnapReset) _applySnap.Clear();

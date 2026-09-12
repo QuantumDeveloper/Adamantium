@@ -109,6 +109,7 @@ public partial class RenderCache
         _snap.Clear();         // full rebuild -> drop last frame's frozen layout snapshot (else stale overlay positions + unbounded _snap growth)
         _worldCache.Clear();   // new frame: drop last frame's transform + clip memos
         _clipCache.Clear();
+        _clipOwnerCache.Clear();
         _clipSlotCache.Clear();
         _clipShapeCache.Clear();
         _relWorldCache.Clear();
@@ -419,6 +420,7 @@ public partial class RenderCache
         _worldCache.Clear();    // drop any absolute transforms/clips memoised during the build so ProcessCommands recomputes rebased
         _relWorldCache.Clear();
         _clipCache.Clear();
+        _clipOwnerCache.Clear();
         _clipSlotCache.Clear();
         _clipShapeCache.Clear();
         _nodeCache.Clear();
@@ -912,6 +914,31 @@ public partial class RenderCache
         var slot = RoundedClipSlot(c, fullScissor);
         return slot >= 0 && _clipShapeCache.TryGetValue(c, out var shape) ? shape : default;
     }
+
+    // WHICH viewport cuts this element - the nearest ClipToBounds ancestor (itself included), or null when nothing does.
+    // It decides CumulativeClip entirely: two elements with the same one share the whole chain above it, so they share
+    // the clip. That makes it the identity a batch SEGMENT groups by. Grouping by the resulting RECT is not the same
+    // thing and is what broke: a recorded segment carries ONE owner, the replay re-derives its scissor from that owner
+    // alone, and two owners whose rects merely coincided at record time then part - the members of the other one are
+    // cut away. Measured on a grid's row-details panel: its tab strip (clip 126,587 820x31) glued into a segment whose
+    // scissor came back as the panel CONTENT's (126,618 820x26), and the strip vanished whole on ~2% of frames.
+    private IUIComponent ClipOwnerOf(IUIComponent c)
+    {
+        if (c == null) return null;
+        if (_clipOwnerCache.TryGetValue(c, out var cached)) return cached;
+
+        var s = ApplySnap(c);
+        // An adorner takes its clip from the viewports above its TARGET (see AdornerClip), which no single ancestor
+        // names - so it is its own group rather than being merged with anything.
+        var owner = s.ClipToBounds ? c
+            : !c.ClippedByRenderParent && s.RenderParent != null ? c
+            : ClipOwnerOf(s.RenderParent);
+
+        _clipOwnerCache[c] = owner;
+        return owner;
+    }
+
+    private readonly Dictionary<IUIComponent, IUIComponent> _clipOwnerCache = new();
 
     private Rect? CumulativeClip(IUIComponent c)
     {

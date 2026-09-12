@@ -74,10 +74,16 @@ public partial class RenderCache
     // belong together; anyone ELSE overlapping it still forces a flush, or a later sibling would be painted over.
     private IUIComponent _haloOverOwner;
     private Rect2D _batchScissor;
-    // WHOSE clip the pending batch sits under. A flush cycle ends the moment the scissor changes, so everything in it
-    // shares one clip - and naming it is what lets a segment's frozen rect be derived again when that viewport moves.
+    // WHOSE clip the pending batch sits under - the VIEWPORT (ClipOwnerOf), not the last element added. A flush cycle
+    // ends when the rect changes OR when that owner does, so everything in a segment really does share one clip: the
+    // replay re-derives the segment's frozen rect from this one owner, and members of any other are cut away.
     private IUIComponent _batchClip;
     private bool _batchOpen;
+
+    /// <summary>Has the open batch's CLIP GROUP ended? Both halves matter: the rect, because a segment carries one
+    /// scissor, and the OWNER, because the replay re-derives that scissor from it alone.</summary>
+    private bool ClipGroupChanged(Rect2D scissor, IUIComponent c)
+        => _batchOpen && (!ScissorEquals(_batchScissor, scissor) || !ReferenceEquals(_batchClip, ClipOwnerOf(c)));
 
     // General instanced fills (arbitrary tessellated geometry sharing a mesh), flushed in PAINT ORDER via FlushBatches.
     // Own buffer manager, distinct from the per-unit geometry buffers.
@@ -658,6 +664,18 @@ public partial class RenderCache
         var phase0 = System.Diagnostics.Stopwatch.GetTimestamp();
         BeginTransformFrame(device);
 
+        // Both memos are WITHIN-frame and must drop together: a clip recomputed against a stale world is worse than a
+        // stale clip. Only a full rebuild dropped them otherwise, so a viewport that travels without announcing a move -
+        // one nested in a scroller, or a RECYCLED container now standing somewhere else - cut its own content with last
+        // frame's rect. Measured on a tab strip in an open details panel: 28 bad frames of 40, then 0.
+        _worldCache.Clear();
+        _relWorldCache.Clear();
+        _clipCache.Clear();
+        // NOT _clipOwnerCache: which viewport cuts an element is STRUCTURAL - the ClipToBounds flags and the render
+        // parent chain - so it survives every frame in which the tree did not change, and the applier drops it when a
+        // packet changes the snapshot it is derived from. Dropping it here instead cost a recursive walk up the chain
+        // per unit per frame: measured on the grid tab at rest, 453 -> 336 fps and draw 1,6 -> 2,2 ms.
+
         // Rounded clips, refreshed from their owners BEFORE the clean-frame early-out - for the same reason the
         // composited animations below run there: a replayed frame re-records nothing, so a clip that changed shape
         // reaches the screen only through its slot.
@@ -937,7 +955,7 @@ public partial class RenderCache
                 var reach = System.Math.Max(HaloRectCollector.MaxReach(unit.RenderData.Halo),
                     HaloLivingCollector.MaxReach(unit.RenderData.LivingHalo));
                 var bandBounds = LogicalBounds(unit.Component, wt).Inflate(reach);
-                if ((_batchOpen && !ScissorEquals(_batchScissor, scissor)) || OverlapsHigherLayer(-1, bandBounds))
+                if (ClipGroupChanged(scissor, unit.Component) || OverlapsHigherLayer(-1, bandBounds))
                 {
                     FlushBatches(device, fullScissor, ref scissorNarrowed);
                 }
@@ -959,7 +977,7 @@ public partial class RenderCache
             if (device != null && unit is RectangleRenderUnit rru && _rectBatch.CanBatch(rru.RectPayload))
             {
                 var rectBounds = LogicalBounds(unit.Component, wt);
-                if ((_batchOpen && !ScissorEquals(_batchScissor, scissor)) || OverlapsHigherLayer(0, rectBounds, unit.Component))   // 0 = rect layer
+                if (ClipGroupChanged(scissor, unit.Component) || OverlapsHigherLayer(0, rectBounds, unit.Component))   // 0 = rect layer
                     FlushBatches(device, fullScissor, ref scissorNarrowed);
                 var bakeWorld = ResolveBake(device, unit.Component, wt, out var slot4Rect);
                 FadeBySlot(unit);   // this pass reads the alpha from the slot - keep it out of the colour
@@ -974,7 +992,7 @@ public partial class RenderCache
                         NoteBatched(group, _rectBatch, slot);
                     }
                     _batchScissor = scissor;
-                    _batchClip = unit.Component;
+                    _batchClip = ClipOwnerOf(unit.Component);
                     _batchOpen = true;
                     continue;
                 }
@@ -988,7 +1006,7 @@ public partial class RenderCache
                 // A rounded rect with a LINEAR/RADIAL gradient fill: same SDF-batch family, different pass (the pixel shader
                 // evaluates the gradient). Shares the clip group with the other batches.
                 var gradRectBounds = LogicalBounds(unit.Component, wt);
-                if ((_batchOpen && !ScissorEquals(_batchScissor, scissor)) || OverlapsHigherLayer(2, gradRectBounds, unit.Component))   // 2 = gradient-rect layer
+                if (ClipGroupChanged(scissor, unit.Component) || OverlapsHigherLayer(2, gradRectBounds, unit.Component))   // 2 = gradient-rect layer
                     FlushBatches(device, fullScissor, ref scissorNarrowed);
                 var gradBakeWorld = ResolveBake(device, unit.Component, wt, out var slot4Grad);
                 FadeBySlot(unit);
@@ -1002,7 +1020,7 @@ public partial class RenderCache
                         IndexUnitBrush(unit.Component, unit, grru.RectPayload.LiveBrush);
                     }
                     _batchScissor = scissor;
-                    _batchClip = unit.Component;
+                    _batchClip = ClipOwnerOf(unit.Component);
                     _batchOpen = true;
                     continue;
                 }
@@ -1012,7 +1030,7 @@ public partial class RenderCache
             else if (device != null && unit is EllipseRenderUnit eru && _ellipseBatch.CanBatch(eru.EllipsePayload))
             {
                 var ellipseBounds = LogicalBounds(unit.Component, wt);
-                if ((_batchOpen && !ScissorEquals(_batchScissor, scissor)) || OverlapsHigherLayer(1, ellipseBounds, unit.Component))   // 1 = ellipse layer
+                if (ClipGroupChanged(scissor, unit.Component) || OverlapsHigherLayer(1, ellipseBounds, unit.Component))   // 1 = ellipse layer
                     FlushBatches(device, fullScissor, ref scissorNarrowed);
                 var bakeWorld = ResolveBake(device, unit.Component, wt, out var slot4El);
                 FadeBySlot(unit);
@@ -1026,7 +1044,7 @@ public partial class RenderCache
                         IndexUnitBrush(unit.Component, unit, eru.EllipsePayload.LiveBrush);
                     }
                     _batchScissor = scissor;
-                    _batchClip = unit.Component;
+                    _batchClip = ClipOwnerOf(unit.Component);
                     _batchOpen = true;
                     continue;
                 }
@@ -1037,7 +1055,7 @@ public partial class RenderCache
             else if (device != null && unit is RegularPolygonRenderUnit pru2 && _polygonBatch.CanBatch(pru2.PolygonPayload))
             {
                 var polyBounds = LogicalBounds(unit.Component, wt);
-                if ((_batchOpen && !ScissorEquals(_batchScissor, scissor)) || OverlapsHigherLayer(1, polyBounds, unit.Component))
+                if (ClipGroupChanged(scissor, unit.Component) || OverlapsHigherLayer(1, polyBounds, unit.Component))
                     FlushBatches(device, fullScissor, ref scissorNarrowed);
                 var bakeWorldPoly = ResolveBake(device, unit.Component, wt, out var slot4Poly);
                 FadeBySlot(unit);   // this pass reads the alpha from the slot - keep the chain out of the colour
@@ -1056,7 +1074,7 @@ public partial class RenderCache
                         IndexUnitBrush(unit.Component, unit, pru2.PolygonPayload.LiveBrush);
                     }
                     _batchScissor = scissor;
-                    _batchClip = unit.Component;
+                    _batchClip = ClipOwnerOf(unit.Component);
                     _batchOpen = true;
                     continue;
                 }
@@ -1069,7 +1087,7 @@ public partial class RenderCache
                 // A polygon with a GRADIENT fill: the same instanced pass the gradient rect uses, the shape still a
                 // distance field. Same collector, so the same layer - the two ride one segment.
                 var gradPolyBounds = LogicalBounds(unit.Component, wt);
-                if ((_batchOpen && !ScissorEquals(_batchScissor, scissor)) || OverlapsHigherLayer(2, gradPolyBounds, unit.Component))   // 2 = gradient-rect layer
+                if (ClipGroupChanged(scissor, unit.Component) || OverlapsHigherLayer(2, gradPolyBounds, unit.Component))   // 2 = gradient-rect layer
                     FlushBatches(device, fullScissor, ref scissorNarrowed);
                 var gradPolyBake = ResolveBake(device, unit.Component, wt, out var slot4GradPoly);
                 FadeBySlot(unit);
@@ -1083,7 +1101,7 @@ public partial class RenderCache
                         IndexUnitBrush(unit.Component, unit, gpru.PolygonPayload.LiveBrush);
                     }
                     _batchScissor = scissor;
-                    _batchClip = unit.Component;
+                    _batchClip = ClipOwnerOf(unit.Component);
                     _batchOpen = true;
                     continue;
                 }
@@ -1095,7 +1113,7 @@ public partial class RenderCache
                 // A polygon with a PROCEDURAL fill (pattern or noise): the pattern pass, same layer as the rect and the
                 // ellipse forms of it.
                 var patPolyBounds = LogicalBounds(unit.Component, wt);
-                if ((_batchOpen && !ScissorEquals(_batchScissor, scissor)) || !_patternBatch.SameKind(PatternRectCollector.KindOf(ppru.PolygonPayload.Brush))
+                if (ClipGroupChanged(scissor, unit.Component) || !_patternBatch.SameKind(PatternRectCollector.KindOf(ppru.PolygonPayload.Brush))
                     || OverlapsHigherLayer(4, patPolyBounds, unit.Component))   // 4 = pattern layer
                     FlushBatches(device, fullScissor, ref scissorNarrowed);
                 var patPolyBake = ResolveBake(device, unit.Component, wt, out var slot4PatPoly);
@@ -1109,7 +1127,7 @@ public partial class RenderCache
                         group.NotBatchable("patternPolygon");
                     }
                     _batchScissor = scissor;
-                    _batchClip = unit.Component;
+                    _batchClip = ClipOwnerOf(unit.Component);
                     _batchOpen = true;
                     continue;
                 }
@@ -1128,7 +1146,7 @@ public partial class RenderCache
                     _texRectBatch.BeginFrame(device);
                 }
                 var texPolyBounds = LogicalBounds(unit.Component, wt);
-                if ((_batchOpen && !ScissorEquals(_batchScissor, scissor)) || !_texRectBatch.SameTexture(texPolyTexture)
+                if (ClipGroupChanged(scissor, unit.Component) || !_texRectBatch.SameTexture(texPolyTexture)
                     || OverlapsHigherLayer(6, texPolyBounds, unit.Component))   // 6 = textured layer
                 {
                     FlushBatches(device, fullScissor, ref scissorNarrowed);
@@ -1144,7 +1162,7 @@ public partial class RenderCache
                         group.NotBatchable("texturedPolygon");
                     }
                     _batchScissor = scissor;
-                    _batchClip = unit.Component;
+                    _batchClip = ClipOwnerOf(unit.Component);
                     _batchOpen = true;
                     continue;
                 }
@@ -1155,7 +1173,7 @@ public partial class RenderCache
             {
                 // A full ellipse with a LINEAR/RADIAL gradient fill: gradient sibling of the solid ellipse SDF batch.
                 var gradElBounds = LogicalBounds(unit.Component, wt);
-                if ((_batchOpen && !ScissorEquals(_batchScissor, scissor)) || OverlapsHigherLayer(3, gradElBounds, unit.Component))   // 3 = gradient-ellipse layer
+                if (ClipGroupChanged(scissor, unit.Component) || OverlapsHigherLayer(3, gradElBounds, unit.Component))   // 3 = gradient-ellipse layer
                     FlushBatches(device, fullScissor, ref scissorNarrowed);
                 var gradElBakeWorld = ResolveBake(device, unit.Component, wt, out var slot4GradEl);
                 FadeBySlot(unit);
@@ -1169,7 +1187,7 @@ public partial class RenderCache
                         IndexUnitBrush(unit.Component, unit, geru.EllipsePayload.LiveBrush);
                     }
                     _batchScissor = scissor;
-                    _batchClip = unit.Component;
+                    _batchClip = ClipOwnerOf(unit.Component);
                     _batchOpen = true;
                     continue;
                 }
@@ -1182,7 +1200,7 @@ public partial class RenderCache
                 // jagged tessellated edges), the shader branching to the ellipse SDF on the negative baked corner radius.
                 // Same clip group + layer 4 as the pattern rect.
                 var patElBounds = LogicalBounds(unit.Component, wt);
-                if ((_batchOpen && !ScissorEquals(_batchScissor, scissor)) || !_patternBatch.SameKind(PatternRectCollector.KindOf(peru.EllipsePayload.Brush))
+                if (ClipGroupChanged(scissor, unit.Component) || !_patternBatch.SameKind(PatternRectCollector.KindOf(peru.EllipsePayload.Brush))
                     || OverlapsHigherLayer(4, patElBounds, unit.Component))   // 4 = pattern layer
                 {
                     FlushBatches(device, fullScissor, ref scissorNarrowed);
@@ -1198,7 +1216,7 @@ public partial class RenderCache
                         group.NotBatchable("patternEllipse");
                     }
                     _batchScissor = scissor;
-                    _batchClip = unit.Component;
+                    _batchClip = ClipOwnerOf(unit.Component);
                     _batchOpen = true;
                     continue;
                 }
@@ -1278,7 +1296,7 @@ public partial class RenderCache
                 // A rounded rect with a PROCEDURAL PATTERN fill (checkerboard/stripes/dots/grid): a new SDF-batch sibling,
                 // its own pass evaluates the pattern per fragment. Shares the clip group with the other batches.
                 var patternBounds = LogicalBounds(unit.Component, wt);
-                if ((_batchOpen && !ScissorEquals(_batchScissor, scissor)) || !_patternBatch.SameKind(PatternRectCollector.KindOf(pru.RectPayload.Brush))
+                if (ClipGroupChanged(scissor, unit.Component) || !_patternBatch.SameKind(PatternRectCollector.KindOf(pru.RectPayload.Brush))
                     || OverlapsHigherLayer(4, patternBounds, unit.Component))   // 4 = pattern layer
                 {
                     FlushBatches(device, fullScissor, ref scissorNarrowed);
@@ -1300,7 +1318,7 @@ public partial class RenderCache
                         group.NotBatchable("patternRect");
                     }
                     _batchScissor = scissor;
-                    _batchClip = unit.Component;
+                    _batchClip = ClipOwnerOf(unit.Component);
                     _batchOpen = true;
                     continue;
                 }
@@ -1313,7 +1331,7 @@ public partial class RenderCache
                 // iterates z=z²+c per fragment. Shares the clip group with the other batches; auto-morph is a shader-side
                 // Time drift, so this batch is not paint/slot-patchable (no _sdfSlotByUnit entry) - a full walk re-records it.
                 var fractalBounds = LogicalBounds(unit.Component, wt);
-                if ((_batchOpen && !ScissorEquals(_batchScissor, scissor)) || !_fractalBatch.SameKind(FractalRectCollector.KindOf(fru.RectPayload.Brush))
+                if (ClipGroupChanged(scissor, unit.Component) || !_fractalBatch.SameKind(FractalRectCollector.KindOf(fru.RectPayload.Brush))
                     || OverlapsHigherLayer(5, fractalBounds, unit.Component))   // 5 = fractal layer
                 {
                     FlushBatches(device, fullScissor, ref scissorNarrowed);
@@ -1330,7 +1348,7 @@ public partial class RenderCache
                         group.NotBatchable("fractal");
                     }
                     _batchScissor = scissor;
-                    _batchClip = unit.Component;
+                    _batchClip = ClipOwnerOf(unit.Component);
                     _batchOpen = true;
                     continue;
                 }
@@ -1356,7 +1374,7 @@ public partial class RenderCache
                     _texRectBatch.BeginFrame(device);
                 }
                 var texBounds = LogicalBounds(unit.Component, wt);
-                if ((_batchOpen && !ScissorEquals(_batchScissor, scissor)) || !_texRectBatch.SameTexture(texture)
+                if (ClipGroupChanged(scissor, unit.Component) || !_texRectBatch.SameTexture(texture)
                     || OverlapsHigherLayer(6, texBounds, unit.Component))   // 6 = textured layer
                 {
                     FlushBatches(device, fullScissor, ref scissorNarrowed);
@@ -1376,7 +1394,7 @@ public partial class RenderCache
                         group.NotBatchable("texturedRect");
                     }
                     _batchScissor = scissor;
-                    _batchClip = unit.Component;
+                    _batchClip = ClipOwnerOf(unit.Component);
                     _batchOpen = true;
                     continue;
                 }
@@ -1398,7 +1416,7 @@ public partial class RenderCache
                     _texRectBatch.BeginFrame(device);
                 }
                 var texEllBounds = LogicalBounds(unit.Component, wt);
-                if ((_batchOpen && !ScissorEquals(_batchScissor, scissor)) || !_texRectBatch.SameTexture(texEllTexture)
+                if (ClipGroupChanged(scissor, unit.Component) || !_texRectBatch.SameTexture(texEllTexture)
                     || OverlapsHigherLayer(6, texEllBounds, unit.Component))   // 6 = textured layer
                 {
                     FlushBatches(device, fullScissor, ref scissorNarrowed);
@@ -1414,7 +1432,7 @@ public partial class RenderCache
                         group.NotBatchable("texturedEllipse");
                     }
                     _batchScissor = scissor;
-                    _batchClip = unit.Component;
+                    _batchClip = ClipOwnerOf(unit.Component);
                     _batchOpen = true;
                     continue;
                 }
@@ -1423,7 +1441,7 @@ public partial class RenderCache
             }
             else if (device != null && unit is TextRenderUnit tru && tru.TextComponent is { } tc && _textBatch.CanBatch(tc, out var atlas))
             {
-                if ((_batchOpen && !ScissorEquals(_batchScissor, scissor)) || !_textBatch.SameAtlas(atlas))
+                if (ClipGroupChanged(scissor, unit.Component) || !_textBatch.SameAtlas(atlas))
                     FlushBatches(device, fullScissor, ref scissorNarrowed);
                 // Node-aware, same as the rect batch: glyphs pack NODE-LOCAL with the node's transform-table slot, so a block
                 // under a motion node (a scroll list) rides the O(1) slot-write fast path. ResolveBake returns the
@@ -1450,7 +1468,7 @@ public partial class RenderCache
                         for (var g = textFirst; g < _textBatch.RetainedCount; g++) NoteBatched(group, _textBatch, g);
                     }
                     _batchScissor = scissor;
-                    _batchClip = unit.Component;
+                    _batchClip = ClipOwnerOf(unit.Component);
                     _batchOpen = true;
                     continue;   // baked into the batch - drawn at the next flush (node-aware: no MarkNodeNotAware)
                 }
@@ -1462,7 +1480,7 @@ public partial class RenderCache
                 // General instanced fill (arbitrary tessellated geometry sharing a mesh): collect the fill and DEFER this
                 // unit's fringe/stroke to the flush (drawn over the fill). A clip change flushes; the fill lands in its
                 // natural z-layer (paint order), not all-at-once.
-                if (_batchOpen && !ScissorEquals(_batchScissor, scissor))
+                if (ClipGroupChanged(scissor, unit.Component))
                     FlushBatches(device, fullScissor, ref scissorNarrowed);
                 // A group draws every fill and only then every fringe, so an already-pending FRINGED shape could band this
                 // one. Masking the fringes to the group's own coverage settles it - except once a frame has spent all
@@ -1496,7 +1514,7 @@ public partial class RenderCache
                         IndexUnitBrush(unit.Component, unit, gru.Payload.LiveBrush);
                     }
                     _batchScissor = scissor;
-                    _batchClip = unit.Component;
+                    _batchClip = ClipOwnerOf(unit.Component);
                     _batchOpen = true;
                     continue;   // fill batched; fringe/stroke drawn at the flush, over the fill
                 }
@@ -1507,7 +1525,7 @@ public partial class RenderCache
             {
                 // General instanced GRADIENT fill (arbitrary geometry, gradient pass): same path, the fill body is skipped
                 // (FillInstanced) and its fringe/stroke draw at the flush.
-                if (_batchOpen && !ScissorEquals(_batchScissor, scissor))
+                if (ClipGroupChanged(scissor, unit.Component))
                     FlushBatches(device, fullScissor, ref scissorNarrowed);
                 var gradBake = ResolveBake(device, unit.Component, wt, out var slot4GradFill);
                 FadeBySlot(unit);
@@ -1519,7 +1537,7 @@ public partial class RenderCache
                     // bakes its transform at record time and is re-pointed at the flush - see PrepareOverlay.
                     if (_recording) group.NotBatchable("instancedGradientFill");
                     _batchScissor = scissor;
-                    _batchClip = unit.Component;
+                    _batchClip = ClipOwnerOf(unit.Component);
                     _batchOpen = true;
                     continue;
                 }
@@ -1531,7 +1549,7 @@ public partial class RenderCache
                 // A BACKDROP MATERIAL on authored geometry - an outline that arrives as triangles rather than as a
                 // formula. Same instanced path as the pattern and textured fills, plus the region it will copy: only the
                 // cache knows how a logical box lands in device pixels.
-                if (_batchOpen && !ScissorEquals(_batchScissor, scissor))
+                if (ClipGroupChanged(scissor, unit.Component))
                     FlushBatches(device, fullScissor, ref scissorNarrowed);
                 EnsureMaterialBatch(device);
                 var matBounds = LogicalBounds(unit.Component, wt);
@@ -1543,7 +1561,7 @@ public partial class RenderCache
                     mgru.FillInstanced = true;
                     if (_recording) group.NotBatchable("instancedMaterialFill");
                     _batchScissor = scissor;
-                    _batchClip = unit.Component;
+                    _batchClip = ClipOwnerOf(unit.Component);
                     _batchOpen = true;
                     continue;
                 }
@@ -1553,7 +1571,7 @@ public partial class RenderCache
             {
                 // General instanced PATTERN/NOISE fill (arbitrary geometry, pattern-fill pass): same path as the gradient
                 // one - the fill body is skipped (FillInstanced) and the unit's fringe/stroke draw at the flush.
-                if (_batchOpen && !ScissorEquals(_batchScissor, scissor))
+                if (ClipGroupChanged(scissor, unit.Component))
                     FlushBatches(device, fullScissor, ref scissorNarrowed);
                 var patBake = ResolveBake(device, unit.Component, wt, out var slot4PatFill);
                 FadeBySlot(unit);
@@ -1564,7 +1582,7 @@ public partial class RenderCache
                     // As the gradient above: the fill rides the slot, the overlay is re-pointed at the flush.
                     if (_recording) group.NotBatchable("instancedPatternFill");
                     _batchScissor = scissor;
-                    _batchClip = unit.Component;
+                    _batchClip = ClipOwnerOf(unit.Component);
                     _batchOpen = true;
                     continue;
                 }
@@ -1574,7 +1592,7 @@ public partial class RenderCache
             {
                 // General instanced TEXTURED fill (arbitrary geometry, textured-fill pass): as the gradient and pattern
                 // ones - the fill body is skipped (FillInstanced) and the unit's fringe/stroke draw at the flush.
-                if (_batchOpen && !ScissorEquals(_batchScissor, scissor))
+                if (ClipGroupChanged(scissor, unit.Component))
                     FlushBatches(device, fullScissor, ref scissorNarrowed);
                 var texBake = ResolveBake(device, unit.Component, wt, out var slot4TexFill);
                 FadeBySlot(unit);
@@ -1584,7 +1602,7 @@ public partial class RenderCache
                     tgru.FillInstanced = true;
                     if (_recording) group.NotBatchable("instancedTexturedFill");
                     _batchScissor = scissor;
-                    _batchClip = unit.Component;
+                    _batchClip = ClipOwnerOf(unit.Component);
                     _batchOpen = true;
                     continue;
                 }
@@ -2921,7 +2939,7 @@ public partial class RenderCache
         // Layer 7, the highest of the fills, on purpose: a material copies the frame behind it, so anything meant to
         // show THROUGH it has to have been drawn already. Overlapping a higher layer flushes, as everywhere else - and
         // here that rule is also what keeps two materials over each other from capturing the same stale frame.
-        if ((_batchOpen && !ScissorEquals(_batchScissor, scissor))
+        if (ClipGroupChanged(scissor, component)
             || !_materialBatch.SameKind(brush, source)   // one source AND one pass per segment
             || OverlapsHigherLayer(7, bounds, component))
         {
