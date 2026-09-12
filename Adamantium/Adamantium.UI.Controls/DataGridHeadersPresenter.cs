@@ -61,9 +61,14 @@ public class DataGridHeadersPresenter : Panel
 
     // The CORNER: the same control the number strip is made of, with no number in it. Pressing it takes the whole
     // table - the one gesture every spreadsheet has, and the reason the corner is a button at all.
+    //
+    // It is the head of the WHOLE left pinned zone, not of the numbers alone. Sized to the numbers, it left the strip of
+    // details toggles beside it with no head at all, and the headers carry their own sideways offset - so a column
+    // sliding off the left edge went on being drawn in that gap: another column's funnel showing through above the
+    // toggles. The zone covers itself for the rows; it has to cover itself here too.
     private void SyncCorner()
     {
-        if (Owner?.ShowRowNumbers != true)
+        if (Owner == null || Owner.LeftStripsLeading <= 0)
         {
             if (_corner != null) _corner.Visibility = Visibility.Collapsed;
             return;
@@ -158,11 +163,12 @@ public class DataGridHeadersPresenter : Panel
             pair.Value.Arrange(new Rect(ScreenXOf(column, offset), 0, column.ActualWidth, finalSize.Height));
         }
 
-        // ...and the corner sits over the number strip, which now begins where the details toggles end.
+        // ...and the corner stands over the whole left zone - the toggles AND the numbers - from the very edge.
         if (_corner is { Visibility: Visibility.Visible })
         {
-            _corner.Measure(new Size(Owner.RowNumberWidth, finalSize.Height));
-            _corner.Arrange(new Rect(Owner.DetailsStripLeading, 0, Owner.RowNumberWidth, finalSize.Height));
+            var head = new Size(Owner.LeftStripsLeading, finalSize.Height);
+            _corner.Measure(head);
+            _corner.Arrange(new Rect(0, 0, head.Width, head.Height));
         }
 
         return finalSize;
