@@ -289,6 +289,12 @@
         <Setter Property="Background" Value="{ObservableResource SolidBackgroundFillColorTertiary}"/>
     </Style>
 
+    <!-- The keyboard standing ON a caption. A caption holds no cells, so no cell can carry the active look and the ROW
+         has to - the same wash the cells take, over the whole of it. -->
+    <Style Selector="DataGridRow[IsGroup=true][IsSelected=true]">
+        <Setter Property="Background" Value="{ThemeResource AccentFillColorSelection}"/>
+    </Style>
+
     <!-- The number strip and the corner above it. OPAQUE by necessity: it is pinned, and what scrolls passes under it.
          The number is quieter than the data - it is a handle and a landmark, not a value to read. -->
     <Style Selector="DataGridRowHeader">
@@ -387,7 +393,9 @@
                             BorderBrush="{TemplateBinding GridLineBrush}"
                             BorderThickness="{TemplateBinding GridLineThickness}"
                             Padding="{TemplateBinding Padding}">
-                        <Grid ColumnDefinitions="Auto,*">
+                        <!-- PART_Indent: depth pushes the CONTENT right, never the border above it - that one paints
+                             the grid lines and the selection, and shifting it left a hole at the start of the cell. -->
+                        <Grid x:Name="PART_Indent" ColumnDefinitions="Auto,*">
                             <!-- The strip the grid hit-tests IS this element: the cell hooks PART_Expander, so what is
                                  drawn and what reacts cannot drift apart. -->
                             <Border Grid.Column="0" x:Name="PART_Expander"
