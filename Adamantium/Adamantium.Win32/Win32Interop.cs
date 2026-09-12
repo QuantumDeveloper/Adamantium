@@ -112,6 +112,12 @@ namespace Adamantium.Win32
         [DllImport("user32.dll")]
         public static extern bool GetWindowRect(IntPtr hWnd, out RECT lpRect);
 
+        /// <summary>The active window OF THE CALLING THREAD - which is the UI thread, so it is our own window and never
+        /// another application's. What a modal dialog is owned by, so it centres on the window the user pressed in and
+        /// that window cannot be used behind it.</summary>
+        [DllImport("user32.dll")]
+        public static extern IntPtr GetActiveWindow();
+
         [DllImport("user32.dll", SetLastError = true)]
         public static extern Boolean AdjustWindowRect(ref RECT lpRect, UInt32 dwStyle, bool bMenu);
 
