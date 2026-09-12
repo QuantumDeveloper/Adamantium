@@ -336,6 +336,10 @@ public partial class DataGridViewModel : TabPageViewModel
 
     [Bindable] private int _sizeCeiling = 9000;
 
+    /// <summary>Past this a Size still ACCEPTABLE means something - conditional formatting, which is a different
+    /// question from whether the value is allowed at all. Bound, so dragging it repaints the column live.</summary>
+    [Bindable] private int _sizeWarnAbove = 6000;
+
     /// <summary>Whether a refused value keeps the editor open. Both answers are on this page because the right one is
     /// the application's: a form being filled in has to let a half-finished record stand, a ledger must not take a
     /// figure that cannot be true.</summary>

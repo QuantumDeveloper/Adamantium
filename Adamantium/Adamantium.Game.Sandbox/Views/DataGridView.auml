@@ -125,6 +125,12 @@
                     <DataGridTextColumn.ValidationRule>
                         <val:RangeRule Min="{Binding SizeFloor}" Max="{Binding SizeCeiling}"/>
                     </DataGridTextColumn.ValidationRule>
+                    <!-- CONDITIONAL FORMATTING on the same column, and the two are different questions: the rule above
+                         says the value is not ACCEPTABLE, this one says what an acceptable value MEANS. It answers
+                         "Warning" and the theme decides that is amber. -->
+                    <DataGridTextColumn.StateRule>
+                        <val:AboveThresholdRule Threshold="{Binding SizeWarnAbove}"/>
+                    </DataGridTextColumn.StateRule>
                 </DataGridTextColumn>
 
                 <!-- Read-only BY THE COLUMN, which is the other way to refuse an edit: Code refuses one cell at a time
@@ -283,6 +289,15 @@
                     <TextBlock Grid.Row="1" Grid.Column="0" Text="to" VerticalAlignment="Center" Margin="0,0,8,0"/>
                     <NumericUpDown Grid.Row="1" Grid.Column="1"
                                    Value="{Binding SizeCeiling, Mode=TwoWay}" Minimum="0" Maximum="10000"
+                                   SmallChange="250" SnapsToSmallChange="true" StringFormat="N0"/>
+                </Grid>
+                <!-- A DIFFERENT question from the two above: those say what is allowed, this says what an allowed value
+                     MEANS. The rule answers "Warning" and the theme paints it amber - drag this and watch the column
+                     repaint live. -->
+                <Grid ColumnDefinitions="Auto,*" Margin="0,0,0,6">
+                    <TextBlock Grid.Column="0" Text="warn above" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                    <NumericUpDown Grid.Column="1"
+                                   Value="{Binding SizeWarnAbove, Mode=TwoWay}" Minimum="0" Maximum="10000"
                                    SmallChange="250" SnapsToSmallChange="true" StringFormat="N0"/>
                 </Grid>
                 <CheckBox Content="Own error colour" Margin="0,0,0,6"

@@ -4592,6 +4592,59 @@ public class DataGridTests
         Assert.That(grid.Rows.Count, Is.EqualTo(6), "and given back");
     }
 
+    private sealed class OverRule : DataGridStateRule
+    {
+        public int Threshold { get; set; }
+
+        public override object State(object value, object item) =>
+            int.TryParse(value?.ToString(), out var number) && number > Threshold ? "Warning" : null;
+    }
+
+    // Conditional formatting: the MEANING is worked out from the value, where StateBinding reads one the record already
+    // carries. A meaning, never a colour - the theme decides what "Warning" looks like.
+    [Test]
+    public void AStateRule_GivesTheCellItsMeaning_FromTheValue()
+    {
+        var (grid, _) = EditableGrid();
+        grid.Columns[1].StateRule = new OverRule { Threshold = 1 };
+        Relayout(grid);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(RowAt(grid, 0).CellAt(1).State, Is.Null, "1 is not over 1");
+            Assert.That(RowAt(grid, 1).CellAt(1).State, Is.EqualTo("Warning"), "2 is");
+        });
+    }
+
+    // A record that states its own meaning is not argued with: the rule is asked only where the binding said nothing.
+    [Test]
+    public void AStatedMeaning_WinsOverTheRule()
+    {
+        var (grid, _) = EditableGrid();
+        grid.Columns[1].StateBinding = new Binding("Name");   // every row says something
+        grid.Columns[1].StateRule = new OverRule { Threshold = 0 };
+        Relayout(grid);
+
+        Assert.That(RowAt(grid, 1).CellAt(1).State, Is.EqualTo("two"), "the record's own word");
+    }
+
+    // The threshold is a PROPERTY of the rule, and the rule is in the column's logical tree - so moving it repaints.
+    [Test]
+    public void MovingTheThreshold_RepaintsTheColumn()
+    {
+        var (grid, _) = EditableGrid();
+        var rule = new OverRule { Threshold = 5 };
+        grid.Columns[1].StateRule = rule;
+        Relayout(grid);
+
+        Assert.That(RowAt(grid, 1).CellAt(1).State, Is.Null, "2 is under 5");
+
+        rule.Threshold = 1;
+        grid.RefreshRealizedRows();
+
+        Assert.That(RowAt(grid, 1).CellAt(1).State, Is.EqualTo("Warning"));
+    }
+
     private static void OnClipboard(string text) => Adamantium.UI.Core.Input.Clipboard.SetText(text);
 
     [Test]

@@ -371,7 +371,7 @@ public class DataGridCell : ContentControl
         ContentTemplate = IsEditing ? column?.EditingTemplate ?? column?.DisplayTemplate : column?.DisplayTemplate;
 
         Content = column?.CellContentFor(item);
-        State = column == null || item == null ? null : column.Read(column.StateBinding, item);
+        State = column?.StateFor(item);
         IsReadOnly = (column?.IsReadOnly ?? false)
                      || (column?.IsReadOnlyBinding != null && column.Read(column.IsReadOnlyBinding, item) as bool? == true);
 
