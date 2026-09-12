@@ -24,6 +24,7 @@ public partial class TreeDataGrid : Selector
     public TreeDataGrid()
     {
         Columns.CollectionChanged += OnColumnsChanged;
+        GroupDescriptions.CollectionChanged += OnGroupDescriptionsChanged;
         RebuildFlattener();
     }
 
@@ -478,9 +479,6 @@ public partial class TreeDataGrid : Selector
         if (column == null) return;
 
         if (!GroupDescriptions.Remove(column)) GroupDescriptions.Add(column);
-        RebuildFlattener();
-        _groupPanel?.Sync();
-        _columnChooser?.Sync();
     }
 
     /// <summary>Moves a column to another place in the grouping - what carrying its chip along the strip does. The
@@ -490,14 +488,15 @@ public partial class TreeDataGrid : Selector
         if (from < 0 || from >= GroupDescriptions.Count || to < 0 || to >= GroupDescriptions.Count || from == to) return;
 
         var column = GroupDescriptions[from];
+
+        // Two writes, ONE regrouping: the table in between is grouped by a column that is on its way somewhere, and
+        // rebuilding it there would throw away work to show a state nobody asked for.
+        _regrouping = true;
         GroupDescriptions.RemoveAt(from);
         GroupDescriptions.Insert(to, column);
+        _regrouping = false;
 
-        // The nesting changed, so every path did: what was open was open in a grouping that no longer exists.
-        _openGroups.Clear();
-        RebuildFlattener();
-        _groupPanel?.Sync();
-        _columnChooser?.Sync();
+        ApplyGrouping();
     }
 
     /// <summary>Ungroups everything.</summary>
@@ -506,6 +505,22 @@ public partial class TreeDataGrid : Selector
         if (GroupDescriptions.Count == 0) return;
 
         GroupDescriptions.Clear();
+    }
+
+    private bool _regrouping;
+
+    // The collection IS the grouping, so what follows from changing it belongs to the collection and not to the three
+    // methods that happen to be the polite way of doing it. Spread across those, the public collection was an invitation
+    // to a silent no-op: adding a column to it grouped by nothing at all - no rebuild, no chip in the strip, the column
+    // still offered in the chooser - until something unrelated happened to rebuild the table.
+    private void OnGroupDescriptionsChanged(object sender, NotifyCollectionChangedEventArgs e)
+    {
+        if (!_regrouping) ApplyGrouping();
+    }
+
+    private void ApplyGrouping()
+    {
+        // The nesting names every path, and it just changed: what was open was open in a grouping that no longer exists.
         _openGroups.Clear();
         RebuildFlattener();
         _groupPanel?.Sync();
