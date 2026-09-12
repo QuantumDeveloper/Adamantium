@@ -691,7 +691,18 @@ public partial class RenderCache
 
         _groups.Clear();
         _groups.AddRange(_mergedGroups);
-        foreach (var group in _pendingInserts) group.InOrder = true;
+        foreach (var group in _pendingInserts)
+        {
+            group.InOrder = true;
+            if (!group.Unrecorded) continue;
+
+            // It is BACK, and what it drew is not. While it was out of the order its instances were blanked and its
+            // arena slots handed back (BlankOrphanInstances), so the units that survived describe bytes that no longer
+            // exist - re-inserting it puts an empty group into the paint order, holding its slot and drawing nothing.
+            // Told to the recorder, which owns the mirror that still claims those units (see NoteUnrecorded).
+            group.Unrecorded = false;
+            NoteUnrecorded(group.Component);
+        }
 
         // A group JOINED the paint order, so the recorded stream has no ops for it at all and a patch cannot show what
         // was not there. Departures are answered by _leftTheOrder; this is the arrival.

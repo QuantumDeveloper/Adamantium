@@ -41,6 +41,11 @@ public partial class RenderCache
         // In the paint order (_groups) right now? A hidden control keeps its group + units but leaves the order.
         public bool InOrder;
 
+        // Its instances were blanked and its arena slots handed back while it was out of the order: the units object
+        // survives, the bytes it drew do not. Set at the departure, PAID at the return - leaving can last a whole
+        // session (a scrollbar the window stopped needing), coming back is the rare half.
+        public bool Unrecorded;
+
         // Written INTO every rect instance this group bakes, so the arena can always say whose a slot is - see
         // RectBatchCollector.TryAdd. Small and dense (an int per group, never reused within a frame).
         public int Tag;
@@ -131,6 +136,50 @@ public partial class RenderCache
 
     private bool HoldsUnits(IUIComponent component) =>
         _recordedUnits.TryGetValue(component, out var entry) && entry.Units > 0;
+
+    // UN-RECORDED on the render thread, applied by the recorder that owns the mirror.
+    //
+    // Leaving the paint order is not free: the departed group's instances are blanked and its arena slots handed back
+    // (BlankOrphanInstances). The units object survives - that is the point of pooling a hidden container - but the
+    // BYTES it drew do not. Nothing said so, so the mirror went on claiming units the arena no longer held, and a return
+    // read as "kept its units": re-inserted into the paint order, never re-recorded, drawing nothing while holding its
+    // slot. That is a row of a recycled virtualizing panel going blank and staying blank until the whole scene was
+    // re-recorded.
+    //
+    // The mirror is the RECORDER's (see _recordedUnits) and the blanking is the render thread's, so the fact crosses
+    // here rather than being written across. Draining it is O(what actually left the order) - nothing per frame, nothing
+    // at rest.
+    private readonly List<IUIComponent> _unrecorded = new();
+
+    private void NoteUnrecorded(IUIComponent component)
+    {
+        if (component == null) return;
+        lock (_unrecorded) _unrecorded.Add(component);
+    }
+
+    private void DrainUnrecorded()
+    {
+        lock (_unrecorded)
+        {
+            if (_unrecorded.Count == 0) return;
+
+            foreach (var component in _unrecorded)
+            {
+                _recordedUnits.Remove(component);   // it holds no units any more - say so, so a return re-records
+                component.InvalidateRender(false);  // ...and a component whose geometry reads valid renders nothing
+            }
+
+            _unrecorded.Clear();
+
+            // Listing them as dirty is NOT enough, and that is the whole shape of this state: the ranks still stand, the
+            // units still exist, and only the bytes underneath them went - so the paint order the retained stream
+            // describes no longer matches the arena it addresses, and no per-component mark can say that. This is the
+            // flag that exists for exactly this ("a state only a full RECORD can fix"), and it is paid once per batch of
+            // departures, not per frame.
+            _forceFullNextFrame = true;
+            Core.LoopSignal.Request();
+        }
+    }
 
     /// <summary>The dirty marks THIS cache builds from. A cache draws one surface - a window's content, a popup layer, an
     /// adorner layer - and each of those has its own marks (see RenderDirtyRouter), so "is there work?" is a question
@@ -340,6 +389,9 @@ public partial class RenderCache
         _packet.Reset(RenderBuildKind.Clean);
         // LIVE read of the root - taken here (recorder thread), travels ON the packet.
         _packet.ProjectionMatrix = visualRoot.GetProjectionMatrix();
+
+        // What the render thread un-recorded since the last build - taken BEFORE the clean check, because it is work.
+        DrainUnrecorded();
 
         // Fully clean: re-draw the retained units as-is. (Unless a prior frame deferred a full walk - pay that first.)
         if (_built && !Dirty.HasWork && !_forceFullNextFrame) return;

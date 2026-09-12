@@ -290,6 +290,14 @@ public partial class RenderCache
 
             // Runs it no longer owns anywhere: keeping them would let a later patch address space that is now free.
             if (reclaimedAll) group.Runs.Clear();
+
+            // ...and THIS is where a group stops being recorded: its instances are blanked and its slots are back in the
+            // arena. The units object survives - that is what makes a pooled container cheap to bring back - but the
+            // bytes it drew are gone, and nothing said so. The recorder went on believing the mirror, so a return read
+            // as "kept its units": re-inserted into the paint order, never re-recorded, holding its slot and drawing
+            // nothing. Told across the thread boundary because the mirror is the recorder's (see NoteUnrecorded).
+            //
+            group.Unrecorded = true;
         }
 
         // A segment whose every instance has just been blanked is a draw call that paints nothing. Let it go: the op
