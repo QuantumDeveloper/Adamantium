@@ -71,6 +71,7 @@
     <PaletteColor Key="DataGridSearchMatchColor" Color="#59FFD60A"/>
     <!-- ...and the cell the search is ON. Denser, but still a WASH: a solid plate swallowed the check box under it. -->
     <PaletteColor Key="DataGridSearchCurrentColor" Color="#A6FFD60A"/>
+    <PaletteColor Key="DataGridValidationErrorColor" Color="#59FF453A"/>
     <PaletteColor Key="ControlStrokeColorSecondary" Color="#2EFFFFFF"/>
 
     <!-- The UNSET surface of a selection control - the switch's groove, the empty checkbox, the empty radio. One key,

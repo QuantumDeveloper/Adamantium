@@ -892,6 +892,101 @@ public class DataGridTests
         Assert.That(grid.CellFor(0, 0).GridLineBrush, Is.EqualTo(Brushes.Green));
     }
 
+    // ---- Validation: a value the column will not accept, and a record that complains about itself ----------------
+
+    private sealed class NoBlanks : DataGridValidationRule
+    {
+        public override string Validate(object value, object item) =>
+            string.IsNullOrWhiteSpace(value as string) ? "a name is required" : null;
+    }
+
+    private sealed class Complaining : System.ComponentModel.INotifyDataErrorInfo
+    {
+        public string Name { get; set; }
+        public string Note { get; set; }
+        private string _fault;
+
+        public string Fault
+        {
+            get => _fault;
+            set
+            {
+                _fault = value;
+                ErrorsChanged?.Invoke(this, new System.ComponentModel.DataErrorsChangedEventArgs(nameof(Name)));
+            }
+        }
+
+        public bool HasErrors => _fault != null;
+        public event EventHandler<System.ComponentModel.DataErrorsChangedEventArgs> ErrorsChanged;
+
+        public System.Collections.IEnumerable GetErrors(string propertyName) =>
+            propertyName == nameof(Name) && _fault != null ? new[] { _fault } : Array.Empty<string>();
+    }
+
+    // The rule is asked of EVERY row, not only of an edit: data arrives wrong as readily as it is typed wrong, and a
+    // table that only marked what was typed in front of it would leave a loaded page looking clean.
+    [Test]
+    public void ACellTheColumnWillNotAccept_IsMarked_WithoutAnyoneEditingIt()
+    {
+        var column = new DataGridTextColumn { Binding = new Binding("Name"), Width = new GridLength(100) };
+        var grid = Grid(column);
+        grid.ItemsSource = new List<Row> { new() { Name = "kept" }, new() { Name = "  " } };
+        column.ValidationRule = new NoBlanks();
+
+        Relayout(grid);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(grid.CellFor(0, 0).HasValidationError, Is.False, "a value the rule accepts is left alone");
+            Assert.That(grid.CellFor(1, 0).HasValidationError, Is.True, "and one it does not is marked");
+            Assert.That(grid.CellFor(1, 0).ValidationError, Is.EqualTo("a name is required"),
+                "the MESSAGE travels with the mark - a red box that says nothing is a puzzle");
+            Assert.That(grid.CellFor(1, 0).ToolTip, Is.EqualTo("a name is required"), "...and the cell can say it");
+        });
+    }
+
+    // The OTHER source, asked in the same breath: a record that knows it is wrong says so itself, and the grid takes
+    // that as readily as its own rule - with no rule on the column at all.
+    [Test]
+    public void ARecordThatReportsItsOwnError_MarksTheCell()
+    {
+        var item = new Complaining { Name = "Ada", Fault = "this one is filed as an error" };
+        var grid = Grid(new DataGridTextColumn { Binding = new Binding("Name"), Width = new GridLength(100) });
+        grid.ItemsSource = new List<Complaining> { item };
+
+        Relayout(grid);
+        Assert.That(grid.CellFor(0, 0).ValidationError, Is.EqualTo("this one is filed as an error"));
+
+        // ...and it can stop complaining without anything else being touched: an error arrives and leaves on its own
+        // event, which is the half of INotifyDataErrorInfo that is easy to leave out.
+        item.Fault = null;
+        Relayout(grid);
+        Assert.That(grid.CellFor(0, 0).HasValidationError, Is.False, "the mark goes when the complaint does");
+    }
+
+    // The colour is the PAGE's to name, exactly as the search washes are - and handing it back has to restore the
+    // theme's, which is the half a plain null assignment gets wrong.
+    [Test]
+    public void TheErrorWash_TakesTheBrushTheGridNames_AndGivesItBack()
+    {
+        var column = new DataGridTextColumn { Binding = new Binding("Name"), Width = new GridLength(100) };
+        var grid = Grid(column);
+        grid.ItemsSource = new List<Row> { new() { Name = "  " } };
+        column.ValidationRule = new NoBlanks();
+        Relayout(grid);
+
+        grid.CellFor(0, 0).SetValue(DataGridCell.ValidationErrorBrushProperty, Brushes.Blue, ValuePriority.Style);
+
+        grid.ValidationErrorBrush = Brushes.Red;
+        Relayout(grid);
+        Assert.That(grid.CellFor(0, 0).ValidationErrorBrush, Is.EqualTo(Brushes.Red), "the page's colour wins");
+
+        grid.ValidationErrorBrush = null;
+        Relayout(grid);
+        Assert.That(grid.CellFor(0, 0).ValidationErrorBrush, Is.EqualTo(Brushes.Blue),
+            "and saying nothing hands the theme's colour back");
+    }
+
     private sealed class Washes : System.ComponentModel.INotifyPropertyChanged
     {
         private Brush _match;

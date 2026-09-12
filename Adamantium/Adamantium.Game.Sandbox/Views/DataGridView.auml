@@ -1,6 +1,7 @@
 <View xmlns="http://adamantium/ui"
       xmlns:x="http://adamantium/ui/xaml/extensions"
-      xmlns:conv="clr-namespace:Adamantium.Game.Sandbox.Converters">
+      xmlns:conv="clr-namespace:Adamantium.Game.Sandbox.Converters"
+      xmlns:val="clr-namespace:Adamantium.Game.Sandbox.Validation">
     <!-- A column stands in the grid's LOGICAL tree, so everything on it binds like anything else: its value against the
          row's item, its list of choices against this page's view-model. -->
     <!-- The table on the left, its settings in a panel of their own on the right - they never overlap, and the switches
@@ -27,6 +28,7 @@
                       ShowSearchPanel="{Binding ShowSearchPanel}"
                       SearchMatchBrush="{Binding SearchMatchBrush}"
                       SearchCurrentMatchBrush="{Binding SearchCurrentMatchBrush}"
+                      ValidationErrorBrush="{Binding ValidationErrorBrush}"
                       RowDetailsHeight="120"
                       Indent="16"
                       ExpanderColumnIndex="2">
@@ -104,9 +106,16 @@
 
                 <!-- ...and the format is the column's too. It is bound rather than written out here BECAUSE it is the
                      column's and not the function's: a fixed "Σ {0:N0}" went on saying Σ over an average. -->
+                <!-- VALIDATION by a rule on the column: the generated sizes run 251..9139, so some of them are outside
+                     what this page accepts and are washed the moment the table is shown - no edit required. The limits
+                     are BOUND, so moving them repaints the table live. -->
                 <DataGridTextColumn Header="Size" Binding="{Binding Size}" Width="80" SortMemberPath="Size"
                                     Aggregate="{Binding SizeAggregate}"
-                                    AggregateFormat="{Binding SizeAggregateFormat}"/>
+                                    AggregateFormat="{Binding SizeAggregateFormat}">
+                    <DataGridTextColumn.ValidationRule>
+                        <val:RangeRule Min="{Binding SizeFloor}" Max="{Binding SizeCeiling}"/>
+                    </DataGridTextColumn.ValidationRule>
+                </DataGridTextColumn>
 
                 <!-- Read-only BY THE COLUMN, which is the other way to refuse an edit: Code refuses one cell at a time
                      instead. Both are honoured by the same BeginEdit. -->
@@ -202,6 +211,33 @@
                 <TextBlock Text="Keep the alpha down - it is a wash over the cell, not a plate."
                            FontSize="11" Margin="0,0,0,8" TextWrapping="WrapByWords"
                            Foreground="{ObservableResource TextFillColorSecondary}"/>
+
+                <TextBlock Text="VALIDATION" FontSize="11" Margin="0,10,0,6"
+                           Foreground="{ObservableResource TextFillColorSecondary}"/>
+                <!-- TWO SOURCES on this page at once: the Size column carries a rule with the limits below, and the
+                     record itself reports an error on its Status - the grid asks both and paints the cell either way. -->
+                <TextBlock Text="Size is accepted between these; the Status cell of a record filed as an error is marked by the record itself."
+                           FontSize="11" Margin="0,0,0,6" TextWrapping="WrapByWords"
+                           Foreground="{ObservableResource TextFillColorSecondary}"/>
+                <!-- One above the other: side by side, two spinners and their labels do not fit this panel and the
+                     second one loses its buttons off the edge. -->
+                <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto" Margin="0,0,0,6">
+                    <TextBlock Grid.Row="0" Grid.Column="0" Text="from" VerticalAlignment="Center" Margin="0,0,8,4"/>
+                    <NumericUpDown Grid.Row="0" Grid.Column="1" Margin="0,0,0,4"
+                                   Value="{Binding SizeFloor, Mode=TwoWay}" Minimum="0" Maximum="10000"
+                                   SmallChange="250" SnapsToSmallChange="true" StringFormat="N0"/>
+                    <TextBlock Grid.Row="1" Grid.Column="0" Text="to" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                    <NumericUpDown Grid.Row="1" Grid.Column="1"
+                                   Value="{Binding SizeCeiling, Mode=TwoWay}" Minimum="0" Maximum="10000"
+                                   SmallChange="250" SnapsToSmallChange="true" StringFormat="N0"/>
+                </Grid>
+                <CheckBox Content="Own error colour" Margin="0,0,0,6"
+                          IsChecked="{Binding OwnValidationColour, Mode=TwoWay}"/>
+                <Grid ColumnDefinitions="Auto,*" Margin="0,0,0,8">
+                    <ColorPickerButton Grid.Column="0" Width="72" Height="24" Margin="0,0,8,0"
+                                       SelectedColor="{Binding ValidationErrorColour, Mode=TwoWay}"/>
+                    <TextBlock Grid.Column="1" Text="Rejected value" VerticalAlignment="Center"/>
+                </Grid>
 
                 <TextBlock Text="GROUPING" FontSize="11" Margin="0,10,0,6"
                            Foreground="{ObservableResource TextFillColorSecondary}"/>

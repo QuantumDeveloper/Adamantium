@@ -42,6 +42,7 @@
     <PaletteColor Key="DataGridSearchMatchColor" Color="#59E8C15C"/>
     <!-- ...and the cell the search is ON - see the macOS dark palette. -->
     <PaletteColor Key="DataGridSearchCurrentColor" Color="#A6E8C15C"/>
+    <PaletteColor Key="DataGridValidationErrorColor" Color="#59E06C75"/>
     <PaletteColor Key="ControlStrokeColorSecondary" Color="#2EFFFFFF"/>
 
     <PaletteColor Key="OnAccentOverlayPointerOver" Color="#33FFFFFF"/>

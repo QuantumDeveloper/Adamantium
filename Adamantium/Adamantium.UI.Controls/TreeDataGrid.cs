@@ -843,6 +843,18 @@ public partial class TreeDataGrid : Selector
         set => SetValue(SearchCurrentMatchBrushProperty, value);
     }
 
+    /// <summary>What a cell holding a value its column will not accept is washed with. Named by the page like the
+    /// search washes are; unset, the theme's own colour stands.</summary>
+    public static readonly AdamantiumProperty ValidationErrorBrushProperty = AdamantiumProperty.Register(
+        nameof(ValidationErrorBrush), typeof(Brush), typeof(TreeDataGrid),
+        new PropertyMetadata(null, PropertyMetadataOptions.AffectsRender, OnSearchBrushChanged));
+
+    public Brush ValidationErrorBrush
+    {
+        get => GetValue<Brush>(ValidationErrorBrushProperty);
+        set => SetValue(ValidationErrorBrushProperty, value);
+    }
+
     // The cells take their colours when they are attached, so the ones already built have to be told.
     private static void OnSearchBrushChanged(AdamantiumComponent d, AdamantiumPropertyChangedEventArgs e) =>
         (d as TreeDataGrid)?.RefreshRealizedRows();

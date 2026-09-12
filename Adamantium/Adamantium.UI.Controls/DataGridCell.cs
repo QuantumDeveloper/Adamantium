@@ -140,6 +140,53 @@ public class DataGridCell : ContentControl
         nameof(SearchMatchBrush), typeof(Brush), typeof(DataGridCell),
         new PropertyMetadata(null, PropertyMetadataOptions.AffectsRender));
 
+    /// <summary>What a cell holding a value the column will not accept is washed with. Set by the theme and overridden
+    /// by <see cref="TreeDataGrid.ValidationErrorBrush"/>, exactly as the search washes are.</summary>
+    public static readonly AdamantiumProperty ValidationErrorBrushProperty = AdamantiumProperty.Register(
+        nameof(ValidationErrorBrush), typeof(Brush), typeof(DataGridCell),
+        new PropertyMetadata(null, PropertyMetadataOptions.AffectsRender));
+
+    /// <summary>What is wrong with this cell's value, or null when nothing is. The MESSAGE, so the cell can say it -
+    /// a red box that does not tell you what it wants is a puzzle, not a validation.</summary>
+    public static readonly AdamantiumProperty ValidationErrorProperty = AdamantiumProperty.Register(
+        nameof(ValidationError), typeof(string), typeof(DataGridCell),
+        new PropertyMetadata(null, PropertyMetadataOptions.AffectsRender, OnValidationErrorChanged));
+
+    /// <summary>Whether <see cref="ValidationError"/> says anything - the flag a theme trigger reads, because a trigger
+    /// tests a value and "any non-empty string" is not one.</summary>
+    public static readonly AdamantiumProperty HasValidationErrorProperty = AdamantiumProperty.Register(
+        nameof(HasValidationError), typeof(bool), typeof(DataGridCell),
+        new PropertyMetadata(false, PropertyMetadataOptions.AffectsRender));
+
+    public Brush ValidationErrorBrush
+    {
+        get => GetValue<Brush>(ValidationErrorBrushProperty);
+        set => SetValue(ValidationErrorBrushProperty, value);
+    }
+
+    public string ValidationError
+    {
+        get => GetValue<string>(ValidationErrorProperty);
+        set => SetValue(ValidationErrorProperty, value);
+    }
+
+    public bool HasValidationError
+    {
+        get => GetValue<bool>(HasValidationErrorProperty);
+        private set => SetValue(HasValidationErrorProperty, value);
+    }
+
+    // The message carries the tooltip with it: one write says what is wrong, whether it reaches the eye as a wash or
+    // as words. A cell is recycled, so the empty case has to clear the tooltip rather than leave the last row's.
+    private static void OnValidationErrorChanged(AdamantiumComponent d, AdamantiumPropertyChangedEventArgs e)
+    {
+        if (d is not DataGridCell cell) return;
+
+        var text = e.NewValue as string;
+        cell.HasValidationError = !string.IsNullOrEmpty(text);
+        cell.ToolTip = cell.HasValidationError ? text : null;
+    }
+
     /// <summary>...and the cell the search is ON. A WASH, never a plate: a cell holds a check box and a meaning, and a
     /// solid colour swallows both.</summary>
     public static readonly AdamantiumProperty SearchCurrentBrushProperty = AdamantiumProperty.Register(
@@ -349,6 +396,12 @@ public class DataGridCell : ContentControl
         Adopt(GridLineBrushProperty, grid?.GridLinesBrush);
         Adopt(SearchMatchBrushProperty, grid?.SearchMatchBrush);
         Adopt(SearchCurrentBrushProperty, grid?.SearchCurrentMatchBrush);
+        Adopt(ValidationErrorBrushProperty, grid?.ValidationErrorBrush);
+
+        // Asked here, with everything else a cell learns on the way in, so a row scrolled back into view is marked the
+        // same as one that never left. A cell being EDITED is left alone: the value under the editor is the old one,
+        // and marking it red while the user is still typing the replacement reads as a complaint about the typing.
+        ValidationError = IsEditing ? null : column?.Validate(item);
     }
 
     private void Adopt(AdamantiumProperty property, Brush brush)

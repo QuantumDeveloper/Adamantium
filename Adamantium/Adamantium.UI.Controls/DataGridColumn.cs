@@ -36,6 +36,15 @@ public abstract class DataGridColumn : FundamentalUIComponent
         nameof(IsReadOnlyBinding), typeof(BindingBase), typeof(DataGridColumn),
         new PropertyMetadata(null, OnRowBindingChanged));
 
+    /// <summary>What this column will accept. Asked of every row, not only of an edit: data arrives wrong as readily
+    /// as it is typed wrong, and a table that only marks what was typed in front of it is no use on a loaded page.
+    /// <para>A record that reports its OWN errors (<see cref="System.ComponentModel.INotifyDataErrorInfo"/>) is
+    /// honoured with or without this - the two are asked together, and the rule is what a page without a validating
+    /// view-model uses.</para></summary>
+    public static readonly AdamantiumProperty ValidationRuleProperty = AdamantiumProperty.Register(
+        nameof(ValidationRule), typeof(DataGridValidationRule), typeof(DataGridColumn),
+        new PropertyMetadata(null, OnValidationRuleChanged));
+
     public static readonly AdamantiumProperty HeaderTemplateProperty = AdamantiumProperty.Register(nameof(HeaderTemplate),
         typeof(DataTemplate), typeof(DataGridColumn), new PropertyMetadata(null));
 
@@ -142,6 +151,35 @@ public abstract class DataGridColumn : FundamentalUIComponent
         get => GetValue<BindingBase>(IsReadOnlyBindingProperty);
         set => SetValue(IsReadOnlyBindingProperty, value);
     }
+
+    public DataGridValidationRule ValidationRule
+    {
+        get => GetValue<DataGridValidationRule>(ValidationRuleProperty);
+        set => SetValue(ValidationRuleProperty, value);
+    }
+
+    /// <summary>What is wrong with this column's value on <paramref name="item"/>, or null when nothing is. BOTH
+    /// sources, in the order a reader expects: the record's own complaint first - it knows more than a column can -
+    /// then this column's rule.</summary>
+    protected internal string Validate(object item)
+    {
+        if (item == null) return null;
+
+        if (item is System.ComponentModel.INotifyDataErrorInfo reporter && ErrorMemberPath is { Length: > 0 } member)
+        {
+            foreach (var error in reporter.GetErrors(member) ?? System.Linq.Enumerable.Empty<object>())
+                if (error?.ToString() is { Length: > 0 } text) return text;
+        }
+
+        return ValidationRule is { } rule ? rule.Validate(ReadWithoutTheUI(item), item) : null;
+    }
+
+    // WHICH member of the record this column stands for, as INotifyDataErrorInfo names them. The same answer the value
+    // reader uses, so "the column's value" and "the column's errors" can never be about two different fields.
+    private string ErrorMemberPath =>
+        SortMemberPath is { Length: > 0 } sort ? sort
+        : Binding is Binding plain ? plain.Path?.Path
+        : null;
 
     public DataTemplate HeaderTemplate
     {
@@ -273,6 +311,17 @@ public abstract class DataGridColumn : FundamentalUIComponent
     // happened to rebuild the rows.
     private static void OnRowBindingChanged(AdamantiumComponent component, AdamantiumPropertyChangedEventArgs e) =>
         (component as DataGridColumn)?.Owner?.RefreshRealizedRows();
+
+    // A rule JOINS the column's logical tree, for the reason a column joins the grid's: that is what gives it a
+    // DataContext, and with it {Binding} on its own properties - a limit read off the page rather than compiled in.
+    private static void OnValidationRuleChanged(AdamantiumComponent component, AdamantiumPropertyChangedEventArgs e)
+    {
+        if (component is not DataGridColumn column) return;
+
+        if (e.OldValue is DataGridValidationRule gone) column.RemoveLogicalChild(gone);
+        if (e.NewValue is DataGridValidationRule added) column.AddLogicalChild(added);
+        column.Owner?.RefreshRealizedRows();
+    }
 
     /// <summary>The grid this column was added to, or null while it stands alone.</summary>
     protected internal TreeDataGrid Owner => LogicalParent as TreeDataGrid;

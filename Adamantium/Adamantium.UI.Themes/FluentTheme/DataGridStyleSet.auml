@@ -333,6 +333,7 @@
         <!-- The theme's own rules. A grid that names its brushes overrides these; one that says nothing keeps them. -->
         <Setter Property="GridLineBrush" Value="{ObservableResource DataGridLineColor}"/>
         <Setter Property="SearchMatchBrush" Value="{ObservableResource DataGridSearchMatchColor}"/>
+        <Setter Property="ValidationErrorBrush" Value="{ObservableResource DataGridValidationErrorColor}"/>
         <Setter Property="SearchCurrentBrush" Value="{ObservableResource DataGridSearchCurrentColor}"/>
         <Setter Property="Template">
             <Setter.Value>
@@ -401,6 +402,14 @@
                         <PropertyTrigger Property="IsCurrentSearchMatch" Value="true">
                             <Setter TargetName="CellBorder" Property="Background"
                                     Value="{TemplateBinding SearchCurrentBrush}"/>
+                        </PropertyTrigger>
+
+                        <!-- A value the column will not accept wins over ALL of them: found, selected, current. Those
+                             say where you are, this says the record is wrong - and a wrong value hidden under the
+                             selection is exactly the one that gets saved. -->
+                        <PropertyTrigger Property="HasValidationError" Value="true">
+                            <Setter TargetName="CellBorder" Property="Background"
+                                    Value="{TemplateBinding ValidationErrorBrush}"/>
                         </PropertyTrigger>
                         <PropertyTrigger Property="IsActive" Value="true">
                             <Setter TargetName="CellBorder" Property="BorderThickness" Value="1"/>
