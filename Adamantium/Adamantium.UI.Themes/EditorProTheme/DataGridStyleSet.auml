@@ -223,6 +223,7 @@
 
     <Style Selector="DataGridRow">
         <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="ValidationErrorBrush" Value="{ObservableResource DataGridValidationErrorColor}"/>
     </Style>
 
     <!-- The zebra: band 1 is tinted, band 0 shows the table's own surface, so an unset AlternationCount changes nothing. -->
@@ -239,6 +240,13 @@
          has to - the same wash the cells take, over the whole of it. -->
     <Style Selector="DataGridRow[IsGroup=true][IsSelected=true]">
         <Setter Property="Background" Value="{ThemeResource AccentFillColorSelection}"/>
+    </Style>
+
+    <!-- A fault in the RECORD, not in any one of its cells - a "from" later than a "to". It washes the whole row for
+         exactly that reason: marking one of the cells involved would name the wrong culprit. Through the row's own
+         brush, so a page that names its colour is obeyed here as it is on the cells. -->
+    <Style Selector="DataGridRow[HasValidationError=true]">
+        <Setter Property="Background" Value="{Self ValidationErrorBrush}"/>
     </Style>
 
     <!-- The number strip and its corner - see Fluent's set for why it is opaque. -->

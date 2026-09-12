@@ -24,6 +24,52 @@ public class DataGridRow : Panel
         nameof(AlternationIndex), typeof(Int32), typeof(DataGridRow),
         new PropertyMetadata(0, PropertyMetadataOptions.AffectsRender));
 
+    /// <summary>What is wrong with this RECORD taken as a whole - a "from" later than a "to", parts that do not add up.
+    /// On the row rather than on a cell because the fault belongs to none of them; the message is also the row's
+    /// tooltip, since a mark that cannot say what it means is only an alarm.</summary>
+    public static readonly AdamantiumProperty ValidationErrorProperty = AdamantiumProperty.Register(
+        nameof(ValidationError), typeof(string), typeof(DataGridRow),
+        new PropertyMetadata(null, PropertyMetadataOptions.AffectsRender, OnValidationErrorChanged));
+
+    /// <summary>Whether <see cref="ValidationError"/> says anything - the flag a theme trigger reads, because a trigger
+    /// compares values and "not empty" is not a value.</summary>
+    public static readonly AdamantiumProperty HasValidationErrorProperty = AdamantiumProperty.Register(
+        nameof(HasValidationError), typeof(bool), typeof(DataGridRow),
+        new PropertyMetadata(false, PropertyMetadataOptions.AffectsRender));
+
+    /// <summary>The wash a faulted row takes, handed down by <see cref="TreeDataGrid.ValidationErrorBrush"/> exactly as
+    /// the cells' is.</summary>
+    public static readonly AdamantiumProperty ValidationErrorBrushProperty = AdamantiumProperty.Register(
+        nameof(ValidationErrorBrush), typeof(Brush), typeof(DataGridRow),
+        new PropertyMetadata(null, PropertyMetadataOptions.AffectsRender));
+
+    public string ValidationError
+    {
+        get => GetValue<string>(ValidationErrorProperty);
+        set => SetValue(ValidationErrorProperty, value);
+    }
+
+    public bool HasValidationError
+    {
+        get => GetValue<bool>(HasValidationErrorProperty);
+        private set => SetValue(HasValidationErrorProperty, value);
+    }
+
+    public Brush ValidationErrorBrush
+    {
+        get => GetValue<Brush>(ValidationErrorBrushProperty);
+        set => SetValue(ValidationErrorBrushProperty, value);
+    }
+
+    private static void OnValidationErrorChanged(AdamantiumComponent d, AdamantiumPropertyChangedEventArgs e)
+    {
+        if (d is not DataGridRow row) return;
+
+        var text = e.NewValue as string;
+        row.HasValidationError = text is { Length: > 0 };
+        row.ToolTip = row.HasValidationError ? text : null;
+    }
+
     public bool IsSelected
     {
         get => GetValue<bool>(IsSelectedProperty);
@@ -232,6 +278,13 @@ public class DataGridRow : Panel
         }
 
         SyncNumber();
+
+        // The record as a WHOLE, asked here because this is where the row learns its item changed - the same place the
+        // cells are told, and an error nobody re-asks is an error that stays after it has been put right.
+        var owner = Owner;
+        ValidationError = owner?.ValidateRow(item);
+        if (owner?.ValidationErrorBrush is { } wash) ValidationErrorBrush = wash;
+        else ClearValue(ValidationErrorBrushProperty);
     }
 
     /// <summary>The group this row stands for, or null on an ordinary row.</summary>

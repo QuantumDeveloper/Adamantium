@@ -191,6 +191,12 @@ public abstract class DataGridColumn : FundamentalUIComponent
         return ValidationRule is { } rule ? rule.Validate(ReadWithoutTheUI(item), item) : null;
     }
 
+    /// <summary>What this column's rule says about a value that has NOT been written yet - what blocking asks before it
+    /// lets an editor go. Only the rule: the record's own report is about what it holds, and it holds the old value
+    /// still.</summary>
+    protected internal string Refuses(object value, object item) =>
+        ValidationRule is { } rule ? rule.Validate(value, item) : null;
+
     // WHICH member of the record this column stands for, as INotifyDataErrorInfo names them. The same answer the value
     // reader uses, so "the column's value" and "the column's errors" can never be about two different fields.
     private string ErrorMemberPath =>

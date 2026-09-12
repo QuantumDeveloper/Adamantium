@@ -177,7 +177,9 @@ public class DataGridColumnHeader : ContentControl
         ContentTemplate = column?.HeaderTemplate;
         Content = column?.Header;
         SortDirection = direction;
-        CanFilter = column?.CanUserFilter ?? false;
+        // BOTH have to agree, and the table can only take the funnel away: a column that refused one does not get it
+        // back because the table allows them in general.
+        CanFilter = (column?.CanUserFilter ?? false) && (owner?.CanUserFilterColumns ?? true);
         IsFiltered = owner?.IsFiltered(column) ?? false;
         IsFrozen = column?.IsFrozen ?? false;
         ZIndex = IsFrozen ? 1 : 0;
