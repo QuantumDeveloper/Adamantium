@@ -2021,6 +2021,10 @@ public partial class TreeDataGrid : Selector
                 e.Handled = CopySelection();
                 break;
 
+            case Key.V when control && !IsEditing:
+                e.Handled = PasteSelection();
+                break;
+
             case Key.Delete when !IsEditing:
                 e.Handled = DeleteSelectedRows();
                 break;
@@ -2163,18 +2167,175 @@ public partial class TreeDataGrid : Selector
         if (!SelectedCells.TryGetBounds(out var bounds) || Rows is not { } rows) return string.Empty;
 
         var text = new StringBuilder();
+        var first = true;
         for (var row = bounds.FirstRow; row <= bounds.LastRow && row < rows.Count; row++)
         {
-            if (row > bounds.FirstRow) text.Append('\n');
+            if (!HoldsCells(rows[row].Node)) continue;
+
+            if (!first) text.Append('\n');
+            first = false;
+
+            var leading = true;
             for (var column = bounds.FirstColumn; column <= bounds.LastColumn && column < Columns.Count; column++)
             {
-                if (column > bounds.FirstColumn) text.Append('\t');
+                if (!Columns[column].IsShown) continue;
+
+                if (!leading) text.Append('\t');
+                leading = false;
                 if (!SelectedCells.Contains(row, column)) continue;
-                text.Append(Columns[column].CellContentFor(rows[row].Node));
+
+                // What the column STANDS FOR, not what its cell is handed. A template column's cell is handed the ROW
+                // itself, so that its template can bind against it - putting that on the clipboard writes out a type
+                // name. The column says what it means through SortMemberPath, which is what a sort, a search and the
+                // export all already ask it.
+                text.Append(Quoted(ValueOf(Columns[column], rows[row].Node)?.ToString()));
             }
         }
 
         return text.ToString();
+    }
+
+    /// <summary>Writes the clipboard into the table, starting at the top-left of the selection - or at the active cell
+    /// when nothing is selected. False when there was nothing to paste, or when nothing would take it.
+    /// <para>Every value goes through <see cref="CellEditEnding"/>, so a view-model that refuses a value refuses it
+    /// however it arrives, and through the column's binding, which converts it and REFUSES what will not fit. A
+    /// read-only cell, a column with no binding of its own to write through, and anything past the last row or column
+    /// are all simply not written: the table does not grow to take a paste.</para></summary>
+    public bool PasteSelection()
+    {
+        if (IsEditing && !CommitEdit()) return false;
+
+        var block = Split(Clipboard.GetText());
+        if (block.Count == 0 || Rows is not { } rows) return false;
+
+        var anchor = SelectedCells.TryGetBounds(out var bounds)
+            ? bounds
+            : new CellRange(ActiveRow, ActiveColumn, ActiveRow, ActiveColumn);
+
+        if (anchor.FirstRow < 0 || anchor.FirstColumn < 0) return false;
+
+        var written = 0;
+        var lastRow = anchor.FirstRow;
+        var lastColumn = anchor.FirstColumn;
+        var row = anchor.FirstRow;
+
+        foreach (var line in block)
+        {
+            // Rows and columns that hold no cells are STEPPED OVER and consume no line of the clipboard: a caption
+            // between two records is the table's own furniture, and a paste of three lines means the next three records.
+            while (row < rows.Count && !HoldsCells(rows[row].Node)) row++;
+            if (row >= rows.Count) break;
+
+            var item = rows[row].Node;
+            var column = anchor.FirstColumn;
+
+            foreach (var field in line)
+            {
+                while (column < Columns.Count && !Columns[column].IsShown) column++;
+                if (column >= Columns.Count) break;
+
+                if (Accept(item, Columns[column], field)) written++;
+                lastRow = row;
+                lastColumn = Math.Max(lastColumn, column);
+                column++;
+            }
+
+            row++;
+        }
+
+        if (written == 0) return false;
+
+        SelectedCells.Set(new CellRange(anchor.FirstRow, anchor.FirstColumn, lastRow, lastColumn));
+        RefreshRealizedRows();
+        RefreshCellSelectionVisuals();
+        return true;
+    }
+
+    // A template column has no binding of its own, so there is nowhere to put a pasted value: its editor writes through
+    // the TEMPLATE's bindings, and there is no editor here. Refused rather than accepted-and-dropped.
+    private bool Accept(object item, DataGridColumn column, string text)
+    {
+        if (column.Binding == null || IsCellReadOnly(column, item)) return false;
+
+        var args = new DataGridCellEditEventArgs(item, column, text);
+        CellEditEnding?.Invoke(this, args);
+
+        return !args.Cancel && column.Write(item, args.Value);
+    }
+
+    // A group caption and a details panel are not records: there is nothing in them to copy and nothing to write into.
+    private static bool HoldsCells(object node) => node is not DataGridGroup && node is not DataGridRowDetails;
+
+    // Tabs and newlines are the format's own punctuation, so a value carrying one has to be quoted or it silently
+    // becomes two fields. The same rule a spreadsheet uses on its way out, which is what makes the round trip hold.
+    private static string Quoted(string value)
+    {
+        if (string.IsNullOrEmpty(value)) return string.Empty;
+        if (value.IndexOf('\t') < 0 && value.IndexOf('"') < 0
+            && value.IndexOf('\n') < 0 && value.IndexOf('\r') < 0) return value;
+
+        return "\"" + value.Replace("\"", "\"\"") + "\"";
+    }
+
+    private static List<string[]> Split(string text)
+    {
+        var block = new List<string[]>();
+        if (string.IsNullOrEmpty(text)) return block;
+
+        var fields = new List<string>();
+        var field = new StringBuilder();
+        var quoted = false;
+
+        for (var i = 0; i < text.Length; i++)
+        {
+            var c = text[i];
+
+            if (quoted)
+            {
+                if (c != '"') { field.Append(c); continue; }
+                if (i + 1 < text.Length && text[i + 1] == '"') { field.Append('"'); i++; continue; }
+                quoted = false;
+                continue;
+            }
+
+            switch (c)
+            {
+                // A quote OPENS a field only at its start; one in the middle of a value is just a character, which is
+                // how a spreadsheet reads it too.
+                case '"' when field.Length == 0:
+                    quoted = true;
+                    break;
+
+                case '\t':
+                    fields.Add(field.ToString());
+                    field.Clear();
+                    break;
+
+                case '\r':
+                    break;
+
+                case '\n':
+                    fields.Add(field.ToString());
+                    field.Clear();
+                    block.Add(fields.ToArray());
+                    fields.Clear();
+                    break;
+
+                default:
+                    field.Append(c);
+                    break;
+            }
+        }
+
+        // Text that ends with a line break has already closed its last line - nothing is left, and a blank row would be
+        // one record of empties written over the table.
+        if (field.Length > 0 || fields.Count > 0)
+        {
+            fields.Add(field.ToString());
+            block.Add(fields.ToArray());
+        }
+
+        return block;
     }
 
     /// <summary>Whether column <paramref name="index"/> has a cell on a realized row. Frozen columns always do; the
