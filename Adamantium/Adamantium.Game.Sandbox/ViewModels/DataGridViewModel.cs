@@ -11,14 +11,41 @@ using Adamantium.UI.Core.Media;
 namespace Adamantium.Game.Sandbox.ViewModels;
 
 /// <summary>One node of the grid's data. A tree AND a table: the first columns are flat facts, the hierarchy starts
-/// wherever the expander column is put - which is the case this control was written for.</summary>
-public class GridNode
+/// wherever the expander column is put - which is the case this control was written for.
+/// <para>It reports its OWN errors (<see cref="System.ComponentModel.INotifyDataErrorInfo"/>), which is the second of the two
+/// ways the grid learns a cell is wrong - the first being a rule on the column. Both are shown on this page on purpose:
+/// a rule is what a page without a validating model uses, and this is what a model that knows better says for itself.</para></summary>
+public class GridNode : System.ComponentModel.INotifyDataErrorInfo
 {
     public string Code { get; set; }
     public string Owner { get; set; }
     public string Name { get; set; }
     public int Size { get; set; }
-    public string Status { get; set; }
+
+    /// <summary>Setting it re-states the record's errors, so a status typed into the grid repaints the cell without
+    /// anything else being touched - which is the half of INotifyDataErrorInfo that is easy to leave out.</summary>
+    public string Status
+    {
+        get => _status;
+        set
+        {
+            if (_status == value) return;
+            _status = value;
+            ErrorsChanged?.Invoke(this, new System.ComponentModel.DataErrorsChangedEventArgs(nameof(Status)));
+        }
+    }
+
+    private string _status;
+
+    public bool HasErrors => _status == "error";
+
+    public event EventHandler<System.ComponentModel.DataErrorsChangedEventArgs> ErrorsChanged;
+
+    public IEnumerable GetErrors(string propertyName) =>
+        propertyName == nameof(Status) && HasErrors
+            ? new[] { "The record is filed as an error" }
+            : Array.Empty<string>();
+
     public bool Done { get; set; }
     public string Checksum { get; set; }
     public string Region { get; set; }
@@ -189,6 +216,23 @@ public partial class DataGridViewModel : TabPageViewModel
 
     /// <summary>...and the cell the search is standing on.</summary>
     public Brush SearchCurrentMatchBrush => OwnSearchColours ? new SolidColorBrush(SearchCurrentColour) : null;
+
+    /// <summary>Whether this page names the colour a rejected value is washed with, instead of leaving it to the theme -
+    /// the same two states as the search colours, and the same reason for showing both.</summary>
+    [Bindable, Affects(nameof(ValidationErrorBrush))]
+    private bool _ownValidationColour;
+
+    [Bindable, Affects(nameof(ValidationErrorBrush))]
+    private Color _validationErrorColour = new(0xC8, 0x46, 0x21, 0x66);
+
+    /// <summary>What a cell the column will not accept is washed with - null while the theme owns it.</summary>
+    public Brush ValidationErrorBrush => OwnValidationColour ? new SolidColorBrush(ValidationErrorColour) : null;
+
+    /// <summary>The range the Size column will accept. Bound INTO the rule from here, which is the point of a rule
+    /// being a component: the limits are a page's business, not a compiled-in constant.</summary>
+    [Bindable] private int _sizeFloor = 500;
+
+    [Bindable] private int _sizeCeiling = 9000;
 
     /// <summary>What the Size column adds up to. Every aggregate is here to be tried: a sum is what a quantity wants,
     /// an average what a rate does.</summary>

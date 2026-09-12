@@ -283,6 +283,7 @@
         <!-- The theme's own rules - see Fluent's set. -->
         <Setter Property="GridLineBrush" Value="{ObservableResource DataGridLineColor}"/>
         <Setter Property="SearchMatchBrush" Value="{ObservableResource DataGridSearchMatchColor}"/>
+        <Setter Property="ValidationErrorBrush" Value="{ObservableResource DataGridValidationErrorColor}"/>
         <Setter Property="SearchCurrentBrush" Value="{ObservableResource DataGridSearchCurrentColor}"/>
         <Setter Property="Template">
             <Setter.Value>
@@ -354,6 +355,12 @@
                         <PropertyTrigger Property="IsCurrentSearchMatch" Value="true">
                             <Setter TargetName="CellBorder" Property="Background"
                                     Value="{TemplateBinding SearchCurrentBrush}"/>
+                        </PropertyTrigger>
+
+                        <!-- A value the column will not accept wins over all of them - see the Fluent set. -->
+                        <PropertyTrigger Property="HasValidationError" Value="true">
+                            <Setter TargetName="CellBorder" Property="Background"
+                                    Value="{TemplateBinding ValidationErrorBrush}"/>
                         </PropertyTrigger>
                         <!-- The ACTIVE cell is outlined, not filled: it sits inside the selection and has to be told
                              apart from it. -->

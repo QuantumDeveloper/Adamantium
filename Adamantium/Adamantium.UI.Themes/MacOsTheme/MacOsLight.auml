@@ -49,6 +49,7 @@
     <PaletteColor Key="DataGridSearchMatchColor" Color="#66FFCC00"/>
     <!-- ...and the cell the search is ON - see the dark palette. -->
     <PaletteColor Key="DataGridSearchCurrentColor" Color="#B3FFCC00"/>
+    <PaletteColor Key="DataGridValidationErrorColor" Color="#59FF3B30"/>
     <PaletteColor Key="ControlStrokeColorSecondary" Color="#2E000000"/>
 
     <!-- The UNSET surface of a selection control - see MacOsDark for why it is one key and its own. The light side had

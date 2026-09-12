@@ -71,6 +71,7 @@ public class DataGridRow : Panel
     // cell leaving one end is the cell entering the other - the same reasoning as rows leaving the top of a list.
     private readonly Dictionary<int, DataGridCell> _cells = new();
     private INotifyPropertyChanged _followed;
+    private INotifyDataErrorInfo _reporting;
     private Decorators.Border _frozenBackdrop;
     private Decorators.Border _rightBackdrop;
     private DataGridGroupHeader _groupHeader;
@@ -118,9 +119,19 @@ public class DataGridRow : Panel
         if (_followed != null) _followed.PropertyChanged -= OnItemChanged;
         _followed = item as INotifyPropertyChanged;
         if (_followed != null) _followed.PropertyChanged += OnItemChanged;
+
+        // A record that reports its own errors is followed HERE, once per row, and not per cell: cells are recycled
+        // constantly, and a subscription taken per cell is a subscription nobody can be sure was released.
+        if (_reporting != null) _reporting.ErrorsChanged -= OnItemErrorsChanged;
+        _reporting = item as INotifyDataErrorInfo;
+        if (_reporting != null) _reporting.ErrorsChanged += OnItemErrorsChanged;
     }
 
     private void OnItemChanged(object sender, PropertyChangedEventArgs e) => SyncCells();
+
+    // An error can arrive with no value change behind it - a server answering, a rule re-run elsewhere - so this is its
+    // own way in rather than something the value notification is expected to carry.
+    private void OnItemErrorsChanged(object sender, DataErrorsChangedEventArgs e) => SyncCells();
 
     // Belt and braces: whatever drops this row - a recycle, a reset, the whole table being discarded with the page -
     // leaving the tree releases the item. The subscription points at the LONG-LIVED end, so a missed release is not a
