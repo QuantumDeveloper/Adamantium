@@ -73,6 +73,9 @@
     <PaletteColor Key="DataGridSearchCurrentColor" Color="#A6FFD60A"/>
     <PaletteColor Key="DataGridValidationErrorColor" Color="#59FF453A"/>
     <PaletteColor Key="ControlStrokeColorSecondary" Color="#2EFFFFFF"/>
+    <!-- See FluentDark: the grid is a ruler, not a control's hairline. -->
+    <PaletteColor Key="CanvasGridColor" Color="#36FFFFFF"/>
+    <PaletteColor Key="CanvasAxisColor" Color="#78FFFFFF"/>
 
     <!-- The UNSET surface of a selection control - the switch's groove, the empty checkbox, the empty radio. One key,
          because it is one surface: all three say "not chosen" and all three have to be FOUND before they can say it.

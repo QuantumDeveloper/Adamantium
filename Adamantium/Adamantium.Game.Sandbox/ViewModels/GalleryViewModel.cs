@@ -42,6 +42,7 @@ public partial class GalleryViewModel
         new OpacityViewModel(),
         new ViewboxViewModel(),
         new ZoomBoxViewModel(),
+        new InfiniteCanvasViewModel(),
         new TilesViewModel(),
         new InstancingViewModel(),
         new TransformsViewModel(),

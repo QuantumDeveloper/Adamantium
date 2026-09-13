@@ -58,6 +58,7 @@
         <StyleInclude Source="{x:Type mac:MacOsToolTipStyleSet}"/>
         <StyleInclude Source="{x:Type mac:MacOsKeyTipAdornerStyleSet}"/>
         <StyleInclude Source="{x:Type mac:MacOsZoomBoxStyleSet}"/>
+        <StyleInclude Source="{x:Type mac:MacOsInfiniteCanvasStyleSet}"/>
         <StyleInclude Source="{x:Type mac:MacOsTilesHostStyleSet}"/>
         <StyleInclude Source="{x:Type mac:MacOsFlipTileStyleSet}"/>
         <StyleInclude Source="{x:Type mac:MacOsGridSplitterStyleSet}"/>
