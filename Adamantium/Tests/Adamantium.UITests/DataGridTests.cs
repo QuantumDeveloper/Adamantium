@@ -1637,6 +1637,7 @@ public class DataGridTests
         public string Name { get; set; }
         public int Count { get; set; }
         public bool Done { get; set; }
+        public bool? Flag { get; set; }
         public bool Locked { get; set; }
         public ObservableCollection<Editable> Children { get; } = new();
     }
@@ -1655,6 +1656,42 @@ public class DataGridTests
         grid.ItemsSource = items;
         Relayout(grid);
         return (grid, items);
+    }
+
+    // A cell's template is built OVER its content, and nothing at all is built over null - not the display, and not
+    // the editor either. Reported from the stand: a record added through the strip left its other members unset, and
+    // opening one of those cells showed no drop-down whatsoever.
+    [Test]
+    public void ACellOverAnUnsetMember_StillHasSomethingToBuildOver()
+    {
+        var items = new List<Editable> { new() { Name = null, Flag = null } };
+        var grid = Grid(
+            new DataGridTextColumn { Binding = new Binding("Name"), Width = new GridLength(100) },
+            new DataGridCheckBoxColumn { Binding = new Binding("Flag"), Width = new GridLength(60) });
+        grid.ItemsSource = items;
+        Relayout(grid);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(grid.CellFor(0, 0)?.Content, Is.EqualTo(string.Empty), "empty, never null");
+            Assert.That(grid.CellFor(0, 1)?.Content, Is.EqualTo(false), "and the box of nothing is unticked, not \"\"");
+        });
+    }
+
+    // A cell is a CARRIER: the table has a handful of them and points each at one row after another. Pointed at a
+    // record that holds nothing there, it has to stop showing what the last record held - on the stand a record added
+    // at the end came up wearing the name, owner and region of whichever row its container had been.
+    [Test]
+    public void ACellPointedAtARecordWithNothingThere_StopsShowingTheLastOne()
+    {
+        var (grid, _) = EditableGrid();
+        var cell = grid.CellFor(0, 0);
+
+        Assert.That(cell.Content, Is.EqualTo("one"), "the record it starts on");
+
+        cell.Attach(grid.Columns[0], 0, new Editable());
+
+        Assert.That(cell.Content, Is.EqualTo(string.Empty), "and nothing of it once it is pointed elsewhere");
     }
 
     [Test]
@@ -3030,6 +3067,213 @@ public class DataGridTests
         Assert.That(grid.ShowSearchPanel, Is.True, "nothing was left masking the binding");
     }
 
+    // Everything, as ONE rectangle: the selection is kept as ranges, and a range per row would buy ten thousand of them
+    // for one keystroke.
+    [Test]
+    public void CtrlA_TakesTheWholeTable_AsOneRectangle()
+    {
+        var grid = GroupableGrid(6);
+        Relayout(grid);
+
+        grid.SelectAll();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(grid.SelectedCells.Ranges, Has.Count.EqualTo(1));
+            Assert.That(grid.SelectedCells.Contains(0, 0), Is.True);
+            Assert.That(grid.SelectedCells.Contains(grid.Rows.Count - 1, grid.Columns.Count - 1), Is.True);
+        });
+    }
+
+    // The ACTIVE frame walks inside the block and leaves it alone - that separation is the point of having a frame:
+    // Enter goes down a column of a rectangle already taken without losing the rectangle.
+    [Test]
+    public void Enter_StepsTheFrameDown_AndLeavesATakenBlockAlone()
+    {
+        var grid = GroupableGrid(6);
+        Relayout(grid);
+        grid.SelectCell(1, 0);
+        grid.SelectCell(3, 1, extend: true);
+
+        Assert.That(grid.StepActiveRow(1), Is.True);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(grid.ActiveRow, Is.EqualTo(4), "the frame moved");
+            Assert.That(grid.SelectedCells.Contains(1, 0), Is.True, "and the block it was taken from stands");
+            Assert.That(grid.SelectedCells.Contains(3, 1), Is.True);
+        });
+    }
+
+    // One cell is not a block: there the frame and the selection are the same thing and travel together.
+    [Test]
+    public void Enter_OnASingleCell_TakesTheCellItLandsOn()
+    {
+        var grid = GroupableGrid(6);
+        Relayout(grid);
+        grid.SelectCell(1, 1);
+
+        grid.StepActiveRow(1);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(grid.ActiveRow, Is.EqualTo(2));
+            Assert.That(grid.SelectedCells.Contains(2, 1), Is.True);
+            Assert.That(grid.SelectedCells.Contains(1, 1), Is.False, "and lets go of the one it left");
+        });
+    }
+
+    [Test]
+    public void Enter_AtTheLastRow_StaysThereAndSpendsTheKey()
+    {
+        var grid = GroupableGrid(4);
+        Relayout(grid);
+        var last = grid.Rows.Count - 1;
+        grid.SelectCell(last, 0);
+
+        Assert.That(grid.StepActiveRow(1), Is.True, "the key was aimed at the table either way");
+        Assert.That(grid.ActiveRow, Is.EqualTo(last));
+    }
+
+    // What is recorded is the CHANGE, not the gesture: an editor, a paste and a placeholder all arrive at the same
+    // write and come back the same way.
+    [Test]
+    public void AnEdit_ComesBack_AndGoesAgain()
+    {
+        var (grid, items) = EditableGrid();
+
+        grid.BeginEdit(0, 0);
+        grid.CellFor(0, 0).EditedValue = "changed";
+        grid.CommitEdit();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(items[0].Name, Is.EqualTo("changed"));
+            Assert.That(grid.CanUndo, Is.True);
+            Assert.That(grid.CanRedo, Is.False);
+        });
+
+        Assert.That(grid.Undo(), Is.True);
+        Assert.That(items[0].Name, Is.EqualTo("one"), "back to what the record held");
+
+        Assert.That(grid.Redo(), Is.True);
+        Assert.That(items[0].Name, Is.EqualTo("changed"));
+    }
+
+    // A paste of a block is ONE act: one paste is one thing the user did, and one Ctrl+Z is what they reach for.
+    [Test]
+    public void APastedBlock_ComesBackInOne()
+    {
+        var (grid, items) = EditableGrid();
+        grid.SelectCell(0, 0);
+        OnClipboard("first\t10\nsecond\t20");
+
+        Assert.That(grid.PasteSelection(), Is.True);
+        Assert.That(items[1].Name, Is.EqualTo("second"));
+
+        Assert.That(grid.Undo(), Is.True);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(items[0].Name, Is.EqualTo("one"));
+            Assert.That(items[0].Count, Is.EqualTo(1));
+            Assert.That(items[1].Name, Is.EqualTo("two"), "the whole block, not its last cell");
+            Assert.That(items[1].Count, Is.EqualTo(2));
+            Assert.That(grid.CanUndo, Is.False, "and it was one act");
+        });
+    }
+
+    // Undoing an act does not record the reversal - otherwise the history buries the act under the undoing of it and
+    // a second Ctrl+Z does the change again.
+    [Test]
+    public void Undoing_IsNotItselfRecorded()
+    {
+        var (grid, items) = EditableGrid();
+        grid.BeginEdit(0, 0);
+        grid.CellFor(0, 0).EditedValue = "changed";
+        grid.CommitEdit();
+
+        grid.Undo();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(grid.CanUndo, Is.False);
+            Assert.That(grid.Undo(), Is.False);
+            Assert.That(items[0].Name, Is.EqualTo("one"));
+        });
+    }
+
+    // Doing something new throws away what was taken back: the table went one way, and the other way no longer leads
+    // anywhere it has been.
+    [Test]
+    public void ANewAct_ThrowsAwayWhatWasTakenBack()
+    {
+        var (grid, items) = EditableGrid();
+        grid.BeginEdit(0, 0);
+        grid.CellFor(0, 0).EditedValue = "first";
+        grid.CommitEdit();
+        grid.Undo();
+
+        Assert.That(grid.CanRedo, Is.True);
+
+        grid.BeginEdit(0, 0);
+        grid.CellFor(0, 0).EditedValue = "second";
+        grid.CommitEdit();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(grid.CanRedo, Is.False);
+            Assert.That(items[0].Name, Is.EqualTo("second"));
+        });
+    }
+
+    // A record put back goes back WHERE it was: at the end of the list it is not the record that was taken out of the
+    // middle of it.
+    [Test]
+    public void ADeletedRow_ComesBackWhereItWas()
+    {
+        var items = new ObservableCollection<Editable>
+        {
+            new() { Name = "one" }, new() { Name = "two" }, new() { Name = "three" }
+        };
+
+        var grid = Grid(new DataGridTextColumn { Binding = new Binding("Name"), Width = new GridLength(100) });
+        grid.ItemsSource = items;
+        grid.CanUserDeleteRows = true;
+        Relayout(grid);
+
+        var middle = items[1];
+        Assert.That(grid.DeleteRow(1), Is.True);
+        Assert.That(items, Has.Count.EqualTo(2));
+
+        Assert.That(grid.Undo(), Is.True);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(items, Has.Count.EqualTo(3));
+            Assert.That(items[1], Is.SameAs(middle), "back in the middle, not appended");
+        });
+    }
+
+    // Zero is the honest way to say no to a history: nothing is kept AND nothing is recorded, rather than a list
+    // nobody can reach.
+    [Test]
+    public void ALimitOfZero_RecordsNothingAtAll()
+    {
+        var (grid, items) = EditableGrid();
+        grid.UndoLimit = 0;
+
+        grid.BeginEdit(0, 0);
+        grid.CellFor(0, 0).EditedValue = "changed";
+        grid.CommitEdit();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(items[0].Name, Is.EqualTo("changed"), "the write still happened");
+            Assert.That(grid.CanUndo, Is.False);
+        });
+    }
+
     private static void PressKey(TreeDataGrid grid, Key key) =>
         grid.RaiseEvent(new KeyEventArgs(KeyboardDevice.CurrentDevice, key, InputModifiers.None, 0)
         {
@@ -3614,6 +3858,33 @@ public class DataGridTests
 
         grid.ExpandRow(grid.Rows[0]);
         Assert.That(grid.TotalFor(grid.Columns[1]), Is.EqualTo(10.0), "and opening the branch does not change it");
+    }
+
+    // A total is over the whole SET, and adding a row changes the set. The rows themselves arrive through the
+    // collection's own notification and the totals were left behind with them - on the stand the footer went on saying
+    // ten thousand after a record had been added. Paid in the LAYOUT pass and not per notification: the walk reads
+    // every row, and a source that announces a hundred additions one at a time must not buy a hundred walks.
+    [Test]
+    public void AddingARow_BringsTheTotalsWithIt_AndPaysForThemOnce()
+    {
+        var items = new ObservableCollection<Row>(Flat(4));
+        var grid = Grid(
+            new DataGridTextColumn { Binding = new Binding("Region"), Width = new GridLength(100) },
+            new DataGridTextColumn { Binding = new Binding("Size"), Width = new GridLength(100) });
+        grid.ItemsSource = items;
+        grid.Columns[1].Aggregate = DataGridAggregate.Sum;
+        Relayout(grid);
+
+        Assert.That(grid.TotalFor(grid.Columns[1]), Is.EqualTo(10.0), "1+2+3+4");
+
+        items.Add(new Row { Name = "Item 5", Region = "south", Size = 5 });
+        items.Add(new Row { Name = "Item 6", Region = "north", Size = 6 });
+
+        Assert.That(grid.TotalFor(grid.Columns[1]), Is.EqualTo(10.0), "not yet - neither add walked the rows");
+
+        Relayout(grid);
+
+        Assert.That(grid.TotalFor(grid.Columns[1]), Is.EqualTo(21.0), "and ONE walk answered for both");
     }
 
     // What the table totals is what its groups total between them - one population, counted once, however it is cut up.
@@ -4643,6 +4914,436 @@ public class DataGridTests
         grid.RefreshRealizedRows();
 
         Assert.That(RowAt(grid, 1).CellAt(1).State, Is.EqualTo("Warning"));
+    }
+
+    private static void Type(TreeDataGrid grid, string text) =>
+        grid.RaiseEvent(new TextInputEventArgs(text) { RoutedEvent = Keyboard.TextInputEvent });
+
+    // How every spreadsheet has always worked, and the difference between a table you can fill in and one you have to
+    // be shown how to fill in.
+    [Test]
+    public void TypingOnACell_OpensItsEditor_WithWhatWasTyped()
+    {
+        var (grid, _) = EditableGrid();
+        grid.SelectCell(0, 0);
+
+        Type(grid, "R");
+        Relayout(grid, grid.CellFor(0, 0));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(grid.IsEditing, Is.True);
+            Assert.That(grid.EditingRow, Is.EqualTo(0));
+            Assert.That(grid.EditingColumn, Is.EqualTo(0));
+        });
+    }
+
+    // It REPLACES what the cell held: typing over a value is how a value is replaced everywhere else, and an editor
+    // that kept the old one and appended would spell nonsense.
+    [Test]
+    public void WhatWasTyped_ReplacesWhatTheCellHeld()
+    {
+        var (grid, items) = EditableGrid();
+        grid.SelectCell(0, 0);
+
+        Type(grid, "R");
+        Relayout(grid, grid.CellFor(0, 0));
+        grid.CommitEdit();
+
+        Assert.That(items[0].Name, Is.EqualTo("R"), "not \"oneR\"");
+    }
+
+    // A control character is not something to type INTO a cell - it is something the table itself answers.
+    [Test]
+    public void AControlCharacter_OpensNothing()
+    {
+        var (grid, _) = EditableGrid();
+        grid.SelectCell(0, 0);
+
+        Type(grid, "\t");
+
+        Assert.That(grid.IsEditing, Is.False);
+    }
+
+    // Already editing, the characters belong to the editor - the grid must not open a second one under it.
+    [Test]
+    public void TypingWhileEditing_IsTheEditorsBusiness()
+    {
+        var (grid, _) = EditableGrid();
+        grid.SelectCell(0, 0);
+        grid.BeginEdit(0, 1);
+
+        Type(grid, "x");
+
+        Assert.That(grid.EditingColumn, Is.EqualTo(1), "the open editor stands");
+    }
+
+    private static DataGridNewRowPresenter NewRow(TreeDataGrid grid)
+    {
+        var strip = new DataGridNewRowPresenter { Owner = grid };
+        strip.Measure(new Size(400, 26));
+        strip.Arrange(new Rect(0, 0, 400, 26));
+        return strip;
+    }
+
+    // OUTSIDE the list, which is the whole point of it being a strip: the table keeps exactly the rows its source has,
+    // so nothing has to be kept out of the sort, the filters, the totals, the file or the clipboard.
+    [Test]
+    public void TheNewRowStrip_AddsNoRowAndNoRecord()
+    {
+        var (grid, items) = EditableGrid();
+        grid.ShowNewItemRow = true;
+        var strip = NewRow(grid);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(grid.Rows.Count, Is.EqualTo(2), "the table still has what its source has");
+            Assert.That(items.Count, Is.EqualTo(2));
+            Assert.That(strip.CellAt(0), Is.Not.Null, "and the strip has a field per column");
+        });
+    }
+
+    // The record is made on the COMMIT, not a keystroke earlier: typing something and thinking better of it has to
+    // leave nothing behind.
+    [Test]
+    public void TypingIntoTheStrip_MakesTheRecord_OnCommit()
+    {
+        var (grid, items) = EditableGrid();
+        grid.ShowNewItemRow = true;
+        var strip = NewRow(grid);
+
+        Assert.That(strip.Begin(0), Is.True, "the field opens");
+        strip.CellAt(0).EditedValue = "made here";
+
+        Assert.That(items.Count, Is.EqualTo(2), "still nothing - it is only being typed");
+
+        Assert.That(grid.CommitEdit(), Is.True, "and the table's own CommitEdit answers for the strip");
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(items.Count, Is.EqualTo(3));
+            Assert.That(items[2].Name, Is.EqualTo("made here"));
+            Assert.That(strip.IsEditing, Is.False, "the strip is empty again, ready for the next");
+        });
+    }
+
+    [Test]
+    public void LeavingTheStrip_WithoutCommitting_MakesNothing()
+    {
+        var (grid, items) = EditableGrid();
+        grid.ShowNewItemRow = true;
+        var strip = NewRow(grid);
+
+        strip.Begin(0);
+        strip.CellAt(0).EditedValue = "never mind";
+        grid.CancelEdit();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(items.Count, Is.EqualTo(2));
+            Assert.That(strip.IsEditing, Is.False);
+        });
+    }
+
+    // A field's Content is EMPTY, never null: a cell's template is a DataTemplate over its Content, so null builds
+    // nothing at all - the editor included, and the typing would go nowhere.
+    [Test]
+    public void AStripField_HoldsSomethingForItsTemplateToBuild()
+    {
+        var (grid, _) = EditableGrid();
+        grid.ShowNewItemRow = true;
+        grid.NewRowHint = "add one";
+        var strip = NewRow(grid);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(strip.CellAt(0).Content, Is.EqualTo("add one"), "the hint on the first column shown");
+            Assert.That(strip.CellAt(1).Content, Is.EqualTo(string.Empty), "and empty, not null, on the rest");
+        });
+    }
+
+    // Escape ends the strip's edit the same way it ends the table's. It used to be asked of the table's own IsEditing
+    // alone, which is FALSE while the strip holds the edit, so the key fell through to nothing and the record was made
+    // by the focus loss that followed.
+    [Test]
+    public void Escape_EndsTheStripsEditToo()
+    {
+        var (grid, items) = EditableGrid();
+        grid.ShowNewItemRow = true;
+        var strip = NewRow(grid);
+
+        strip.Begin(0);
+        strip.CellAt(0).EditedValue = "never mind";
+
+        PressKey(grid, Key.Escape);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(strip.IsEditing, Is.False);
+            Assert.That(items.Count, Is.EqualTo(2), "and nothing was made on the way out");
+        });
+    }
+
+    // A choice from a list is a VALUE, not a decision to create one. Reported from the stand: picking an owner in the
+    // strip made a record there and then, so walking down the list left one behind at every step.
+    [Test]
+    public void ChoosingFromAList_InTheStrip_MakesNothingUntilTheCommit()
+    {
+        var (grid, items) = EditableGrid();
+        grid.ShowNewItemRow = true;
+        var strip = NewRow(grid);
+
+        strip.Begin(0);
+        strip.CellAt(0).EditedValue = "picked";
+
+        grid.FinishEditOnChoice();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(items.Count, Is.EqualTo(2), "the choice made nothing");
+            Assert.That(strip.IsEditing, Is.True, "and the field still stands, holding it");
+        });
+
+        Assert.That(grid.CommitEdit(), Is.True);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(items.Count, Is.EqualTo(3), "the commit is what makes the record");
+            Assert.That(items[2].Name, Is.EqualTo("picked"), "and it kept what was chosen");
+        });
+    }
+
+    // In a cell of the table the row already exists and the choice IS the whole edit, so it saves.
+    [Test]
+    public void ChoosingFromAList_InTheTable_SavesTheCell()
+    {
+        var (grid, items) = EditableGrid();
+        grid.BeginEdit(0, 0);
+        grid.CellFor(0, 0).EditedValue = "picked";
+
+        grid.FinishEditOnChoice();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(items[0].Name, Is.EqualTo("picked"));
+            Assert.That(grid.IsEditing, Is.False);
+        });
+    }
+
+    // Focus leaving a cell of the TABLE saves it - the row is there and the value is an edit of it. Focus leaving the
+    // strip creates nothing: a record that appears because someone clicked elsewhere is worse than a few keystrokes.
+    // It does not throw the strip away either - a CLICK on the next field moves the focus before it opens anything, so
+    // discarding here emptied the strip on the way to the very field being reached for.
+    [Test]
+    public void FocusLeavingTheStrip_MakesNothing_AndKeepsWhatWasTyped()
+    {
+        var (grid, items) = EditableGrid();
+        grid.ShowNewItemRow = true;
+        var strip = NewRow(grid);
+
+        strip.Begin(0);
+        strip.CellAt(0).EditedValue = "clicked away";
+
+        grid.FinishEditOnFocusLoss();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(items.Count, Is.EqualTo(2), "nothing was made");
+            Assert.That(strip.IsEditing, Is.False, "the field is closed");
+            Assert.That(strip.CellAt(0).Content, Is.EqualTo("clicked away"), "and what went in it is still there");
+        });
+    }
+
+    // Escape is the one that empties it - that is what "never mind" has to mean, and it has to mean it for the whole
+    // strip and not just the field standing open.
+    [Test]
+    public void Escape_EmptiesTheWholeStrip()
+    {
+        var (grid, _) = EditableGrid();
+        grid.ShowNewItemRow = true;
+        grid.NewRowHint = "add one";
+        var strip = NewRow(grid);
+
+        strip.Begin(0);
+        strip.CellAt(0).EditedValue = "never mind";
+        grid.FinishEditOnFocusLoss();
+
+        grid.CancelEdit();
+
+        Assert.That(strip.CellAt(0).Content, Is.EqualTo("add one"), "back to the hint, holding nothing");
+    }
+
+    [Test]
+    public void FocusLeavingACellOfTheTable_StillSavesIt()
+    {
+        var (grid, items) = EditableGrid();
+        grid.BeginEdit(0, 0);
+        grid.CellFor(0, 0).EditedValue = "kept";
+
+        grid.FinishEditOnFocusLoss();
+
+        Assert.That(items[0].Name, Is.EqualTo("kept"));
+    }
+
+    // A field of the strip shows NONE of the column's display template. Over a record that does not exist it draws a
+    // live-looking control - on the stand a tick box came out bright and half-set - that reads as part of the table and
+    // answers to nothing.
+    [Test]
+    public void AStripField_ShowsNoneOfTheColumnsTemplate()
+    {
+        var items = new List<Editable> { new() { Name = "one" } };
+        var grid = Grid(
+            new DataGridTextColumn { Binding = new Binding("Name"), Width = new GridLength(100) },
+            new DataGridCheckBoxColumn { Binding = new Binding("Done"), Width = new GridLength(60) });
+        grid.ItemsSource = items;
+        grid.ShowNewItemRow = true;
+        Relayout(grid);
+
+        var strip = NewRow(grid);
+        var box = grid.Columns[1];
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(strip.CellAt(1).ContentTemplate, Is.Null, "no box over a record that does not exist");
+            Assert.That(grid.CellFor(0, 1)?.ContentTemplate, Is.Not.Null, "while a real row still draws one");
+        });
+
+        strip.Begin(1);
+
+        Assert.That(strip.CellAt(1).ContentTemplate, Is.Not.Null, "and the field builds its editor once opened");
+        Assert.That(box.IsReadOnly, Is.False);
+    }
+
+    // Filling a record in IS moving between its fields. The strip only ever knew the one standing open, so choosing an
+    // owner threw away the code that had just been typed and the record came out holding whichever field was last.
+    [Test]
+    public void TheStrip_KeepsEveryFieldFilledIn_NotOnlyTheOneOpen()
+    {
+        var (grid, items) = EditableGrid();
+        grid.ShowNewItemRow = true;
+        var strip = NewRow(grid);
+
+        strip.Begin(0);
+        strip.CellAt(0).EditedValue = "both";
+        strip.Begin(1);
+        strip.CellAt(1).EditedValue = 7;
+
+        Assert.That(strip.CellAt(0).Content, Is.EqualTo("both"), "the field left behind still shows what went in it");
+
+        Assert.That(grid.CommitEdit(), Is.True);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(items[2].Name, Is.EqualTo("both"));
+            Assert.That(items[2].Count, Is.EqualTo(7), "and BOTH reached the record");
+        });
+    }
+
+    // An editor is built OVER the cell's content - PrepareEditor is handed exactly that - so a field re-opened on an
+    // empty content came up empty and threw away what had already been typed into it. Going back to a field is what
+    // correcting a typo IS.
+    [Test]
+    public void AStripField_OpenedAgain_StillHoldsWhatWasTypedInIt()
+    {
+        var (grid, _) = EditableGrid();
+        grid.ShowNewItemRow = true;
+        var strip = NewRow(grid);
+
+        strip.Begin(0);
+        strip.CellAt(0).EditedValue = "typed once";
+        strip.Begin(1);
+        strip.Begin(0);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(strip.CellAt(0).IsEditing, Is.True, "open again");
+            Assert.That(strip.CellAt(0).Content, Is.EqualTo("typed once"), "and the editor is built over what is there");
+        });
+    }
+
+    // Tab is the next CELL, not the next control: left to the ordinary tab order it stepped out of the table
+    // altogether, taking a half-filled record with it.
+    [Test]
+    public void Tab_WalksTheStripsFields_AndKeepsWhatIsInThem()
+    {
+        var (grid, _) = EditableGrid();
+        grid.ShowNewItemRow = true;
+        var strip = NewRow(grid);
+
+        strip.Begin(0);
+        strip.CellAt(0).EditedValue = "kept";
+
+        Assert.That(grid.StepCell(1), Is.True);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(strip.CellAt(1).IsEditing, Is.True, "the next field is the one open");
+            Assert.That(strip.CellAt(0).Content, Is.EqualTo("kept"));
+        });
+
+        Assert.That(grid.StepCell(-1), Is.True);
+        Assert.That(strip.CellAt(0).IsEditing, Is.True, "and it walks back");
+    }
+
+    // A field that has been filled in shows its value the way its COLUMN shows values. Tabbing past a tick box left the
+    // strip reading "False" in words, because a placeholder deliberately wears none of the column's template - which is
+    // right only while it stands for nothing.
+    [Test]
+    public void AFilledStripField_ShowsItsValueTheWayTheColumnDoes()
+    {
+        var items = new List<Editable> { new() { Name = "one" } };
+        var grid = Grid(
+            new DataGridTextColumn { Binding = new Binding("Name"), Width = new GridLength(100) },
+            new DataGridCheckBoxColumn { Binding = new Binding("Done"), Width = new GridLength(60) });
+        grid.ItemsSource = items;
+        grid.ShowNewItemRow = true;
+        Relayout(grid);
+
+        var strip = NewRow(grid);
+
+        strip.Begin(1);
+        strip.CellAt(1).EditedValue = true;
+        strip.Begin(0);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(strip.CellAt(1).Content, Is.EqualTo(true), "the value it was given");
+            Assert.That(strip.CellAt(1).ContentTemplate, Is.Not.Null, "drawn as a box, not as the word for one");
+        });
+    }
+
+    [Test]
+    public void Tab_WalksTheTablesCells_AndWrapsIntoTheNextRow()
+    {
+        var (grid, _) = EditableGrid();
+        grid.SelectCell(0, 0);
+
+        grid.StepCell(1);
+        Assert.Multiple(() =>
+        {
+            Assert.That(grid.ActiveRow, Is.EqualTo(0));
+            Assert.That(grid.ActiveColumn, Is.EqualTo(1));
+        });
+
+        grid.StepCell(1);
+        Assert.Multiple(() =>
+        {
+            Assert.That(grid.ActiveRow, Is.EqualTo(1), "past the last column is the next row");
+            Assert.That(grid.ActiveColumn, Is.EqualTo(0));
+        });
+    }
+
+    // A column that refuses edits refuses them here too - there is no reason a table would let a value be typed into a
+    // field it will not take.
+    [Test]
+    public void AReadOnlyColumn_TakesNoNewRecordEither()
+    {
+        var (grid, _) = EditableGrid();
+        grid.Columns[0].IsReadOnly = true;
+        grid.ShowNewItemRow = true;
+        var strip = NewRow(grid);
+
+        Assert.That(strip.Begin(0), Is.False);
     }
 
     private static void OnClipboard(string text) => Adamantium.UI.Core.Input.Clipboard.SetText(text);

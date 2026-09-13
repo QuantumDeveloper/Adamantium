@@ -22,7 +22,7 @@
                             BorderThickness="{TemplateBinding BorderThickness}"
                             CornerRadius="{TemplateBinding CornerRadius}"
                             ClipToBounds="True">
-                        <Grid RowDefinitions="Auto,Auto,Auto,*,Auto" ColumnDefinitions="*,Auto">
+                        <Grid RowDefinitions="Auto,Auto,Auto,*,Auto,Auto" ColumnDefinitions="*,Auto">
                             <!-- The search strip, at the very top: it speaks about the WHOLE table, grouping and all. -->
                             <DataGridSearchPanel x:Name="PART_SearchPanel" Grid.Row="0" Grid.ColumnSpan="2"
                                                  Visibility="Collapsed"/>
@@ -86,7 +86,17 @@
                             <!-- The totals. Outside the vertical scroller for the same reason the header is: a total
                                  belongs to the whole table, so it must not scroll away from it. It DOES follow the
                                  columns sideways, which the strip does for itself. -->
-                            <Border x:Name="PART_FooterBand" Grid.Row="4" Grid.ColumnSpan="2" Visibility="Collapsed"
+                            <!-- The strip a new record is typed into, ABOVE the totals and outside the vertical
+                                 scroller: it is not one of the rows, and nobody should have to scroll ten thousand of
+                                 them to add one. -->
+                            <Border x:Name="PART_NewRowBand" Grid.Row="4" Grid.ColumnSpan="2" Visibility="Collapsed"
+                                    Background="{TemplateBinding Background}"
+                                    BorderBrush="{ObservableResource DataGridLineColor}"
+                                    BorderThickness="0 1 0 0">
+                                <DataGridNewRowPresenter x:Name="PART_NewRow" Height="{TemplateBinding RowHeight}"/>
+                            </Border>
+
+                            <Border x:Name="PART_FooterBand" Grid.Row="5" Grid.ColumnSpan="2" Visibility="Collapsed"
                                     Background="{ObservableResource SolidBackgroundFillColorTertiary}"
                                     BorderBrush="{ObservableResource DataGridLineColor}"
                                     BorderThickness="0 1 0 0">
@@ -114,6 +124,9 @@
                         <!-- The band exists exactly while some column asks for a total - see TreeDataGrid.HasTotals. -->
                         <PropertyTrigger Property="HasTotals" Value="true">
                             <Setter TargetName="PART_FooterBand" Property="Visibility" Value="Visible"/>
+                        </PropertyTrigger>
+                        <PropertyTrigger Property="ShowNewItemRow" Value="true">
+                            <Setter TargetName="PART_NewRowBand" Property="Visibility" Value="Visible"/>
                         </PropertyTrigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
@@ -384,6 +397,25 @@
         </Setter>
     </Style>
 
+    <!-- An editor INSIDE A CELL, and only there - see Fluent's set for why. -->
+    <Style Selector="TextBox.DataGridEditor">
+        <Setter Property="CornerRadius" Value="0"/>
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="Padding" Value="8 0"/>
+        <Setter Property="MinWidth" Value="0"/>
+        <Setter Property="MinHeight" Value="0"/>
+        <Setter Property="VerticalAlignment" Value="Stretch"/>
+        <Setter Property="VerticalContentAlignment" Value="Center"/>
+    </Style>
+
+    <!-- The list keeps its own padding - see Fluent's set. -->
+    <Style Selector="DropDown.DataGridEditor">
+        <Setter Property="CornerRadius" Value="0"/>
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="MinWidth" Value="0"/>
+        <Setter Property="MinHeight" Value="0"/>
+    </Style>
+
     <Style Selector="DataGridCell">
         <Setter Property="Foreground" Value="{ObservableResource TextFillColorPrimary}"/>
         <Setter Property="FontSize" Value="{ResourceReference FontSizeBody}"/>
@@ -500,6 +532,8 @@
                              otherwise squeeze the field, and a drop-down loses more of its width than it can spare. -->
                         <PropertyTrigger Property="IsEditing" Value="true">
                             <Setter TargetName="CellBorder" Property="Padding" Value="0"/>
+                            <!-- ...the whole of it, top to bottom - see Fluent's set. -->
+                            <Setter TargetName="PART_ContentPresenter" Property="VerticalAlignment" Value="Stretch"/>
                         </PropertyTrigger>
                         <!-- What the view-model called an error. A MEANING from the model, a colour from here. -->
                         <!-- The three meanings a table normally distinguishes. A column states them through

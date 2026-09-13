@@ -247,6 +247,7 @@ public class DataGridCell : ContentControl
         cell.DetachEditor();
         cell.ContentTemplate = cell.IsEditing
             ? cell.Column.EditingTemplate ?? cell.Column.DisplayTemplate
+            : cell.IsPlaceholder ? null
             : cell.Column.DisplayTemplate;
         cell._pendingEditorFocus = cell.IsEditing;
         cell.ClipToBounds = cell.IsEditing;
@@ -258,13 +259,60 @@ public class DataGridCell : ContentControl
 
     internal object ValueForCommit() => EditedValue ?? Column?.ReadEditor(_editor) ?? Content;
 
+    /// <summary>What the user typed to OPEN this editor. It is the edited VALUE from the moment it is typed - the
+    /// editor is only the view of it, and it is built by the template swap this edit asks for and arrives a layout pass
+    /// later. Written through here rather than into the editor so that the character is not lost in between: a commit
+    /// in that gap would otherwise write back the value the typing was replacing.</summary>
+    internal string PendingText
+    {
+        get => _pendingText;
+        set
+        {
+            _pendingText = value;
+            if (value is { Length: > 0 }) EditedValue = value;
+        }
+    }
+
+    private string _pendingText;
+
+    // A field of the strip for a record that does not exist yet, rather than a cell of a row. It stands for nothing
+    // until someone types in it, and shows nothing until then.
+    internal bool IsPlaceholder { get; set; }
+
     private void AttachEditor()
     {
-        _pendingEditorFocus = false;
         _editor = FindEditor(this);
+
+        // Not found is NOT "there is none": the editing template is swapped in by this very edit, and its content can
+        // be built a pass later than the arrange that first asks for it. Giving up here left an editor the user could
+        // see and type into but that the cell did not know about - no Enter, no value on commit. The flag stays up and
+        // the next arrange asks again; it comes down by itself when the edit ends.
         if (_editor == null) return;
 
+        _pendingEditorFocus = false;
+
         Column?.PrepareEditor(_editor, Item, Content);
+
+        // ...and what the user typed REPLACES what the editor was prepared with: typing over a cell is how a value is
+        // replaced everywhere else, and an editor that kept the old value and appended would spell nonsense.
+        if (PendingText is { Length: > 0 } seed && _editor is Text.TextBoxBase typed)
+        {
+            typed.Text = seed;
+
+            // ...and the SELECTION has to be collapsed behind it. PrepareEditor selects the whole value so that typing
+            // replaces it - which is right when the editor is opened with F2, and here would have the NEXT character
+            // replace the one that opened it: five keys went in and "hello" came out "ello".
+            typed.SelectionLength = 0;
+            typed.SelectionStart = seed.Length;
+            typed.CaretIndex = seed.Length;
+
+            // ...and the seed stops being the answer the moment the editor holds it. EditedValue outranks the editor on
+            // a commit - that is how a template column writes back - so leaving the first character there made it the
+            // WHOLE value: five keys in, one character saved.
+            EditedValue = null;
+        }
+
+        PendingText = null;
         if (_editor is TextBox box) box.EnterPressed += OnEditorEnter;
 
         // A drop-down COMMITS ON CHOICE. Its list is a popup: opening it takes the focus off the editor, so the
@@ -300,12 +348,28 @@ public class DataGridCell : ContentControl
 
     private void OnEditorEnter(object sender, KeyEventArgs e)
     {
-        if (OwningGrid()?.CommitEdit() == true) e.Handled = true;
+        var back = (e.Modifiers & (InputModifiers.LeftShift | InputModifiers.RightShift)) != 0;
+        if (OwningGrid()?.FinishEditAndStep(back) == true) e.Handled = true;
+    }
+
+    protected override void OnPreviewKeyDown(KeyEventArgs e)
+    {
+        base.OnPreviewKeyDown(e);
+
+        // Enter says "this cell is done", and the TUNNEL is the only place it can say so before the editor spends the
+        // key on something else: a closed drop-down answers Enter by opening its list, so an edit made entirely of a
+        // choice had no way to be finished at all - the key just re-opened what the user had already chosen from. An
+        // OPEN list keeps the key, because there Enter is how a row is picked.
+        if (e.Handled || e.Key != Key.Enter || !IsEditing) return;
+        if (_editor is not DropDown { IsDropDownOpen: false }) return;
+
+        var back = (e.Modifiers & (InputModifiers.LeftShift | InputModifiers.RightShift)) != 0;
+        if (OwningGrid()?.FinishEditAndStep(back) == true) e.Handled = true;
     }
 
     private void OnEditorChosen(object sender, EventArgs e)
     {
-        if (IsEditing) OwningGrid()?.CommitEdit();
+        if (IsEditing) OwningGrid()?.FinishEditOnChoice();
     }
 
     private void OnEditorLostFocus(object sender, RoutedEventArgs e)
@@ -313,14 +377,18 @@ public class DataGridCell : ContentControl
         // ...and while that list is OPEN the focus is inside it, not gone from the cell: ending the edit here would
         // close the very list the user is choosing from.
         if (_editor is DropDown { IsDropDownOpen: true }) return;
-        if (IsEditing) OwningGrid()?.CommitEdit();
+        if (IsEditing) OwningGrid()?.FinishEditOnFocusLoss();
     }
 
     private TreeDataGrid OwningGrid()
     {
+        // A cell lives in a row or in the strip for the record that does not exist yet. Both are ASKED rather than
+        // guessed at: each holds the grid it belongs to, so a cell in a grid inside a cell cannot answer for the wrong
+        // one.
         for (IUIComponent node = this; node != null; node = node.VisualParent)
         {
             if (node is DataGridRow row) return row.Owner;
+            if (node is DataGridNewRowPresenter strip) return strip.Owner;
         }
 
         return null;
@@ -368,7 +436,12 @@ public class DataGridCell : ContentControl
         // The EDITING template has to survive this. Attach runs on every measure pass, not only on a rebind, so handing
         // the cell its plain template back here wiped the editor before it was ever built - editing looked implemented
         // and did nothing at all.
-        ContentTemplate = IsEditing ? column?.EditingTemplate ?? column?.DisplayTemplate : column?.DisplayTemplate;
+        // A PLACEHOLDER shows none of it until it is opened: a display template over a record that does not exist draws
+        // a live-looking control - the stand's tick box came out bright and half-set - that reads to the user as part
+        // of the table and answers to nothing.
+        ContentTemplate = IsEditing ? column?.EditingTemplate ?? column?.DisplayTemplate
+            : IsPlaceholder ? null
+            : column?.DisplayTemplate;
 
         Content = column?.CellContentFor(item);
         State = column?.StateFor(item);

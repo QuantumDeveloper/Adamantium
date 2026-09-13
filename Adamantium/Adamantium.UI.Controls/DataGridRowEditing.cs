@@ -72,8 +72,13 @@ public partial class TreeDataGrid
 
         if (indices.Count == 0 && ActiveRow >= 0) indices.Add(ActiveRow);
 
+        // ONE act, however many rows went: clearing a selection is one thing the user did.
+        _history.Begin();
+
         var removed = false;
         for (var i = indices.Count - 1; i >= 0; i--) removed |= DeleteRow(indices[i]);
+
+        _history.End();
 
         if (removed) SelectedCells.Clear();
         return removed;
@@ -93,7 +98,12 @@ public partial class TreeDataGrid
         RowDeleting?.Invoke(this, args);
         if (args.Cancel) return false;
 
+        // WHERE it was, not just what it was: a record put back at the end of the list is not the record that was taken
+        // out of the middle of it.
+        var at = owner.IndexOf(node);
         owner.Remove(node);
+        _history.Record(new DataGridRowEdit(owner, node, at, added: false));
+
         if (parent != null || owner is not System.Collections.Specialized.INotifyCollectionChanged) Refresh();
         return true;
     }
@@ -119,10 +129,43 @@ public partial class TreeDataGrid
         var item = args.NewItem ?? NewItemLike(index >= 0 ? rows[index].Node : FirstItem(owner));
         if (item == null) return null;
 
-        var at = index >= 0 ? owner.IndexOf(rows[index].Node) + 1 : owner.Count;
-        owner.Insert(Math.Clamp(at, 0, owner.Count), item);
+        var at = Math.Clamp(index >= 0 ? owner.IndexOf(rows[index].Node) + 1 : owner.Count, 0, owner.Count);
+        owner.Insert(at, item);
+        _history.Record(new DataGridRowEdit(owner, item, at, added: true));
 
         if (parent != null || owner is not System.Collections.Specialized.INotifyCollectionChanged) Refresh();
+        return item;
+    }
+
+    /// <summary>Makes the record the placeholder row was standing in for, writes what was just typed into it, and adds
+    /// it at the END of the top level - where the blank row was. Null when nothing was made: no mutable source, a
+    /// handler that refused, or an item type that cannot be built and was not supplied.
+    /// <para>The same RowAdding the Insert gesture raises, so an application answers for both in one place.</para>
+    /// </summary>
+    internal object CreateFromNewRow(IEnumerable<KeyValuePair<DataGridColumn, object>> values)
+    {
+        if (!CanUserAddRows || Roots(out _) is not { IsReadOnly: false } owner) return null;
+
+        var args = new DataGridRowEventArgs(null, null);
+        RowAdding?.Invoke(this, args);
+        if (args.Cancel) return null;
+
+        var item = args.NewItem ?? NewItemLike(FirstItem(owner));
+        if (item == null) return null;
+
+        // EVERY field that was filled in, and all of them BEFORE the record goes in. Added first, it would be sorted,
+        // filtered and grouped by what it does not hold yet, and then move again the moment it did - a record that
+        // lands twice in two places.
+        // Written STRAIGHT, not through the history: the record is not in the table yet, so there is nothing to take a
+        // value back to. Taking the record out again is what undoing this act means, and that is the one thing recorded.
+        foreach (var pair in values)
+        {
+            if (pair.Key?.Binding != null) pair.Key.Write(item, pair.Value);
+        }
+
+        owner.Add(item);
+        _history.Record(new DataGridRowEdit(owner, item, owner.Count - 1, added: true));
+        if (owner is not System.Collections.Specialized.INotifyCollectionChanged) Refresh();
         return item;
     }
 
