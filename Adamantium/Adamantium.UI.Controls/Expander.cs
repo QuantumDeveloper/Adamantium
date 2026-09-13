@@ -102,7 +102,10 @@ public class Expander : ContentControl
     {
         if (!CanCollapse && IsExpanded) return false;
 
-        IsExpanded = !IsExpanded;
+        // SetCurrentValue, NOT the CLR setter: a user's click must not write a LOCAL value, which outranks a binding
+        // and would leave the expander deaf to its own source ever after - which folding state bound to a view-model
+        // is exactly the case for. Mirrors ToggleButton.OnToggle and Slider.
+        SetCurrentValue(IsExpandedProperty, !IsExpanded);
         return true;
     }
 

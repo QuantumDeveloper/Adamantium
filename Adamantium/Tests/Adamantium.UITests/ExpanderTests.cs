@@ -1,4 +1,6 @@
+using System.ComponentModel;
 using Adamantium.UI.Controls;
+using Adamantium.UI.Core.Data;
 using Adamantium.UI.Core.Input;
 using NUnit.Framework;
 
@@ -94,5 +96,47 @@ public class ExpanderTests
     public void ItIsAKeyboardStop()
     {
         Assert.That(new Expander().Focusable, Is.True, "a header that answers Space has to be reachable by Tab");
+    }
+
+    private sealed class Fold : INotifyPropertyChanged
+    {
+        private bool _open;
+
+        public bool Open
+        {
+            get => _open;
+            set
+            {
+                _open = value;
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Open)));
+            }
+        }
+
+        public event PropertyChangedEventHandler PropertyChanged;
+    }
+
+    // Folding state belongs in a view-model: which groups an inspector has open is the user's, and it has to survive
+    // the panel being rebuilt. The binding is two-way by default, so the header carries the state BOTH ways - and it
+    // has to keep carrying it after the user has clicked, which is what a Local value written by the click would end.
+    [Test]
+    public void ItsFoldingStateBindsBothWays()
+    {
+        var model = new Fold();
+        var expander = new Expander { DataContext = model };
+        expander.SetBinding("IsExpanded", new Binding("Open"));
+
+        Assert.That(expander.IsExpanded, Is.False, "starts where the model is");
+
+        // Source changes are batched and applied on the frame's flush - see BindingBatchingTests.
+        model.Open = true;
+        BindingUpdateQueue.Flush();
+        Assert.That(expander.IsExpanded, Is.True, "the model opens it");
+
+        expander.Toggle();
+        Assert.That(model.Open, Is.False, "and a click writes back");
+
+        model.Open = true;
+        BindingUpdateQueue.Flush();
+        Assert.That(expander.IsExpanded, Is.True, "the model still moves it AFTER a click - the binding survived");
     }
 }

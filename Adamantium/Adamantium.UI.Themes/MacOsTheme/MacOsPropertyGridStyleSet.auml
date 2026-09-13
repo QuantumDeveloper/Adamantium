@@ -23,14 +23,49 @@
                             BorderThickness="1"
                             CornerRadius="7"
                             ClipToBounds="True">
-                        <!-- Pixel scrolling, not item scrolling - see Fluent's set: an item-scrolling viewer measured
-                             unbounded reports nothing, and the inspector loses its height. -->
-                        <ScrollViewer CanContentScroll="False"
-                                      HorizontalScrollBarVisibility="Disabled"
-                                      VerticalScrollBarVisibility="Auto">
-                            <StackPanel x:Name="PART_Sections" Orientation="Vertical"/>
-                        </ScrollViewer>
+                        <Grid RowDefinitions="Auto,*">
+                            <!-- Outside the viewer, so it stays put while the rows scroll; the cross sits ON the field
+                                 rather than beside it - see Fluent's set. -->
+                            <Grid Grid.Row="0" Margin="6 6 6 4">
+                                <TextBox x:Name="PART_Search"
+                                         Height="24" Padding="6 0 24 0"
+                                         Placeholder="Search properties"
+                                         Visibility="Collapsed"/>
+                                <!-- The theme's DRAWN cross, not a character - see Fluent's set. -->
+                                <Button x:Name="PART_ClearSearch"
+                                        Visibility="Collapsed"
+                                        Width="17" Height="17" MinWidth="0" MinHeight="0"
+                                        Padding="0" Margin="0 0 5 0"
+                                        HorizontalAlignment="Right" VerticalAlignment="Center"
+                                        ToolTipService.ToolTip="Clear the search (Esc)">
+                                    <Image Source="{ResourceReference CloseIcon}" Width="8" Height="8"
+                                           HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                </Button>
+                            </Grid>
+
+                            <!-- Pixel scrolling, not item scrolling - see Fluent's set: an item-scrolling viewer
+                                 measured unbounded reports nothing, and the inspector loses its height. -->
+                            <ScrollViewer Grid.Row="1"
+                                          CanContentScroll="False"
+                                          HorizontalScrollBarVisibility="Disabled"
+                                          VerticalScrollBarVisibility="Auto">
+                                <StackPanel x:Name="PART_Sections" Orientation="Vertical"/>
+                            </ScrollViewer>
+                        </Grid>
                     </Border>
+                    <ControlTemplate.Triggers>
+                        <PropertyTrigger Property="ShowSearch" Value="true">
+                            <Setter TargetName="PART_Search" Property="Visibility" Value="Visible"/>
+                        </PropertyTrigger>
+                        <!-- Only while there IS a search - see Fluent's set. -->
+                        <MultiTrigger>
+                            <MultiTrigger.Conditions>
+                                <Condition Property="ShowSearch" Value="true"/>
+                                <Condition Property="HasSearchText" Value="true"/>
+                            </MultiTrigger.Conditions>
+                            <Setter TargetName="PART_ClearSearch" Property="Visibility" Value="Visible"/>
+                        </MultiTrigger>
+                    </ControlTemplate.Triggers>
                 </ControlTemplate>
             </Setter.Value>
         </Setter>

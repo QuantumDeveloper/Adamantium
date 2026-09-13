@@ -2,7 +2,10 @@ using System.Collections;
 using System.Collections.Specialized;
 using Adamantium.UI.Controls.Base;
 using Adamantium.UI.Controls.Panels;
+using Adamantium.UI.Controls.Primitives;
+using Adamantium.UI.Controls.Text;
 using Adamantium.UI.Core;
+using Adamantium.UI.Core.Input;
 using Adamantium.UI.Core.RoutedEvents;
 
 namespace Adamantium.UI.Controls;
@@ -74,8 +77,28 @@ public class PropertyGrid : Control
         nameof(SectionsSource), typeof(IEnumerable), typeof(PropertyGrid),
         new PropertyMetadata(null, PropertyMetadataOptions.AffectsMeasure, OnSelectedObjectChanged));
 
+    /// <summary>Narrows the inspector to the properties whose name carries this, ignoring case. A section whose own
+    /// name carries it keeps all of its properties - asking for "Transform" means the whole of it.
+    /// <para>While it is set, a composite opens whether or not it was folded and so does a section holding a match:
+    /// a search that hides its own results behind something folded is worse than no search. Both go back to how the
+    /// user left them once it is cleared.</para></summary>
+    public static readonly AdamantiumProperty SearchTextProperty = AdamantiumProperty.Register(nameof(SearchText),
+        typeof(String), typeof(PropertyGrid), new PropertyMetadata(null, OnSearchTextChanged));
+
+    /// <summary>Whether the inspector carries its search field. An inspector of five rows does not need one.</summary>
+    public static readonly AdamantiumProperty ShowSearchProperty = AdamantiumProperty.Register(nameof(ShowSearch),
+        typeof(Boolean), typeof(PropertyGrid), new PropertyMetadata(true, PropertyMetadataOptions.AffectsMeasure));
+
+    /// <summary>Whether a search is running. The control keeps it; the theme reads it to show the button that drops
+    /// the search - a cross standing on an empty field would be offering to undo nothing.</summary>
+    public static readonly AdamantiumProperty HasSearchTextProperty = AdamantiumProperty.Register(
+        nameof(HasSearchText), typeof(Boolean), typeof(PropertyGrid), new PropertyMetadata(false));
+
     private readonly List<PropertyRow> _rows = new();
+    private readonly List<PropertySection> _openedBySearch = new();
     private Panel _host;
+    private TextBox _search;
+    private ButtonBase _clearSearch;
     private PropertyRow _selected;
 
     static PropertyGrid()
@@ -167,6 +190,34 @@ public class PropertyGrid : Control
         set => SetValue(MixedTextProperty, value);
     }
 
+    public String SearchText
+    {
+        get => GetValue<String>(SearchTextProperty);
+        set => SetValue(SearchTextProperty, value);
+    }
+
+    public Boolean ShowSearch
+    {
+        get => GetValue<Boolean>(ShowSearchProperty);
+        set => SetValue(ShowSearchProperty, value);
+    }
+
+    public Boolean HasSearchText
+    {
+        get => GetValue<Boolean>(HasSearchTextProperty);
+        set => SetValue(HasSearchTextProperty, value);
+    }
+
+    /// <summary>Drops the search and shows every property again. What Escape does, and what the cross in the field
+    /// does - one way out, whichever is reached for.</summary>
+    public void ClearSearch()
+    {
+        if (String.IsNullOrEmpty(SearchText)) return;
+
+        SearchText = null;
+        _search?.Focus();
+    }
+
 
     /// <summary>The row the pointer or the keyboard is on.</summary>
     public PropertyRow SelectedRow => _selected;
@@ -182,18 +233,71 @@ public class PropertyGrid : Control
         _host.Children.Clear();
         _rows.Clear();
 
+        var wanted = SearchText?.Trim();
+        var searching = !String.IsNullOrEmpty(wanted);
+
+        // The sections the search forced open are opened again from scratch every pass, so whatever is still in the
+        // list is a section the user had folded himself before this search started - give it back.
+        if (!searching) ReleaseOpened();
+
         foreach (var section in DisplayedSections())
         {
+            // A section named for what is being looked for keeps all of its properties: asking for "Transform" means
+            // the whole of it, not the one row that happens to repeat the word.
+            var whole = searching && Carries(section.Header as String, wanted);
             var rows = new StackPanel { Orientation = Orientation.Vertical };
 
             // A section may inspect something of its own; the rest follow the selection - all of it.
             var targets = section.Target != null ? new[] { section.Target } : Targets;
 
-            foreach (var definition in section.Properties) AddRow(rows, definition, targets, 0);
+            foreach (var definition in section.Properties)
+            {
+                AddRow(rows, definition, targets, 0, whole ? null : wanted);
+            }
 
+            // Assigned BEFORE the section may be dropped: a section left holding the rows of the last pass would keep
+            // answering with them long after the search stopped agreeing.
             section.Content = rows;
+
+            // A section with nothing in it is not an empty section, it is one the search has no answer from - and a
+            // column of empty headers reads as a result.
+            if (searching && rows.Children.Count == 0) continue;
+
             _host.Children.Add(section);
+
+            // SetCurrentValue, not the setter: folding state is two-way bindable, and a Local value written from here
+            // would outrank the binding and leave the section deaf to its own view-model ever after.
+            if (searching && !section.IsExpanded)
+            {
+                _openedBySearch.Add(section);
+                section.SetCurrentValue(Expander.IsExpandedProperty, true);
+            }
         }
+    }
+
+    private void ReleaseOpened()
+    {
+        foreach (var section in _openedBySearch) section.SetCurrentValue(Expander.IsExpandedProperty, false);
+
+        _openedBySearch.Clear();
+    }
+
+    private static bool Carries(String text, String wanted) =>
+        text != null && text.Contains(wanted, StringComparison.CurrentCultureIgnoreCase);
+
+    // Whether this definition, or anything under it, answers the search. A composite whose CHILD matches has to stand:
+    // hiding the parent would hide the answer.
+    private static bool Answers(PropertyDefinition definition, String wanted)
+    {
+        if (Carries(definition.Header as String, wanted)) return true;
+        if (definition is not CompositeProperty composite) return false;
+
+        foreach (var child in composite.Children)
+        {
+            if (Answers(child, wanted)) return true;
+        }
+
+        return false;
     }
 
     /// <summary>What a definition holds on ONE object, read through its binding. For a question asked once - a test, a
@@ -295,8 +399,81 @@ public class PropertyGrid : Control
     {
         base.OnApplyTemplate();
 
+        UnhookSearch();
+
         _host = GetTemplateChild("PART_Sections") as Panel;
+        _search = GetTemplateChild("PART_Search") as TextBox;
+        _clearSearch = GetTemplateChild("PART_ClearSearch") as ButtonBase;
+
+        if (_search != null)
+        {
+            _search.Text = SearchText;
+            _search.PropertyChanged += OnSearchTyped;
+            _search.KeyDown += OnSearchKeyDown;
+        }
+
+        if (_clearSearch != null) _clearSearch.Click += OnClearSearchPressed;
+
         Rebuild();
+    }
+
+    public override void OnRemoveTemplate()
+    {
+        base.OnRemoveTemplate();
+        UnhookSearch();
+
+        _search = null;
+        _clearSearch = null;
+        _host = null;
+    }
+
+    private void UnhookSearch()
+    {
+        if (_search != null)
+        {
+            _search.PropertyChanged -= OnSearchTyped;
+            _search.KeyDown -= OnSearchKeyDown;
+        }
+
+        if (_clearSearch != null) _clearSearch.Click -= OnClearSearchPressed;
+    }
+
+    private void OnSearchTyped(object sender, AdamantiumPropertyChangedEventArgs e)
+    {
+        if (e.Property == TextBox.TextProperty) SearchText = _search?.Text;
+    }
+
+    private void OnSearchKeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key != Key.Escape || String.IsNullOrEmpty(SearchText)) return;
+
+        ClearSearch();
+        e.Handled = true;
+    }
+
+    private void OnClearSearchPressed(object sender, RoutedEventArgs e) => ClearSearch();
+
+    // Escape anywhere in the inspector, not only in the field: a search is narrowed down, then a row is clicked, and by
+    // then the field no longer has the focus - and the way out has to be the same key it was a moment ago.
+    protected override void OnKeyDown(KeyEventArgs e)
+    {
+        base.OnKeyDown(e);
+
+        if (e.Handled || e.Key != Key.Escape || String.IsNullOrEmpty(SearchText)) return;
+
+        ClearSearch();
+        e.Handled = true;
+    }
+
+    private static void OnSearchTextChanged(AdamantiumComponent component, AdamantiumPropertyChangedEventArgs e)
+    {
+        if (component is not PropertyGrid grid) return;
+
+        var wanted = e.NewValue as String;
+        if (grid._search != null && grid._search.Text != wanted) grid._search.Text = wanted;
+
+        grid.HasSearchText = !String.IsNullOrEmpty(wanted?.Trim());
+        grid.Rebuild();
     }
 
     private IEnumerable<PropertySection> DisplayedSections()
@@ -312,9 +489,13 @@ public class PropertyGrid : Control
         return many;
     }
 
-    private void AddRow(Panel host, PropertyDefinition definition, IReadOnlyList<object> targets, int depth)
+    private void AddRow(Panel host, PropertyDefinition definition, IReadOnlyList<object> targets, int depth,
+        String wanted)
     {
         if (!definition.IsVisible) return;
+
+        var searching = !String.IsNullOrEmpty(wanted);
+        if (searching && !Answers(definition, wanted)) return;
 
         var row = new PropertyRow();
         row.Attach(this, definition, targets, depth * Indent);
@@ -322,9 +503,14 @@ public class PropertyGrid : Control
         host.Children.Add(row);
         _rows.Add(row);
 
-        if (definition is not CompositeProperty { IsExpanded: true } composite) return;
+        if (definition is not CompositeProperty composite) return;
 
-        foreach (var child in composite.Children) AddRow(host, child, targets, depth + 1);
+        // A folded composite opens while a search is running: its children are where the answer is, and leaving it shut
+        // would hide what the search just found. A composite whose OWN name is the answer keeps all of its children.
+        if (!composite.IsExpanded && !searching) return;
+
+        var inside = searching && Carries(composite.Header as String, wanted) ? null : wanted;
+        foreach (var child in composite.Children) AddRow(host, child, targets, depth + 1, inside);
     }
 
     private void OnSectionsChanged(object sender, NotifyCollectionChangedEventArgs e) => Rebuild();
