@@ -6,6 +6,7 @@ using System.Linq;
 using Adamantium.Mathematics;
 using Adamantium.MVVM;
 using Adamantium.UI.Controls;
+using Adamantium.UI.Controls.DataGrid;
 using Adamantium.UI.Core;
 using Adamantium.UI.Core.Media;
 
@@ -19,6 +20,11 @@ namespace Adamantium.Game.Sandbox.ViewModels;
 public class GridNode : System.ComponentModel.INotifyDataErrorInfo
 {
     public string Code { get; set; }
+
+    /// <summary>The code of the record this one belongs to, or null at the top. What <c>ParentKeyPath</c> reads - the
+    /// same parentage the nested <see cref="Children"/> already holds, said as a key instead.</summary>
+    public string ParentCode { get; set; }
+
     public string Owner { get; set; }
     public string Name { get; set; }
     public int Size { get; set; }
@@ -93,6 +99,11 @@ public partial class DataGridViewModel : TabPageViewModel
                 Done = (c + depth) % 2 == 0
             };
 
+            // The SAME parentage, said the other way: held as nesting for ChildrenPath, and named by key for
+            // KeyPath/ParentKeyPath. One generator feeds both, so the two ways of describing a tree can be compared on
+            // the same data instead of on two demos that only look alike.
+            child.ParentCode = parent.Code;
+
             Fill(child, seed + c + depth);
             Branch(child, random, seed + c, depth + 1, deepest);
             parent.Children.Add(child);
@@ -142,9 +153,58 @@ public partial class DataGridViewModel : TabPageViewModel
         }
 
         Nodes = new ObservableCollection<GridNode>(roots);
+
+        // EVERY record at the top level - which is what a flat source IS. The same set the nested one holds, said the
+        // way a database hands it over: no record contains another, and who belongs to whom is in the keys.
+        var flat = new List<GridNode>(roots.Count);
+        foreach (var root in roots) Flatten(root, flat);
+        FlatNodes = new ObservableCollection<GridNode>(flat);
+    }
+
+    private static void Flatten(GridNode node, List<GridNode> into)
+    {
+        into.Add(node);
+        foreach (var child in node.Children) Flatten(child, into);
     }
 
     public ObservableCollection<GridNode> Nodes { get; }
+
+    /// <summary>The same records, flat. Bound instead of <see cref="Nodes"/> when the tree is worked out from keys.
+    /// </summary>
+    public ObservableCollection<GridNode> FlatNodes { get; }
+
+    /// <summary>Which of the two ways the table is told about the tree. The rows on screen must come out IDENTICAL -
+    /// that is the whole point of having both on one set of data, and the one way to see that the key relation really
+    /// produces the same tree rather than something that merely looks like one.</summary>
+    [Bindable] private bool _treeFromKeys;
+
+    /// <summary>What the table reads: the nested records, or all of them flat.</summary>
+    public IEnumerable TreeSource => TreeFromKeys ? FlatNodes : Nodes;
+
+    /// <summary>Set only in the nested mode - the two ways must not both be on, or the table would be told the same
+    /// parentage twice and the key relation would be the one quietly ignored.</summary>
+    public string TreeChildrenPath => TreeFromKeys ? null : "Children";
+
+    public string TreeKeyPath => TreeFromKeys ? "Code" : null;
+
+    public string TreeParentKeyPath => TreeFromKeys ? "ParentCode" : null;
+
+    /// <summary>What the table was GIVEN, which is the only visible difference between the two modes - and the point.
+    /// The rows come out identical either way; what changes is the shape of the source. Said as a COUNT because that
+    /// is what proves it: hand the table 12 448 flat records and it shows 10 000 rows with branches, so the relation
+    /// really did build the tree. Were KeyPath quietly ignored, all 12 448 would be sitting in the table.</summary>
+    public string TreeSourceStatus => TreeFromKeys
+        ? $"{FlatNodes.Count:N0} records, all at the top level - the tree is worked out from Code / ParentCode"
+        : $"{Nodes.Count:N0} records, each holding its own children";
+
+    partial void OnTreeFromKeysChanged(bool value)
+    {
+        RaisePropertyChanged(nameof(TreeSource));
+        RaisePropertyChanged(nameof(TreeChildrenPath));
+        RaisePropertyChanged(nameof(TreeKeyPath));
+        RaisePropertyChanged(nameof(TreeParentKeyPath));
+        RaisePropertyChanged(nameof(TreeSourceStatus));
+    }
 
     [Bindable] private int _alternationCount = 2;
 
@@ -196,6 +256,8 @@ public partial class DataGridViewModel : TabPageViewModel
 
     /// <summary>Whether the strip a header is dropped into to group by it is shown.</summary>
     [Bindable] private bool _showGroupPanel;
+
+    [Bindable] private bool _showSortPanel;
 
     /// <summary>Whether the table offers a say in which columns it shows - the handle at the end of the header band.
     /// Only the OFFER: what the user then chooses is the columns' own state and outlives this switch.</summary>
