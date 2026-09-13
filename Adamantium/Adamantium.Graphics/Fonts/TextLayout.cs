@@ -164,8 +164,20 @@ public class TextLayout : DisposableObject
 
     public Size ProcessText(string text, double fontSize, TextRenderingParameters renderingParameters)
     {
+        // NOTHING is not "no work to do". Returning zero here left the last text's shaped words and glyph quads in
+        // place, and whoever drew this layout next drew THOSE: a block whose text was cleared went on saying what it
+        // used to. In a table that is a recycled row wearing the name, owner and region of the row its container had
+        // been - the record was blank, the screen was not.
         if (string.IsNullOrEmpty(text))
+        {
+            _wordData?.Clear();
+            ElementsCount = 0;
+            CalculatedLayoutSize = Size.Zero;
+            RealTextDimensions = Size.Zero;
+            _textUpdated = true;
+            _vertexBufferDirty = true;
             return Size.Zero;
+        }
 
         RenderingParameters = renderingParameters;
 
