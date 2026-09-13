@@ -85,9 +85,13 @@ public class PropertyGrid : Control
     public static readonly AdamantiumProperty SearchTextProperty = AdamantiumProperty.Register(nameof(SearchText),
         typeof(String), typeof(PropertyGrid), new PropertyMetadata(null, OnSearchTextChanged));
 
-    /// <summary>Whether the inspector carries its search field. An inspector of five rows does not need one.</summary>
+    /// <summary>Whether the inspector carries its search field. An inspector of five rows does not need one.
+    /// <para>Taking the field away drops whatever was being searched for: an inspector left narrowed down with nothing
+    /// on it to widen it again is a trap, and looks like an inspector that has lost most of its properties.</para>
+    /// </summary>
     public static readonly AdamantiumProperty ShowSearchProperty = AdamantiumProperty.Register(nameof(ShowSearch),
-        typeof(Boolean), typeof(PropertyGrid), new PropertyMetadata(true, PropertyMetadataOptions.AffectsMeasure));
+        typeof(Boolean), typeof(PropertyGrid),
+        new PropertyMetadata(true, PropertyMetadataOptions.AffectsMeasure, OnShowSearchChanged));
 
     /// <summary>Whether a search is running. The control keeps it; the theme reads it to show the button that drops
     /// the search - a cross standing on an empty field would be offering to undo nothing.</summary>
@@ -463,6 +467,11 @@ public class PropertyGrid : Control
 
         ClearSearch();
         e.Handled = true;
+    }
+
+    private static void OnShowSearchChanged(AdamantiumComponent component, AdamantiumPropertyChangedEventArgs e)
+    {
+        if (component is PropertyGrid grid && e.NewValue is false) grid.ClearSearch();
     }
 
     private static void OnSearchTextChanged(AdamantiumComponent component, AdamantiumPropertyChangedEventArgs e)

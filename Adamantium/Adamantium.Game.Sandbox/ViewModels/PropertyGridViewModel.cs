@@ -92,6 +92,11 @@ public partial class PropertyGridViewModel : TabPageViewModel
 
     [Bindable] private bool _both;
 
+    /// <summary>Whether the generated inspector carries a search field. Bound to a toggle on the page so the property
+    /// can be seen doing something: an inspector of a handful of rows does not need one, and the row it takes is worth
+    /// more to the rows.</summary>
+    [Bindable] private bool _searchable = true;
+
     public string LeftCaption => _both
         ? "Written by hand - now over BOTH objects"
         : "Written by hand - over Player, sections and properties declared in markup";

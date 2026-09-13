@@ -54,6 +54,14 @@
                          Brush="{ResourceReference TextFillColorSecondary}"/>
     </DrawingImage>
 
+    <!-- Put it back: an arrow going BACK around, not a return key. Segments rather than an arc - the path parser reads
+         lines - and the head at the left end, pointing the way it travels. Stroked, like the close glyph. -->
+    <DrawingImage x:Key="RevertIcon">
+        <GeometryDrawing Geometry="M8.6,6.4 L8.4,4.4 L7.3,2.8 L5.4,2 L3.5,2.4 L2.2,3.7 L1.7,5.4 M0.2,4.4 L1.7,6.3 L3.4,4.7"
+                         Stroke="{ResourceReference TextFillColorSecondary}"
+                         StrokeThickness="1"/>
+    </DrawingImage>
+
     <!-- Which columns are shown: three bars of a table, the middle one dropped out - the whole of what the chooser
          does, said in the shape rather than in a word that would need translating. -->
     <DrawingImage x:Key="ColumnsIcon">

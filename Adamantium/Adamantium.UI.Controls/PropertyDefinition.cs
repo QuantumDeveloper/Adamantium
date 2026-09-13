@@ -56,6 +56,23 @@ public abstract class PropertyDefinition : FundamentalUIComponent
 
     /// <summary>What the command is given. Null means the objects the line is pointed at - which is what the command
     /// almost always wants, and what it would otherwise have to be handed by hand on every line.</summary>
+    /// <summary>What this property is worth when nothing has been done to it. A row holding anything else says so and
+    /// offers to put this back.
+    /// <para>Set it and the property HAS a default, null included - which is why <see cref="HasDefault"/> is a flag of
+    /// its own rather than a null check: null is a perfectly good default for a reference, and reading "no default" out
+    /// of it would leave those rows unable to reset.</para></summary>
+    // Starts UNSET, not null: null is a value a property can legitimately default to, and a slot starting at null
+    // cannot tell being ASSIGNED null from never having been touched. AdamantiumProperty.UnsetValue is what the
+    // property system already means by "nothing here", so assigning it back removes the default again.
+    public static readonly AdamantiumProperty DefaultValueProperty = AdamantiumProperty.Register(nameof(DefaultValue),
+        typeof(object), typeof(PropertyDefinition),
+        new PropertyMetadata(AdamantiumProperty.UnsetValue, OnDefaultValueChanged));
+
+    /// <summary>Whether a default was ever given. The definition keeps it; a row reads it to know whether resetting is
+    /// something it can offer at all.</summary>
+    public static readonly AdamantiumProperty HasDefaultProperty = AdamantiumProperty.Register(nameof(HasDefault),
+        typeof(bool), typeof(PropertyDefinition), new PropertyMetadata(false));
+
     public static readonly AdamantiumProperty ActionCommandParameterProperty = AdamantiumProperty.Register(
         nameof(ActionCommandParameter), typeof(object), typeof(PropertyDefinition), new PropertyMetadata(null));
 
@@ -122,6 +139,22 @@ public abstract class PropertyDefinition : FundamentalUIComponent
     {
         get => GetValue(ActionCommandParameterProperty);
         set => SetValue(ActionCommandParameterProperty, value);
+    }
+
+    public object DefaultValue
+    {
+        get
+        {
+            var value = GetValue(DefaultValueProperty);
+            return ReferenceEquals(value, AdamantiumProperty.UnsetValue) ? null : value;
+        }
+        set => SetValue(DefaultValueProperty, value);
+    }
+
+    public bool HasDefault
+    {
+        get => GetValue<bool>(HasDefaultProperty);
+        set => SetValue(HasDefaultProperty, value);
     }
 
     public DataTemplate ValueTemplate
@@ -193,6 +226,15 @@ public abstract class PropertyDefinition : FundamentalUIComponent
     // to look again - the same reason IsVisible says so.
     private static void OnShowActionButtonChanged(AdamantiumComponent component, AdamantiumPropertyChangedEventArgs e) =>
         (component as PropertyDefinition)?.LayoutChanged?.Invoke(component, EventArgs.Empty);
+
+    // Being ASSIGNED is what gives a property a default, whatever it was assigned - null included.
+    private static void OnDefaultValueChanged(AdamantiumComponent component, AdamantiumPropertyChangedEventArgs e)
+    {
+        if (component is not PropertyDefinition definition) return;
+
+        definition.HasDefault = !ReferenceEquals(e.NewValue, AdamantiumProperty.UnsetValue);
+        definition.LayoutChanged?.Invoke(component, EventArgs.Empty);
+    }
 
     private void OnChildrenChanged(object sender, NotifyCollectionChangedEventArgs e)
     {

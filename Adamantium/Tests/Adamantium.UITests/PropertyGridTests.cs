@@ -982,6 +982,151 @@ public class PropertyGridTests
         Assert.That(pressed.Handled, Is.False);
     }
 
+    // The mark is the point as much as the button: an inspector of forty rows has to say which of them were touched.
+    [Test]
+    public void ARowMarksItselfWhenItHoldsSomethingOtherThanTheDefault()
+    {
+        var target = new Target { Name = "entity" };
+        var name = new StringProperty { Header = "Name", Binding = new Binding("Name"), DefaultValue = "entity" };
+        var grid = Built(Section(target, name));
+
+        var row = RowOf(grid, name);
+        Assert.That(row.IsModified, Is.False, "it is at its default");
+
+        grid.Write(row, "changed");
+        Assert.That(row.IsModified, Is.True);
+
+        Assert.That(row.ResetToDefault(), Is.True);
+        Assert.Multiple(() =>
+        {
+            Assert.That(target.Name, Is.EqualTo("entity"));
+            Assert.That(row.IsModified, Is.False, "and the mark goes with it");
+        });
+    }
+
+    // Without a default there is nothing to go back to, and the row must not pretend otherwise.
+    [Test]
+    public void ARowWithNoDefaultOffersNoReset()
+    {
+        var target = new Target { Name = "anything" };
+        var name = new StringProperty { Header = "Name", Binding = new Binding("Name") };
+        var grid = Built(Section(target, name));
+
+        var row = RowOf(grid, name);
+        Assert.Multiple(() =>
+        {
+            Assert.That(row.IsModified, Is.False);
+            Assert.That(row.ResetToDefault(), Is.False);
+        });
+    }
+
+    // NULL is a perfectly good default for a reference, which is why having one is a flag and not a null check.
+    [Test]
+    public void ADefaultOfNothingIsStillADefault()
+    {
+        var target = new Target { Name = "something" };
+        var name = new StringProperty { Header = "Name", Binding = new Binding("Name"), DefaultValue = null };
+        var grid = Built(Section(target, name));
+
+        var row = RowOf(grid, name);
+        Assert.That(row.IsModified, Is.True, "it holds a name, and the default is none");
+
+        Assert.That(row.ResetToDefault(), Is.True);
+        Assert.That(target.Name, Is.Null);
+    }
+
+    // A read-only row cannot take a write, so a mark there would promise a button that does nothing.
+    [Test]
+    public void AReadOnlyRowIsNeverMarkedModified()
+    {
+        var target = new Target();
+        var locked = new StringProperty
+        {
+            Header = "Locked",
+            Binding = new Binding("Locked"),
+            IsReadOnly = true,
+            DefaultValue = 0
+        };
+        var grid = Built(Section(target, locked));
+
+        var row = RowOf(grid, locked);
+        Assert.Multiple(() =>
+        {
+            Assert.That(row.IsModified, Is.False);
+            Assert.That(row.ResetToDefault(), Is.False, "and the reset is refused like any other write");
+            Assert.That(target.Locked, Is.EqualTo(7));
+        });
+    }
+
+    // Several objects that disagree cannot all be at the default - at most one of them is - and one reset is what makes
+    // them agree again.
+    [Test]
+    public void ResettingSeveralObjectsBringsThemAllBack()
+    {
+        var first = new Target { Name = "one" };
+        var second = new Target { Name = "two" };
+        var name = new StringProperty { Header = "Name", Binding = new Binding("Name"), DefaultValue = "entity" };
+        var grid = MultiGrid(name, first, second);
+
+        var row = RowOf(grid, name);
+        Assert.That(row.IsModified, Is.True, "they disagree, so they are not all at the default");
+
+        Assert.That(row.ResetToDefault(), Is.True);
+        Assert.Multiple(() =>
+        {
+            Assert.That(first.Name, Is.EqualTo("entity"));
+            Assert.That(second.Name, Is.EqualTo("entity"));
+            Assert.That(row.IsMixed, Is.False);
+            Assert.That(row.IsModified, Is.False);
+        });
+    }
+
+    // The generated inspector gets defaults with no markup at all: they are what a FRESH instance of the type holds.
+    [Test]
+    public void TheBuilderReadsDefaultsOffTheType()
+    {
+        var sections = new PropertyDefinitionBuilder().BuildSections(typeof(Target));
+
+        PropertyDefinition name = null;
+        foreach (var section in sections)
+        {
+            foreach (var property in section.Properties)
+            {
+                if (property.Header as string == "Name") name = property;
+            }
+        }
+
+        Assert.That(name, Is.Not.Null);
+        Assert.Multiple(() =>
+        {
+            Assert.That(name.HasDefault, Is.True);
+            Assert.That(name.DefaultValue, Is.EqualTo("entity"), "what a new Target is called");
+        });
+    }
+
+    // The field is the only way back to the whole inspector. Taking it away while a search is running would leave the
+    // panel narrowed down with nothing on it to widen it again - and looking like it had lost most of its properties.
+    [Test]
+    public void HidingTheSearchDropsIt()
+    {
+        var grid = Searchable();
+        grid.SearchText = "offset";
+        Assert.That(HeadersOf(grid), Does.Not.Contain("Name"));
+
+        grid.ShowSearch = false;
+        Assert.Multiple(() =>
+        {
+            Assert.That(grid.SearchText, Is.Null);
+            Assert.That(HeadersOf(grid), Does.Contain("Name"), "every property is back");
+        });
+    }
+
+    [Test]
+    public void TheSearchIsThereUnlessItIsTurnedOff()
+    {
+        Assert.That(new PropertyGrid().ShowSearch, Is.True);
+    }
+
     private sealed class Recording : ICommand
     {
         public object Ran;
