@@ -3,7 +3,7 @@
 _Статический анализ + ЗАМЕР (Release, dev Quadro RTX 4000). Незакоммиченный артефакт (не в индексе). Ссылки на код — `файл:строка`._
 _v1 — повод: FPS-регресс на `ListBox` (Stack- и Wrap-виртуализация) до ~30. Замер показал: узкое место — НЕ растеризация текста и НЕ аналитическое AA, а **CPU-запись композитов** (194 draw'а/кадр). Решение — собирать текст коллекций в ОДИН инстансный draw из общего MSDF-атласа прямо в основной проход. FontRenderer уже инстансовый — это эволюция, не пайплайн с нуля._
 _v2 (ПОПРАВКА пути): активный per-draw путь — **`EffectPass.ApplyHeap` (`EffectPass.cs:138`), descriptor-HEAP**, а НЕ `ApplyBuffer` (`UseDescriptorHeap=true` — рантайм-дефолт; buffer только в Designer.Host, см. [[descriptor-heap-driver-limitation]]). `ApplyHeap` **легче**: без `MapMemory`/`UnmapMemory`, offset'ы текстур/сэмплеров предвычислены линкером (`GlobalHeapOffset`), CB по BDA-адресу. Per-draw стоимость там = CB `Allocate`+`CopyFrom`+`GetDeviceAddress`, `BindShader` на стадию (vkCmdBindShadersEXT), `PushDataEXT`, + строковые лукапы `Effect.Parameters[name]`/`parameterPushOffsets`. Тезис плана НЕ меняется (схлопывание N draw'ов → ~1), меняется только адрес узкого места. Ссылки на `ApplyBuffer`/`§6 Фаза 0` ниже читать с этой поправкой._
-_v3 (РЕШЕНИЕ по реализации, 2026-06-30): in-shader пер-блочная матрица (BlockData/blockId из §4-6) **НЕВОЗМОЖНА на dev-Turing — ЛЮБОЙ непрямой доступ к mat4 в графическом шейдере 100%-AVs `vkCreateShadersEXT`** (проверено 3 раза: BDA mat4 load, BDA 4×float4, CB-массив `float4x4[256]` по пер-инстанс индексу). Выживает только ОДИН статический `float4x4`-юниформ (baseline; FillFringe/Stroke так и делают — статический `Projection`, а BDA только в compute). compute тоже отвергли (чтение mat4 по BDA в compute не проверено + крупно). → **Принят CPU-пред­трансформ (§9)**: позиции глифов запекаются на CPU, VS жмёт только статический `Projection`. §4-6 (in-shader lookup) — SUPERSEDED §9; вернуться к ним, когда драйвер починят. FontEffect.fx переписан на Slang (это ОК, работает) и оставлен._
+_v3 (РЕШЕНИЕ по реализации, 2026-06-30): in-shader пер-блочная матрица (BlockData/blockId из §4-6) **НЕВОЗМОЖНА на dev-Turing — ЛЮБОЙ непрямой доступ к mat4 в графическом шейдере 100%-AVs `vkCreateShadersEXT`** (проверено 3 раза: BDA mat4 load, BDA 4×float4, CB-массив `float4x4[256]` по пер-инстанс индексу). Выживает только ОДИН статический `float4x4`-юниформ (baseline; FillFringe/Stroke так и делают — статический `Projection`, а BDA только в compute). compute тоже отвергли (чтение mat4 по BDA в compute не проверено + крупно). → **Принят CPU-предтрансформ (§9)**: позиции глифов запекаются на CPU, VS жмёт только статический `Projection`. §4-6 (in-shader lookup) — SUPERSEDED §9; вернуться к ним, когда драйвер починят. FontEffect.fx переписан на Slang (это ОК, работает) и оставлен._
 
 ---
 
@@ -177,14 +177,14 @@ struct BlockData {           // на блок текста ИЛИ на фигу�
 
 ---
 
-## 9. РЕАЛИЗАЦИЯ: CPU-пред­трансформ (РЕШЕНО 2026-06-30, supersedes §4-6)
+## 9. РЕАЛИЗАЦИЯ: CPU-предтрансформ (РЕШЕНО 2026-06-30, supersedes §4-6)
 
 Драйверо-безопасный путь: пер-блочный трансформ применяется к позициям глифов **на CPU** (общий случай — полная матрица), графический VS жмёт **только статический `Projection`** (= паттерн FillFringe/Stroke; единственная конструкция, которая не AV'ит). НЕ требует BDA/массивов/индексов матриц в шейдере.
 
 **ВАЖНО — проверять на GPU (юзер делает на пробуждении), вслепую НЕ строилось.** Текущее состояние дерева: рабочий baseline (юниформ `MatrixTransform`) + Slang-перепись FontEffect.fx, собирается чисто. TEMP-перф-инструментация на месте (для замера выигрыша; снять в конце).
 
 ### Матрица (вывод)
-Сейчас раст­р в RT: `finalMatrix = Translation(location) × RT_ortho`, где `location = TextArea.X/Y + pad` (UIRenderComponent.cs:336); глифы из `layout.VertexBuffer` — в layout-локальных координатах. Композит: RT-квад `Rect(-pad,-pad, ds+2pad)` рисуется при `WorldTransform` (`RenderData.TransformMatrix`).
+Сейчас растр в RT: `finalMatrix = Translation(location) × RT_ortho`, где `location = TextArea.X/Y + pad` (UIRenderComponent.cs:336); глифы из `layout.VertexBuffer` — в layout-локальных координатах. Композит: RT-квад `Rect(-pad,-pad, ds+2pad)` рисуется при `WorldTransform` (`RenderData.TransformMatrix`).
 ⇒ глиф mesh-pos = `glyph_local + TextArea` (pad сокращается: RT-origin -pad, location +pad). ⇒ для ПРЯМОГО draw (row-vector конвенция движка):
 ```
 mvp = Translation(TextArea.X, TextArea.Y, 5)  ×  RenderData.TransformMatrix  ×  RenderData.ProjectionMatrix
@@ -195,8 +195,8 @@ RenderScale для прямого draw = 1 (супер-сэмпл RT больш�
 БЕЗ изменения шейдера (одна статическая матрица = рабочий путь). Снимает RT + композит + прерывание прохода; проверяет «текст в основном проходе» + качество.
 - Тогл `FontRenderer.UseDirectTextDraw` (static bool, default **false** — дефолт = текущий RT-путь, не трогаем).
 - `FontRenderer.DrawLayoutDirect(sampler, layout, fg, stroke, Matrix4x4F mvp)`: тело как `DrawInternal` (FontRenderer.cs:137) НО без `SetState`/`RestoreState`/смены RT — ставит эффект-параметры + `MatrixTransform = mvp` + `Draw(4, layout.ElementsCount)` в ТЕКУЩИЙ проход.
-  - **GPU-стейт — ВНИМАНИЕ (проверяемо только на GPU):** не переопределять viewport/scissor (берём основного прохода); **MSAA = основного таргета** (НЕ `renderTarget.MSAALevel` из `DrawInternal` — там был no-MSAA RT); **depth — как у прочих UI-юнитов основного прохода** (`UIRenderComponent.Render`: `CompareOp.Always`, test/write on — НЕ `depth off` как в RT-раст­ре); блендинг premult (как сейчас). Несовпадение стейта → текст не нарисуется/конфликт с другими draw'ами.
-- Интеграция в text-юните (`TextRenderComponent`, UIRenderComponent.cs:255): при тогле — `PreRender` early-return (пропускает раст­р), `Render` early-branch зовёт `DrawLayoutDirect(mvp = Translation(TextArea)×RenderData.TransformMatrix×RenderData.ProjectionMatrix)` вместо `Texture=_renderTarget.ResolveTexture; base.Render()`. Ветки ОТДЕЛЬНО, дефолт (off) не трогать.
+  - **GPU-стейт — ВНИМАНИЕ (проверяемо только на GPU):** не переопределять viewport/scissor (берём основного прохода); **MSAA = основного таргета** (НЕ `renderTarget.MSAALevel` из `DrawInternal` — там был no-MSAA RT); **depth — как у прочих UI-юнитов основного прохода** (`UIRenderComponent.Render`: `CompareOp.Always`, test/write on — НЕ `depth off` как в RT-растре); блендинг premult (как сейчас). Несовпадение стейта → текст не нарисуется/конфликт с другими draw'ами.
+- Интеграция в text-юните (`TextRenderComponent`, UIRenderComponent.cs:255): при тогле — `PreRender` early-return (пропускает растр), `Render` early-branch зовёт `DrawLayoutDirect(mvp = Translation(TextArea)×RenderData.TransformMatrix×RenderData.ProjectionMatrix)` вместо `Texture=_renderTarget.ResolveTexture; base.Render()`. Ветки ОТДЕЛЬНО, дефолт (off) не трогать.
 - **Verify (GPU):** текст на месте/верная позиция, AV нет, MSDF-качество ок без супер-сэмпла.
 
 ### Стадия 2 — агрегация (один draw на коллекцию) = выигрыш FPS

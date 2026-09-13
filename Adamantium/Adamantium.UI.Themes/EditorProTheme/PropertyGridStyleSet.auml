@@ -45,7 +45,8 @@
             <Setter.Value>
                 <ControlTemplate TargetType="PropertyRow">
                     <Border x:Name="RowBorder" Background="Transparent">
-                        <Grid x:Name="PART_Layout" ColumnDefinitions="140,7,*">
+                        <!-- A fourth column for the "..." button - Auto, so off it costs nothing. See Fluent's set. -->
+                        <Grid x:Name="PART_Layout" ColumnDefinitions="140,7,*,Auto">
                             <Grid Grid.Column="0" ColumnDefinitions="Auto,*" Margin="10 0 0 0">
                                 <!-- The strip that opens a composite row. Reserved on every row, so the names of one
                                      level line up whether or not that row has children. -->
@@ -82,9 +83,21 @@
                                     TextTrimming="CharEllipses"
                                     Foreground="{TemplateBinding Foreground}"
                                     FontSize="{TemplateBinding FontSize}"/>
+
+                            <!-- Square, the editors' height, and its inherited minimum zeroed - see Fluent's set. -->
+                            <Button Grid.Column="3" x:Name="PART_Action"
+                                    Content="..." Visibility="Collapsed"
+                                    Width="19" Height="19" MinWidth="0" MinHeight="0"
+                                    Padding="0" Margin="0 0 4 0"
+                                    VerticalAlignment="Center"
+                                    FontSize="{ResourceReference FontSizeCaption}"
+                                    ToolTipService.ToolTip="More"/>
                         </Grid>
                     </Border>
                     <ControlTemplate.Triggers>
+                        <PropertyTrigger Property="ShowActionButton" Value="true">
+                            <Setter TargetName="PART_Action" Property="Visibility" Value="Visible"/>
+                        </PropertyTrigger>
                         <PropertyTrigger Property="HasChildren" Value="true">
                             <Setter TargetName="Glyph" Property="Visibility" Value="Visible"/>
                         </PropertyTrigger>

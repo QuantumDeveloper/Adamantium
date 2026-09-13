@@ -7,6 +7,7 @@ using Adamantium.UI.Controls.Primitives;
 using Adamantium.UI.Controls.Text;
 using Adamantium.UI.Core;
 using Adamantium.UI.Core.Data;
+using Adamantium.UI.Core.Media;
 using Adamantium.UI.Core.RoutedEvents;
 using Adamantium.UI.Core.Templates;
 
@@ -39,6 +40,24 @@ public abstract class PropertyDefinition : FundamentalUIComponent
     /// "show advanced" switch is made of.</summary>
     public static readonly AdamantiumProperty IsVisibleProperty = AdamantiumProperty.Register(nameof(IsVisible),
         typeof(bool), typeof(PropertyDefinition), new PropertyMetadata(true, OnIsVisibleChanged));
+
+    /// <summary>Whether the line ends with the "..." button. OFF by default: a button on every line of an inspector is
+    /// a column of buttons that mostly do nothing, and a line that offers one had better mean it.</summary>
+    public static readonly AdamantiumProperty ShowActionButtonProperty = AdamantiumProperty.Register(
+        nameof(ShowActionButton), typeof(bool), typeof(PropertyDefinition),
+        new PropertyMetadata(false, OnShowActionButtonChanged));
+
+    /// <summary>What the "..." button runs. The editor in the value cell says what the property IS; this is for
+    /// everything a cell cannot hold - a file to pick, a longer form to open, a value to be computed from elsewhere -
+    /// and what it does is the application's business, which is why it is a command and not an event on the control.
+    /// </summary>
+    public static readonly AdamantiumProperty ActionCommandProperty = AdamantiumProperty.Register(nameof(ActionCommand),
+        typeof(ICommand), typeof(PropertyDefinition), new PropertyMetadata(null));
+
+    /// <summary>What the command is given. Null means the objects the line is pointed at - which is what the command
+    /// almost always wants, and what it would otherwise have to be handed by hand on every line.</summary>
+    public static readonly AdamantiumProperty ActionCommandParameterProperty = AdamantiumProperty.Register(
+        nameof(ActionCommandParameter), typeof(object), typeof(PropertyDefinition), new PropertyMetadata(null));
 
     /// <summary>What the value looks like when nobody is editing it. Null means the default look for its kind.</summary>
     public static readonly AdamantiumProperty ValueTemplateProperty = AdamantiumProperty.Register(nameof(ValueTemplate),
@@ -87,6 +106,24 @@ public abstract class PropertyDefinition : FundamentalUIComponent
         set => SetValue(IsVisibleProperty, value);
     }
 
+    public bool ShowActionButton
+    {
+        get => GetValue<bool>(ShowActionButtonProperty);
+        set => SetValue(ShowActionButtonProperty, value);
+    }
+
+    public ICommand ActionCommand
+    {
+        get => GetValue<ICommand>(ActionCommandProperty);
+        set => SetValue(ActionCommandProperty, value);
+    }
+
+    public object ActionCommandParameter
+    {
+        get => GetValue(ActionCommandParameterProperty);
+        set => SetValue(ActionCommandParameterProperty, value);
+    }
+
     public DataTemplate ValueTemplate
     {
         get => GetValue<DataTemplate>(ValueTemplateProperty);
@@ -126,7 +163,35 @@ public abstract class PropertyDefinition : FundamentalUIComponent
     protected internal virtual bool TryConvert(object edited, Type target, out object value) =>
         BoundValue.TryConvert(edited, target, out value);
 
+    /// <summary>Whether two of the selected objects hold the SAME value, which is what decides that a row of a multiple
+    /// selection shows a value rather than reporting that the objects disagree.
+    /// <para><see cref="object.Equals(object, object)"/> by default, which is right for a number, a string or an enum.
+    /// A value that is an OBJECT is a different matter: two brushes of the same colour are not the same instance, and
+    /// comparing them by reference makes a row report a difference nobody can see. A definition whose value is an object
+    /// says here what "the same" means for it - and does so WITHOUT the type itself gaining an equality, which the
+    /// render cache's change detection depends on staying by reference.</para></summary>
+    protected internal virtual bool SameValue(object left, object right) => Equals(left, right);
+
+    /// <summary>Whether this property's editor can stand EMPTY - showing no value while staying usable, which is what a
+    /// row of disagreeing objects needs: setting one value on all of them is the point of selecting several.
+    /// <para>A field, a number and a list all have an empty state. A colour swatch does not - it is a colour or it is
+    /// nothing - so a definition whose editor cannot show "no value" says so here, and its row stays blank instead of
+    /// standing there showing a colour neither object holds.</para></summary>
+    protected internal virtual bool EditorCanShowNothing => true;
+
+    /// <summary>Writes what the editor produced INTO the value the property already holds, and says whether it did.
+    /// <para>A property normally means "the value is replaced", and that is what happens when this says no. The
+    /// exception is a value that is an OBJECT WITH PARTS and is shared: the object keeps the same brush and the brush
+    /// changes colour, so everything else painting with that brush follows. Replacing it would leave them all on the
+    /// old one.</para></summary>
+    protected internal virtual bool WriteInto(object current, object edited) => false;
+
     private static void OnIsVisibleChanged(AdamantiumComponent component, AdamantiumPropertyChangedEventArgs e) =>
+        (component as PropertyDefinition)?.LayoutChanged?.Invoke(component, EventArgs.Empty);
+
+    // The row reads this when it is bound, so a line that gains its button while the inspector is open has to be told
+    // to look again - the same reason IsVisible says so.
+    private static void OnShowActionButtonChanged(AdamantiumComponent component, AdamantiumPropertyChangedEventArgs e) =>
         (component as PropertyDefinition)?.LayoutChanged?.Invoke(component, EventArgs.Empty);
 
     private void OnChildrenChanged(object sender, NotifyCollectionChangedEventArgs e)
@@ -213,9 +278,11 @@ public class NumericProperty : PropertyDefinition
         numeric.Minimum = Minimum;
         numeric.Maximum = Maximum;
         numeric.SmallChange = Step;
+        // NULL, not zero, when there is nothing to show - the objects disagree. A zero here would be a number neither
+        // of them holds, which is worse than an empty field: it reads as an answer.
         numeric.Value = value is IConvertible convertible
             ? Convert.ToDouble(convertible, System.Globalization.CultureInfo.InvariantCulture)
-            : 0;
+            : null;
     }
 
     protected internal override object ReadEditor(IUIComponent editor) => (editor as NumericUpDown)?.Value;
@@ -233,7 +300,12 @@ public class BooleanProperty : PropertyDefinition
 
     protected internal override void PrepareEditor(IUIComponent editor, object value)
     {
-        if (editor is ToggleButton toggle) toggle.IsChecked = value as bool? ?? false;
+        if (editor is not ToggleButton toggle) return;
+
+        // INDETERMINATE when the objects disagree: an unticked box would say they are all off, and half of them are on.
+        // Three-state only while that is the case, so an ordinary row is an ordinary two-state box.
+        toggle.IsThreeState = value is not bool;
+        toggle.IsChecked = value as bool?;
     }
 
     protected internal override object ReadEditor(IUIComponent editor) => (editor as ToggleButton)?.IsChecked;
@@ -282,6 +354,79 @@ public class ChoiceProperty : PropertyDefinition
     }
 
     protected internal override object ReadEditor(IUIComponent editor) => (editor as DropDown)?.SelectedItem;
+}
+
+/// <summary>A <see cref="Color"/>, edited by the swatch button that opens the full picker. A colour is the one value
+/// nobody can type: "#3A6EA5" says nothing to the eye and three numbers say less, so the editor has to SHOW it.</summary>
+public class ColorProperty : PropertyDefinition
+{
+    private DataTemplate _editor;
+
+    protected internal override DataTemplate DefaultEditorTemplate =>
+        _editor ??= new DataTemplate(() => new TemplateResult { RootComponent = PropertyEditors.Swatch() });
+
+    protected internal override bool EditorCanShowNothing => false;
+
+    protected internal override void PrepareEditor(IUIComponent editor, object value)
+    {
+        if (editor is ColorPickerButton swatch && value is Color colour) swatch.SelectedColor = colour;
+    }
+
+    protected internal override object ReadEditor(IUIComponent editor) => (editor as ColorPickerButton)?.SelectedColor;
+}
+
+/// <summary>A <see cref="SolidColorBrush"/>, edited by the same swatch a <see cref="ColorProperty"/> uses. A property
+/// that carries ONE colour is a solid brush and nothing else - a gradient has no single colour to show or to set - so
+/// this line does not offer a choice of brush; the day a property may hold any brush, that is a different line with a
+/// chooser in it.
+/// <para>The colour is painted INTO the brush the property already holds. A brush is usually shared - a theme colour
+/// stands behind a dozen elements - and replacing it would leave every one of them on the old one. Where the brush
+/// refuses to be painted, being frozen, a new one is put in its place instead: frozen means immutable, and the property
+/// can still be pointed at something else.</para></summary>
+public class SolidColorBrushProperty : PropertyDefinition
+{
+    private DataTemplate _editor;
+
+    protected internal override DataTemplate DefaultEditorTemplate =>
+        _editor ??= new DataTemplate(() => new TemplateResult { RootComponent = PropertyEditors.Swatch() });
+
+    protected internal override bool EditorCanShowNothing => false;
+
+    protected internal override void PrepareEditor(IUIComponent editor, object value)
+    {
+        if (editor is ColorPickerButton swatch && value is SolidColorBrush brush) swatch.SelectedColor = brush.Color;
+    }
+
+    protected internal override object ReadEditor(IUIComponent editor) => (editor as ColorPickerButton)?.SelectedColor;
+
+    // What the line shows of a brush is its COLOUR, so that is what "the same" means here. Two objects each holding
+    // their own brush of the same colour agree as far as this line is concerned, and a row reporting otherwise would be
+    // reporting a difference nobody can see.
+    protected internal override bool SameValue(object left, object right) =>
+        left is SolidColorBrush first && right is SolidColorBrush second
+            ? first.Color == second.Color
+            : base.SameValue(left, right);
+
+    protected internal override bool WriteInto(object current, object edited)
+    {
+        if (current is not SolidColorBrush { IsFrozen: false } brush || edited is not Color colour) return false;
+
+        brush.Color = colour;
+        return true;
+    }
+
+    // Reached only when the brush would not take the colour - it is frozen, or there was no brush there at all. A new
+    // one then, because refusing here would be the line quietly doing nothing.
+    protected internal override bool TryConvert(object edited, Type target, out object value)
+    {
+        if (edited is Color colour)
+        {
+            value = new SolidColorBrush(colour);
+            return true;
+        }
+
+        return base.TryConvert(edited, target, out value);
+    }
 }
 
 /// <summary>A property that holds other properties: a vector, a colour, a nested object. It has no value of its own -
@@ -343,6 +488,15 @@ internal static class PropertyEditors
         MinWidth = 0,
         MinHeight = 0,
         BorderThickness = new Thickness(0),
+        VerticalAlignment = VerticalAlignment.Stretch,
+        HorizontalAlignment = HorizontalAlignment.Stretch
+    };
+
+    // No border of its own: the swatch IS the control, and a frame around a colour changes how the colour reads.
+    public static ColorPickerButton Swatch() => new()
+    {
+        MinWidth = 0,
+        MinHeight = 0,
         VerticalAlignment = VerticalAlignment.Stretch,
         HorizontalAlignment = HorizontalAlignment.Stretch
     };

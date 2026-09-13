@@ -1,10 +1,14 @@
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
+using Adamantium.Core.Commands;
 using Adamantium.Mathematics;
 using Adamantium.UI.Controls;
+using Adamantium.UI.Controls.Primitives;
+using Adamantium.UI.Controls.Text;
 using Adamantium.UI.Core;
 using Adamantium.UI.Core.Data;
+using Adamantium.UI.Core.Media;
 using NUnit.Framework;
 
 namespace Adamantium.UITests;
@@ -43,6 +47,26 @@ public class PropertyGridTests
         public Visibility Visibility { get; set; } = Visibility.Visible;
 
         public int Locked { get; set; } = 7;
+
+        private Color _tint = Colors.CornflowerBlue;
+
+        public Color Tint
+        {
+            get => _tint;
+            set { _tint = value; Raise(nameof(Tint)); }
+        }
+
+        /// <summary>A brush the line paints INTO. Get-only on purpose: the property is never written, which is the
+        /// whole claim - and a setter would let a test pass that had quietly replaced it.</summary>
+        public Brush Fill { get; } = new SolidColorBrush(Colors.Tomato);
+
+        public Brush Frozen { get; set; } = Snapshot(new SolidColorBrush(Colors.Tomato));
+
+        private static Brush Snapshot(Brush brush)
+        {
+            brush.ForRendering();
+            return brush.Snapshot;
+        }
 
         public event PropertyChangedEventHandler PropertyChanged;
 
@@ -90,6 +114,35 @@ public class PropertyGridTests
         var section = new PropertySection { Header = "Transform", Target = target, IsExpanded = true };
         foreach (var property in properties) section.Properties.Add(property);
         return section;
+    }
+
+    // Rows are templated by a theme in the application. A test that asks about the EDITOR has to give them one, because
+    // the editor is built by the value presenter and a row with no parts has nowhere to build it. Only the one part the
+    // question needs - the rest of the row is chrome.
+    private static void TemplateRows(PropertyGrid grid)
+    {
+        var chrome = new Adamantium.UI.Core.Templates.ControlTemplate(() =>
+        {
+            var host = new ContentPresenter();
+            var result = new Adamantium.UI.Core.Templates.TemplateResult { RootComponent = host };
+            result.RegisterName("PART_Value", host);
+            return result;
+        });
+
+        foreach (var section in grid.Sections)
+        {
+            if (section.Content is not IUIComponent host) continue;
+            foreach (var child in host.VisualChildren)
+            {
+                if (child is not PropertyRow row) continue;
+
+                row.Template = chrome;
+                // The row's OWN pass, not the grid's: the editor is built by the presenter during measure and picked up
+                // in arrange, and a grid that has already settled will not walk down to a child again.
+                row.Measure(new Size(400, 40), force: true);
+                row.Arrange(new Rect(0, 0, 400, 40));
+            }
+        }
     }
 
     private static PropertyRow RowOf(PropertyGrid grid, PropertyDefinition definition)
@@ -337,6 +390,10 @@ public class PropertyGridTests
 
         var grid = Built(section);
         grid.SelectedObjects = targets;
+
+        // Again, because the selection arrives AFTER the first pass and a row finds its editor once a pass has run.
+        grid.Measure(new Size(400, 400), force: true);
+        grid.Arrange(new Rect(0, 0, 400, 400));
         return grid;
     }
 
@@ -406,5 +463,433 @@ public class PropertyGridTests
 
         grid.SelectedObject = second;
         Assert.That(RowOf(grid, name).Value, Is.EqualTo("two"), "the section follows the selection");
+    }
+
+    // A colour is a value like any other: the line reads one and writes one back.
+    [Test]
+    public void AColourLineReadsAndWritesAColour()
+    {
+        var target = new Target();
+        var tint = new ColorProperty { Header = "Tint", Binding = new Binding("Tint") };
+        var grid = Built(Section(target, tint));
+
+        Assert.That(RowOf(grid, tint).Value, Is.EqualTo(Colors.CornflowerBlue));
+
+        Assert.That(grid.Write(RowOf(grid, tint), Colors.Goldenrod), Is.True);
+        Assert.That(target.Tint, Is.EqualTo(Colors.Goldenrod));
+    }
+
+    // The point of the brush line: it does NOT put a new brush on the object, it changes the colour inside the one
+    // already there. Everything else painting with that brush follows, and nothing had to be told. Note the binding is
+    // one-way and the write still lands - nothing is written back through it.
+    [Test]
+    public void ABrushLineChangesTheColourInsideTheBrushItWasGiven()
+    {
+        var target = new Target();
+        var before = target.Fill;
+
+        var fill = new SolidColorBrushProperty
+        {
+            Header = "Fill",
+            Binding = new Binding("Fill") { Mode = BindingMode.OneWay }
+        };
+        var grid = Built(Section(target, fill));
+
+        Assert.That(grid.Write(RowOf(grid, fill), Colors.Goldenrod), Is.True);
+        Assert.Multiple(() =>
+        {
+            Assert.That(target.Fill, Is.SameAs(before), "the SAME brush - nobody was handed a new one");
+            Assert.That(((SolidColorBrush)target.Fill).Color, Is.EqualTo(Colors.Goldenrod));
+        });
+    }
+
+    // A frozen brush is shared and cannot be painted into. Then the line falls back to putting a new brush there, which
+    // is the only thing left that can work - silently doing nothing would leave the inspector showing a colour the
+    // object never took.
+    [Test]
+    public void AFrozenBrushIsReplacedRatherThanPainted()
+    {
+        var target = new Target();
+        var before = target.Frozen;
+
+        var frozen = new SolidColorBrushProperty { Header = "Frozen", Binding = new Binding("Frozen") };
+        var grid = Built(Section(target, frozen));
+
+        Assert.That(grid.Write(RowOf(grid, frozen), Colors.Goldenrod), Is.True);
+        Assert.Multiple(() =>
+        {
+            Assert.That(target.Frozen, Is.Not.SameAs(before), "a new brush, because the old one cannot be painted");
+            Assert.That(((SolidColorBrush)target.Frozen).Color, Is.EqualTo(Colors.Goldenrod));
+            Assert.That(((SolidColorBrush)before).Color, Is.EqualTo(Colors.Tomato), "and the shared one is untouched");
+        });
+    }
+
+    // The "..." button is the line's, not the inspector's: off everywhere until a line asks for it, so an inspector of
+    // lines that offer nothing shows no buttons at all.
+    [Test]
+    public void TheActionButtonIsOffUnlessTheLineAsksForIt()
+    {
+        var target = new Target();
+        var plain = new StringProperty { Header = "Name", Binding = new Binding("Name") };
+        var offering = new StringProperty
+        {
+            Header = "Tag",
+            Binding = new Binding("Name"),
+            ShowActionButton = true
+        };
+        var grid = Built(Section(target, plain, offering));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(RowOf(grid, plain).ShowActionButton, Is.False);
+            Assert.That(RowOf(grid, offering).ShowActionButton, Is.True, "the row mirrors what the line asked for");
+        });
+    }
+
+    // What the button DOES is the application's business. The inspector only hands over what the line is pointed at -
+    // one object, or all of them when several are selected.
+    [Test]
+    public void TheActionButtonRunsTheApplicationsCommand()
+    {
+        var target = new Target();
+        var command = new Recording();
+        var tag = new StringProperty
+        {
+            Header = "Tag",
+            Binding = new Binding("Name"),
+            ShowActionButton = true,
+            ActionCommand = command
+        };
+        var grid = Built(Section(target, tag));
+
+        Assert.That(RowOf(grid, tag).RunAction(), Is.True);
+        Assert.That(command.Ran, Is.SameAs(target), "the one object the line is pointed at");
+    }
+
+    [Test]
+    public void TheActionButtonHandsOverEveryObjectWhenSeveralAreSelected()
+    {
+        var first = new Target();
+        var second = new Target();
+        var command = new Recording();
+        var tag = new StringProperty
+        {
+            Header = "Tag",
+            Binding = new Binding("Name"),
+            ShowActionButton = true,
+            ActionCommand = command
+        };
+        var grid = MultiGrid(tag, first, second);
+
+        Assert.That(RowOf(grid, tag).RunAction(), Is.True);
+        Assert.That(command.Ran, Is.EqualTo(new object[] { first, second }));
+    }
+
+    // A command that says it cannot run must not be run - and the row must SAY the press did nothing rather than
+    // reporting a press that never reached anything.
+    [Test]
+    public void AnActionThatCannotRunIsNotRun()
+    {
+        var target = new Target();
+        var command = new Recording { CanRun = false };
+        var tag = new StringProperty
+        {
+            Header = "Tag",
+            Binding = new Binding("Name"),
+            ShowActionButton = true,
+            ActionCommand = command
+        };
+        var grid = Built(Section(target, tag));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(RowOf(grid, tag).RunAction(), Is.False);
+            Assert.That(command.Ran, Is.Null);
+        });
+    }
+
+    // A line offering the button but no command: pressing it is a no-op, not a crash.
+    [Test]
+    public void AButtonWithNoCommandDoesNothing()
+    {
+        var target = new Target();
+        var tag = new StringProperty { Header = "Tag", Binding = new Binding("Name"), ShowActionButton = true };
+        var grid = Built(Section(target, tag));
+
+        Assert.That(RowOf(grid, tag).RunAction(), Is.False);
+    }
+
+    // Two objects each holding their OWN brush of the same colour hold, as far as the line is concerned, the same
+    // value - a brush has no equality of its own, so comparing them by reference would have the row reporting a
+    // difference nobody can see.
+    [Test]
+    public void TwoBrushesOfOneColourAreNotADifference()
+    {
+        var fill = new SolidColorBrushProperty { Header = "Fill", Binding = new Binding("Fill") };
+        var grid = MultiGrid(fill, new Target(), new Target());
+
+        var row = RowOf(grid, fill);
+        Assert.Multiple(() =>
+        {
+            Assert.That(row.Target, Is.Not.SameAs(row.Targets[1]));
+            Assert.That(((Target)row.Targets[0]).Fill, Is.Not.SameAs(((Target)row.Targets[1]).Fill),
+                "two brushes, not one - which is what makes this worth asserting");
+            Assert.That(row.IsMixed, Is.False, "and the line shows the colour they agree on");
+        });
+    }
+
+    [Test]
+    public void TwoBrushesOfDifferentColoursStillDisagree()
+    {
+        var second = new Target();
+        ((SolidColorBrush)second.Fill).Color = Colors.Goldenrod;
+
+        var fill = new SolidColorBrushProperty { Header = "Fill", Binding = new Binding("Fill") };
+        var grid = MultiGrid(fill, new Target(), second);
+
+        Assert.That(RowOf(grid, fill).IsMixed, Is.True);
+    }
+
+    // A row of disagreeing objects KEEPS its editor: putting one value on all of them is the point of selecting
+    // several, and a row with nothing in it cannot be filled.
+    [Test]
+    public void ARowTheObjectsDisagreeOnCanStillBeEdited()
+    {
+        var first = new Target { Name = "one" };
+        var second = new Target { Name = "two" };
+        var name = new StringProperty { Header = "Name", Binding = new Binding("Name") };
+        var grid = MultiGrid(name, first, second);
+
+        TemplateRows(grid);
+
+        var row = RowOf(grid, name);
+        Assert.That(row.Editor, Is.Not.Null, "the editor is there even with nothing to show");
+
+        Assert.That(grid.Write(row, "agreed"), Is.True);
+        Assert.Multiple(() =>
+        {
+            Assert.That(first.Name, Is.EqualTo("agreed"));
+            Assert.That(second.Name, Is.EqualTo("agreed"));
+            Assert.That(row.IsMixed, Is.False, "and they no longer disagree");
+        });
+    }
+
+    // The conversion has to know the type even when there is no common value to read it off - otherwise what was typed
+    // reaches a double-valued property as a string.
+    [Test]
+    public void ANumberTypedIntoADisagreeingRowIsStillConverted()
+    {
+        var first = new Target { Scale = 1 };
+        var second = new Target { Scale = 2 };
+        var scale = new NumericProperty { Header = "Scale", Binding = new Binding("Scale") };
+        var grid = MultiGrid(scale, first, second);
+
+        var row = RowOf(grid, scale);
+        Assert.That(row.IsMixed, Is.True);
+
+        Assert.That(grid.Write(row, "7,5"), Is.True);
+        Assert.Multiple(() =>
+        {
+            Assert.That(first.Scale, Is.EqualTo(7.5));
+            Assert.That(second.Scale, Is.EqualTo(7.5));
+        });
+    }
+
+    // A colour swatch has no empty state - it is a colour or it is nothing. So that one row stays blank rather than
+    // standing there showing a colour neither object holds.
+    [Test]
+    public void AColourRowTheObjectsDisagreeOnStaysBlank()
+    {
+        var second = new Target { Tint = Colors.Goldenrod };
+        var tint = new ColorProperty { Header = "Tint", Binding = new Binding("Tint") };
+        var grid = MultiGrid(tint, new Target(), second);
+
+        TemplateRows(grid);
+
+        var row = RowOf(grid, tint);
+        Assert.Multiple(() =>
+        {
+            Assert.That(row.IsMixed, Is.True);
+            Assert.That(row.Editor, Is.Null, "no swatch, because there is no colour it could honestly show");
+        });
+    }
+
+    // An empty editor says nothing on its own, and "nothing" is not what happened - a double cannot hold nothing at
+    // all. So the editor's prompt says the objects hold more than one value, and it goes once they agree.
+    [Test]
+    public void ADisagreeingEditorSaysSoAndStopsWhenTheyAgree()
+    {
+        var first = new Target { Scale = 1 };
+        var second = new Target { Scale = 2 };
+        var scale = new NumericProperty { Header = "Scale", Binding = new Binding("Scale") };
+        var grid = MultiGrid(scale, first, second);
+
+        TemplateRows(grid);
+
+        var row = RowOf(grid, scale);
+        Assert.That(row.Editor, Is.InstanceOf<NumericUpDown>());
+        Assert.That(((NumericUpDown)row.Editor).Placeholder, Is.EqualTo(grid.MixedText));
+
+        Assert.That(grid.Write(row, 7.0), Is.True);
+        Assert.That(((NumericUpDown)row.Editor).Placeholder, Is.Null, "they agree now - there is nothing to say");
+    }
+
+    // The point of the whole thing: the caption appears ONLY where the objects really hold different values. A row they
+    // all agree on shows that value, however many of them are selected.
+    [Test]
+    public void OnlyTheRowsThatReallyDifferSaySo()
+    {
+        var first = new Target { Name = "Player", Scale = 1 };
+        var second = new Target { Name = "Enemy", Scale = 1 };
+
+        var name = new StringProperty { Header = "Name", Binding = new Binding("Name") };
+        var scale = new NumericProperty { Header = "Scale", Binding = new Binding("Scale") };
+
+        var section = new PropertySection { Header = "General", IsExpanded = true };
+        section.Properties.Add(name);
+        section.Properties.Add(scale);
+
+        var grid = Built(section);
+        grid.SelectedObjects = new[] { first, second };
+        TemplateRows(grid);
+
+        var differing = RowOf(grid, name);
+        var agreed = RowOf(grid, scale);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(differing.IsMixed, Is.True);
+            Assert.That(((TextBox)differing.Editor).Placeholder, Is.EqualTo(grid.MixedText));
+
+            Assert.That(agreed.IsMixed, Is.False, "they hold the same number");
+            Assert.That(agreed.Value, Is.EqualTo(1.0), "so the row shows it");
+            Assert.That(((NumericUpDown)agreed.Editor).Placeholder, Is.Null, "and says nothing about a difference");
+        });
+    }
+
+    // A hundred objects that agree are still one value, not a hundred.
+    [Test]
+    public void ManyObjectsThatAgreeShowTheirValue()
+    {
+        var targets = new Target[100];
+        for (var i = 0; i < targets.Length; i++) targets[i] = new Target { Name = "shared" };
+
+        var name = new StringProperty { Header = "Name", Binding = new Binding("Name") };
+        var grid = MultiGrid(name, targets);
+
+        TemplateRows(grid);
+
+        var row = RowOf(grid, name);
+        Assert.Multiple(() =>
+        {
+            Assert.That(row.IsMixed, Is.False);
+            Assert.That(row.Value, Is.EqualTo("shared"));
+            Assert.That(((TextBox)row.Editor).Placeholder, Is.Null);
+        });
+    }
+
+    // And a hundred that do not agree still say it in one phrase - what each of them holds is not something a row can
+    // show, and trying would fill it with a line nobody can read.
+    [Test]
+    public void ManyObjectsThatDisagreeSaySoInOnePhrase()
+    {
+        var targets = new Target[100];
+        for (var i = 0; i < targets.Length; i++) targets[i] = new Target { Name = $"object {i}" };
+
+        var name = new StringProperty { Header = "Name", Binding = new Binding("Name") };
+        var grid = MultiGrid(name, targets);
+
+        TemplateRows(grid);
+
+        var row = RowOf(grid, name);
+        Assert.Multiple(() =>
+        {
+            Assert.That(row.IsMixed, Is.True);
+            Assert.That(((TextBox)row.Editor).Placeholder, Is.EqualTo(grid.MixedText));
+        });
+    }
+
+    // An unticked box on a row where half the objects are ticked would be a plain lie. Indeterminate, and one flip
+    // resolves them all - to TRUE, because leaving them disagreeing is the one thing nobody asked for.
+    [Test]
+    public void ABooleanTheObjectsDisagreeOnIsIndeterminate()
+    {
+        var first = new Target { IsEnabled = true };
+        var second = new Target { IsEnabled = false };
+        var enabled = new BooleanProperty { Header = "Enabled", Binding = new Binding("IsEnabled") };
+        var grid = MultiGrid(enabled, first, second);
+
+        TemplateRows(grid);
+
+        var row = RowOf(grid, enabled);
+        Assert.That(row.Editor, Is.InstanceOf<ToggleButton>());
+        Assert.That(((ToggleButton)row.Editor).IsChecked, Is.Null, "neither on nor off - they disagree");
+
+        Assert.That(grid.ToggleRow(row), Is.True);
+        Assert.Multiple(() =>
+        {
+            Assert.That(first.IsEnabled, Is.True);
+            Assert.That(second.IsEnabled, Is.True);
+            Assert.That(((ToggleButton)row.Editor).IsChecked, Is.True);
+        });
+    }
+
+    private sealed class Recording : ICommand
+    {
+        public object Ran;
+
+        public bool CanRun = true;
+
+        public bool CanExecute(object parameter = null) => CanRun;
+
+        public void Execute(object parameter = null) => Ran = parameter;
+
+        public event EventHandler CanExecuteChanged;
+
+        public void RaiseCanExecuteChanged() => CanExecuteChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    // A MEASUREMENT, not a check - explicit, so it runs when asked. How the inspector scales with the size of the
+    // selection, which is the number that decides whether an editor can point it at everything a user just selected.
+    // Written to a file because a number printed from a test run is lost.
+    [Test, Explicit]
+    public void MeasureLargeSelection()
+    {
+        var report = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "propertygrid-selection.csv");
+        System.IO.File.WriteAllText(report, "objects,rows,bind ms,read ms,write ms\n");
+
+        foreach (var count in new[] { 1, 10, 100, 1000, 10000, 50000 })
+        {
+            var targets = new Target[count];
+            for (var i = 0; i < count; i++) targets[i] = new Target { Name = "shared", Scale = 1 };
+
+            var section = new PropertySection { Header = "General", IsExpanded = true };
+            var name = new StringProperty { Header = "Name", Binding = new Binding("Name") };
+            section.Properties.Add(name);
+            section.Properties.Add(new StringProperty { Header = "Locked", Binding = new Binding("Locked") });
+            section.Properties.Add(new NumericProperty { Header = "Scale", Binding = new Binding("Scale") });
+            section.Properties.Add(new BooleanProperty { Header = "Enabled", Binding = new Binding("IsEnabled") });
+
+            var grid = Built(section);
+
+            var watch = System.Diagnostics.Stopwatch.StartNew();
+            grid.SelectedObjects = targets;
+            var bind = watch.Elapsed.TotalMilliseconds;
+
+            var row = RowOf(grid, name);
+
+            watch.Restart();
+            grid.Refresh();
+            var read = watch.Elapsed.TotalMilliseconds;
+
+            watch.Restart();
+            grid.Write(row, "pushed");
+            var write = watch.Elapsed.TotalMilliseconds;
+
+            System.IO.File.AppendAllText(report,
+                $"{count},{section.Properties.Count},{bind:F1},{read:F1},{write:F1}\n");
+        }
+
+        TestContext.Out.WriteLine(System.IO.File.ReadAllText(report));
     }
 }

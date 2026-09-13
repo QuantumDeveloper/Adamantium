@@ -36,6 +36,11 @@ public class NumericUpDown : RangeLimitsBase
         typeof(double?), typeof(NumericUpDown),
         new PropertyMetadata(null, PropertyMetadataOptions.BindsTwoWayByDefault, OnValueChanged, CoerceValue));
 
+    /// <summary>Prompt text shown while the box is empty and unfocused - the entry box's own
+    /// <see cref="TextBoxBase.Placeholder"/>, forwarded so it can be set without reaching into the template.</summary>
+    public static readonly AdamantiumProperty PlaceholderProperty = AdamantiumProperty.Register(nameof(Placeholder),
+        typeof(string), typeof(NumericUpDown), new PropertyMetadata(null, OnPlaceholderChanged));
+
     public static readonly AdamantiumProperty ButtonsPlacementProperty = AdamantiumProperty.Register(
         nameof(ButtonsPlacement), typeof(NumericButtonsPlacement), typeof(NumericUpDown),
         new PropertyMetadata(NumericButtonsPlacement.Split));
@@ -163,6 +168,12 @@ public class NumericUpDown : RangeLimitsBase
     {
         AddHandler(Keyboard.PreviewTextInputEvent, new TextInputEventHandler(OnPreviewTextInput));
         AddHandler(Mouse.MouseWheelEvent, new MouseWheelEventHandler(OnMouseWheelStep));
+    }
+
+    public string Placeholder
+    {
+        get => GetValue<string>(PlaceholderProperty);
+        set => SetValue(PlaceholderProperty, value);
     }
 
     public NumericButtonsPlacement ButtonsPlacement
@@ -331,6 +342,7 @@ public class NumericUpDown : RangeLimitsBase
             _text.EnterPressed += OnTextEnterPressed;
             _text.LostFocus += OnTextLostFocus;
             _text.PropertyChanged += OnTextChanged;
+            _text.Placeholder = Placeholder;
         }
         if (_increase != null) _increase.Click += OnIncreaseClick;
         if (_decrease != null) _decrease.Click += OnDecreaseClick;
@@ -377,6 +389,11 @@ public class NumericUpDown : RangeLimitsBase
         if (value < box.Minimum) value = box.Minimum;
         if (value > box.Maximum) value = box.Maximum;
         return value;
+    }
+
+    private static void OnPlaceholderChanged(AdamantiumComponent d, AdamantiumPropertyChangedEventArgs e)
+    {
+        if (d is NumericUpDown numeric && numeric._text != null) numeric._text.Placeholder = e.NewValue as string;
     }
 
     private static void OnValueChanged(AdamantiumComponent d, AdamantiumPropertyChangedEventArgs e)
