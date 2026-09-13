@@ -8,6 +8,7 @@ using Adamantium.UI.Controls.Primitives;
 using Adamantium.UI.Controls.Text;
 using Adamantium.UI.Core;
 using Adamantium.UI.Core.Data;
+using Adamantium.UI.Core.Input;
 using Adamantium.UI.Core.Media;
 using NUnit.Framework;
 
@@ -832,6 +833,153 @@ public class PropertyGridTests
             Assert.That(second.IsEnabled, Is.True);
             Assert.That(((ToggleButton)row.Editor).IsChecked, Is.True);
         });
+    }
+
+    private static List<string> HeadersOf(PropertyGrid grid)
+    {
+        var headers = new List<string>();
+        foreach (var section in grid.Sections)
+        {
+            if (section.Content is not IUIComponent host) continue;
+            foreach (var child in host.VisualChildren)
+            {
+                if (child is PropertyRow row) headers.Add(row.Definition.Header as string);
+            }
+        }
+
+        return headers;
+    }
+
+    private static PropertyGrid Searchable()
+    {
+        var target = new Target();
+
+        var general = new PropertySection { Header = "General", Target = target, IsExpanded = true };
+        general.Properties.Add(new StringProperty { Header = "Name", Binding = new Binding("Name") });
+        general.Properties.Add(new BooleanProperty { Header = "Enabled", Binding = new Binding("IsEnabled") });
+
+        var transform = new PropertySection { Header = "Transform", Target = target, IsExpanded = true };
+        var position = new CompositeProperty { Header = "Position", IsExpanded = true };
+        position.Children.Add(new NumericProperty { Header = "Scale X", Binding = new Binding("Scale") });
+        position.Children.Add(new NumericProperty { Header = "Offset", Binding = new Binding("Scale") });
+        transform.Properties.Add(position);
+
+        return Built(general, transform);
+    }
+
+    // An inspector of a real object runs to dozens of rows, and scrolling for the one being looked for is the thing a
+    // search replaces.
+    [Test]
+    public void SearchKeepsOnlyTheRowsThatCarryIt()
+    {
+        var grid = Searchable();
+        Assert.That(HeadersOf(grid), Does.Contain("Enabled"));
+
+        grid.SearchText = "name";
+        Assert.That(HeadersOf(grid), Is.EqualTo(new[] { "Name" }), "and case is not what a search is about");
+
+        grid.SearchText = null;
+        Assert.That(HeadersOf(grid), Does.Contain("Enabled"), "cleared, the inspector is whole again");
+    }
+
+    // A composite whose CHILD is the answer has to stand: hiding the parent would hide what was found.
+    [Test]
+    public void SearchKeepsTheParentOfWhatItFound()
+    {
+        var grid = Searchable();
+
+        grid.SearchText = "offset";
+        Assert.That(HeadersOf(grid), Is.EqualTo(new[] { "Position", "Offset" }));
+    }
+
+    // Asking for a section by name means the whole of it, not the one row that happens to repeat the word.
+    [Test]
+    public void SearchingForASectionKeepsAllOfIt()
+    {
+        var grid = Searchable();
+
+        grid.SearchText = "transform";
+        Assert.That(HeadersOf(grid), Is.EqualTo(new[] { "Position", "Scale X", "Offset" }));
+    }
+
+    // A section with no answer is not shown empty: a column of bare headers reads as a result.
+    [Test]
+    public void ASectionWithNoAnswerIsNotShown()
+    {
+        var grid = Searchable();
+
+        Assert.That(((IUIComponent)grid.Sections[0]).VisualParent, Is.Not.Null, "General is on screen to begin with");
+
+        grid.SearchText = "offset";
+        Assert.That(((IUIComponent)grid.Sections[0]).VisualParent, Is.Null, "and gone - it has nothing to answer with");
+    }
+
+    // A search that hides its own results behind something folded is worse than no search - and what the user folded
+    // himself comes back once it is cleared.
+    [Test]
+    public void SearchOpensWhatItNeedsAndGivesItBack()
+    {
+        var grid = Searchable();
+        grid.Sections[1].IsExpanded = false;
+
+        grid.SearchText = "offset";
+        Assert.That(grid.Sections[1].IsExpanded, Is.True, "opened, or the answer is behind a fold");
+
+        grid.SearchText = null;
+        Assert.That(grid.Sections[1].IsExpanded, Is.False, "and folded again, the way the user left it");
+    }
+
+    // One way out of a search, reached two ways - and the row it was narrowed down to may well have the focus by then,
+    // which is why Escape is the inspector's and not only the field's.
+    [Test]
+    public void ClearSearchDropsIt()
+    {
+        var grid = Searchable();
+        grid.SearchText = "offset";
+
+        Assert.That(grid.HasSearchText, Is.True, "the theme reads this to show the cross");
+
+        grid.ClearSearch();
+        Assert.Multiple(() =>
+        {
+            Assert.That(grid.SearchText, Is.Null);
+            Assert.That(grid.HasSearchText, Is.False);
+            Assert.That(HeadersOf(grid), Does.Contain("Enabled"), "and every property is back");
+        });
+    }
+
+    [Test]
+    public void EscapeDropsTheSearch()
+    {
+        var grid = Searchable();
+        grid.SearchText = "offset";
+
+        var pressed = new KeyEventArgs(KeyboardDevice.CurrentDevice, Key.Escape, InputModifiers.None, 0)
+        {
+            RoutedEvent = Keyboard.KeyDownEvent
+        };
+        grid.RaiseEvent(pressed);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(grid.SearchText, Is.Null);
+            Assert.That(pressed.Handled, Is.True, "and the key is spent - it undid something");
+        });
+    }
+
+    // Escape with nothing to undo belongs to whatever else wants it - a dialog to close, an edit to abandon.
+    [Test]
+    public void EscapeWithNoSearchIsLeftAlone()
+    {
+        var grid = Searchable();
+
+        var pressed = new KeyEventArgs(KeyboardDevice.CurrentDevice, Key.Escape, InputModifiers.None, 0)
+        {
+            RoutedEvent = Keyboard.KeyDownEvent
+        };
+        grid.RaiseEvent(pressed);
+
+        Assert.That(pressed.Handled, Is.False);
     }
 
     private sealed class Recording : ICommand
