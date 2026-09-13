@@ -25,6 +25,7 @@ public partial class TreeDataGrid : Selector
     {
         Columns.CollectionChanged += OnColumnsChanged;
         GroupDescriptions.CollectionChanged += OnGroupDescriptionsChanged;
+        AddHandler(Keyboard.TextInputEvent, new TextInputEventHandler(OnTextInput));
         RebuildFlattener();
     }
 
@@ -311,7 +312,27 @@ public partial class TreeDataGrid : Selector
     // the honest answer anyway: where a new row belongs depends on the sort.
     private void OnSourceChanged(object sender, NotifyCollectionChangedEventArgs e)
     {
-        if (Filter != null || HasColumnFilters || SortColumn != null) RebuildFlattener();
+        if (Filter != null || HasColumnFilters || SortColumn != null)
+        {
+            RebuildFlattener();
+            return;
+        }
+
+        // The rows themselves come through the collection's own notification, but a TOTAL is over the whole set, and
+        // the set just changed. A Move is the one action that leaves it the same set, so it is the one that pays
+        // nothing.
+        if (e.Action != NotifyCollectionChangedAction.Move) InvalidateTotals();
+    }
+
+    private bool _totalsDirty;
+
+    // A total is a walk of every row - measured at 25 ms per aggregating column over ten thousand - so a source that
+    // announces a hundred additions one at a time must not buy a hundred walks. Raised here, paid ONCE, in the pass
+    // that shows the result.
+    private void InvalidateTotals()
+    {
+        _totalsDirty = true;
+        InvalidateMeasure();
     }
 
     /// <summary>Where a row's children come from, when a member path cannot say it - a lookup in a dictionary, a flat
@@ -381,6 +402,7 @@ public partial class TreeDataGrid : Selector
     {
         (_headers as IMeasurableComponent)?.InvalidateMeasure();
         (_footer as IMeasurableComponent)?.InvalidateMeasure();
+        (_newRow as IMeasurableComponent)?.InvalidateMeasure();
     }
 
     /// <summary>Keeps only rows the predicate accepts - AND their ancestors, because a match nobody can reach is not a
@@ -508,6 +530,63 @@ public partial class TreeDataGrid : Selector
 
         ApplyGrouping();
     }
+
+    /// <summary>Whether the table keeps a blank row at the bottom for a record that does not exist yet - what most
+    /// people look for first, and the only way to fill a table that is empty. Off by default: it changes the SHAPE of
+    /// the table, and a table that grew a row nobody asked for would be a surprise. Needs
+    /// <see cref="CanUserAddRows"/> as well - a table that refuses new records must not offer a place to type one.
+    /// </summary>
+    public static readonly AdamantiumProperty ShowNewItemRowProperty = AdamantiumProperty.Register(
+        nameof(ShowNewItemRow), typeof(bool), typeof(TreeDataGrid),
+        new PropertyMetadata(false, OnShowNewItemRowChanged));
+
+    public bool ShowNewItemRow
+    {
+        get => GetValue<bool>(ShowNewItemRowProperty);
+        set => SetValue(ShowNewItemRowProperty, value);
+    }
+
+    /// <summary>What the blank row says while it is empty. A row that looks like a gap at the end of the table is a row
+    /// nobody presses.</summary>
+    public static readonly AdamantiumProperty NewRowHintProperty = AdamantiumProperty.Register(
+        nameof(NewRowHint), typeof(string), typeof(TreeDataGrid),
+        new PropertyMetadata("Add a record", PropertyMetadataOptions.AffectsRender, OnNewRowHintChanged));
+
+    public string NewRowHint
+    {
+        get => GetValue<string>(NewRowHintProperty);
+        set => SetValue(NewRowHintProperty, value);
+    }
+
+    private static void OnShowNewItemRowChanged(AdamantiumComponent d, AdamantiumPropertyChangedEventArgs e) =>
+        (d as TreeDataGrid)?.RebuildFlattener();
+
+    private static void OnNewRowHintChanged(AdamantiumComponent d, AdamantiumPropertyChangedEventArgs e) =>
+        (d as TreeDataGrid)?.RefreshRealizedRows();
+
+    /// <summary>Whether the strip for a new record is standing right now.</summary>
+    internal bool HasNewItemRow => ShowNewItemRow && CanUserAddRows;
+
+    /// <summary>Blank space after the last row, so that row can be scrolled CLEAR of the horizontal scrollbar. The bar
+    /// is drawn over the content, so without this the last row is permanently half-covered - and the row it covers is
+    /// the one a table with a placeholder needs most.
+    /// <para>Added only when the table can scroll sideways at all: a short table that ends in an inch of nothing looks
+    /// like a fault, and there is no bar there to clear.</para></summary>
+    public static readonly AdamantiumProperty EndPaddingProperty = AdamantiumProperty.Register(
+        nameof(EndPadding), typeof(Double), typeof(TreeDataGrid),
+        new PropertyMetadata(16.0, PropertyMetadataOptions.AffectsMeasure));
+
+    public Double EndPadding
+    {
+        get => GetValue<Double>(EndPaddingProperty);
+        set => SetValue(EndPaddingProperty, value);
+    }
+
+    /// <summary>The strip for a new record, registered by the template. Its edit is the grid's edit - one CommitEdit
+    /// answers for both - because a table with two independent editors open is a table with two current cells.</summary>
+    internal void AdoptNewRow(DataGridNewRowPresenter strip) => _newRow = strip;
+
+    private DataGridNewRowPresenter _newRow;
 
     /// <summary>Ungroups everything.</summary>
     public void ClearGrouping()
@@ -1253,6 +1332,17 @@ public partial class TreeDataGrid : Selector
         _scroll.BringIntoView(new Rect(x, row * height, width, height));
     }
 
+    /// <summary>Brings one column into view SIDEWAYS only. The strip for a new record stands outside the rows'
+    /// scroller, so "show me this column" there has no row to name and must not move the table up or down to answer -
+    /// tabbing into the last field scrolled nothing at all and the field simply left the screen.</summary>
+    internal void ScrollColumnIntoView(int column)
+    {
+        if (_scroll == null || column < 0 || column >= Columns.Count) return;
+        if (Columns[column] is not { IsFrozen: false } wanted) return;
+
+        _scroll.BringIntoView(new Rect(wanted.Offset, _scroll.ScrollOffset.Y, wanted.ActualWidth, 1));
+    }
+
     private int RowIndexOf(object item)
     {
         var rows = Rows;
@@ -1606,8 +1696,7 @@ public partial class TreeDataGrid : Selector
         // EVERY strip placed by the width pass, not just the headers: each one measures its parts at the columns'
         // widths, and a measure nobody invalidates never runs. The strip of totals kept the width it had, so a widened
         // column left its total trimmed to an ellipsis.
-        (_headers as IMeasurableComponent)?.InvalidateMeasure();
-        (_footer as IMeasurableComponent)?.InvalidateMeasure();
+        RefreshStrips();
 
         // ...and the strip that OFFERS the columns: a column hidden from anywhere else - a page's binding, the code
         // behind a menu - has to tick down on it too, or the switch and the table say different things.
@@ -1679,6 +1768,7 @@ public partial class TreeDataGrid : Selector
         base.OnApplyTemplate();
         if (GetTemplateChild("PART_Headers") is DataGridHeadersPresenter headers) headers.Owner = this;
         if (GetTemplateChild("PART_Footer") is DataGridFooterPresenter footer) footer.Owner = this;
+        if (GetTemplateChild("PART_NewRow") is DataGridNewRowPresenter newRow) newRow.Owner = this;
         if (GetTemplateChild("PART_GroupPanel") is DataGridGroupPanel groupPanel) groupPanel.Owner = this;
         if (GetTemplateChild("PART_SearchPanel") is DataGridSearchPanel searchPanel) searchPanel.Owner = this;
 
@@ -1812,6 +1902,12 @@ public partial class TreeDataGrid : Selector
         // The width pass has already run with the old width, and the in-pass re-run only catches reports made while
         // this grid's measure is still on the stack - a virtualized row measured later is not.
         InvalidateMeasure();
+
+        // ...and every strip placed by those same numbers, or they keep the offsets the OLD leading zone produced. The
+        // rows move right by what the strip of numbers gained and nothing else does: scroll a table past its ten
+        // thousandth row and the header, the totals and the field for a new record all stand a digit's width to the
+        // left of the columns they belong to.
+        RefreshStrips();
     }
 
     private static void OnShowRowNumbersChanged(AdamantiumComponent d, AdamantiumPropertyChangedEventArgs e)
@@ -1935,6 +2031,69 @@ public partial class TreeDataGrid : Selector
         set => SetValue(SelectionUnitProperty, value);
     }
 
+    private readonly DataGridEditHistory _history = new();
+
+    /// <summary>How many acts the table can take back. ZERO turns the history off and stops it recording anything -
+    /// which is the honest way to say no to it: a history that is kept and refused is a list nobody can reach.</summary>
+    public int UndoLimit
+    {
+        get => _history.Limit;
+        set
+        {
+            _history.Limit = Math.Max(0, value);
+            if (_history.Limit == 0) _history.Clear();
+        }
+    }
+
+    /// <summary>Whether there is anything to take back.</summary>
+    public bool CanUndo => _history.CanUndo;
+
+    /// <summary>Whether anything taken back can be done again.</summary>
+    public bool CanRedo => _history.CanRedo;
+
+    /// <summary>Takes back the last thing the table did to the data - a cell, a paste, a record added or removed. False
+    /// when there is nothing to take back, or when the cell standing open will not let go.</summary>
+    public bool Undo() => StepHistory(undo: true);
+
+    /// <summary>Does again what was last taken back.</summary>
+    public bool Redo() => StepHistory(undo: false);
+
+    /// <summary>Forgets everything recorded so far - what an application calls when the data underneath was replaced by
+    /// something the table never watched change.</summary>
+    public void ClearHistory() => _history.Clear();
+
+    private bool StepHistory(bool undo)
+    {
+        // The open editor holds a value that is not in the record yet. Letting it go FIRST keeps the history in the
+        // order the user made it, and a refusal stops the whole thing rather than undoing around it.
+        if (IsEditing && !CommitEdit()) return false;
+
+        if (!(undo ? _history.Undo(out var structural) : _history.Redo(out structural))) return false;
+
+        // A record came or went: the flat list is not the same list. A value changed: the same rows, read again.
+        if (structural) Refresh();
+        else
+        {
+            RefreshRealizedRows();
+            InvalidateTotals();
+        }
+
+        return true;
+    }
+
+    /// <summary>Everything the table holds. ONE rectangle and not a range per row: the selection is kept as ranges, and
+    /// a table of ten thousand rows would otherwise buy ten thousand of them for a single keystroke.</summary>
+    public void SelectAll()
+    {
+        var rowCount = Rows?.Count ?? 0;
+        if (rowCount == 0 || Columns.Count == 0) return;
+
+        SelectedCells.Set(new CellRange(0, 0, rowCount - 1, Columns.Count - 1));
+        _anchorRow = ActiveRow < 0 ? 0 : ActiveRow;
+        _anchorColumn = ActiveColumn < 0 ? 0 : ActiveColumn;
+        RefreshCellSelectionVisuals();
+    }
+
     /// <summary>Selects whole columns - a click on a column header. One rectangle however many rows there are.</summary>
     public void SelectColumns(int firstColumn, int lastColumn, bool add = false)
     {
@@ -1975,6 +2134,142 @@ public partial class TreeDataGrid : Selector
         // A walk that leaves the table where it was is a walk out of sight: the active cell is the one thing the
         // keyboard has to keep on screen, and the table is taller and wider than the view by design.
         ScrollIntoView(row, column);
+    }
+
+    /// <summary>The whole of what Enter means in a table: finish what is open, then step the frame down - back up with
+    /// Shift. Stated ONCE because two things ask for it: the grid's own key handling, and a text editor, which raises
+    /// its Enter as an event of its own and consumes the key before the grid ever sees it.</summary>
+    internal bool FinishEditAndStep(bool back)
+    {
+        // The strip MAKES THE RECORD and goes no further: there is no cell below a record that does not exist yet, and
+        // the strip is where the next one gets typed anyway.
+        if (_newRow is { IsFilling: true }) return CommitEdit();
+
+        // A refusal keeps the cell AND the key: stepping off it is exactly what was refused.
+        if (IsEditing && !CommitEdit()) return true;
+
+        return StepActiveRow(back ? -1 : 1);
+    }
+
+    /// <summary>Moves the ACTIVE frame one row, leaving the selection where it is. That separation is the point of
+    /// having a frame at all: Enter walks down a column of a rectangle already taken without losing the rectangle. A
+    /// single cell is not a rectangle - there the frame and the selection are one thing and travel together.</summary>
+    public bool StepActiveRow(int delta)
+    {
+        var rows = Rows;
+        if (rows == null || rows.Count == 0 || Columns.Count == 0 || delta == 0) return false;
+
+        // Nothing is current yet: the key puts the frame ON the table rather than stepping from nowhere.
+        if (ActiveRow < 0 || ActiveColumn < 0)
+        {
+            SelectCell(0, 0);
+            ScrollIntoView(0, 0);
+            return true;
+        }
+
+        var row = ActiveRow;
+        do
+        {
+            row += delta;
+        }
+        while (row >= 0 && row < rows.Count && !HoldsCells(rows[row].Node));
+
+        // Spent at the ends rather than passed on: the table is what the key was aimed at either way.
+        if (row < 0 || row >= rows.Count) return true;
+
+        if (IsBlockTaken())
+        {
+            ActiveRow = row;
+            RefreshCellSelectionVisuals();
+        }
+        else
+        {
+            SelectCell(row, ActiveColumn);
+        }
+
+        ScrollIntoView(row, ActiveColumn);
+        return true;
+    }
+
+    private bool IsBlockTaken()
+    {
+        var ranges = SelectedCells.Ranges;
+        if (ranges.Count > 1) return true;
+        if (ranges.Count == 0) return false;
+
+        return ranges[0].FirstRow != ranges[0].LastRow || ranges[0].FirstColumn != ranges[0].LastColumn;
+    }
+
+    /// <summary>One cell along, wrapping into the next row at the end of one and stopping at the table's ends. What Tab
+    /// does: the strip for a new record walks its own fields, the table walks its cells, and an edit that was open
+    /// travels with the step - filling a table in means typing, stepping, typing.</summary>
+    public bool StepCell(int delta)
+    {
+        if (delta == 0) return false;
+        if (_newRow is { IsEditing: true }) return _newRow.Step(delta);
+
+        var rows = Rows;
+        if (rows == null || rows.Count == 0 || Columns.Count == 0) return false;
+
+        // A refusal spends the key rather than passing it on: the cell would not let the value go, and stepping off it
+        // is exactly what it refused.
+        var wasEditing = IsEditing;
+        if (wasEditing && !CommitEdit()) return true;
+
+        var row = Math.Clamp(ActiveRow < 0 ? 0 : ActiveRow, 0, rows.Count - 1);
+        var column = ActiveColumn < 0 ? 0 : ActiveColumn;
+
+        while (true)
+        {
+            column += delta;
+
+            if (column < 0 || column >= Columns.Count)
+            {
+                var next = row + delta;
+                if (next < 0 || next >= rows.Count) return true;
+
+                row = next;
+                column = delta > 0 ? -1 : Columns.Count;
+                continue;
+            }
+
+            // A caption or a details panel holds no cells: the step passes OVER it rather than landing on a row that
+            // has nothing to land on.
+            if (!HoldsCells(rows[row].Node))
+            {
+                var over = row + delta;
+                if (over < 0 || over >= rows.Count) return true;
+
+                row = over;
+                column = delta > 0 ? -1 : Columns.Count;
+                continue;
+            }
+
+            if (!Columns[column].IsShown) continue;
+
+            SelectCell(row, column);
+            ScrollIntoView(row, column);
+            if (wasEditing) BeginEdit(row, column);
+            return true;
+        }
+    }
+
+    // A printable character on the active cell OPENS its editor and goes in as the first thing typed - how every
+    // spreadsheet has always worked, and the difference between a table you can fill in and one you have to be shown
+    // how to fill in. F2 and the double-click stay: they are how you open a cell to AMEND what it holds rather than
+    // replace it.
+    private void OnTextInput(object sender, TextInputEventArgs e)
+    {
+        if (e.Handled || IsEditing || _newRow is { IsEditing: true }) return;
+        if (string.IsNullOrEmpty(e.Text) || char.IsControl(e.Text[0])) return;
+
+        // AFTER the edit is opened, and it has to be: opening one detaches whatever editor the cell had, and detaching
+        // clears the edited value - a seed written first would be wiped by the very call that asks for it.
+        if (!BeginEdit(ActiveRow, ActiveColumn)) return;
+
+        var cell = CellFor(ActiveRow, ActiveColumn);
+        if (cell != null) cell.PendingText = e.Text;
+        e.Handled = true;
     }
 
     /// <summary>Walks the table with the arrows, Shift extending from the anchor. False for any other key, so the
@@ -2196,7 +2491,37 @@ public partial class TreeDataGrid : Selector
                 e.Handled = BeginEdit(ActiveRow, ActiveColumn);
                 break;
 
-            case Key.Escape when IsEditing:
+            // Tab is the NEXT CELL here, not the next control. A table is a grid of fields, and the key that walks
+            // fields is the one everybody reaches for; left to the ordinary tab order it stepped out of the table
+            // altogether, taking a half-filled record with it. Claimed while the event is still passing through the
+            // grid, so the navigation at the root never sees it.
+            case Key.Tab:
+                e.Handled = StepCell(shift ? -1 : 1);
+                break;
+
+            // The grid answers for Enter, not only the text editor: a single-line field raises EnterPressed of its own
+            // and a list does not, so an edit made ENTIRELY of a choice had no explicit way to be finished at all.
+            case Key.Enter:
+                e.Handled = FinishEditAndStep(shift);
+                break;
+
+            case Key.A when control && !IsEditing:
+                SelectAll();
+                e.Handled = true;
+                break;
+
+            // Shift+Ctrl+Z is the same gesture as Ctrl+Y - both are what people press, and a table that answers only
+            // one of them is a table half the room cannot undo in.
+            case Key.Z when control && shift:
+            case Key.Y when control:
+                e.Handled = Redo();
+                break;
+
+            case Key.Z when control:
+                e.Handled = Undo();
+                break;
+
+            case Key.Escape when IsEditing || _newRow is { IsFilling: true }:
                 CancelEdit();
                 e.Handled = true;
                 break;
@@ -2271,6 +2596,7 @@ public partial class TreeDataGrid : Selector
 
         var item = rows[row].Node;
         var dataColumn = Columns[column];
+
         if (IsCellReadOnly(dataColumn, item)) return false;
 
         var args = new DataGridCellEditEventArgs(item, dataColumn);
@@ -2284,10 +2610,34 @@ public partial class TreeDataGrid : Selector
         return true;
     }
 
+    // Focus leaving a cell of the TABLE saves it: the row is already there, and what was typed is an edit of a value
+    // that exists. Focus leaving the strip for a new record CREATES NOTHING - a record that appears because someone
+    // clicked elsewhere is worse than a few characters lost - but it does not throw the strip away either: a click on
+    // the next field moves the focus before it opens anything, so discarding here emptied the strip on the way to the
+    // very field being reached for. The strip is emptied by Escape, and turned into a record by a commit.
+    internal void FinishEditOnFocusLoss()
+    {
+        if (_newRow is { IsEditing: true }) _newRow.Close();
+        else if (IsEditing) CommitEdit();
+    }
+
+    // Choosing from a list is a VALUE, not a decision to create one. In a cell of the table the row already exists and
+    // the choice IS the whole edit, so it saves. In the strip it waits: picking your way down a dropdown would
+    // otherwise leave a record behind at every step, and only Enter says the record was meant.
+    internal void FinishEditOnChoice()
+    {
+        if (_newRow is { IsEditing: true }) return;
+        if (IsEditing) CommitEdit();
+    }
+
     /// <summary>Writes what the editor holds and leaves edit mode. False means the write was refused - by a handler or by
     /// the view-model - and the cell stays in edit with what the user typed, which is what validation looks like here.</summary>
     public bool CommitEdit()
     {
+        // The strip for a new record commits through here too: one entry point, so an application that closes an edit
+        // does not have to know WHICH of the two was open.
+        if (_newRow is { IsFilling: true }) return _newRow.Commit();
+
         if (!IsEditing) return true;
 
         var rows = Rows;
@@ -2319,6 +2669,12 @@ public partial class TreeDataGrid : Selector
     /// <summary>Leaves edit mode without writing anything.</summary>
     public void CancelEdit()
     {
+        if (_newRow is { IsFilling: true })
+        {
+            _newRow.Cancel();
+            return;
+        }
+
         if (!IsEditing) return;
         EndEdit();
     }
@@ -2342,8 +2698,24 @@ public partial class TreeDataGrid : Selector
 
     // A template column writes through its OWN two-way bindings while the user is in it, so there is nothing left here
     // to write and refusing would leave the cell stuck in edit.
-    private static bool WriteThroughColumn(DataGridColumn column, object item, object value) =>
-        column.Binding == null || column.Write(item, value);
+    // EVERY value the table writes goes through here, which is what makes one history of it: the editor, the paste and
+    // the placeholder all arrive at this line, and a fourth way of writing would have to as well.
+    private bool WriteThroughColumn(DataGridColumn column, object item, object value)
+    {
+        if (column.Binding == null) return true;
+
+        // Read BEFORE and AFTER off the object rather than remembering what was handed in: what the object took is the
+        // only thing putting it back can be expected to restore, converters and refusals included.
+        var before = _history.Limit > 0 && !_history.IsApplying ? column.Read(column.Binding, item) : null;
+        if (!column.Write(item, value)) return false;
+
+        if (_history.Limit > 0)
+        {
+            _history.Record(new DataGridValueEdit(column, item, before, column.Read(column.Binding, item)));
+        }
+
+        return true;
+    }
 
     /// <summary>Whether this one cell refuses editing: the column first, then the row's own answer through
     /// <see cref="DataGridColumn.IsReadOnlyBinding"/>.</summary>
@@ -2428,10 +2800,15 @@ public partial class TreeDataGrid : Selector
         var lastColumn = anchor.FirstColumn;
         var row = anchor.FirstRow;
 
+        // ONE act, however many cells it fills: one paste is one thing the user did, and one Ctrl+Z is what they reach
+        // for afterwards.
+        _history.Begin();
+
         foreach (var line in block)
         {
-            // Rows and columns that hold no cells are STEPPED OVER and consume no line of the clipboard: a caption
+            // Rows and columns that hold no record are STEPPED OVER and consume no line of the clipboard: a caption
             // between two records is the table's own furniture, and a paste of three lines means the next three records.
+            // The placeholder is stepped over too - pasting does not CREATE records, it fills the ones that are there.
             while (row < rows.Count && !HoldsCells(rows[row].Node)) row++;
             if (row >= rows.Count) break;
 
@@ -2452,6 +2829,8 @@ public partial class TreeDataGrid : Selector
             row++;
         }
 
+        _history.End();
+
         if (written == 0) return false;
 
         SelectedCells.Set(new CellRange(anchor.FirstRow, anchor.FirstColumn, lastRow, lastColumn));
@@ -2469,11 +2848,12 @@ public partial class TreeDataGrid : Selector
         var args = new DataGridCellEditEventArgs(item, column, text);
         CellEditEnding?.Invoke(this, args);
 
-        return !args.Cancel && column.Write(item, args.Value);
+        return !args.Cancel && WriteThroughColumn(column, item, args.Value);
     }
 
-    // A group caption and a details panel are not records: there is nothing in them to copy and nothing to write into.
+    // A group caption and a details panel have no cells at all: nothing to write into and nothing to walk to.
     private static bool HoldsCells(object node) => node is not DataGridGroup && node is not DataGridRowDetails;
+
 
     // Tabs and newlines are the format's own punctuation, so a value carrying one has to be quoted or it silently
     // becomes two fields. The same rule a spreadsheet uses on its way out, which is what makes the round trip hold.
@@ -2609,6 +2989,12 @@ public partial class TreeDataGrid : Selector
 
     protected override Size MeasureOverride(Size availableSize)
     {
+        if (_totalsDirty)
+        {
+            _totalsDirty = false;
+            RefreshTotals();
+        }
+
         // The scroller's offset is RECONCILED here as well as pushed by its event: an event can be raised while the
         // offset it announces is still settling, and a header strip standing one scroll behind its rows is exactly what
         // that looks like. Reading it once a pass costs nothing and cannot be missed.

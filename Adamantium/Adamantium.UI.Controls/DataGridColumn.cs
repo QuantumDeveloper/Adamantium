@@ -4,6 +4,7 @@ using Adamantium.UI.Controls.Primitives;
 using Adamantium.UI.Controls.Text;
 using Adamantium.UI.Core;
 using Adamantium.UI.Core.Data;
+using Adamantium.UI.Core.Resources;
 using Adamantium.UI.Core.RoutedEvents;
 using Adamantium.UI.Core.Templates;
 
@@ -389,7 +390,12 @@ public abstract class DataGridColumn : FundamentalUIComponent
 
     /// <summary>The content a cell shows for one row - the value the column's binding produces, or the ROW itself when
     /// the column names no binding, so a template column's cell binds against the item.</summary>
-    protected internal object CellContentFor(object row) => Binding == null ? row : Read(Binding, row);
+    protected internal object CellContentFor(object row) => Binding == null ? row : Read(Binding, row) ?? EmptyContent;
+
+    /// <summary>What a cell shows when its row holds nothing there. NEVER null: a cell's template is built OVER its
+    /// content and nothing is built over null - not the display, and not the editor either, so a record with an unset
+    /// member had a cell that could not be edited at all. A column answers for its own kind of empty.</summary>
+    protected internal virtual object EmptyContent => string.Empty;
 
     // What a cell reads off its row changed, so every cell of this column has to read again. A binding is not layout:
     // nothing about it dirties a measure, and without this the new declaration would only take on the next thing that
@@ -547,6 +553,9 @@ public class DataGridCheckBoxColumn : DataGridColumn
     // This column shows a BOX, not words. Its value reads as "False", and a search for "al" found every one of them.
     protected internal override bool IsSearchable => false;
 
+    // The box of nothing is unticked, not the empty string: this template binds IsChecked straight at the content.
+    protected internal override object EmptyContent => false;
+
     protected internal override void PrepareEditor(IUIComponent editor, object item, object value)
     {
         if (editor is ToggleButton toggle) toggle.IsChecked = value as bool? ?? false;
@@ -617,7 +626,7 @@ public class DataGridDropDownColumn : DataGridColumn
     protected internal override DataTemplate EditingTemplate =>
         CellEditingTemplate ?? (_defaultEditor ??= new DataTemplate(() => new TemplateResult
         {
-            RootComponent = new DropDown { MinWidth = 0, MinHeight = 0, BorderThickness = new Thickness(0) }
+            RootComponent = new DropDown { Classes = new Classes { DataGridEditors.EditorClass } }
         }));
 
     protected internal override void PrepareEditor(IUIComponent editor, object item, object value)
@@ -650,14 +659,15 @@ public class DataGridDropDownColumn : DataGridColumn
 
 internal static class DataGridEditors
 {
-    public static TextBox Field() => new()
-    {
-        BorderThickness = new Thickness(0),
-        Padding = new Thickness(0),
-        MinWidth = 0,
-        MinHeight = 0,
-        VerticalAlignment = VerticalAlignment.Stretch
-    };
+    /// <summary>The class every editor a column builds for itself wears, so a theme can say what an editor INSIDE A
+    /// CELL looks like without touching what the control looks like anywhere else. A field in a cell is not a field on
+    /// a page: it fills a rectangle with hard edges, and the rounded box the ordinary style gives it read as a control
+    /// dropped onto the table rather than as the cell being filled in.</summary>
+    public const string EditorClass = "DataGridEditor";
+
+    // A NEW collection per editor, never the property's default: that default is one shared instance, and adding to it
+    // would name every component in the application a grid editor.
+    public static TextBox Field() => new() { Classes = new Classes { EditorClass } };
 
     public static DataTemplate Box(bool live) => new(() =>
     {

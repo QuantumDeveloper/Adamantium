@@ -206,6 +206,10 @@ public partial class DataGridViewModel : TabPageViewModel
     /// back the rows the funnels had hidden.</summary>
     [Bindable] private bool _canFilterColumns = true;
 
+    /// <summary>Whether the table keeps a blank row at the bottom to type a new record into. Off to begin with, so the
+    /// difference it makes to the shape of the table can be seen by switching it on.</summary>
+    [Bindable] private bool _showNewItemRow;
+
     /// <summary>Where this page keeps the saved arrangement. A FILE, not a field: the whole point of saving the
     /// columns is that the choice outlives the run, and a demo that only remembered it in memory would demonstrate
     /// nothing - including whether the state object can actually be written at all.</summary>
@@ -237,6 +241,31 @@ public partial class DataGridViewModel : TabPageViewModel
             System.IO.File.ReadAllText(LayoutFile));
         grid.RestoreColumnState(state);
         LayoutStatus = $"Restored {state?.Columns.Count ?? 0} columns";
+    }
+
+    /// <summary>What the history buttons report. Shown as a COUNT of what is reachable in each direction, because
+    /// "undo did something" is not visible on a table of ten thousand rows unless you were looking at the right one.
+    /// </summary>
+    [Bindable] private string _historyStatus = "Nothing to take back";
+
+    [Command]
+    private void UndoEdit(object target)
+    {
+        if (target is not TreeDataGrid grid) return;
+
+        HistoryStatus = grid.Undo()
+            ? $"Took one back; {(grid.CanUndo ? "more behind" : "nothing behind")}, {(grid.CanRedo ? "one ahead" : "none ahead")}"
+            : "Nothing to take back";
+    }
+
+    [Command]
+    private void RedoEdit(object target)
+    {
+        if (target is not TreeDataGrid grid) return;
+
+        HistoryStatus = grid.Redo()
+            ? $"Did one again; {(grid.CanUndo ? "more behind" : "nothing behind")}, {(grid.CanRedo ? "one ahead" : "none ahead")}"
+            : "Nothing to do again";
     }
 
     /// <summary>What the export buttons report - the path, because a demo whose export cannot be OPENED has shown

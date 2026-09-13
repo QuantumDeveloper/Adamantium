@@ -36,7 +36,12 @@ public class DataGridRowsPresenter : StackPanel
     {
         var extent = base.MeasureVirtualized(availableSize, offset);
         var width = Owner?.ColumnsWidth ?? 0;
-        return width > extent.Width ? new Size(width, extent.Height) : extent;
+        if (width <= extent.Width) return extent;
+
+        // Wider than the view means a horizontal scrollbar, and the bar is drawn OVER the content: without a tail of
+        // blank the last row is permanently half-covered by it - and with a placeholder at the bottom, that is the row
+        // the table most needs reachable.
+        return new Size(width, extent.Height + Math.Max(0, Owner?.EndPadding ?? 0));
     }
 
     protected override void ArrangeVirtualized(Size finalSize, Vector2 offset)

@@ -26,7 +26,7 @@
                             BorderThickness="{TemplateBinding BorderThickness}"
                             CornerRadius="{TemplateBinding CornerRadius}"
                             ClipToBounds="True">
-                        <Grid RowDefinitions="Auto,Auto,Auto,*,Auto" ColumnDefinitions="*,Auto">
+                        <Grid RowDefinitions="Auto,Auto,Auto,*,Auto,Auto" ColumnDefinitions="*,Auto">
                             <!-- The search strip, at the very top - see the macOS set. -->
                             <DataGridSearchPanel x:Name="PART_SearchPanel" Grid.Row="0" Grid.ColumnSpan="2"
                                                  Visibility="Collapsed"/>
@@ -88,7 +88,17 @@
                             </ScrollViewer>
 
                             <!-- The totals, outside the vertical scroller - see the macOS set. -->
-                            <Border x:Name="PART_FooterBand" Grid.Row="4" Grid.ColumnSpan="2" Visibility="Collapsed"
+                            <!-- The strip a new record is typed into, ABOVE the totals and outside the vertical
+                                 scroller: it is not one of the rows, and nobody should have to scroll ten thousand of
+                                 them to add one. -->
+                            <Border x:Name="PART_NewRowBand" Grid.Row="4" Grid.ColumnSpan="2" Visibility="Collapsed"
+                                    Background="{TemplateBinding Background}"
+                                    BorderBrush="{ObservableResource DataGridLineColor}"
+                                    BorderThickness="0 1 0 0">
+                                <DataGridNewRowPresenter x:Name="PART_NewRow" Height="{TemplateBinding RowHeight}"/>
+                            </Border>
+
+                            <Border x:Name="PART_FooterBand" Grid.Row="5" Grid.ColumnSpan="2" Visibility="Collapsed"
                                     Background="{ObservableResource SolidBackgroundFillColorTertiary}"
                                     BorderBrush="{ObservableResource DataGridLineColor}"
                                     BorderThickness="0 1 0 0">
@@ -119,6 +129,9 @@
                         </PropertyTrigger>
                         <PropertyTrigger Property="HasTotals" Value="true">
                             <Setter TargetName="PART_FooterBand" Property="Visibility" Value="Visible"/>
+                        </PropertyTrigger>
+                        <PropertyTrigger Property="ShowNewItemRow" Value="true">
+                            <Setter TargetName="PART_NewRowBand" Property="Visibility" Value="Visible"/>
                         </PropertyTrigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
@@ -383,6 +396,29 @@
         </Setter>
     </Style>
 
+    <!-- An editor INSIDE A CELL, and only there - the class is worn by the editors a column builds for itself, so a
+         text box on a page is untouched. A cell is a rectangle with hard edges and its padding drops to zero while the
+         editor stands in it, so the editor fills that rectangle square and carries the cell's own padding: the text
+         stays exactly where it was reading, and the value is not a rounded box dropped onto the table. -->
+    <Style Selector="TextBox.DataGridEditor">
+        <Setter Property="CornerRadius" Value="0"/>
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="Padding" Value="10 0"/>
+        <Setter Property="MinWidth" Value="0"/>
+        <Setter Property="MinHeight" Value="0"/>
+        <Setter Property="VerticalAlignment" Value="Stretch"/>
+        <Setter Property="VerticalContentAlignment" Value="Center"/>
+    </Style>
+
+    <!-- The list keeps its own PADDING: that is where its height comes from, and taking it away to match the cell's
+         left inset collapsed the control to the height of the word in it. Only the rounding and the frame go. -->
+    <Style Selector="DropDown.DataGridEditor">
+        <Setter Property="CornerRadius" Value="0"/>
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="MinWidth" Value="0"/>
+        <Setter Property="MinHeight" Value="0"/>
+    </Style>
+
     <Style Selector="DataGridCell">
         <Setter Property="Foreground" Value="{ObservableResource TextFillColorPrimary}"/>
         <Setter Property="FontSize" Value="{ResourceReference FontSizeBody}"/>
@@ -479,6 +515,10 @@
                         <!-- An editor takes the WHOLE cell - see the macOS set. -->
                         <PropertyTrigger Property="IsEditing" Value="true">
                             <Setter TargetName="CellBorder" Property="Padding" Value="0"/>
+                            <!-- ...the WHOLE of it, top to bottom. The content is centred and sized to itself the rest
+                                 of the time, which is right for a value being read and leaves an editor standing a few
+                                 pixels short of the cell it is filling in. -->
+                            <Setter TargetName="PART_ContentPresenter" Property="VerticalAlignment" Value="Stretch"/>
                         </PropertyTrigger>
                         <!-- The three meanings a table normally distinguishes. A column states them through
                              StateBinding or works them out with a StateRule; what they LOOK like is decided here, which

@@ -28,6 +28,8 @@
                       ShowSearchPanel="{Binding ShowSearchPanel}"
                       CanUserChooseColumns="{Binding CanChooseColumns}"
                       CanUserFilterColumns="{Binding CanFilterColumns}"
+                      ShowNewItemRow="{Binding ShowNewItemRow}"
+                      NewRowHint="New assembly"
                       SearchMatchBrush="{Binding SearchMatchBrush}"
                       SearchCurrentMatchBrush="{Binding SearchCurrentMatchBrush}"
                       ValidationErrorBrush="{Binding ValidationErrorBrush}"
@@ -196,6 +198,10 @@
                      one that cannot be narrowed at all. -->
                 <CheckBox Content="Let the user filter columns" Margin="0,0,0,6"
                           IsChecked="{Binding CanFilterColumns, Mode=TwoWay}"/>
+                <!-- The blank row at the very bottom. Scroll to the end, type into it, press Enter - the record is made
+                     THEN, not a keystroke earlier, so Escape leaves nothing behind. -->
+                <CheckBox Content="Row for a new record" Margin="0,0,0,6"
+                          IsChecked="{Binding ShowNewItemRow, Mode=TwoWay}"/>
                 <!-- The arrangement written to a FILE and read back - what makes choosing columns worth anything.
                      Hide a column, drag a header, widen one, pin one, sort by one; save; put it all back wrong;
                      restore. -->
@@ -209,6 +215,23 @@
                 </Grid>
                 <TextBlock Text="{Binding LayoutStatus}" FontSize="11" Margin="0,0,0,8"
                            Foreground="{ObservableResource TextFillColorSecondary}"/>
+
+                <!-- The same acts Ctrl+Z and Ctrl+Y reach; the buttons exist because a demo has to be able to SHOW
+                     them. Edit a cell, paste a block, delete a row, add one through the placeholder - each is one act
+                     and comes back whole. -->
+                <TextBlock Text="HISTORY" FontSize="11" Margin="0,4,0,6"
+                           Foreground="{ObservableResource TextFillColorSecondary}"/>
+                <Grid ColumnDefinitions="*,*" Margin="0,0,0,4">
+                    <Button Grid.Column="0" Content="Undo" Margin="0,0,4,0"
+                            Command="{Binding UndoEditCommand}"
+                            CommandParameter="{Binding ElementName=Table}"/>
+                    <Button Grid.Column="1" Content="Redo"
+                            Command="{Binding RedoEditCommand}"
+                            CommandParameter="{Binding ElementName=Table}"/>
+                </Grid>
+                <TextBlock Text="{Binding HistoryStatus}" FontSize="11" Margin="0,0,0,8" TextWrapping="WrapByWords"
+                           Foreground="{ObservableResource TextFillColorSecondary}"/>
+
                 <TextBlock Text="EXPORT" FontSize="11" Margin="0,4,0,6"
                            Foreground="{ObservableResource TextFillColorSecondary}"/>
                 <!-- What goes out is what is on screen - the visible columns in their order, the rows filtered and
