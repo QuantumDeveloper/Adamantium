@@ -1,5 +1,5 @@
 using Adamantium.Game.Sandbox.ViewModels;
-using Adamantium.UI.Controls;
+using Adamantium.UI.Controls.DataGrid;
 
 namespace Adamantium.Game.Sandbox.Validation;
 

@@ -8,6 +8,7 @@ using System.Linq;
 using Adamantium.Mathematics;
 using Adamantium.UI.Controls;
 using Adamantium.UI.Controls.Base;
+using Adamantium.UI.Controls.DataGrid;
 using Adamantium.UI.Controls.Decorators;
 using Adamantium.UI.Controls.Panels;
 using Adamantium.UI.Core;
@@ -3274,6 +3275,309 @@ public class DataGridTests
         });
     }
 
+    // The FIRST key decides and the next breaks its ties. Said as a list rather than as a flag per column, because the
+    // ORDER is the whole of what a second key means.
+    [Test]
+    public void TwoKeys_TheFirstDecides_AndTheSecondBreaksItsTies()
+    {
+        var grid = GroupableGrid(6);
+        Relayout(grid);
+
+        grid.SortBy(grid.Columns[0]);          // Region: north / south
+        grid.AddSort(grid.Columns[1], descending: true);   // Size, biggest first within each region
+
+        var regions = grid.Rows.Select(r => ((Row)r.Node).Region).ToList();
+        var sizes = grid.Rows.Select(r => ((Row)r.Node).Size).ToList();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(regions, Is.Ordered, "the first key runs the table");
+            Assert.That(sizes.Take(3), Is.Ordered.Descending, "and the second orders what the first tied");
+            Assert.That(sizes.Skip(3), Is.Ordered.Descending);
+        });
+    }
+
+    [Test]
+    public void MovingAKey_ChangesWhichOneDecides()
+    {
+        var grid = GroupableGrid(6);
+        Relayout(grid);
+
+        grid.SortBy(grid.Columns[1]);   // Size
+        grid.AddSort(grid.Columns[0]);  // Region breaks its ties
+
+        Assert.That(grid.SortColumn, Is.SameAs(grid.Columns[1]));
+
+        grid.MoveSorting(1, 0);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(grid.SortColumn, Is.SameAs(grid.Columns[0]), "the one moved to the front");
+            Assert.That(grid.Rows.Select(r => ((Row)r.Node).Region), Is.Ordered);
+        });
+    }
+
+    // Where a column stands is what the header shows beside its arrow. Nothing to show with one key: a lone "1" is a
+    // question rather than an answer.
+    [Test]
+    public void TheLevel_IsOneBased_AndOnlyMeansSomethingWithSeveralKeys()
+    {
+        var grid = GroupableGrid(4);
+        Relayout(grid);
+
+        grid.SortBy(grid.Columns[0]);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(grid.SortLevelOf(grid.Columns[0]), Is.EqualTo(1));
+            Assert.That(grid.SortLevelOf(grid.Columns[1]), Is.EqualTo(0), "not a key at all");
+        });
+
+        grid.AddSort(grid.Columns[1]);
+
+        Assert.That(grid.SortLevelOf(grid.Columns[1]), Is.EqualTo(2));
+    }
+
+    // Adding a column already in the sort turns it around WHERE IT STANDS rather than appending it a second time.
+    [Test]
+    public void AddingAKeyTwice_TurnsItAroundInPlace()
+    {
+        var grid = GroupableGrid(4);
+        Relayout(grid);
+
+        grid.SortBy(grid.Columns[0]);
+        grid.AddSort(grid.Columns[1]);
+        grid.AddSort(grid.Columns[0], descending: true);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(grid.SortDescriptions, Has.Count.EqualTo(2));
+            Assert.That(grid.SortLevelOf(grid.Columns[0]), Is.EqualTo(1), "still the one that decides");
+            Assert.That(grid.SortDescending, Is.True);
+        });
+    }
+
+    [Test]
+    public void FlippingAndRemoving_LeaveTheOrderOfTheRestAlone()
+    {
+        var grid = GroupableGrid(4);
+        Relayout(grid);
+
+        grid.SortBy(grid.Columns[0]);
+        grid.AddSort(grid.Columns[1]);
+        grid.AddSort(grid.Columns[2]);
+
+        grid.FlipSort(grid.Columns[1]);
+        Assert.Multiple(() =>
+        {
+            Assert.That(grid.SortDescriptions[1].Descending, Is.True);
+            Assert.That(grid.SortLevelOf(grid.Columns[2]), Is.EqualTo(3), "and it stayed where it was");
+        });
+
+        grid.RemoveSort(grid.Columns[0]);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(grid.SortDescriptions, Has.Count.EqualTo(2));
+            Assert.That(grid.SortLevelOf(grid.Columns[1]), Is.EqualTo(1), "the rest moved up");
+            Assert.That(grid.SortLevelOf(grid.Columns[2]), Is.EqualTo(2));
+        });
+    }
+
+    // Taking the strip away leaves the FIRST key and drops the rest: sorting by one column is something the headers say
+    // on their own, being sorted by three with nothing to show it is an order nothing explains.
+    [Test]
+    public void HidingTheStrip_KeepsOneKeyAndDropsTheRest()
+    {
+        var grid = GroupableGrid(4);
+        grid.ShowSortPanel = true;
+        Relayout(grid);
+
+        grid.SortBy(grid.Columns[0]);
+        grid.AddSort(grid.Columns[1]);
+
+        grid.ShowSortPanel = false;
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(grid.SortDescriptions, Has.Count.EqualTo(1));
+            Assert.That(grid.SortColumn, Is.SameAs(grid.Columns[0]));
+        });
+    }
+
+    // Every key is saved, not just the first - a layout that came back sorted by one of three would be the saving
+    // quietly failing.
+    [Test]
+    public void SavedLayout_CarriesEveryKey()
+    {
+        // The columns bind to Region and Size, so those paths ARE their saved names - see DataGridColumn.StateKey.
+        var grid = GroupableGrid(4);
+        Relayout(grid);
+
+        grid.SortBy(grid.Columns[0]);
+        grid.AddSort(grid.Columns[1], descending: true);
+
+        var state = grid.CaptureColumnState();
+        grid.ClearSorting();
+        grid.RestoreColumnState(state);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(grid.SortDescriptions, Has.Count.EqualTo(2));
+            Assert.That(grid.SortLevelOf(grid.Columns[1]), Is.EqualTo(2));
+            Assert.That(grid.SortDescriptions[1].Descending, Is.True);
+        });
+    }
+
+    // A file written before the table could sort by several carries only the old fields, and coming back unsorted from
+    // it would be the saving quietly failing the other way.
+    [Test]
+    public void ALayoutSavedWithOneKey_StillRestores()
+    {
+        var grid = GroupableGrid(4);
+        Relayout(grid);
+
+        grid.RestoreColumnState(new DataGridColumnsState { SortKey = "Region", SortDescending = true });
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(grid.SortColumn, Is.SameAs(grid.Columns[0]));
+            Assert.That(grid.SortDescending, Is.True);
+        });
+    }
+
+    private sealed class Joined
+    {
+        public string Id { get; set; }
+        public string Parent { get; set; }
+        public string Name { get; set; }
+    }
+
+    private static TreeDataGrid RelatedGrid(params Joined[] items)
+    {
+        var grid = Grid(new DataGridTextColumn { Binding = new Binding("Name"), Width = new GridLength(100) });
+        grid.ItemsSource = new List<Joined>(items);
+        grid.KeyPath = "Id";
+        grid.ParentKeyPath = "Parent";
+        Relayout(grid);
+        return grid;
+    }
+
+    // The shape data arrives in from a database or a service - rows with an id and a parent id - said in markup rather
+    // than assembled in code.
+    [Test]
+    public void KeysMakeTheTree_WithoutARecordHoldingItsChildren()
+    {
+        var grid = RelatedGrid(
+            new Joined { Id = "a", Name = "root" },
+            new Joined { Id = "b", Parent = "a", Name = "child" },
+            new Joined { Id = "c", Parent = "b", Name = "grandchild" });
+
+        Assert.That(grid.Rows, Has.Count.EqualTo(1), "one root, folded");
+
+        grid.ExpandRow(grid.Rows[0]);
+        grid.ExpandRow(grid.Rows[1]);
+
+        Assert.That(grid.Rows.Select(r => ((Joined)r.Node).Name),
+            Is.EqualTo(new[] { "root", "child", "grandchild" }));
+    }
+
+    // An ORPHAN stands at the top rather than disappearing: a record the table cannot reach is data silently lost,
+    // which is worse than a record shown where it does not belong.
+    [Test]
+    public void ARecordNamingAParentNobodyAnswersTo_StandsAtTheTop()
+    {
+        var grid = RelatedGrid(
+            new Joined { Id = "a", Name = "root" },
+            new Joined { Id = "b", Parent = "missing", Name = "orphan" });
+
+        Assert.That(grid.Rows.Select(r => ((Joined)r.Node).Name), Is.EqualTo(new[] { "root", "orphan" }));
+    }
+
+    [Test]
+    public void ARecordNamingItself_IsARootAndNotItsOwnChild()
+    {
+        var grid = RelatedGrid(new Joined { Id = "a", Parent = "a", Name = "alone" });
+
+        Assert.That(grid.Rows, Has.Count.EqualTo(1));
+        Assert.That(grid.Rows[0].IsExpanded, Is.False);
+    }
+
+    // A CYCLE reaches nothing: neither record is a root and neither is under one, so both would simply vanish. It is
+    // broken open at its first record in the source's own order - shown, rather than dropped and never explained.
+    [Test]
+    public void ACycle_IsBrokenOpen_AndEveryRecordIsStillThere()
+    {
+        var grid = RelatedGrid(
+            new Joined { Id = "a", Parent = "b", Name = "first" },
+            new Joined { Id = "b", Parent = "a", Name = "second" });
+
+        Assert.That(grid.Rows, Has.Count.EqualTo(1), "one of them at the top");
+        Assert.That(((Joined)grid.Rows[0].Node).Name, Is.EqualTo("first"), "the first one the source names");
+
+        grid.ExpandRow(grid.Rows[0]);
+
+        Assert.That(grid.Rows.Select(r => ((Joined)r.Node).Name), Is.EqualTo(new[] { "first", "second" }),
+            "and the other under it, once");
+    }
+
+    // Two records claiming one key is the data contradicting itself. The first owns it - hanging the children off both
+    // would put the same rows in the table twice, which is the one outcome that is certainly wrong.
+    [Test]
+    public void TwoRecordsWithOneKey_DoNotBothCollectTheChildren()
+    {
+        var grid = RelatedGrid(
+            new Joined { Id = "a", Name = "first a" },
+            new Joined { Id = "a", Name = "second a" },
+            new Joined { Id = "c", Parent = "a", Name = "child" });
+
+        Assert.That(grid.Rows, Has.Count.EqualTo(2), "both roots, the child folded under one of them");
+
+        grid.ExpandRow(grid.Rows[0]);
+
+        Assert.That(grid.Rows.Select(r => ((Joined)r.Node).Name),
+            Is.EqualTo(new[] { "first a", "child", "second a" }));
+    }
+
+    // One path alone cannot say what belongs to what, and half a relation quietly doing nothing is the kind of no-op
+    // nobody finds.
+    [Test]
+    public void OnePathAlone_MakesNoTree()
+    {
+        var grid = Grid(new DataGridTextColumn { Binding = new Binding("Name"), Width = new GridLength(100) });
+        grid.ItemsSource = new List<Joined>
+        {
+            new() { Id = "a", Name = "one" },
+            new() { Id = "b", Parent = "a", Name = "two" }
+        };
+        grid.KeyPath = "Id";
+        Relayout(grid);
+
+        Assert.That(grid.Rows, Has.Count.EqualTo(2), "a flat list, as it was handed in");
+    }
+
+    // A record arriving changes what belongs to what, not just where one row sits - the lookup that says so was worked
+    // out before it happened.
+    [Test]
+    public void ARecordAddedToALiveSource_JoinsTheTree()
+    {
+        var items = new ObservableCollection<Joined> { new() { Id = "a", Name = "root" } };
+        var grid = Grid(new DataGridTextColumn { Binding = new Binding("Name"), Width = new GridLength(100) });
+        grid.ItemsSource = items;
+        grid.KeyPath = "Id";
+        grid.ParentKeyPath = "Parent";
+        Relayout(grid);
+
+        items.Add(new Joined { Id = "b", Parent = "a", Name = "child" });
+        Relayout(grid);
+
+        Assert.That(grid.Rows, Has.Count.EqualTo(1), "still one root");
+
+        grid.ExpandRow(grid.Rows[0]);
+
+        Assert.That(grid.Rows.Select(r => ((Joined)r.Node).Name), Is.EqualTo(new[] { "root", "child" }));
+    }
+
     private static void PressKey(TreeDataGrid grid, Key key) =>
         grid.RaiseEvent(new KeyEventArgs(KeyboardDevice.CurrentDevice, key, InputModifiers.None, 0)
         {
@@ -3825,7 +4129,7 @@ public class DataGridTests
         var order = grid.Columns[0];
 
         headers.BeginReorder(0, 10);
-        headers.EndReorder(250, intoGroupPanel: true);
+        headers.EndReorder(250, DataGridDropStrip.Grouping);
 
         Assert.Multiple(() =>
         {

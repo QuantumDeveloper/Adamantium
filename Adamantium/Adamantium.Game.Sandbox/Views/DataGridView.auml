@@ -17,14 +17,17 @@
         <!-- The tint comes from the picker below by ELEMENT, not through the view-model: the swatch's brush is the one
              live object and both the button and the table paint from it. -->
         <TreeDataGrid Grid.Row="2" x:Name="Table"
-                      ItemsSource="{Binding Nodes}"
-                      ChildrenPath="Children"
+                      ItemsSource="{Binding TreeSource}"
+                      ChildrenPath="{Binding TreeChildrenPath}"
+                      KeyPath="{Binding TreeKeyPath}"
+                      ParentKeyPath="{Binding TreeParentKeyPath}"
                       GridLinesVisibility="{Binding GridLines}"
                       ShowRowNumbers="{Binding ShowRowNumbers}"
                       SelectionUnit="{Binding SelectionUnit}"
                       AlternationCount="{Binding AlternationCount}"
                       AlternationBrush="{Binding SelectedBrush, ElementName=TintPicker}"
                       ShowGroupPanel="{Binding ShowGroupPanel}"
+                      ShowSortPanel="{Binding ShowSortPanel}"
                       ShowSearchPanel="{Binding ShowSearchPanel}"
                       CanUserChooseColumns="{Binding CanChooseColumns}"
                       CanUserFilterColumns="{Binding CanFilterColumns}"
@@ -337,6 +340,26 @@
                      take the column back out. Groups nest in the order the chips stand in. -->
                 <CheckBox Content="Grouping panel" Margin="0,0,0,6"
                           IsChecked="{Binding ShowGroupPanel, Mode=TwoWay}"/>
+
+                <TextBlock Text="TREE" FontSize="11" Margin="0,10,0,6"
+                           Foreground="{ObservableResource TextFillColorSecondary}"/>
+                <!-- The SAME records and the same parentage, described the two ways the control accepts: records
+                     holding their children, or a flat list joined on keys - the shape a database hands over. The rows
+                     on screen must come out identical; that is what makes this a test and not an illustration. -->
+                <CheckBox Content="Tree from keys, not nesting" Margin="0,0,0,4"
+                          IsChecked="{Binding TreeFromKeys, Mode=TwoWay}"/>
+                <!-- The only thing that CHANGES on screen, and the thing that proves it: hand the table twelve
+                     thousand flat records and it still shows ten thousand rows with branches. -->
+                <TextBlock Text="{Binding TreeSourceStatus}" FontSize="11" Margin="0,0,0,6" TextWrapping="WrapByWords"
+                           Foreground="{ObservableResource TextFillColorSecondary}"/>
+
+                <TextBlock Text="SORTING" FontSize="11" Margin="0,10,0,6"
+                           Foreground="{ObservableResource TextFillColorSecondary}"/>
+                <!-- A click on a header still sorts by that ONE column. The strip is how a table is sorted by several:
+                     drag a header into it to add a key, press a chip to turn it around, drag one to change which key
+                     decides. From the second key on, each header also says which key it is. -->
+                <CheckBox Content="Sorting panel" Margin="0,0,0,6"
+                          IsChecked="{Binding ShowSortPanel, Mode=TwoWay}"/>
 
                 <TextBlock Text="TOTALS" FontSize="11" Margin="0,10,0,6"
                            Foreground="{ObservableResource TextFillColorSecondary}"/>

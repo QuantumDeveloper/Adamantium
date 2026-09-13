@@ -1,5 +1,5 @@
 using System;
-using Adamantium.UI.Controls;
+using Adamantium.UI.Controls.DataGrid;
 using Adamantium.UI.Core;
 
 namespace Adamantium.Game.Sandbox.Validation;

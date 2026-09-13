@@ -22,7 +22,7 @@
                             BorderThickness="{TemplateBinding BorderThickness}"
                             CornerRadius="{TemplateBinding CornerRadius}"
                             ClipToBounds="True">
-                        <Grid RowDefinitions="Auto,Auto,Auto,*,Auto,Auto" ColumnDefinitions="*,Auto">
+                        <Grid RowDefinitions="Auto,Auto,Auto,Auto,*,Auto,Auto" ColumnDefinitions="*,Auto">
                             <!-- The search strip, at the very top: it speaks about the WHOLE table, grouping and all. -->
                             <DataGridSearchPanel x:Name="PART_SearchPanel" Grid.Row="0" Grid.ColumnSpan="2"
                                                  Visibility="Collapsed"/>
@@ -33,10 +33,17 @@
                             <DataGridGroupPanel x:Name="PART_GroupPanel" Grid.Row="1" Grid.ColumnSpan="2"
                                                 Visibility="Collapsed"/>
 
+                            <!-- The sorting strip, between the grouping and the headers, and there for the same reason
+                                 the grouping one is: a header is carried up out of the band and put down in it. It is
+                                 also the ONLY place a sort by several columns can be seen - which key decides, which
+                                 only breaks ties, and which way each runs. Off unless the table asks for it. -->
+                            <DataGridSortPanel x:Name="PART_SortPanel" Grid.Row="2" Grid.ColumnSpan="2"
+                                               Visibility="Collapsed"/>
+
                             <!-- The header band, and under it the rows. The header is OUTSIDE the vertical scroller on
                                  purpose: it stays put while the rows move under it, which is the whole of what a header
                                  is for. -->
-                            <Border Grid.Row="2" Grid.Column="0"
+                            <Border Grid.Row="3" Grid.Column="0"
                                     Background="{ObservableResource SolidBackgroundFillColorTertiary}"
                                     BorderBrush="{ObservableResource DataGridLineColor}"
                                     BorderThickness="0 0 0 1">
@@ -45,7 +52,7 @@
 
                             <!-- The rail the chooser's handle stands in - see the Fluent set for why it is a column
                                  rather than something laid over the band. -->
-                            <Border Grid.Row="2" Grid.RowSpan="2" Grid.Column="1" x:Name="PART_ChooserRail"
+                            <Border Grid.Row="3" Grid.RowSpan="2" Grid.Column="1" x:Name="PART_ChooserRail"
                                     Visibility="Collapsed" Width="22"
                                     Background="{ObservableResource SolidBackgroundFillColorTertiary}"
                                     BorderBrush="{ObservableResource DataGridLineColor}"
@@ -60,7 +67,7 @@
 
                             <!-- Light dismiss - see the Fluent set: this flyout has no buttons, so clicking away is
                                  the only way out. -->
-                            <Popup x:Name="PART_ChooserPopup" Grid.Row="2" Grid.Column="1"
+                            <Popup x:Name="PART_ChooserPopup" Grid.Row="3" Grid.Column="1"
                                    KeepOpen="False" IgnoreTargetPress="True"
                                    Placement="Bottom" FlipToFit="True" VerticalOffset="4">
                                 <Popup.ChildTemplate>
@@ -76,7 +83,7 @@
 
                             <!-- NAMED: the grid follows this scroller sideways - the header strip lives outside it and
                                  has to be moved by hand, and the column window is taken from the same offset. -->
-                            <ScrollViewer Grid.Row="3" Grid.Column="0" x:Name="PART_ScrollHost"
+                            <ScrollViewer Grid.Row="4" Grid.Column="0" x:Name="PART_ScrollHost"
                                           CanContentScroll="True"
                                           HorizontalScrollBarVisibility="Auto"
                                           VerticalScrollBarVisibility="Auto">
@@ -89,14 +96,14 @@
                             <!-- The strip a new record is typed into, ABOVE the totals and outside the vertical
                                  scroller: it is not one of the rows, and nobody should have to scroll ten thousand of
                                  them to add one. -->
-                            <Border x:Name="PART_NewRowBand" Grid.Row="4" Grid.ColumnSpan="2" Visibility="Collapsed"
+                            <Border x:Name="PART_NewRowBand" Grid.Row="5" Grid.ColumnSpan="2" Visibility="Collapsed"
                                     Background="{TemplateBinding Background}"
                                     BorderBrush="{ObservableResource DataGridLineColor}"
                                     BorderThickness="0 1 0 0">
                                 <DataGridNewRowPresenter x:Name="PART_NewRow" Height="{TemplateBinding RowHeight}"/>
                             </Border>
 
-                            <Border x:Name="PART_FooterBand" Grid.Row="5" Grid.ColumnSpan="2" Visibility="Collapsed"
+                            <Border x:Name="PART_FooterBand" Grid.Row="6" Grid.ColumnSpan="2" Visibility="Collapsed"
                                     Background="{ObservableResource SolidBackgroundFillColorTertiary}"
                                     BorderBrush="{ObservableResource DataGridLineColor}"
                                     BorderThickness="0 1 0 0">
@@ -104,7 +111,7 @@
                             </Border>
 
                             <!-- Where a dragged column would land - see Fluent's set. -->
-                            <Border x:Name="PART_DropIndicator" Grid.Row="2" Grid.RowSpan="2" Grid.Column="0"
+                            <Border x:Name="PART_DropIndicator" Grid.Row="3" Grid.RowSpan="2" Grid.Column="0"
                                     Width="2" HorizontalAlignment="Left" VerticalAlignment="Stretch"
                                     IsHitTestVisible="False" Visibility="Collapsed"
                                     Background="{TemplateBinding DropIndicatorBrush}"/>
@@ -117,6 +124,9 @@
                         </PropertyTrigger>
                         <PropertyTrigger Property="ShowGroupPanel" Value="true">
                             <Setter TargetName="PART_GroupPanel" Property="Visibility" Value="Visible"/>
+                        </PropertyTrigger>
+                        <PropertyTrigger Property="ShowSortPanel" Value="true">
+                            <Setter TargetName="PART_SortPanel" Property="Visibility" Value="Visible"/>
                         </PropertyTrigger>
                         <PropertyTrigger Property="CanUserChooseColumns" Value="true">
                             <Setter TargetName="PART_ChooserRail" Property="Visibility" Value="Visible"/>
@@ -169,10 +179,19 @@
                                     FontSize="{TemplateBinding FontSize}"
                                     Content="{TemplateBinding Content}"
                                     ContentTemplate="{TemplateBinding ContentTemplate}"/>
-                            <Image Grid.Column="1" x:Name="SortGlyph"
-                                   Source="{ResourceReference ChevronUpIcon}"
-                                   Width="10" Height="10" Margin="6 0 0 0"
-                                   VerticalAlignment="Center" Visibility="Collapsed"/>
+                            <!-- The arrow, and from the SECOND key on the number of the key this column is. Three
+                                 headers wearing an arrow and nothing else say the table is sorted by three things and
+                                 not a word about which of them decides. -->
+                            <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                                <Image x:Name="SortGlyph"
+                                       Source="{ResourceReference ChevronUpIcon}"
+                                       Width="10" Height="10" Margin="6 0 0 0"
+                                       VerticalAlignment="Center" Visibility="Collapsed"/>
+                                <TextBlock x:Name="SortLevelText" VerticalAlignment="Center" Margin="2 0 0 0"
+                                           Text="{TemplateBinding SortLevelText}"
+                                           FontSize="{ResourceReference FontSizeCaption}"
+                                           Foreground="{ObservableResource TextFillColorTertiary}"/>
+                            </StackPanel>
 
                             <!-- The funnel answers for its own press (DataGridColumnHeader hooks it), so the area that
                                  reacts is the area that is drawn - the same rule the tree expander follows. -->
@@ -724,6 +743,120 @@
 
     <!-- The row that stands for a group. NOT tinted: the pinned zone is painted from the ROW's own colour, and a
          caption with a plate of its own would break in two at the zone's edge. Weight and the glyph carry it instead. -->
+    <!-- The sorting strip. Built like the grouping one because it IS the same act - a header is carried into a band and
+         the band says what the table now does - and because a user who has learned one has learned the other. What it
+         adds is a direction per chip, since a key has one and a grouping does not. -->
+    <Style Selector="DataGridSortPanel">
+        <Setter Property="Background" Value="{ObservableResource SolidBackgroundFillColorSecondary}"/>
+        <Setter Property="BorderBrush" Value="{ObservableResource DataGridLineColor}"/>
+        <Setter Property="BorderThickness" Value="0 0 0 1"/>
+        <Setter Property="Padding" Value="8 5"/>
+        <Setter Property="MinHeight" Value="30"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="DataGridSortPanel">
+                    <Border x:Name="PanelBg"
+                            Background="{TemplateBinding Background}"
+                            BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}"
+                            Padding="{TemplateBinding Padding}">
+                        <Grid ColumnDefinitions="*,Auto">
+                            <!-- The hint stands where the chips will, and goes when the first one arrives: an empty
+                                 strip has to say what it is FOR, and a full one has to say what it holds. -->
+                            <TextBlock Grid.Column="0" x:Name="PART_Hint"
+                                       Text="Drag a column header here to sort by it; drag another to break its ties"
+                                       VerticalAlignment="Center"
+                                       FontSize="{ResourceReference FontSizeCaption}"
+                                       Foreground="{ObservableResource TextFillColorTertiary}"/>
+                            <StackPanel Grid.Column="0" x:Name="PART_Chips"
+                                        Orientation="Horizontal" VerticalAlignment="Center"/>
+
+                            <!-- Offered only while there IS a sort - a command that does nothing is a command that
+                                 teaches nothing. -->
+                            <Button Grid.Column="1" x:Name="PART_Clear" Content="Clear sorting" Visibility="Collapsed"
+                                    FontSize="{ResourceReference FontSizeCaption}" Padding="9 1" Margin="5 0 0 0"/>
+
+                            <!-- Where a carried chip would land. IsHitTestVisible false, or the mark swallows the very
+                                 drop it is describing. -->
+                            <Border Grid.Column="0" x:Name="PART_DropMark"
+                                    Width="2" HorizontalAlignment="Left" VerticalAlignment="Stretch"
+                                    IsHitTestVisible="False" Visibility="Collapsed"
+                                    Background="{ThemeResource AccentFillColorDefault}"/>
+                        </Grid>
+                    </Border>
+
+                    <ControlTemplate.Triggers>
+                        <PropertyTrigger Property="IsDropTarget" Value="true">
+                            <Setter TargetName="PanelBg" Property="Background"
+                                    Value="{ThemeResource AccentFillColorSelection}"/>
+                        </PropertyTrigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style Selector="DataGridSortChip">
+        <Setter Property="Background" Value="{ObservableResource CardBackgroundFillColorDefault}"/>
+        <Setter Property="Foreground" Value="{ObservableResource TextFillColorPrimary}"/>
+        <Setter Property="FontSize" Value="{ResourceReference FontSizeCaption}"/>
+        <Setter Property="Margin" Value="0 0 5 0"/>
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="DataGridSortChip">
+                    <Border x:Name="ChipBg"
+                            Background="{TemplateBinding Background}"
+                            BorderBrush="{ObservableResource ControlStrokeColorDefault}"
+                            BorderThickness="1" CornerRadius="5" Padding="7 2"
+                            ToolTipService.ToolTip="Press to turn it around, drag to change which key decides">
+                        <StackPanel Orientation="Horizontal">
+                            <!-- The number FIRST, because the order is what the strip is chiefly saying. -->
+                            <TextBlock x:Name="LevelText" VerticalAlignment="Center" Margin="0 0 5 0"
+                                       Text="{TemplateBinding Level}"
+                                       Foreground="{ObservableResource TextFillColorTertiary}"/>
+                            <ContentPresenter x:Name="PART_ContentPresenter"
+                                    VerticalAlignment="Center"
+                                    Foreground="{TemplateBinding Foreground}"
+                                    FontSize="{TemplateBinding FontSize}"
+                                    Content="{TemplateBinding Content}"/>
+                            <TextBlock x:Name="DirectionGlyph" Text="↑" VerticalAlignment="Center" Margin="5 0 0 0"
+                                       Foreground="{ObservableResource TextFillColorSecondary}"/>
+                            <!-- The × is a PART: the strip asks whether a press landed on it before arming anything
+                                 else, so it has to be findable by name. -->
+                            <Border x:Name="PART_Remove" Margin="4 0 0 0" Padding="3 0" CornerRadius="3"
+                                    Background="Transparent" ToolTipService.ToolTip="Remove from the sorting">
+                                <TextBlock x:Name="RemoveGlyph" Text="×" VerticalAlignment="Center"
+                                           Foreground="{ObservableResource TextFillColorTertiary}"/>
+                            </Border>
+                        </StackPanel>
+                    </Border>
+
+                    <ControlTemplate.Triggers>
+                        <PropertyTrigger Property="IsDescending" Value="true">
+                            <Setter TargetName="DirectionGlyph" Property="Text" Value="↓"/>
+                        </PropertyTrigger>
+                        <PropertyTrigger Property="IsMouseOver" Value="true">
+                            <Setter TargetName="ChipBg" Property="Background"
+                                    Value="{ObservableResource SubtleFillColorSecondary}"/>
+                        </PropertyTrigger>
+                        <!-- Picked up: the chip fades where it WAS, because the gesture is answered where it would
+                             land. -->
+                        <PropertyTrigger Property="IsDragging" Value="true">
+                            <Setter TargetName="ChipBg" Property="Opacity" Value="0.6"/>
+                        </PropertyTrigger>
+                        <PropertyTrigger SourceName="PART_Remove" Property="IsMouseOver" Value="true">
+                            <Setter TargetName="PART_Remove" Property="Background"
+                                    Value="{ObservableResource SubtleFillColorSecondary}"/>
+                            <Setter TargetName="RemoveGlyph" Property="Foreground"
+                                    Value="{ObservableResource TextFillColorPrimary}"/>
+                        </PropertyTrigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
     <Style Selector="DataGridGroupHeader">
         <Setter Property="Foreground" Value="{ObservableResource TextFillColorPrimary}"/>
         <Setter Property="FontSize" Value="{ResourceReference FontSizeBody}"/>

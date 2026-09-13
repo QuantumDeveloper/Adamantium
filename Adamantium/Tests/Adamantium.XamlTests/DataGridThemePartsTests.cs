@@ -1,6 +1,7 @@
 using Adamantium.Core.DependencyInjection;
 using Adamantium.Mathematics;
 using Adamantium.UI.Controls;
+using Adamantium.UI.Controls.DataGrid;
 using Adamantium.UI.Controls.Panels;
 using Adamantium.UI.Core;
 using Adamantium.UI.Core.Data;
