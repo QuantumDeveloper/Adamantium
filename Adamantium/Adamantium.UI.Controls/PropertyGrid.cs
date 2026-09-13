@@ -60,6 +60,13 @@ public class PropertyGrid : Control
     public static readonly AdamantiumProperty EditorHeightProperty = AdamantiumProperty.Register(nameof(EditorHeight),
         typeof(Double), typeof(PropertyGrid), new PropertyMetadata(20.0, PropertyMetadataOptions.AffectsMeasure));
 
+    /// <summary>What an editor says while the selected objects hold more than one value between them, shown as the
+    /// prompt of an empty editor. Only then: a row they all agree on shows that value like any other row.
+    /// <para>One phrase rather than the values themselves - a hundred objects selected is the ordinary case, and
+    /// listing what each holds would fill the row with a line nobody can read.</para></summary>
+    public static readonly AdamantiumProperty MixedTextProperty = AdamantiumProperty.Register(nameof(MixedText),
+        typeof(String), typeof(PropertyGrid), new PropertyMetadata("multiple values"));
+
     /// <summary>Sections from somewhere ELSE - what <see cref="PropertyDefinitionBuilder"/> made from a type, what an
     /// editor assembled per component. Set, it replaces <see cref="Sections"/> entirely: an inspector is either written
     /// out or generated, and mixing the two silently would be a puzzle for whoever reads the markup.</summary>
@@ -154,6 +161,13 @@ public class PropertyGrid : Control
         set => SetValue(EditorHeightProperty, value);
     }
 
+    public String MixedText
+    {
+        get => GetValue<String>(MixedTextProperty);
+        set => SetValue(MixedTextProperty, value);
+    }
+
+
     /// <summary>The row the pointer or the keyboard is on.</summary>
     public PropertyRow SelectedRow => _selected;
 
@@ -222,8 +236,19 @@ public class PropertyGrid : Control
     {
         if (row?.Definition == null || row.IsReadOnly) return false;
 
+        // INTO the value first, where the definition says the value is an object with parts rather than a thing to be
+        // replaced. Nothing is written through the binding then: the property still points at the same object, which is
+        // the whole point - everything else holding it follows.
+        if (row.Definition.WriteInto(row.Value, edited))
+        {
+            ValueChanged?.Invoke(this, new PropertyValuesChangedEventArgs(row.Targets.Count > 0 ? row.Targets[0] : null,
+                row.Definition));
+            Refresh(null, row.Definition);
+            return true;
+        }
+
         // Every selected object gets the SAME value - that is what editing a multiple selection means.
-        if (!row.Definition.TryConvert(edited, row.Value?.GetType(), out var value)) return false;
+        if (!row.Definition.TryConvert(edited, row.ValueType, out var value)) return false;
         if (!row.WriteValue(value)) return false;
 
         ValueChanged?.Invoke(this, new PropertyValuesChangedEventArgs(row.Targets.Count > 0 ? row.Targets[0] : null,

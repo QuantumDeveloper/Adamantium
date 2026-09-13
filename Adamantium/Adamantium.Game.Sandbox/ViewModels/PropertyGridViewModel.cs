@@ -1,8 +1,11 @@
 using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
 using Adamantium.MVVM;
+using Adamantium.Mathematics;
 using Adamantium.UI.Controls;
 using Adamantium.UI.Core;
+using Adamantium.UI.Core.Media;
 
 namespace Adamantium.Game.Sandbox.ViewModels;
 
@@ -24,6 +27,12 @@ public partial class InspectedEntity
     [Bindable] private double _mass = 80;
     [Bindable] private Visibility _visibility = Visibility.Visible;
     [Bindable] private string _material = "Steel";
+    [Bindable] private Color _tint = Colors.CornflowerBlue;
+
+    /// <summary>A BRUSH, not a colour, and the same instance the swatch beside the inspector paints with. The line for
+    /// it changes the colour INSIDE it rather than putting a new brush here - which is why the swatch follows without
+    /// being told anything: it is holding that brush.</summary>
+    public Brush Fill { get; } = new SolidColorBrush(Colors.Tomato);
 
     public string Guid { get; } = "8f14e45f-ceea-467a-9d3f-1b2c3d4e5f60";
 }
@@ -55,12 +64,56 @@ public partial class PropertyGridViewModel : TabPageViewModel
     /// <summary>The application's list of materials - not the property's, and not a provider's either.</summary>
     public IReadOnlyList<string> Materials { get; } = ["Steel", "Copper", "Glass", "Rubber", "Bone"];
 
-    /// <summary>What the inspectors are pointed at - one object or two, switched by the toggle below them.</summary>
-    public IEnumerable Selection => _both ? new[] { Entity, Other } : new[] { Entity };
+    /// <summary>What the "..." button on a line reports. The command is the APPLICATION'S - the inspector only offers
+    /// the button and hands over what the line is pointed at; what "more" means for a tag is the page's business.
+    /// </summary>
+    [Bindable] private string _actionStatus = "The ... button has not been pressed";
+
+    [Command]
+    private void MoreForTag(object target)
+    {
+        var name = target switch
+        {
+            InspectedEntity one => one.Name,
+            IEnumerable many => string.Join(", ", many.OfType<InspectedEntity>().Select(e => e.Name)),
+            _ => "nothing"
+        };
+
+        ActionStatus = $"... pressed on the Tag line of: {name}";
+    }
+
+    /// <summary>What each inspector is pointed at. DIFFERENT objects by default - the left one at Player, the right one
+    /// at Enemy - so both objects' values are on the page at the same time. An inspector over several objects can only
+    /// be judged against what each of them holds, and a page showing just one of them makes every row of the multiple
+    /// selection an unverifiable claim.</summary>
+    public IEnumerable LeftSelection => _both ? new[] { Entity, Other } : new[] { Entity };
+
+    public IEnumerable RightSelection => _both ? new[] { Entity, Other } : new[] { Other };
 
     [Bindable] private bool _both;
 
-    partial void OnBothChanged(bool value) => RaisePropertyChanged(nameof(Selection));
+    public string LeftCaption => _both
+        ? "Written by hand - now over BOTH objects"
+        : "Written by hand - over Player, sections and properties declared in markup";
+
+    public string RightCaption => _both
+        ? "Generated - now over BOTH objects"
+        : "Generated - over Enemy, PropertyDefinitionBuilder read the type, no markup at all";
+
+    /// <summary>What the toggle beside it has just done. Spelled out because an inspector over several objects behaves
+    /// differently from one over a single object, and a row standing empty is a statement, not a gap.</summary>
+    public string Difference => _both
+        ? "Both are over Player AND Enemy. Rows the two agree on show that value; only rows they really differ on say 'multiple values' - fill one, both take it."
+        : "Two DIFFERENT objects, side by side - compare them. Tick the box to point both inspectors at both at once.";
+
+    partial void OnBothChanged(bool value)
+    {
+        RaisePropertyChanged(nameof(LeftSelection));
+        RaisePropertyChanged(nameof(RightSelection));
+        RaisePropertyChanged(nameof(LeftCaption));
+        RaisePropertyChanged(nameof(RightCaption));
+        RaisePropertyChanged(nameof(Difference));
+    }
 
     /// <summary>The sections the BUILDER makes from the type - no markup at all, which is how an entity's components
     /// will be inspected: it is handed a type and gives back sections carrying ordinary bindings.</summary>

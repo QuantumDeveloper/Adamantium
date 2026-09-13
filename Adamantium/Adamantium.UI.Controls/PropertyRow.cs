@@ -39,15 +39,23 @@ public class PropertyRow : Control
     public static readonly AdamantiumProperty IsMixedProperty = AdamantiumProperty.Register(nameof(IsMixed),
         typeof(bool), typeof(PropertyRow), new PropertyMetadata(false, PropertyMetadataOptions.AffectsRender));
 
+    /// <summary>Whether this row ends with the "..." button. Mirrored off the definition, like the rest of what the
+    /// template triggers on - a template binds to the ROW, and the definition is not in its way.</summary>
+    public static readonly AdamantiumProperty ShowActionButtonProperty = AdamantiumProperty.Register(
+        nameof(ShowActionButton), typeof(bool), typeof(PropertyRow),
+        new PropertyMetadata(false, PropertyMetadataOptions.AffectsRender));
+
     private readonly List<BoundValue> _values = new();
     private Grid _layout;
     private IInputComponent _grip;
     private IInputComponent _expander;
+    private ButtonBase _action;
     private IInputComponent _editor;
     private ContentPresenter _valueHost;
     private ContentPresenter _nameHost;
     private bool _pendingEditor;
     private bool _writing;
+    private bool _pushing;
     private bool _draggingGrip;
     private double _gripFrom;
     private double _widthFrom;
@@ -104,12 +112,40 @@ public class PropertyRow : Control
         set => SetValue(IsMixedProperty, value);
     }
 
+    /// <summary>The type the property holds, read off the objects rather than off <see cref="Value"/> - which is null
+    /// exactly when the objects disagree, and that is the case where a typed value still has to be converted before it
+    /// can be written to all of them.</summary>
+    public Type ValueType
+    {
+        get
+        {
+            foreach (var bound in _values)
+            {
+                if (bound.Value != null) return bound.Value.GetType();
+            }
+
+            return null;
+        }
+    }
+
+    public bool ShowActionButton
+    {
+        get => GetValue<bool>(ShowActionButtonProperty);
+        set => SetValue(ShowActionButtonProperty, value);
+    }
+
     /// <summary>The live editor in the value half, or null on a read-only row.</summary>
     public IInputComponent Editor => _editor;
 
     /// <summary>Points the row at a definition and its objects. Called on creation and on every rebind.</summary>
     internal void Attach(PropertyGrid owner, PropertyDefinition definition, IReadOnlyList<object> targets, double indent)
     {
+        // Same property, same objects - a REFRESH, not a rebind. Building the bindings again would cost the selection's
+        // size twice over: every live value has to be let go one at a time, and letting one go is a search through the
+        // rest. Measured on 50 000 objects, one write spent nearly five minutes there and nothing about what the row is
+        // pointed at had changed.
+        var rebind = !ReferenceEquals(Definition, definition) || !ReferenceEquals(Targets, targets);
+
         Owner = owner;
         Definition = definition;
         Targets = targets ?? Array.Empty<object>();
@@ -118,8 +154,11 @@ public class PropertyRow : Control
         HasChildren = definition is CompositeProperty composite && composite.Children.Count > 0;
         IsExpanded = definition is CompositeProperty { IsExpanded: true };
         IsReadOnly = definition.IsReadOnly;
+        ShowActionButton = definition.ShowActionButton;
 
-        Bind();
+        if (rebind) Bind();
+        else Read();
+
         ApplyContent();
     }
 
@@ -136,13 +175,30 @@ public class PropertyRow : Control
     {
         if (_values.Count == 0) return false;
 
-        foreach (var bound in _values)
+        // Every object's write raises the very signal the row listens to, and answering each one re-reads ALL of them:
+        // one value pushed to a selection of N costs N reads of N values. Measured on a selection of 50 000, a single
+        // write took five minutes. The row already knows what it is writing, so their signals say nothing it does not
+        // know - held off, and the row reads itself ONCE when the push is over.
+        var landed = true;
+        _pushing = true;
+        try
         {
-            if (!bound.Write(value)) return false;
+            foreach (var bound in _values)
+            {
+                if (bound.Write(value)) continue;
+
+                landed = false;
+                break;
+            }
+        }
+        finally
+        {
+            _pushing = false;
         }
 
         Read();
-        return true;
+        ApplyContent();
+        return landed;
     }
 
     public override void OnApplyTemplate()
@@ -163,6 +219,9 @@ public class PropertyRow : Control
         }
 
         if (_expander != null) _expander.MouseLeftButtonDown += OnExpanderPressed;
+
+        _action = GetTemplateChild("PART_Action") as ButtonBase;
+        if (_action != null) _action.Click += OnActionPressed;
 
         ApplyContent();
         ApplyNameWidth();
@@ -246,7 +305,9 @@ public class PropertyRow : Control
         var first = _values[0].Value;
         for (var i = 1; i < _values.Count; i++)
         {
-            if (Equals(_values[i].Value, first)) continue;
+            // The DEFINITION says what "the same" means: two brushes of one colour are two instances, and comparing
+            // them here would make the row report a difference nobody can see.
+            if (Definition?.SameValue(_values[i].Value, first) ?? Equals(_values[i].Value, first)) continue;
 
             Value = null;
             IsMixed = true;
@@ -259,6 +320,8 @@ public class PropertyRow : Control
 
     private void OnBoundValueChanged(object sender, EventArgs e)
     {
+        if (_pushing) return;
+
         Read();
         ApplyContent();
     }
@@ -267,6 +330,7 @@ public class PropertyRow : Control
     {
         if (_grip != null) _grip.MouseLeftButtonDown -= OnGripPressed;
         if (_expander != null) _expander.MouseLeftButtonDown -= OnExpanderPressed;
+        if (_action != null) _action.Click -= OnActionPressed;
         UnhookEditor();
     }
 
@@ -293,7 +357,15 @@ public class PropertyRow : Control
         if (rebuilt) UnhookEditor();
 
         _valueHost.ContentTemplate = template;
-        _valueHost.Content = HasChildren ? (Definition as CompositeProperty)?.Summary : Value;
+
+        // A presenter given null content builds NOTHING, editor included - and the row's value is null exactly when the
+        // selected objects disagree. Left at null the row would lose its editor at the one moment it is most needed:
+        // putting ONE value on all of them is what inspecting several objects is for. Empty content instead, so the
+        // editor is built and stands empty - unless the definition says its editor has no empty state, and a blank row
+        // is then the honest answer rather than an editor showing a value neither object holds.
+        _valueHost.Content = HasChildren
+            ? (Definition as CompositeProperty)?.Summary
+            : Value ?? (template != null && Definition.EditorCanShowNothing ? string.Empty : null);
 
         if (rebuilt || _editor == null) _pendingEditor = template != null && !IsReadOnly;
         else Fill();
@@ -309,10 +381,26 @@ public class PropertyRow : Control
         try
         {
             Definition.PrepareEditor(_editor, Value);
+            MarkMixed();
         }
         finally
         {
             _writing = false;
+        }
+    }
+
+    // An empty editor says nothing on its own, and "nothing" is not what happened - the objects disagree, and for a
+    // number it is not even a state the property can be in. So the editor's own prompt says which it is, and it goes
+    // the moment they agree. ONLY then: a row whose objects hold one value shows that value like any other row.
+    private void MarkMixed()
+    {
+        var prompt = IsMixed ? Owner?.MixedText : null;
+
+        switch (_editor)
+        {
+            case NumericUpDown numeric: numeric.Placeholder = prompt; break;
+            case TextBoxBase box: box.Placeholder = prompt; break;
+            case DropDown drop: drop.Placeholder = prompt; break;
         }
     }
 
@@ -340,6 +428,7 @@ public class PropertyRow : Control
         if (_editor is NumericUpDown numeric) numeric.ValueChanged += OnEditorValueChanged;
         if (_editor is DropDown drop) drop.SelectionChanged += OnEditorChosen;
         if (_editor is ToggleButton toggle) toggle.PropertyChanged += OnTogglePropertyChanged;
+        if (_editor is ColorPickerButton swatch) swatch.PropertyChanged += OnSwatchPropertyChanged;
     }
 
     private void UnhookEditor()
@@ -355,6 +444,7 @@ public class PropertyRow : Control
         if (_editor is NumericUpDown numeric) numeric.ValueChanged -= OnEditorValueChanged;
         if (_editor is DropDown drop) drop.SelectionChanged -= OnEditorChosen;
         if (_editor is ToggleButton toggle) toggle.PropertyChanged -= OnTogglePropertyChanged;
+        if (_editor is ColorPickerButton swatch) swatch.PropertyChanged -= OnSwatchPropertyChanged;
 
         _editor = null;
     }
@@ -365,7 +455,10 @@ public class PropertyRow : Control
     {
         foreach (var child in root.VisualChildren)
         {
-            if (child is NumericUpDown or DropDown or ToggleButton or TextBox) return (IInputComponent)child;
+            // The swatch is named here for the same reason the spinner is: it CONTAINS a picker full of fields and
+            // sliders, and a hunt for "the first focusable thing" would come back with one of those.
+            if (child is NumericUpDown or DropDown or ToggleButton or TextBox or ColorPickerButton)
+                return (IInputComponent)child;
             if (FindEditor(child) is { } nested) return nested;
         }
 
@@ -396,7 +489,40 @@ public class PropertyRow : Control
 
     private void OnTogglePropertyChanged(object sender, AdamantiumPropertyChangedEventArgs e)
     {
-        if (e.Property == ToggleButton.IsCheckedProperty) Commit();
+        if (e.Property != ToggleButton.IsCheckedProperty) return;
+
+        // A click on an indeterminate box lands on FALSE - that is the three-state cycle - while the row's rule for a
+        // boolean the objects disagree on is TRUE, because leaving them disagreeing is the one thing nobody clicked
+        // for. One rule whichever way the row is flipped.
+        if (IsMixed && Owner != null) Owner.ToggleRow(this);
+        else Commit();
+    }
+
+    // A colour is chosen by DRAGGING inside the picker, so this fires all the way through the gesture rather than once
+    // at the end. That is wanted: the object being inspected follows the pointer, which is the whole reason a colour is
+    // picked visually instead of typed.
+    private void OnSwatchPropertyChanged(object sender, AdamantiumPropertyChangedEventArgs e)
+    {
+        if (e.Property == ColorPickerButton.SelectedColorProperty) Commit();
+    }
+
+    /// <summary>Runs the definition's action. The row hands over the OBJECTS it stands for unless the definition named
+    /// a parameter of its own: a command that opens a longer form for this property needs to know what it is being
+    /// opened on, and having to say so on every line is a thing to forget.</summary>
+    public bool RunAction()
+    {
+        if (Definition?.ActionCommand is not { } command) return false;
+
+        var parameter = Definition.ActionCommandParameter ?? (Targets.Count == 1 ? Targets[0] : Targets);
+        if (!command.CanExecute(parameter)) return false;
+
+        command.Execute(parameter);
+        return true;
+    }
+
+    private void OnActionPressed(object sender, RoutedEventArgs e)
+    {
+        if (RunAction()) e.Handled = true;
     }
 
     private void OnExpanderPressed(object sender, MouseButtonEventArgs e)
