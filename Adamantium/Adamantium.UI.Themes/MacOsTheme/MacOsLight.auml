@@ -51,6 +51,9 @@
     <PaletteColor Key="DataGridSearchCurrentColor" Color="#B3FFCC00"/>
     <PaletteColor Key="DataGridValidationErrorColor" Color="#59FF3B30"/>
     <PaletteColor Key="ControlStrokeColorSecondary" Color="#2E000000"/>
+    <!-- See FluentDark: the grid is a ruler, not a control's hairline. -->
+    <PaletteColor Key="CanvasGridColor" Color="#33000000"/>
+    <PaletteColor Key="CanvasAxisColor" Color="#7A000000"/>
 
     <!-- The UNSET surface of a selection control - see MacOsDark for why it is one key and its own. The light side had
          the same problem in the other direction: #E8E8E8 on an #ECECEC window is four levels apart. -->

@@ -46,6 +46,9 @@
     <PaletteColor Key="DataGridSearchCurrentColor" Color="#B3FFD633"/>
     <PaletteColor Key="DataGridValidationErrorColor" Color="#59C42B1C"/>
     <PaletteColor Key="ControlStrokeColorSecondary" Color="#52000000"/>
+    <!-- See FluentDark: the grid is a ruler, not a control's hairline. -->
+    <PaletteColor Key="CanvasGridColor" Color="#3D000000"/>
+    <PaletteColor Key="CanvasAxisColor" Color="#87000000"/>
     <PaletteColor Key="TextFillColorPrimary" Color="#E4000000"/>
     <PaletteColor Key="TextFillColorSecondary" Color="#9E000000"/>
     <PaletteColor Key="TextFillColorTertiary" Color="#72000000"/>

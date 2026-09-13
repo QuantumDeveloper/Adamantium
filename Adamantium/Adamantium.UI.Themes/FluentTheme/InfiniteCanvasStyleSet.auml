@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<StyleSet xmlns="http://adamantium/ui"
+          xmlns:x="http://adamantium/ui/xaml/extensions">
+
+    <!-- InfiniteCanvas: an unbounded plane. NO template - the control draws its own ground, grid and axes, because the
+         grid is not elements: only the marks falling inside the viewport are drawn, and their coordinates come out of
+         the camera. So this set only says how it looks.
+
+         The ground is set here rather than left transparent on purpose: a transparent canvas is also a canvas nothing
+         can be pressed on, and panning starts with a press. -->
+    <Style Selector="InfiniteCanvas">
+        <Setter Property="Background" Value="{ObservableResource SolidBackgroundFillColorBase}"/>
+        <!-- Its own palette entry, not a control's hairline: the grid is a ruler the user reads while working, and the
+             strokes that separate controls are meant to go unnoticed. Borrowing one left the grid invisible. -->
+        <Setter Property="GridBrush" Value="{ObservableResource CanvasGridColor}"/>
+        <!-- The world's own axes stand out from the grid, or there is nothing on an edgeless plane saying where the
+             origin went. -->
+        <Setter Property="AxisBrush" Value="{ObservableResource CanvasAxisColor}"/>
+        <Setter Property="GridThickness" Value="1"/>
+        <Setter Property="GridDotSize" Value="2"/>
+    </Style>
+
+</StyleSet>

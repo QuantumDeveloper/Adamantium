@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<StyleSet xmlns="http://adamantium/ui"
+          xmlns:x="http://adamantium/ui/xaml/extensions">
+
+    <!-- An editor's canvas: a darker ground than the panels around it, so the drawing surface reads as the thing being
+         worked on. No template - the control draws its own ground, grid and axes; see Fluent's set. -->
+    <Style Selector="InfiniteCanvas">
+        <Setter Property="Background" Value="{ObservableResource SolidBackgroundFillColorBase}"/>
+        <Setter Property="GridBrush" Value="{ObservableResource CanvasGridColor}"/>
+        <Setter Property="AxisBrush" Value="{ObservableResource CanvasAxisColor}"/>
+        <Setter Property="GridThickness" Value="1"/>
+        <Setter Property="GridDotSize" Value="2"/>
+    </Style>
+
+</StyleSet>

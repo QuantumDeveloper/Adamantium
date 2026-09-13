@@ -51,6 +51,11 @@
     <PaletteColor Key="DataGridSearchCurrentColor" Color="#A6FCE100"/>
     <PaletteColor Key="DataGridValidationErrorColor" Color="#59FF99A4"/>
     <PaletteColor Key="ControlStrokeColorSecondary" Color="#18FFFFFF"/>
+    <!-- The canvas grid is CONTENT, not a control's hairline: it is a ruler the user reads while working, so it needs
+         far more contrast than the strokes that separate controls (which are meant to go unnoticed). The axes stand out
+         from it again - on an edgeless plane they are the only thing saying where the origin went. -->
+    <PaletteColor Key="CanvasGridColor" Color="#38FFFFFF"/>
+    <PaletteColor Key="CanvasAxisColor" Color="#7AFFFFFF"/>
     <PaletteColor Key="TextFillColorPrimary" Color="#FFFFFF"/>
     <PaletteColor Key="TextFillColorSecondary" Color="#C5FFFFFF"/>
     <PaletteColor Key="TextFillColorTertiary" Color="#87FFFFFF"/>

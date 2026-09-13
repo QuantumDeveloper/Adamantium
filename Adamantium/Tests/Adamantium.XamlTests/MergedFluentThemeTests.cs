@@ -131,7 +131,9 @@ public class MergedFluentThemeTests
         // have to be OPAQUE, and every other stroke in the palette is deliberately not - the two washes the search
         // paints with, one for a cell it found and a denser one for the cell it is on, and the one a cell holding a
         // rejected value is washed with.
-        Assert.That(theme.Palette.Count, Is.EqualTo(39));
+        // 41 with the canvas grid and its axes: a grid is a RULER the user reads while working, not a hairline meant to
+        // go unnoticed, so it cannot borrow a control stroke - borrowing one left it invisible.
+        Assert.That(theme.Palette.Count, Is.EqualTo(41));
     }
 
     [Test]
@@ -195,7 +197,8 @@ public class MergedFluentThemeTests
         // spirit - this guard is against a set going missing, not against the theme ever gaining one.
         // 52 with the TreeDataGrid, for exactly that reason again.
         // 54 with the Expander and the PropertyGrid - two new controls, two new sets.
-        Assert.That(merged.StyleIncludes.Count, Is.EqualTo(54));
+        // 55 with the InfiniteCanvas, for the same reason again.
+        Assert.That(merged.StyleIncludes.Count, Is.EqualTo(55));
     }
 
     [Test]
@@ -224,7 +227,8 @@ public class MergedFluentThemeTests
         // AcrylicFillColorDefault, DataGridLineColor, the two search washes and the validation one. Counting only the
         // brushes is what let four keys go missing unnoticed the first time, so the total is what is guarded; growing
         // it is a deliberate edit here.
-        Assert.That(theme.Palette.Count + theme.RawColors.Count, Is.EqualTo(44));
+        // 46 with the canvas grid colour and its axis colour - see the palette count above.
+        Assert.That(theme.Palette.Count + theme.RawColors.Count, Is.EqualTo(46));
     }
 
     [Test]

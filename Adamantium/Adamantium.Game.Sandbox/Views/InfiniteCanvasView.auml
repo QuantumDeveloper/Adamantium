@@ -1,0 +1,32 @@
+<View xmlns="http://adamantium/ui"
+      xmlns:x="http://adamantium/ui/xaml/extensions">
+    <Grid RowDefinitions="Auto,Auto,Auto,*,Auto" Margin="16">
+
+        <TextBlock Grid.Row="0" Text="InfiniteCanvas" FontSize="18"/>
+        <TextBlock Grid.Row="1" Margin="0,4,0,12" TextWrapping="WrapByWords"
+                   Text="A plane with no edges. The wheel zooms toward the cursor, the middle button - or space and the left one - pans, and neither runs into anything: there is no scrollable extent here, panning moves the CAMERA. The grid is not objects either - only the marks inside the viewport are drawn, and their step coarsens as the camera pulls back, so it never turns to mush."/>
+
+        <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="0,0,0,10">
+            <TextBlock Text="Grid:" VerticalAlignment="Center"/>
+            <DropDown ItemsSource="{Binding GridStyles}" SelectedItem="{Binding GridStyle, Mode=TwoWay}"
+                      Width="120" Margin="8,0,0,0" VerticalAlignment="Center"/>
+
+            <TextBlock Margin="24,0,0,0" VerticalAlignment="Center"
+                       Text="Home - or a double click of the middle button - puts the origin back in the middle"
+                       Foreground="{ObservableResource TextFillColorSecondary}"/>
+        </StackPanel>
+
+        <Border Grid.Row="3" BorderThickness="1" CornerRadius="0"
+                BorderBrush="{ObservableResource ControlStrokeColorDefault}">
+            <!-- Square corners on purpose: the clip here is a rectangular scissor, and a rounded frame would let the
+                 canvas's own square corners poke out from under it. -->
+            <InfiniteCanvas x:Name="Canvas"
+                            GridStyle="{Binding GridStyle}"
+                            Scale="{Binding Scale, Mode=TwoWay}"
+                            Offset="{Binding Offset, Mode=TwoWay}"/>
+        </Border>
+
+        <TextBlock Grid.Row="4" Margin="0,10,0,0" Text="{Binding Camera}"
+                   Foreground="{ObservableResource TextFillColorSecondary}"/>
+    </Grid>
+</View>
