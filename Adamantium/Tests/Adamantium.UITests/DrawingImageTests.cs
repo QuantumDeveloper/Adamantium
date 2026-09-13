@@ -261,6 +261,27 @@ public class DrawingImageTests
         Assert.That(layout.FontSize, Is.GreaterThan(0), "font size never recorded - the layout was not shaped");
     }
 
+    // NOTHING is not "no work to do". Laying out an empty string reported zero and left the last text's shaped words
+    // and glyph quads in place, so whoever drew the layout next drew THOSE - a block whose text was cleared went on
+    // saying what it used to. In a table that is a recycled row wearing the name of the row its container had been.
+    [Test]
+    public void ALayoutWhoseTextIsCleared_KeepsNothingOfTheLastOne()
+    {
+        var font = Adamantium.UI.Controls.Base.UIComponent.DefaultFontFamily;
+        var layout = new TextLayout(font.Typeface, font.Fonts[0]);
+        var area = new Size(400, 100);
+
+        layout.ProcessText("Assembly 14", 12, area, TextWrapping.NoWrap, TextTrimming.None,
+            HorizontalTextAlignment.Left, VerticalTextAlignment.Top);
+
+        Assert.That(layout.RealTextDimensions.Width, Is.GreaterThan(0), "the text it starts with");
+
+        layout.ProcessText(string.Empty, 12, area, TextWrapping.NoWrap, TextTrimming.None,
+            HorizontalTextAlignment.Left, VerticalTextAlignment.Top);
+
+        Assert.That(layout.RealTextDimensions.Width, Is.Zero, "and nothing of it once the text is gone");
+    }
+
     /// <summary>Two elements showing the SAME drawing at different sizes must not share one layout: each render unit
     /// freezes the glyphs off the layout it was handed, so a shared one leaves every consumer but the last drawing
     /// whatever the last shaping put there.</summary>
