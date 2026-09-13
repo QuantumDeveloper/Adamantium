@@ -14,8 +14,12 @@
                       SelectedObjects="{Binding LeftSelection}"
                       NameColumnWidth="150">
             <PropertySection Header="General" IsExpanded="True">
-                <StringProperty Header="Name" Binding="{Binding Name}"/>
-                <BooleanProperty Header="Enabled" Binding="{Binding IsEnabled}"/>
+                <!-- DefaultValue is what the line is worth untouched. A row holding anything else marks itself and
+                     offers the arrow that puts this back - so an inspector of forty rows says at a glance which of
+                     them were edited. The generated half beside it needs none of this: the builder reads the
+                     defaults off a fresh instance of the type. -->
+                <StringProperty Header="Name" Binding="{Binding Name}" DefaultValue="Player"/>
+                <BooleanProperty Header="Enabled" Binding="{Binding IsEnabled}" DefaultValue="True"/>
                 <!-- The "..." button: off on every line by default, and named here. The command is the PAGE'S - the
                      inspector only offers the button and hands over what the line is pointed at. Like the list of
                      materials below, it resolves against the page, because a definition stands in the inspector's
@@ -31,20 +35,23 @@
                 <!-- A composite: one line folded, three when opened. Its children are indented; their VALUES still line
                      up with every other value - that is what one shared grip is for. -->
                 <CompositeProperty Header="Position">
-                    <NumericProperty Header="X" Binding="{Binding PositionX}" Step="0.5"/>
-                    <NumericProperty Header="Y" Binding="{Binding PositionY}" Step="0.5"/>
-                    <NumericProperty Header="Z" Binding="{Binding PositionZ}" Step="0.5"/>
+                    <NumericProperty Header="X" Binding="{Binding PositionX}" Step="0.5" DefaultValue="12.5"/>
+                    <NumericProperty Header="Y" Binding="{Binding PositionY}" Step="0.5" DefaultValue="0"/>
+                    <NumericProperty Header="Z" Binding="{Binding PositionZ}" Step="0.5" DefaultValue="-4"/>
                 </CompositeProperty>
             </PropertySection>
 
             <PropertySection Header="Physics" IsExpanded="True">
-                <NumericProperty Header="Mass" Binding="{Binding Mass}" Minimum="0" Maximum="1000" Step="5"/>
-                <ChoiceProperty Header="Visibility" Binding="{Binding Visibility}" EnumType="{x:Type ui:Visibility}"/>
+                <NumericProperty Header="Mass" Binding="{Binding Mass}" Minimum="0" Maximum="1000" Step="5"
+                                 DefaultValue="80"/>
+                <ChoiceProperty Header="Visibility" Binding="{Binding Visibility}" EnumType="{x:Type ui:Visibility}"
+                                DefaultValue="Visible"/>
                 <!-- Two bindings on one line, and they read DIFFERENT things - which is the whole point. The VALUE is
                      read off the object being inspected; every other property of the definition resolves against the
                      page's DataContext, because a definition stands in the inspector's logical tree. So the list of
                      materials comes straight from the view-model, with no provider in between. -->
-                <ChoiceProperty Header="Material" Binding="{Binding Material}" ItemsSource="{Binding Materials}"/>
+                <ChoiceProperty Header="Material" Binding="{Binding Material}" ItemsSource="{Binding Materials}"
+                                DefaultValue="Steel"/>
                 <!-- The one value nobody can type. The swatch opens the full picker in a flyout, so the line costs one
                      row whether the picker is open or not, and dragging inside it moves the object being inspected as
                      the pointer goes. -->
@@ -57,14 +64,19 @@
             </PropertySection>
         </PropertyGrid>
 
+        <!-- ShowSearch off: an inspector of a handful of rows does not need a field to find them in, and the row it
+             would take is worth more to the rows. The left one keeps it, so the page shows both. -->
         <PropertyGrid Grid.Row="3" Grid.Column="1" Margin="8,0,0,0"
                       SelectedObjects="{Binding RightSelection}"
                       SectionsSource="{Binding Generated}"
+                      ShowSearch="{Binding Searchable}"
                       NameColumnWidth="170"/>
 
         <StackPanel Grid.Row="4" Grid.ColumnSpan="2" Orientation="Horizontal" Margin="0,12,0,0">
             <CheckBox Content="Point both at both objects" IsChecked="{Binding Both, Mode=TwoWay}"
                       VerticalAlignment="Center"/>
+            <CheckBox Content="Search on the right" IsChecked="{Binding Searchable, Mode=TwoWay}"
+                      Margin="16,0,0,0" VerticalAlignment="Center"/>
             <TextBlock Margin="12,0,0,0" VerticalAlignment="Center" Text="{Binding Difference}"/>
         </StackPanel>
 

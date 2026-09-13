@@ -39,6 +39,9 @@ public class PropertyRow : Control
     public static readonly AdamantiumProperty IsMixedProperty = AdamantiumProperty.Register(nameof(IsMixed),
         typeof(bool), typeof(PropertyRow), new PropertyMetadata(false, PropertyMetadataOptions.AffectsRender));
 
+    public static readonly AdamantiumProperty IsModifiedProperty = AdamantiumProperty.Register(nameof(IsModified),
+        typeof(bool), typeof(PropertyRow), new PropertyMetadata(false, PropertyMetadataOptions.AffectsRender));
+
     /// <summary>Whether this row ends with the "..." button. Mirrored off the definition, like the rest of what the
     /// template triggers on - a template binds to the ROW, and the definition is not in its way.</summary>
     public static readonly AdamantiumProperty ShowActionButtonProperty = AdamantiumProperty.Register(
@@ -50,6 +53,7 @@ public class PropertyRow : Control
     private IInputComponent _grip;
     private IInputComponent _expander;
     private ButtonBase _action;
+    private ButtonBase _reset;
     private IInputComponent _editor;
     private ContentPresenter _valueHost;
     private ContentPresenter _nameHost;
@@ -132,6 +136,15 @@ public class PropertyRow : Control
     {
         get => GetValue<bool>(ShowActionButtonProperty);
         set => SetValue(ShowActionButtonProperty, value);
+    }
+
+    /// <summary>Whether what the objects hold is anything other than the property's default. The theme reads it to show
+    /// the button that puts the default back - and the mark itself is worth having: an inspector of forty rows says at
+    /// a glance which four were touched.</summary>
+    public bool IsModified
+    {
+        get => GetValue<bool>(IsModifiedProperty);
+        set => SetValue(IsModifiedProperty, value);
     }
 
     /// <summary>The live editor in the value half, or null on a read-only row.</summary>
@@ -223,6 +236,9 @@ public class PropertyRow : Control
         _action = GetTemplateChild("PART_Action") as ButtonBase;
         if (_action != null) _action.Click += OnActionPressed;
 
+        _reset = GetTemplateChild("PART_Reset") as ButtonBase;
+        if (_reset != null) _reset.Click += OnResetPressed;
+
         ApplyContent();
         ApplyNameWidth();
     }
@@ -299,6 +315,7 @@ public class PropertyRow : Control
         {
             Value = null;
             IsMixed = false;
+            IsModified = false;
             return;
         }
 
@@ -311,11 +328,29 @@ public class PropertyRow : Control
 
             Value = null;
             IsMixed = true;
+
+            // Objects that disagree cannot ALL be at the default - at most one of them is. So the row is modified, and
+            // resetting it is the one edit that makes them agree again.
+            IsModified = !IsReadOnly && Definition?.HasDefault == true;
             return;
         }
 
         Value = first;
         IsMixed = false;
+
+        // Not on a read-only row: the reset it would offer is a write, and a write there is refused. A mark promising
+        // a button that does nothing is worse than no mark.
+        IsModified = !IsReadOnly && Definition is { HasDefault: true } && !Definition.SameValue(first, Default());
+    }
+
+    // The default AS THE PROPERTY WOULD HOLD IT. Written in markup it arrives as text - `DefaultValue="80"` is the
+    // string "80", not the number - and comparing that with what the object holds would mark every such row as edited
+    // the moment it was shown. The same conversion a write goes through, so the two agree about what the value is.
+    private object Default()
+    {
+        var wanted = Definition?.DefaultValue;
+
+        return Definition != null && Definition.TryConvert(wanted, ValueType, out var value) ? value : wanted;
     }
 
     private void OnBoundValueChanged(object sender, EventArgs e)
@@ -331,6 +366,7 @@ public class PropertyRow : Control
         if (_grip != null) _grip.MouseLeftButtonDown -= OnGripPressed;
         if (_expander != null) _expander.MouseLeftButtonDown -= OnExpanderPressed;
         if (_action != null) _action.Click -= OnActionPressed;
+        if (_reset != null) _reset.Click -= OnResetPressed;
         UnhookEditor();
     }
 
@@ -509,6 +545,16 @@ public class PropertyRow : Control
     /// <summary>Runs the definition's action. The row hands over the OBJECTS it stands for unless the definition named
     /// a parameter of its own: a command that opens a longer form for this property needs to know what it is being
     /// opened on, and having to say so on every line is a thing to forget.</summary>
+    /// <summary>Puts the property's default back on every object the row stands for. Goes through the same write as an
+    /// edit does, so a definition that paints INTO its value still paints instead of replacing, and a read-only row
+    /// refuses exactly as it would refuse anything else.</summary>
+    public bool ResetToDefault()
+    {
+        if (Definition is not { HasDefault: true } || Owner == null) return false;
+
+        return Owner.Write(this, Definition.DefaultValue);
+    }
+
     public bool RunAction()
     {
         if (Definition?.ActionCommand is not { } command) return false;
@@ -523,6 +569,11 @@ public class PropertyRow : Control
     private void OnActionPressed(object sender, RoutedEventArgs e)
     {
         if (RunAction()) e.Handled = true;
+    }
+
+    private void OnResetPressed(object sender, RoutedEventArgs e)
+    {
+        if (ResetToDefault()) e.Handled = true;
     }
 
     private void OnExpanderPressed(object sender, MouseButtonEventArgs e)

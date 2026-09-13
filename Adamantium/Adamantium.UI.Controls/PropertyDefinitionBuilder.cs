@@ -18,6 +18,8 @@ namespace Adamantium.UI.Controls;
 /// components are is the application's business.</para></summary>
 public class PropertyDefinitionBuilder
 {
+    private readonly Dictionary<Type, object> _pristine = new();
+
     /// <summary>How deep a nested object is opened into properties of its own. One level by default: a transform inside
     /// a component is worth showing, a whole object graph is not - and a cycle would never end.</summary>
     public int MaxDepth { get; set; } = 1;
@@ -117,7 +119,44 @@ public class PropertyDefinitionBuilder
                                 || property.SetMethod is not { IsPublic: true }
                                 || property.GetCustomAttribute<ReadOnlyAttribute>()?.IsReadOnly == true;
 
+        if (!definition.IsReadOnly) ReadDefault(definition, property);
+
         return definition;
+    }
+
+    /// <summary>What this property is worth on a FRESH instance of its type - which is what "the default" means for a
+    /// class, and is why a generated inspector can offer to reset without a line of markup anywhere.
+    /// <para>A type that cannot be made without arguments simply gets no defaults, and its rows offer no reset. Better
+    /// than a guess: an inspector that puts back a value the object never had is worse than one that puts nothing
+    /// back.</para></summary>
+    private void ReadDefault(PropertyDefinition definition, PropertyInfo property)
+    {
+        if (property.DeclaringType is not { } owner) return;
+
+        if (!_pristine.TryGetValue(owner, out var sample))
+        {
+            try
+            {
+                sample = owner.GetConstructor(Type.EmptyTypes) != null ? Activator.CreateInstance(owner) : null;
+            }
+            catch
+            {
+                sample = null;   // a constructor that needs the world is not a source of defaults
+            }
+
+            _pristine[owner] = sample;
+        }
+
+        if (sample == null) return;
+
+        try
+        {
+            definition.DefaultValue = property.GetValue(sample);
+        }
+        catch
+        {
+            // a getter that throws on an object nothing has been done to says nothing about a default either
+        }
     }
 
     private PropertyDefinition Create(PropertyInfo property, Type type, int depth)
