@@ -19,7 +19,7 @@
 
     <Style Selector="GridSplitter">
         <PropertyTrigger Property="IsMouseOver" Value="true">
-            <Setter Property="Background" Value="{ResourceReference AccentFillColorDefault}"/>
+            <Setter Property="Background" Value="{ThemeResource AccentFillColorDefault}"/>
         </PropertyTrigger>
     </Style>
 

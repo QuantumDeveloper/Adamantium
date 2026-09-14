@@ -545,7 +545,7 @@
                         <PropertyTrigger Property="IsActive" Value="true">
                             <Setter TargetName="CellBorder" Property="BorderThickness" Value="1"/>
                             <Setter TargetName="CellBorder" Property="BorderBrush"
-                                    Value="{ObservableResource AccentFillColorDefault}"/>
+                                    Value="{ThemeResource AccentFillColorDefault}"/>
                         </PropertyTrigger>
                         <!-- An editor takes the WHOLE cell: the padding that keeps text off the column edge would
                              otherwise squeeze the field, and a drop-down loses more of its width than it can spare. -->
