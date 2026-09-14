@@ -11,6 +11,12 @@ public interface INativePlatformSettings
     /// <summary>Longest gap between two clicks that still counts as a double-click, in milliseconds.</summary>
     uint DoubleClickTime { get; }
 
+    /// <summary>How far apart two clicks may land and still be one double-click, per axis (Win32
+    /// <c>SM_CXDOUBLECLK</c>/<c>SM_CYDOUBLECLK</c>). A double click is two clicks in the SAME PLACE, not merely two in
+    /// quick succession - without this a run of quick clicks anywhere on a surface keeps counting up, and any gesture
+    /// that means something on the second one fires where nobody asked for it.</summary>
+    Size DoubleClickSize { get; }
+
     /// <summary>How long the pointer must rest before the OS calls it a HOVER, in milliseconds - the user's own dwell
     /// preference (Win32 <c>SPI_GETMOUSEHOVERTIME</c>, macOS the springing delay). Every "hold still and something
     /// opens" gesture should be paced by it rather than by a number we picked.</summary>

@@ -25,9 +25,10 @@ public enum RawMouseEventType : uint
    X2ButtonDown,
    X2ButtonUp,
 
-   LeftButtonDoubleClick,
-   RightButtonDoubleClick,
-   MiddleButtonDoubleClick,
+   // There is deliberately NO double-click type here. A double click is not a thing a platform reports, it is a thing
+   // counted from two presses and the time between them - and the counting is done once, in MouseDevice.MouseDown, so
+   // that every backend behaves the same and ClickCount is right everywhere. Three members used to sit here that nothing
+   // produced and that would have broken ClickCount had anything produced them.
 
    MouseWheel,
 

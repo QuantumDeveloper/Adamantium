@@ -12,6 +12,7 @@ public class MouseDevice
     private int clickCount = 0;
     private uint lastClickTime = 0;
     private IInputComponent lastClickedComponent = null;
+    private Vector2 lastClickPosition;
 
     public IInputComponent Captured { get; protected set; }
     public IInputComponent DirectlyOver { get; private set; }
@@ -210,24 +211,6 @@ public class MouseDevice
                 var wheel = (RawMouseWheelEventArgs)e;
                 MouseWheel(e.RootComponent, e.Position, e.InputModifiers, e.Timestamp, wheel.WheelDelta, wheel.IsHorizontal);
                 break;
-            case RawMouseEventType.LeftButtonDoubleClick:
-            case RawMouseEventType.MiddleButtonDoubleClick:
-            case RawMouseEventType.RightButtonDoubleClick:
-                switch (e.EventType)
-                {
-                    case RawMouseEventType.LeftButtonDoubleClick:
-                        button = MouseButtons.Left;
-                        break;
-                    case RawMouseEventType.RightButtonDoubleClick:
-                        button = MouseButtons.Right;
-                        break;
-                    case RawMouseEventType.MiddleButtonDoubleClick:
-                        button = MouseButtons.Left;
-                        break;
-                }
-                MouseDoubleClick(e.RootComponent, e.Position, e.Timestamp, button, e.InputModifiers);
-                break;
-
             case RawMouseEventType.RawMouseMove:
                 var args = (RawInputMouseEventArgs)e;
                 RawMouseEvent(args.RootComponent, args.Delta, args.InputModifiers, args.Timestamp);
@@ -371,27 +354,6 @@ public class MouseDevice
         return false;
     }
 
-    private void MouseDoubleClick(IInputComponent rootComponent, Vector2 p, uint timestamp, MouseButtons button, InputModifiers inputModifiers)
-    {
-        var hit = HitTestTopmost(rootComponent, p);
-        if (hit != null)
-        {
-            MouseButtonEventArgs args = new MouseButtonEventArgs(this, button, GetState(button), inputModifiers, timestamp);
-            args.RoutedEvent = Mouse.PreviewMouseDoubleClickEvent;
-
-            hit.RaiseEvent(args);
-
-            args.RoutedEvent = Mouse.PreviewMouseDownEvent;
-            hit.RaiseEvent(args);
-
-            args.RoutedEvent = Mouse.MouseDoubleClickEvent;
-            hit.RaiseEvent(args);
-
-            args.RoutedEvent = Mouse.MouseDownEvent;
-            hit.RaiseEvent(args);
-        }
-    }
-
     private void LeaveWindow(IInputComponent rootComponent, Vector2 p, InputModifiers inputModifiers, uint timestamp)
     {
         // Mouse left the window entirely: everything in the hovered chain leaves, nothing enters - so IsMouseOver is
@@ -477,13 +439,22 @@ public class MouseDevice
             // Elapsed since the previous click = timestamp - lastClickTime (NOT the reverse: both are uint, so the wrong
             // order underflows to a huge value and reset ALWAYS fired, pinning clickCount at 1 - double-clicks never
             // registered anywhere). uint subtraction also wraps correctly across the GetMessageTime rollover.
-            if (timestamp - lastClickTime > PlatformSettings.DoubleClickTime || lastClickedComponent != hit)
+            // ...and the second click must also land in the SAME PLACE. A double click is two clicks on one thing, not
+            // two in quick succession anywhere: without the box, a run of quick clicks across a surface kept counting up
+            // (1, 2, 3, 4...), so anything that acts on the second one fired on a click that was aimed somewhere else
+            // entirely - a line placed vertex by vertex ended itself on the second vertex.
+            var box = PlatformSettings.DoubleClickSize;
+            var moved = Math.Abs(p.X - lastClickPosition.X) > box.Width ||
+                        Math.Abs(p.Y - lastClickPosition.Y) > box.Height;
+
+            if (timestamp - lastClickTime > PlatformSettings.DoubleClickTime || lastClickedComponent != hit || moved)
             {
                 clickCount = 0;
             }
             clickCount++;
             lastClickTime = timestamp;
             lastClickedComponent = hit;
+            lastClickPosition = p;
 
             MouseButtonEventArgs eventArgs = new MouseButtonEventArgs(this, button, GetState(button), inputModifiers, timestamp)
             {

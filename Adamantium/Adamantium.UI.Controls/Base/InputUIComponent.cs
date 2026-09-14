@@ -779,6 +779,8 @@ public class InputUIComponent : MeasurableUIComponent, IInputComponent
                 args.RoutedEvent = PreviewMouseMiddleButtonDownEvent;
             }
             input.RaiseEvent(args);
+
+            RaiseDoubleClick(input, e, Mouse.PreviewMouseDoubleClickEvent);
         }
     }
 
@@ -822,7 +824,32 @@ public class InputUIComponent : MeasurableUIComponent, IInputComponent
             }
 
             input.RaiseEvent(args);
+
+            RaiseDoubleClick(input, e, Mouse.MouseDoubleClickEvent);
         }
+    }
+
+    // The SECOND press of a double click, raised here for the same reason the per-button events are: this runs once per
+    // element as the press travels its route, so an ancestor sees a double click on its descendant, exactly as it sees
+    // the press itself.
+    //
+    // The count is the device's - it is worked out from the time between two presses on the same element, which is the
+    // only place that knowledge exists. Nothing else can raise this: a platform's own double-click message carries no
+    // count, and surfacing one would double-count the press it stands for.
+    //
+    // Raised with its OWN args, like every other promotion here, so handling the double click does NOT mark the press
+    // handled - a control that answers both must say so on both.
+    private static void RaiseDoubleClick(IInputComponent input, MouseButtonEventArgs e, RoutedEvent routedEvent)
+    {
+        // Exactly two. A third and fourth press keep counting up, and they are not further double clicks.
+        if (e.ClickCount != 2) return;
+
+        input.RaiseEvent(new MouseButtonEventArgs(e.MouseDevice, e.ChangedButton, e.ButtonState, e.Modifiers, e.Timestamp)
+        {
+            ClickCount = e.ClickCount,
+            OriginalSource = e.OriginalSource,
+            RoutedEvent = routedEvent
+        });
     }
 
     private static void MouseUpHandler(object sender, MouseButtonEventArgs e)
