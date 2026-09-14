@@ -15,6 +15,8 @@ public class DragThresholdTests
     {
         public uint DoubleClickTime => 500;
 
+        public Size DoubleClickSize => new(4, 4);
+
         public Size DragThreshold => new(4, 4);
 
         public uint HoverTime => 400;

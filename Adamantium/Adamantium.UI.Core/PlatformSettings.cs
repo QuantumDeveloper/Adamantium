@@ -14,6 +14,11 @@ public static class PlatformSettings
    /// every desktop OS ships with, and what we use until a platform says otherwise.</summary>
    public static UInt32 DoubleClickTime => Platform?.DoubleClickTime ?? 500;
 
+   /// <summary>How far apart two clicks may land, PER AXIS, and still be one double-click. 4x4 is the desktop default.
+   /// A platform reporting zero falls back to it: zero would mean no two clicks ever count as a double one.</summary>
+   public static Size DoubleClickSize =>
+      Platform?.DoubleClickSize is { Width: > 0, Height: > 0 } size ? size : new Size(4, 4);
+
    /// <summary>How far the pointer must travel, PER AXIS, before a press becomes a drag - the user's own setting, so a
    /// shaky hand or a high-DPI mouse doesn't turn every click into a drag. 4x4 is the desktop default.</summary>
    public static Size DragThreshold => Platform?.DragThreshold ?? new Size(4, 4);

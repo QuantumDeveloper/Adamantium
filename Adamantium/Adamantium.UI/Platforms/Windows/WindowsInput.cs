@@ -35,6 +35,12 @@ internal sealed class WindowsInput : INativeMouse, INativeKeyboard, INativePlatf
 
     public uint DoubleClickTime => Win32Interop.GetDoubleClickTime();
 
+    // SM_CXDOUBLECLK/SM_CYDOUBLECLK - the box the second click has to land in. Read live, like the rest: a mouse the
+    // user swapped mid-session brings its own settings.
+    public Size DoubleClickSize => new(
+        Win32Interop.GetSystemMetrics(SystemMetrics.Cxdoubleclk),
+        Win32Interop.GetSystemMetrics(SystemMetrics.Cydoubleclk));
+
     // SPI_GETMOUSEHOVERTIME. The call fills an int; if it fails we say 0 and the neutral layer falls back to its default.
     public uint HoverTime
     {
