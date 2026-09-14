@@ -416,6 +416,12 @@ namespace Adamantium.Graphics.Core
             {
                 Synchronization2 = true,
                 DynamicRendering = true,
+                // A shader that discards BEFORE it takes a derivative cannot compile to OpKill - a killed lane stops
+                // feeding its neighbours' fwidth - so the compiler emits OpDemoteToHelperInvocation instead, and that
+                // needs this. It was declared by the shaders and never enabled here, which is a capability used outside
+                // the contract: undefined behaviour, and the shape it took on this driver was a lost device reporting an
+                // invalid read. Unconditional like the two above - Vulkan 1.3 requires every device to support it.
+                ShaderDemoteToHelperInvocation = true,
             };
             
             // Enable host image copy only when the device reports support — turning it on unconditionally would
