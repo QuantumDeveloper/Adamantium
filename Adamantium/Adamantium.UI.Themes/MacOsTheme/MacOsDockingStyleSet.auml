@@ -389,12 +389,12 @@
 
     <Style Selector="PaneSplitter">
         <PropertyTrigger Property="IsMouseOver" Value="true">
-            <Setter Property="Background" Value="{ResourceReference AccentFillColorDefault}"/>
+            <Setter Property="Background" Value="{ThemeResource AccentFillColorDefault}"/>
         </PropertyTrigger>
         <!-- And it STAYS lit while dragging: the pointer leaves the band the moment the boundary starts moving, so
              hover alone made the divider blink out exactly during the gesture it belongs to. -->
         <PropertyTrigger Property="IsDragging" Value="true">
-            <Setter Property="Background" Value="{ResourceReference AccentFillColorDefault}"/>
+            <Setter Property="Background" Value="{ThemeResource AccentFillColorDefault}"/>
         </PropertyTrigger>
     </Style>
 
@@ -403,7 +403,7 @@
     <Style Selector="DockCompass">
         <Setter Property="IndicatorBrush" Value="{ResourceReference DockCompassFillColor}"/>
         <Setter Property="IndicatorStroke" Value="{ResourceReference DockCompassStrokeColor}"/>
-        <Setter Property="ActiveBrush" Value="{ResourceReference AccentFillColorDefault}"/>
+        <Setter Property="ActiveBrush" Value="{ThemeResource AccentFillColorDefault}"/>
         <Setter Property="PreviewBrush" Value="{ResourceReference DockCompassPreviewColor}"/>
     </Style>
 
