@@ -133,7 +133,9 @@ public class MergedFluentThemeTests
         // rejected value is washed with.
         // 41 with the canvas grid and its axes: a grid is a RULER the user reads while working, not a hairline meant to
         // go unnoticed, so it cannot borrow a control stroke - borrowing one left it invisible.
-        Assert.That(theme.Palette.Count, Is.EqualTo(41));
+        // 42 with the canvas selection band, which is the accent at a fraction of its opacity: it is drawn OVER what it
+        // is selecting, and no control fill is translucent enough to be borrowed for that.
+        Assert.That(theme.Palette.Count, Is.EqualTo(42));
     }
 
     [Test]
@@ -227,8 +229,8 @@ public class MergedFluentThemeTests
         // AcrylicFillColorDefault, DataGridLineColor, the two search washes and the validation one. Counting only the
         // brushes is what let four keys go missing unnoticed the first time, so the total is what is guarded; growing
         // it is a deliberate edit here.
-        // 46 with the canvas grid colour and its axis colour - see the palette count above.
-        Assert.That(theme.Palette.Count + theme.RawColors.Count, Is.EqualTo(46));
+        // 46 with the canvas grid colour and its axis colour, 47 with the selection band - see the palette count above.
+        Assert.That(theme.Palette.Count + theme.RawColors.Count, Is.EqualTo(47));
     }
 
     [Test]

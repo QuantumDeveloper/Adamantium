@@ -1,0 +1,13 @@
+namespace Adamantium.UI.Controls;
+
+/// <summary>What a <see cref="ShapeItem"/> IS. One item type rather than three, because all three are the same thing to
+/// everything around them - a box in the world that can be moved, resized, hit and drawn.</summary>
+public enum CanvasShape
+{
+    Rectangle,
+    Ellipse,
+
+    /// <summary>A straight line from one corner of the box to the other. Its box is what the drag made, so which way it
+    /// leans is remembered by the box being read either way round.</summary>
+    Line
+}

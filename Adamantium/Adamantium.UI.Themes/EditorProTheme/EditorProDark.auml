@@ -47,6 +47,7 @@
     <!-- See FluentDark: the grid is a ruler, not a control's hairline. -->
     <PaletteColor Key="CanvasGridColor" Color="#3DFFFFFF"/>
     <PaletteColor Key="CanvasAxisColor" Color="#82FFFFFF"/>
+    <PaletteColor Key="CanvasBandColor" Color="#2B4C8DFF"/>
 
     <PaletteColor Key="OnAccentOverlayPointerOver" Color="#33FFFFFF"/>
     <PaletteColor Key="OnAccentOverlayPressed" Color="#5CFFFFFF"/>
