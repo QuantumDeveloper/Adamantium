@@ -94,6 +94,8 @@ public partial class RenderCache
                             case 11: _haloLivingOver.DrawRecordedSegment(device, op.SegId, fullScissor, _projectionMatrix); break;
                             case 12: _polygonBatch.DrawRecordedSegment(device, op.SegId, fullScissor, _projectionMatrix); break;
                             case 13: _materialBatch.DrawRecordedSegment(device, op.SegId, fullScissor, _projectionMatrix); break;
+                            case 14: _canvasGridBatch.DrawRecordedSegment(device, op.SegId, fullScissor, _projectionMatrix); break;
+                            case 15: _inkBatch.DrawRecordedSegment(device, op.SegId, fullScissor, _projectionMatrix); break;
                             default: _textBatch.DrawRecordedSegment(device, op.SegId, fullScissor, _projectionMatrix); break;
                         }
                         break;
@@ -314,6 +316,12 @@ public partial class RenderCache
         RecordSegment(5, _patternBatch.Flush(device, fullScissor, _projectionMatrix));   // pattern layer: after gradients, before instanced
         RecordSegment(6, _fractalBatch.Flush(device, fullScissor, _projectionMatrix));   // fractal layer: after pattern, before instanced
         if (_texRectBatch != null) RecordSegment(7, _texRectBatch.Flush(device, fullScissor, _projectionMatrix));   // textured layer: after fractal, before instanced
+        // The canvas GROUND, after every other fill. Where it flushes says nothing about what it draws under: what it
+        // covers is settled by OverlapsHigherLayer, which flushes anything painted earlier out of the way first.
+        if (_canvasGridBatch != null) RecordSegment(14, _canvasGridBatch.Flush(device, fullScissor, _projectionMatrix));
+        // INK after the ground it is drawn on - and after every other fill, for the same reason the grid is: what it
+        // covers is settled by OverlapsHigherLayer, not by where it flushes.
+        if (_inkBatch != null) RecordSegment(15, _inkBatch.Flush(device, fullScissor, _projectionMatrix));
         // The general instanced-fill flush is retained too: Flush records the group and returns its index, replayed via
         // ReplayFlush - so a vector icon no longer disables replay for the whole window.
         if (_instancedFill != null)
