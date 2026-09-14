@@ -69,4 +69,76 @@
                          Brush="{ResourceReference TextFillColorSecondary}"/>
     </DrawingImage>
 
+    <!-- Something to take hold of: the ridged grip every movable panel has had since toolbars had them. Bars rather
+         than an arrow because it says "pick this up", not "this way". -->
+    <DrawingImage x:Key="GripIcon">
+        <GeometryDrawing Geometry="M0,1.5 L10,1.5 M0,5 L10,5 M0,8.5 L10,8.5"
+                         Stroke="{ResourceReference TextFillColorSecondary}"
+                         StrokeThickness="1.2"/>
+    </DrawingImage>
+
+    <!-- The tools, each drawn as the thing it makes rather than as a picture of an instrument: what a tool button has to
+         answer is "what will appear when I drag", and the shape is the shortest way to say it. -->
+    <DrawingImage x:Key="ToolSelectIcon">
+        <GeometryDrawing Geometry="M1,0.5 L1,9 L3.2,7 L4.6,9.8 L6.1,9.1 L4.7,6.5 L7.6,6.3 Z"
+                         Brush="{ResourceReference TextFillColorSecondary}"/>
+    </DrawingImage>
+
+    <DrawingImage x:Key="ToolPenIcon">
+        <GeometryDrawing Geometry="M0.6,9.4 L2,6.6 L7.4,1.2 L8.8,2.6 L3.4,8 Z"
+                         Brush="{ResourceReference TextFillColorSecondary}"/>
+    </DrawingImage>
+
+    <DrawingImage x:Key="ToolRectangleIcon">
+        <GeometryDrawing Geometry="M0.8,2 L9.2,2 L9.2,8 L0.8,8 Z"
+                         Stroke="{ResourceReference TextFillColorSecondary}"
+                         StrokeThickness="1.2"/>
+    </DrawingImage>
+
+    <!-- A ring drawn as a twelve-sided polygon: the path parser reads LINE segments, so a circle here is the polygon
+         that is indistinguishable from one at the size an icon is seen. -->
+    <DrawingImage x:Key="ToolEllipseIcon">
+        <GeometryDrawing Geometry="M9,5 L8.46,7 L7,8.46 L5,9 L3,8.46 L1.54,7 L1,5 L1.54,3 L3,1.54 L5,1 L7,1.54 L8.46,3 Z"
+                         Stroke="{ResourceReference TextFillColorSecondary}"
+                         StrokeThickness="1.2"/>
+    </DrawingImage>
+
+    <!-- The two erasers. Both are the rubber on its slant; what tells them apart is what is left UNDER it - which is
+         exactly the difference the two modes make, so the icons differ by the same thing the tools do.
+         By point: the line continues either side with a HOLE rubbed through the middle. -->
+    <DrawingImage x:Key="ToolEraseIcon">
+        <GeometryDrawing Geometry="M1.2,6.6 L5.4,0.8 L8.8,3.2 L4.6,9 L1.2,6.6 Z M0.2,9.8 L2.4,9.8 M7.6,9.8 L9.8,9.8"
+                         Stroke="{ResourceReference TextFillColorSecondary}"
+                         StrokeThickness="1.2"/>
+    </DrawingImage>
+
+    <!-- By stroke: the same rubber, and a CROSS where the line was - the mark for "this one goes", not "this much of
+         it". A whole line drawn under it would read as a line being left alone. -->
+    <DrawingImage x:Key="ToolEraseStrokeIcon">
+        <GeometryDrawing Geometry="M1.2,6.2 L5.4,0.4 L8.8,2.8 L4.6,8.6 L1.2,6.2 Z M5.6,7.4 L9.6,10 M9.6,7.4 L5.6,10"
+                         Stroke="{ResourceReference TextFillColorSecondary}"
+                         StrokeThickness="1.2"/>
+    </DrawingImage>
+
+    <!-- Take it ALL: a bin, which is a different statement from rubbing something out and has to look it. -->
+    <DrawingImage x:Key="ClearAllIcon">
+        <GeometryDrawing Geometry="M1.6,2.6 L2.4,9.6 L7.6,9.6 L8.4,2.6 M0.6,2.6 L9.4,2.6 M3.6,2.6 L3.6,1 L6.4,1 L6.4,2.6"
+                         Stroke="{ResourceReference TextFillColorSecondary}"
+                         StrokeThickness="1.2"/>
+    </DrawingImage>
+
+    <!-- Text: the serif A every tool bar uses, drawn as the letter rather than as a picture of a cursor - what the tool
+         makes is the shortest way to say what it does. -->
+    <DrawingImage x:Key="ToolTextIcon">
+        <GeometryDrawing Geometry="M0.8,9.4 L5,0.8 L9.2,9.4 M2.6,6.6 L7.4,6.6"
+                         Stroke="{ResourceReference TextFillColorSecondary}"
+                         StrokeThickness="1.2"/>
+    </DrawingImage>
+
+    <DrawingImage x:Key="ToolLineIcon">
+        <GeometryDrawing Geometry="M0.8,9 L9.2,1"
+                         Stroke="{ResourceReference TextFillColorSecondary}"
+                         StrokeThickness="1.2"/>
+    </DrawingImage>
+
 </ResourceDictionary>

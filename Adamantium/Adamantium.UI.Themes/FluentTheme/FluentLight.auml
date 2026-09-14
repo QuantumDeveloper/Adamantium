@@ -49,6 +49,7 @@
     <!-- See FluentDark: the grid is a ruler, not a control's hairline. -->
     <PaletteColor Key="CanvasGridColor" Color="#3D000000"/>
     <PaletteColor Key="CanvasAxisColor" Color="#87000000"/>
+    <PaletteColor Key="CanvasBandColor" Color="#2B005FB8"/>
     <PaletteColor Key="TextFillColorPrimary" Color="#E4000000"/>
     <PaletteColor Key="TextFillColorSecondary" Color="#9E000000"/>
     <PaletteColor Key="TextFillColorTertiary" Color="#72000000"/>

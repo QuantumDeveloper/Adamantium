@@ -4,15 +4,21 @@
 
         <TextBlock Grid.Row="0" Text="InfiniteCanvas" FontSize="18"/>
         <TextBlock Grid.Row="1" Margin="0,4,0,12" TextWrapping="WrapByWords"
-                   Text="A plane with no edges. The wheel zooms toward the cursor, the middle button - or space and the left one - pans, and neither runs into anything: there is no scrollable extent here, panning moves the CAMERA. The grid is not objects either - only the marks inside the viewport are drawn, and their step coarsens as the camera pulls back, so it never turns to mush."/>
+                   Text="A plane with no edges: the wheel zooms toward the cursor, the middle button or space pans, and neither runs into anything. What the plain left button does belongs to the TOOL - select, pen, or a shape. What is selected gets a frame with grips, in screen pixels; dragging those moves and resizes the whole selection at once. Delete removes it, Escape lets go."/>
 
+        <!-- Everything that steers the canvas lives in the canvas's own panel: the point of the overlay is that a tool
+             panel belongs ON the surface it works. These two are the exception, and not an arbitrary one - they are the
+             switches that can TAKE THE PANEL AWAY, and a switch inside the thing it hides can only ever be used once. -->
         <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="0,0,0,10">
-            <TextBlock Text="Grid:" VerticalAlignment="Center"/>
-            <DropDown ItemsSource="{Binding GridStyles}" SelectedItem="{Binding GridStyle, Mode=TwoWay}"
-                      Width="120" Margin="8,0,0,0" VerticalAlignment="Center"/>
+            <CheckBox Content="Whiteboard" VerticalAlignment="Center"
+                      ToolTip="The canvas becomes glass over the controls behind it - no ground, no axes, no grid"
+                      IsChecked="{Binding Whiteboard, Mode=TwoWay}"/>
+            <CheckBox Content="Tool panel" MarginLeft="20" VerticalAlignment="Center"
+                      ToolTip="Off, the canvas carries nothing of its own and is steered only from out here"
+                      IsChecked="{Binding ShowPanel, Mode=TwoWay}"/>
 
             <TextBlock Margin="24,0,0,0" VerticalAlignment="Center"
-                       Text="Home - or a double click of the middle button - puts the origin back in the middle"
+                       Text="Home - or a double click of the middle button - returns to the origin"
                        Foreground="{ObservableResource TextFillColorSecondary}"/>
         </StackPanel>
 
@@ -20,13 +26,235 @@
                 BorderBrush="{ObservableResource ControlStrokeColorDefault}">
             <!-- Square corners on purpose: the clip here is a rectangular scissor, and a rounded frame would let the
                  canvas's own square corners poke out from under it. -->
+            <Grid>
+            <!-- UNDER the canvas: an ordinary page of controls, so the whiteboard mode has something to be a whiteboard
+                 OVER. In the other three modes it is hidden behind the ground and never seen. -->
+            <StackPanel Orientation="Vertical" Margin="40,30,0,0" HorizontalAlignment="Left"
+                        VerticalAlignment="Top" Width="320">
+                <TextBlock Text="Somebody else's screen" FontSize="16"/>
+                <TextBlock Margin="0,6,0,0" TextWrapping="WrapByWords"
+                           Text="An ordinary page of controls. Turn Whiteboard on and the canvas above becomes glass: this stays live underneath while the pen draws over it."
+                           Foreground="{ObservableResource TextFillColorSecondary}"/>
+                <Button Content="A button" Margin="0,14,0,0" HorizontalAlignment="Left"/>
+                <CheckBox Content="A checkbox" Margin="0,10,0,0"/>
+                <TextBox Text="A field" Margin="0,10,0,0" Width="200" HorizontalAlignment="Left"/>
+            </StackPanel>
+
+            <!-- The SCENE comes from the page. The canvas asks it what falls inside the piece of world it can see and
+                 puts finished items into it; everything a drawing is for - undo, saving - stays with whoever owns
+                 the drawing. -->
             <InfiniteCanvas x:Name="Canvas"
                             GridStyle="{Binding GridStyle}"
+                            Scene="{Binding Scene}"
+                            Tool="{Binding Tool}"
+                            DefaultTool="{Binding SelectTool}"
+                            Ink="{Binding Ink}"
+                            ShapeFill="{Binding ShapeFillOrNothing}"
+                            InkThickness="{Binding InkThickness}"
+                            TextSize="{Binding TextSize}"
+                            EraserSize="{Binding EraserSize}"
+                            IsDesignMode="{Binding DesignMode}"
+                            IsOverlayVisible="{Binding ShowPanel}"
+                            SnapToGrid="{Binding SnapToGrid}"
+                            SnapMarkBrush="{Binding SnapMark}"
+                            SnapMarkSize="{Binding SnapMarkSize}"
+                            OverlayPlacement="TopLeft"
                             Scale="{Binding Scale, Mode=TwoWay}"
-                            Offset="{Binding Offset, Mode=TwoWay}"/>
+                            Offset="{Binding Offset, Mode=TwoWay}">
+                <!-- The OVERLAY: on the glass, not on the plane. It neither moves nor scales with the camera, and the
+                     canvas carries the LAYER while this content is the page's - which is how somebody who wants
+                     different tools puts their own here instead of building a panel around the canvas. The grip above
+                     it belongs to the canvas: it drags the panel and folds it away. -->
+                <InfiniteCanvas.Overlay>
+                    <Border Background="{ObservableResource SolidBackgroundFillColorSecondary}"
+                            BorderBrush="{ObservableResource ControlStrokeColorDefault}"
+                            BorderThickness="1" CornerRadius="8" Padding="10">
+                        <!-- The panel holds more than a small viewport has room for, and a tool panel that runs off the
+                             bottom is one whose last button cannot be pressed. It SCROLLS rather than being trimmed or
+                             emptied out into the page: what is in it is what the canvas can do, and all of it belongs
+                             on the canvas.
+                             HIDDEN and not Auto: the bar is drawn over the right-hand column and covers the very
+                             steppers it sits on, and a panel this small is scrolled with the wheel anyway. Hidden still
+                             scrolls - it is Disabled that would stop it. -->
+                        <ScrollViewer Height="300"
+                                      VerticalScrollBarVisibility="Hidden" HorizontalScrollBarVisibility="Disabled">
+                        <!-- A stated width, so every row has the same one to divide: the boxes on the right form ONE
+                             column the panel is read down, and a field stopping short of it would read as a different
+                             kind of thing. -->
+                        <StackPanel Orientation="Vertical" Width="204">
+
+                            <TextBlock Text="Tool" FontSize="12"
+                                       Foreground="{ObservableResource TextFillColorSecondary}"/>
+                            <!-- TWO rows, grouped by what a tool leaves behind: what marks the plane freehand, then the
+                                 shapes. Eight in a line would not fit the panel, and the ones that fell off the end
+                                 were simply invisible - a row of buttons does not wrap by itself. -->
+                            <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
+                                <ToggleButton Width="30" Height="28" MinWidth="0" MinHeight="0" Padding="0"
+                                              ToolTip="Select, move and resize"
+                                              IsChecked="{Binding IsSelecting}" Command="{Binding UseSelectCommand}">
+                                    <Image Source="{ObservableResource ToolSelectIcon}" Width="13" Height="13"/>
+                                </ToggleButton>
+                                <ToggleButton Width="30" Height="28" MinWidth="0" MinHeight="0" Padding="0"
+                                              MarginLeft="4" ToolTip="Pen"
+                                              IsChecked="{Binding IsDrawing}" Command="{Binding UsePenCommand}">
+                                    <Image Source="{ObservableResource ToolPenIcon}" Width="13" Height="13"/>
+                                </ToggleButton>
+                                <ToggleButton Width="30" Height="28" MinWidth="0" MinHeight="0" Padding="0"
+                                              MarginLeft="4" ToolTip="Text - click and type, Escape finishes"
+                                              IsChecked="{Binding IsTyping}" Command="{Binding UseTextCommand}">
+                                    <Image Source="{ObservableResource ToolTextIcon}" Width="13" Height="13"/>
+                                </ToggleButton>
+                                <!-- The two erasers are two TOOLS, side by side with the rest: which one you want is the
+                                     same kind of choice as which tool you want, and it is made the same way. -->
+                                <ToggleButton Width="30" Height="28" MinWidth="0" MinHeight="0" Padding="0"
+                                              MarginLeft="4" ToolTip="Eraser - rubs a hole where it is dragged"
+                                              IsChecked="{Binding IsErasingPoints}"
+                                              Command="{Binding UseErasePointCommand}">
+                                    <Image Source="{ObservableResource ToolEraseIcon}" Width="13" Height="13"/>
+                                </ToggleButton>
+                                <ToggleButton Width="30" Height="28" MinWidth="0" MinHeight="0" Padding="0"
+                                              MarginLeft="4" ToolTip="Eraser - takes the whole stroke it touches"
+                                              IsChecked="{Binding IsErasingStrokes}"
+                                              Command="{Binding UseEraseStrokeCommand}">
+                                    <Image Source="{ObservableResource ToolEraseStrokeIcon}" Width="13" Height="13"/>
+                                </ToggleButton>
+                            </StackPanel>
+
+                            <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
+                                <ToggleButton Width="30" Height="28" MinWidth="0" MinHeight="0" Padding="0"
+                                              ToolTip="Rectangle"
+                                              IsChecked="{Binding IsRectangle}" Command="{Binding UseRectangleCommand}">
+                                    <Image Source="{ObservableResource ToolRectangleIcon}" Width="13" Height="13"/>
+                                </ToggleButton>
+                                <ToggleButton Width="30" Height="28" MinWidth="0" MinHeight="0" Padding="0"
+                                              MarginLeft="4" ToolTip="Ellipse"
+                                              IsChecked="{Binding IsEllipse}" Command="{Binding UseEllipseCommand}">
+                                    <Image Source="{ObservableResource ToolEllipseIcon}" Width="13" Height="13"/>
+                                </ToggleButton>
+                                <ToggleButton Width="30" Height="28" MinWidth="0" MinHeight="0" Padding="0"
+                                              MarginLeft="4" ToolTip="Line"
+                                              IsChecked="{Binding IsLine}" Command="{Binding UseLineCommand}">
+                                    <Image Source="{ObservableResource ToolLineIcon}" Width="13" Height="13"/>
+                                </ToggleButton>
+                                <!-- The BIN is not a tool and does not stay pressed: it is one action on the whole
+                                     drawing, so it is a plain button held apart from the tools. -->
+                                <Button Width="30" Height="28" MinWidth="0" MinHeight="0" Padding="0"
+                                        MarginLeft="14" ToolTip="Clear the canvas"
+                                        Command="{Binding EraseCommand}">
+                                    <Image Source="{ObservableResource ClearAllIcon}" Width="13" Height="13"/>
+                                </Button>
+                            </StackPanel>
+
+                            <!-- How wide the eraser is, in screen pixels: wide takes out whole regions, narrow picks
+                                 a thin line out from between its neighbours - and because it is a SCREEN size, zooming
+                                 in makes the same setting finer in the drawing without touching it. -->
+                            <Grid ColumnDefinitions="96,*" Margin="0,10,0,0">
+                                <TextBlock Grid.Column="0" Text="Eraser" FontSize="12" VerticalAlignment="Center"
+                                           Foreground="{ObservableResource TextFillColorSecondary}"/>
+                                <NumericUpDown Grid.Column="1" Margin="6,0,0,0" MinWidth="0"
+                                               Minimum="2" Maximum="240" SmallChange="2"
+                                               IsDragScrubEnabled="True"
+                                               Value="{Binding EraserSize, Mode=TwoWay}"/>
+                            </Grid>
+
+                            <!-- The toolbox: real controls on the plane. The same ElementTool three times with a
+                                 different factory - what a control IS is the application's business, not the canvas's.
+                                 -->
+                            <TextBlock Text="Controls" FontSize="12" Margin="0,10,0,0"
+                                       Foreground="{ObservableResource TextFillColorSecondary}"/>
+                            <StackPanel Orientation="Horizontal" Margin="0,5,0,0">
+                                <ToggleButton Width="60" Height="26" MinWidth="0" MinHeight="0" Padding="0"
+                                              FontSize="11" Content="Button" ToolTip="Drag out a button"
+                                              IsChecked="{Binding IsButton}" Command="{Binding UseButtonCommand}"/>
+                                <ToggleButton Width="60" Height="26" MinWidth="0" MinHeight="0" Padding="0"
+                                              MarginLeft="6" FontSize="11" Content="Check"
+                                              ToolTip="Drag out a checkbox"
+                                              IsChecked="{Binding IsCheck}" Command="{Binding UseCheckCommand}"/>
+                                <ToggleButton Width="60" Height="26" MinWidth="0" MinHeight="0" Padding="0"
+                                              MarginLeft="6" FontSize="11" Content="Box"
+                                              ToolTip="Drag out a text box"
+                                              IsChecked="{Binding IsBox}" Command="{Binding UseBoxCommand}"/>
+                            </StackPanel>
+
+                            <!-- Design, a press picks a control UP; off, the press is the control's own. -->
+                            <CheckBox Content="Design mode" Margin="0,8,0,0"
+                                      IsChecked="{Binding DesignMode, Mode=TwoWay}"/>
+
+                            <!-- Colour and size side by side, the pairing every tool panel uses - and the only way the
+                                 whole panel fits a viewport this size without being scrolled. -->
+                            <TextBlock Text="Stroke" FontSize="12" Margin="0,10,0,0"
+                                       Foreground="{ObservableResource TextFillColorSecondary}"/>
+                            <!-- Two columns, not two widths: a NumericUpDown's own Width is its BOX, and its stepper
+                                 buttons are added outside it - so matching the numbers on the two controls still left
+                                 them ending in different places. The star column ends where the panel does, whatever
+                                 each control decides to make of it. -->
+                            <Grid ColumnDefinitions="96,*" Margin="0,5,0,0">
+                                <ColorPickerButton Grid.Column="0" Height="26"
+                                                   SelectedColor="{Binding InkColour, Mode=TwoWay}"/>
+                                <!-- Drag-scrub on: press the box and pull sideways to run the number, the way a
+                                     property field in a 3D tool does - and the number is still there to be read and
+                                     typed, which a slider never is. -->
+                                <!-- MinWidth explicitly OFF. The theme gives a field a 120 floor - right for one
+                                     standing alone in a form, and wider than this whole column - and a floor beats both
+                                     a width and the slot, because ApplyLayoutConstraints takes the Max last. Left on,
+                                     the field kept its 120 and drew straight through the panel's right border. -->
+                                <NumericUpDown Grid.Column="1" Margin="6,0,0,0" MinWidth="0"
+                                               Minimum="0.5" Maximum="24" SmallChange="0.5"
+                                               IsDragScrubEnabled="True"
+                                               Value="{Binding InkThickness, Mode=TwoWay}"/>
+                            </Grid>
+
+                            <!-- New text is sized in SCREEN pixels, like the pen: what you set is what you see while you
+                                 type, and the words it leaves belong to the plane. -->
+                            <Grid ColumnDefinitions="96,*" Margin="0,10,0,0">
+                                <TextBlock Grid.Column="0" Text="Text" FontSize="12" VerticalAlignment="Center"
+                                           Foreground="{ObservableResource TextFillColorSecondary}"/>
+                                <NumericUpDown Grid.Column="1" Margin="6,0,0,0" MinWidth="0"
+                                               Minimum="6" Maximum="96" SmallChange="1"
+                                               IsDragScrubEnabled="True"
+                                               Value="{Binding TextSize, Mode=TwoWay}"/>
+                            </Grid>
+
+                            <Grid ColumnDefinitions="96,*" Margin="0,10,0,0">
+                                <CheckBox Grid.Column="0" Content="Fill" VerticalAlignment="Center"
+                                          IsChecked="{Binding Filled, Mode=TwoWay}"/>
+                                <ColorPickerButton Grid.Column="1" Height="26" Margin="6,0,0,0"
+                                                   SelectedColor="{Binding FillColour, Mode=TwoWay}"/>
+                            </Grid>
+
+                            <!-- The SURFACE: what the plane itself looks like and what it pulls to. In the panel with
+                                 everything else, because a tool panel belongs on the surface it works. -->
+                            <Grid ColumnDefinitions="96,*" Margin="0,10,0,0">
+                                <TextBlock Grid.Column="0" Text="Grid" FontSize="12" VerticalAlignment="Center"
+                                           Foreground="{ObservableResource TextFillColorSecondary}"/>
+                                <DropDown Grid.Column="1" Margin="6,0,0,0" MinWidth="0"
+                                          ItemsSource="{Binding GridStyles}"
+                                          SelectedItem="{Binding GridStyle, Mode=TwoWay}"/>
+                            </Grid>
+
+                            <CheckBox Content="Snap to grid" Margin="0,10,0,0"
+                                      IsChecked="{Binding SnapToGrid, Mode=TwoWay}"/>
+                            <Grid ColumnDefinitions="96,*" Margin="0,5,0,0">
+                                <ColorPickerButton Grid.Column="0" Height="26"
+                                                   SelectedColor="{Binding SnapColour, Mode=TwoWay}"/>
+                                <NumericUpDown Grid.Column="1" Margin="6,0,0,0" MinWidth="0"
+                                               Minimum="3" Maximum="24"
+                                               IsDragScrubEnabled="True"
+                                               Value="{Binding SnapMarkSize, Mode=TwoWay}"/>
+                            </Grid>
+
+                        </StackPanel>
+                        </ScrollViewer>
+                    </Border>
+                </InfiniteCanvas.Overlay>
+            </InfiniteCanvas>
+            </Grid>
         </Border>
 
-        <TextBlock Grid.Row="4" Margin="0,10,0,0" Text="{Binding Camera}"
-                   Foreground="{ObservableResource TextFillColorSecondary}"/>
+        <StackPanel Grid.Row="4" Orientation="Horizontal" Margin="0,10,0,0">
+            <TextBlock Text="{Binding Camera}" Foreground="{ObservableResource TextFillColorSecondary}"/>
+            <TextBlock Text="{Binding Drawn}" Margin="24,0,0,0"
+                       Foreground="{ObservableResource TextFillColorSecondary}"/>
+        </StackPanel>
     </Grid>
 </View>

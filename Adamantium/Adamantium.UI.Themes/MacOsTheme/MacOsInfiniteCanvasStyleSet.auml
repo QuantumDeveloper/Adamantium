@@ -10,6 +10,35 @@
         <Setter Property="AxisBrush" Value="{ObservableResource CanvasAxisColor}"/>
         <Setter Property="GridThickness" Value="1"/>
         <Setter Property="GridDotSize" Value="2"/>
+        <Setter Property="SnapMarkBrush" Value="{ThemeResource AccentFillColorDefault}"/>
+
+        <!-- Selection and page - see Fluent's set. -->
+        <Setter Property="SelectionBrush" Value="{ThemeResource AccentFillColorDefault}"/>
+        <Setter Property="HandleBrush" Value="{ObservableResource SolidBackgroundFillColorBase}"/>
+        <Setter Property="RubberBandBrush" Value="{ObservableResource CanvasBandColor}"/>
+        <Setter Property="HandleSize" Value="10"/>
+
+        <!-- The overlay layer and its grip - see Fluent's set. -->
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="InfiniteCanvas">
+                    <Grid>
+                        <!-- The controls on the plane, under the panel - see Fluent's set. -->
+                        <CanvasElementLayer x:Name="PART_Elements"/>
+
+                        <StackPanel x:Name="PART_OverlayRoot" Orientation="Vertical" Margin="14">
+                            <Button x:Name="PART_OverlayGrip" Width="32" Height="24"
+                                    MinWidth="0" MinHeight="0" Padding="0"
+                                    HorizontalAlignment="Left" MarginBottom="6"
+                                    ToolTip="Drag to move the panel, click to fold it away">
+                                <Image Source="{ObservableResource GripIcon}" Width="12" Height="12"/>
+                            </Button>
+                            <ContentPresenter x:Name="PART_Overlay"/>
+                        </StackPanel>
+                    </Grid>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
     </Style>
 
 </StyleSet>

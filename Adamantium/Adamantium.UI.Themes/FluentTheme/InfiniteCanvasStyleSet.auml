@@ -18,6 +18,46 @@
         <Setter Property="AxisBrush" Value="{ObservableResource CanvasAxisColor}"/>
         <Setter Property="GridThickness" Value="1"/>
         <Setter Property="GridDotSize" Value="2"/>
+        <Setter Property="SnapMarkBrush" Value="{ThemeResource AccentFillColorDefault}"/>
+
+        <!-- The manipulation frame and its grips: the accent, because what is selected is what the next action applies
+             to, and the band, which is translucent so it does not hide what it is being dragged round. -->
+        <Setter Property="SelectionBrush" Value="{ThemeResource AccentFillColorDefault}"/>
+        <Setter Property="HandleBrush" Value="{ObservableResource SolidBackgroundFillColorBase}"/>
+        <Setter Property="RubberBandBrush" Value="{ObservableResource CanvasBandColor}"/>
+        <Setter Property="HandleSize" Value="9"/>
+
+        <!-- The OVERLAY layer, and the only thing the template is here for: a place on the GLASS, over the plane, that
+             does not move or scale with the camera. The control puts the content and the corner on it - a template
+             cannot map a placement to an alignment, and saying it here would mean three themes having to agree.
+
+             Sized to what it holds and aligned to a corner, NEVER stretched: stretched, it would cover the whole canvas
+             and swallow the presses that draw on it.
+
+             The GRIP is part of the block rather than a thing beside it: it carries the panel when it is dragged and
+             opens it when it is clicked, so the two must travel together or a closed panel would be a panel with no
+             way back. -->
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="InfiniteCanvas">
+                    <Grid>
+                        <!-- The CONTROLS on the plane, first so the tool panel is over them: they are content, and the
+                             panel is the glass in front of it. The canvas places them from the camera. -->
+                        <CanvasElementLayer x:Name="PART_Elements"/>
+
+                        <StackPanel x:Name="PART_OverlayRoot" Orientation="Vertical" Margin="12">
+                            <Button x:Name="PART_OverlayGrip" Width="30" Height="24"
+                                    MinWidth="0" MinHeight="0" Padding="0"
+                                    HorizontalAlignment="Left" MarginBottom="6"
+                                    ToolTip="Drag to move the panel, click to fold it away">
+                                <Image Source="{ObservableResource GripIcon}" Width="12" Height="12"/>
+                            </Button>
+                            <ContentPresenter x:Name="PART_Overlay"/>
+                        </StackPanel>
+                    </Grid>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
     </Style>
 
 </StyleSet>
