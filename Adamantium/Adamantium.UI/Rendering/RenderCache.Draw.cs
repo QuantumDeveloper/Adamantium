@@ -62,6 +62,8 @@ public partial class RenderCache
     private MaterialRectCollector _materialBatch;
     private readonly Dictionary<int, (IUIComponent Node, Matrix4x4F World)> _matSegNode = new();
     private FractalRectCollector _fractalBatch;   // SDF family: rounded rects with an escape-time FRACTAL fill (Julia/Mandelbrot)
+    private CanvasGridCollector _canvasGridBatch;   // the canvas GROUND: one quad, the fragment deciding if it is on a mark
+    private InkCollector _inkBatch;   // INK: a capsule per segment of a stroke, all of them one instanced draw
     private TextureBatchCollector _texRectBatch;   // SDF family: rounded rects whose fill is SAMPLED from a texture (ImageBrush / NineSliceBrush)
     // The soft band (aura / shadow) in its TWO paint positions. An OUTER band goes under every fill; an INNER one over
     // them - drawn under, it would simply be covered by the shape's own fill. Both lazy: most windows have neither.
@@ -484,6 +486,8 @@ public partial class RenderCache
         if (_gradientEllipseBatch != null) _gradientEllipseBatch.TransformsAddress = address;
         if (_patternBatch != null) _patternBatch.TransformsAddress = address;
         if (_fractalBatch != null) _fractalBatch.TransformsAddress = address;
+        if (_canvasGridBatch != null) _canvasGridBatch.TransformsAddress = address;
+        if (_inkBatch != null) _inkBatch.TransformsAddress = address;
         if (_texRectBatch != null) _texRectBatch.TransformsAddress = address;
         if (_materialBatch != null)
         {
@@ -818,6 +822,8 @@ public partial class RenderCache
             _gradientEllipseBatch ??= new GradientEllipseCollector { BatchId = 4 };
             _patternBatch ??= new PatternRectCollector { BatchId = 5 };
             _fractalBatch ??= new FractalRectCollector { BatchId = 6 };
+            _canvasGridBatch ??= new CanvasGridCollector { BatchId = 14 };
+            _inkBatch ??= new InkCollector { BatchId = 15 };
             // Lazy, like the textured batch: a material owns a capture texture, and a tree without one should not pay
             // for it.
             if (_materialBatch != null) _materialBatch.BeginFrame(device);
@@ -829,6 +835,8 @@ public partial class RenderCache
             _gradientEllipseBatch.BeginFrame(device);
             _patternBatch.BeginFrame(device);
             _fractalBatch.BeginFrame(device);
+            _canvasGridBatch.BeginFrame(device);
+            _inkBatch.BeginFrame(device);
             // Created lazily (below, on the first textured fill) - but once it exists it needs its frame reset like any
             // other collector. Leaving it out is what made a nine-slice draw for exactly ONE frame and then vanish.
             _texRectBatch?.BeginFrame(device);
@@ -1007,6 +1015,59 @@ public partial class RenderCache
                 // Rejected (rotated/sheared world, or the instance buffer overflowed): a batchable rect built no per-unit
                 // machinery, so build its body now and re-bake this frame's transform into it, then it draws below.
                 rru.EnsureMachinery();
+                unit.Update(wt, _projectionMatrix, _renderScale);
+            }
+            else if (device != null && unit is RectangleRenderUnit iru && _inkBatch.CanBatch(iru.RectPayload))
+            {
+                // INK: one rectangle becomes as many instances as the stroke has segments, which is what keeps a
+                // drawing to one draw call rather than one per stroke.
+                var inkBounds = LogicalBounds(unit.Component, wt);
+                if (ClipGroupChanged(scissor, unit.Component) || OverlapsHigherLayer(9, inkBounds, unit.Component))
+                    FlushBatches(device, fullScissor, ref scissorNarrowed);
+
+                var inkBakeWorld = ResolveBake(device, unit.Component, wt, out var slot4Ink);
+                FadeBySlot(unit);
+                if (_inkBatch.TryAdd(iru.RectPayload, inkBakeWorld, iru.FillOpacity, scissor, inkBounds, slot4Ink,
+                        iru.FadeSlot, RoundedClipSlot(unit.Component, fullScissor)))
+                {
+                    if (_recording)
+                    {
+                        NoteBatched(group, _inkBatch, _inkBatch.LastSlot);
+                        IndexUnitBrush(unit.Component, unit, iru.RectPayload.LiveBrush);
+                    }
+                    _batchScissor = scissor;
+                    _batchClip = ClipOwnerOf(unit.Component);
+                    _batchOpen = true;
+                    continue;
+                }
+                iru.EnsureMachinery();
+                unit.Update(wt, _projectionMatrix, _renderScale);
+            }
+            else if (device != null && unit is RectangleRenderUnit cgru && _canvasGridBatch.CanBatch(cgru.RectPayload))
+            {
+                // The canvas GROUND: one quad whose every pixel decides for itself whether it is on a mark. Layer 8 -
+                // it flushes after every other fill, so anything painted EARLIER that it overlaps has to be flushed out
+                // of the way first, or the grid covers it.
+                var gridBounds = LogicalBounds(unit.Component, wt);
+                if (ClipGroupChanged(scissor, unit.Component) || OverlapsHigherLayer(8, gridBounds, unit.Component))
+                    FlushBatches(device, fullScissor, ref scissorNarrowed);
+
+                var gridBakeWorld = ResolveBake(device, unit.Component, wt, out var slot4Grid);
+                FadeBySlot(unit);
+                if (_canvasGridBatch.TryAdd(cgru.RectPayload, gridBakeWorld, cgru.FillOpacity, scissor, gridBounds,
+                        slot4Grid, cgru.FadeSlot, RoundedClipSlot(unit.Component, fullScissor)))
+                {
+                    if (_recording)
+                    {
+                        NoteBatched(group, _canvasGridBatch, _canvasGridBatch.LastSlot);
+                        IndexUnitBrush(unit.Component, unit, cgru.RectPayload.LiveBrush);
+                    }
+                    _batchScissor = scissor;
+                    _batchClip = ClipOwnerOf(unit.Component);
+                    _batchOpen = true;
+                    continue;
+                }
+                cgru.EnsureMachinery();
                 unit.Update(wt, _projectionMatrix, _renderScale);
             }
             else if (device != null && unit is RectangleRenderUnit grru && _gradientRectBatch.CanBatch(grru.RectPayload))
@@ -1616,13 +1677,13 @@ public partial class RenderCache
                 }
                 tgru.FillInstanced = false;
             }
-            else if (device != null && (_rectBatch.Active || _ellipseBatch.Active || _gradientRectBatch.Active || _gradientEllipseBatch.Active || _patternBatch.Active || _fractalBatch.Active || _textBatch.Active || (_instancedFill?.Active ?? false) || (_materialBatch?.Active ?? false)))
+            else if (device != null && (_rectBatch.Active || _ellipseBatch.Active || _gradientRectBatch.Active || _gradientEllipseBatch.Active || _patternBatch.Active || _fractalBatch.Active || _textBatch.Active || (_instancedFill?.Active ?? false) || (_materialBatch?.Active ?? false) || (_canvasGridBatch?.Active ?? false)))
             {
                 // A non-batchable unit that overlaps any pending batch: flush them first so this unit paints OVER them, as
                 // its later source order requires. Spatially disjoint units (a list's items) don't flush.
                 var lb = LogicalBounds(unit.Component, wt);
                 if (_rectBatch.OverlapsPending(lb) || _ellipseBatch.OverlapsPending(lb) || _gradientRectBatch.OverlapsPending(lb) || _gradientEllipseBatch.OverlapsPending(lb) || _patternBatch.OverlapsPending(lb) || _fractalBatch.OverlapsPending(lb) || _textBatch.OverlapsPending(lb) || (_instancedFill?.OverlapsPending(lb) ?? false)
-                    || (_materialBatch?.OverlapsPending(lb) ?? false))
+                    || (_materialBatch?.OverlapsPending(lb) ?? false) || (_canvasGridBatch?.OverlapsPending(lb) ?? false))
                     FlushBatches(device, fullScissor, ref scissorNarrowed);
             }
             else if (device == null && unit is RectangleRenderUnit rruNoDev)
@@ -1768,6 +1829,23 @@ public partial class RenderCache
         }
 
         if (layer < 7 && (_instancedFill?.OverlapsPending(lb) ?? false))
+        {
+            return true;
+        }
+
+        // THE CANVAS GROUND. It flushes after every other fill, so anything batched alongside that was painted EARLIER
+        // has to be flushed out first or the grid covers it - which is exactly what happened when this was flushed
+        // first instead: the page's own background, painted long before the canvas, landed on top of the grid and the
+        // canvas came out empty. Where a batch flushes has nothing to do with what it draws UNDER; paint order inside
+        // a clip group is kept by this check, not by the flush position.
+        if (layer < 8 && (_canvasGridBatch?.OverlapsPending(lb) ?? false))
+        {
+            return true;
+        }
+
+        // INK, drawn on the ground and after every other fill. Same rule as the grid above: anything batched alongside
+        // that was painted EARLIER has to be flushed out first, or the ink covers it.
+        if (layer < 9 && (_inkBatch?.OverlapsPending(lb) ?? false))
         {
             return true;
         }
@@ -3024,6 +3102,8 @@ public partial class RenderCache
         11 => _haloLivingOver,
         12 => _polygonBatch,
         13 => _materialBatch,
+        14 => _canvasGridBatch,
+        15 => _inkBatch,
         _ => _textBatch
     };
 

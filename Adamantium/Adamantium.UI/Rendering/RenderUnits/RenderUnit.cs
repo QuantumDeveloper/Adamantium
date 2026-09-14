@@ -611,7 +611,8 @@ public class RectangleRenderUnit : RenderUnit<RectanglePayload>
     // virtualized tile grid cheap. Re-stating the rules here is exactly how they drifted: the ellipse collector learned
     // about a stopless mesh brush and its twin here did not, and the mismatch drew garbage.
     private static bool IsSdfBatchable(RectanglePayload p) =>
-        RectBatchCollector.WantsBatch(p) || MaterialRectCollector.WantsBatch(p);
+        RectBatchCollector.WantsBatch(p) || MaterialRectCollector.WantsBatch(p) || CanvasGridCollector.WantsBatch(p) ||
+        InkCollector.WantsBatch(p);
 
     // A rect the GRADIENT SDF batch (GradientRectCollector) will draw: a linear/radial gradient fill, a batchable pen,
     // uniform corners. Like IsSdfBatchable it means "build ZERO per-unit machinery" - the batch's pixel shader draws the
