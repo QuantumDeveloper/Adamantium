@@ -29,6 +29,18 @@ public class TextTool : ICanvasTool
     /// <summary>A caret outlives the click that placed it - which is exactly what this asks.</summary>
     public bool IsBusy => _editing != null;
 
+    /// <summary>How a rail shows this tool - see <see cref="SelectTool.Name"/>.</summary>
+    public string Name { get; set; } = "Text";
+
+    public string Icon { get; set; } = "ToolTextIcon";
+
+    public Key Shortcut { get; set; } = Key.T;
+
+    public string Description { get; set; } = "click and type, Escape finishes";
+
+    /// <summary>The I-beam every text cursor is, so a click that is about to start typing looks like one.</summary>
+    public Cursor Cursor { get; set; } = Cursors.IBeam;
+
     public void OnPressed(InfiniteCanvas canvas, CanvasPointerEventArgs e)
     {
         if (e.Button != MouseButtons.Left || canvas.Scene == null) return;

@@ -78,7 +78,7 @@ internal sealed class InkCollector : SdfBatchCollector<InkSegmentItem>
         var tx = world.M41;
         var ty = world.M42;
 
-        var colour = Straight(ink.Color, (float)(opacity * ink.Opacity));
+        var color = Straight(ink.Color, (float)(opacity * ink.Opacity));
         var half = (float)(Math.Max(ink.Thickness, 0.1) * 0.5 * Math.Abs(sx));
 
         var header = Count++;
@@ -113,7 +113,7 @@ internal sealed class InkCollector : SdfBatchCollector<InkSegmentItem>
             // index is only right while a run happens to begin at zero, and reads somebody else's record as soon as one
             // does not.
             Clip = new Vector4F(clipSlot, points, first - header, 0),
-            Color = colour
+            Color = color
         };
 
         MarkPending(scissor, logicalBounds);
@@ -126,6 +126,6 @@ internal sealed class InkCollector : SdfBatchCollector<InkSegmentItem>
     public override bool TryStage(IRenderUnit unit, Matrix4x4F world, int transformSlot, int ownerTag, int clipSlot = -1)
         => false;
 
-    private static Vector4F Straight(Color colour, float opacity) =>
-        new(colour.R / 255f, colour.G / 255f, colour.B / 255f, colour.A / 255f * opacity);
+    private static Vector4F Straight(Color color, float opacity) =>
+        new(color.R / 255f, color.G / 255f, color.B / 255f, color.A / 255f * opacity);
 }

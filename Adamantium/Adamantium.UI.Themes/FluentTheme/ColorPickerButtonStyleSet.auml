@@ -7,6 +7,10 @@
          {Ancestor}-bound two-way (the Ancestor binding walks the logical tree, which stays intact for popup content). -->
 
     <Style Selector="ColorPickerButton">
+        <!-- The inset the swatch sits in. STATED here and read by the template below, so that a swatch put somewhere
+             tight can ask for less - written into the template as a literal, the control's own Padding was a property
+             that quietly did nothing. -->
+        <Setter Property="Padding" Value="4"/>
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="ColorPickerButton">
@@ -16,7 +20,7 @@
                                 Background="{ResourceReference ControlFillColorDefault}"
                                 BorderBrush="{ResourceReference ControlStrokeColorDefault}"
                                 BorderThickness="1"
-                                Padding="4">
+                                Padding="{TemplateBinding Padding}">
                             <Border Background="{TemplateBinding SelectedBrush}"
                                     CornerRadius="6"/>
                         </Border>

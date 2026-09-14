@@ -7,9 +7,9 @@ namespace Adamantium.UI.Rendering;
 /// One canvas grid (see GridEffect.fx, pass Grid): a rectangle whose every pixel decides for itself, from the world
 /// coordinate under it, whether it is on a mark. Packed into a BDA storage buffer and read by SV_InstanceID; the quad
 /// comes from SV_VertexID.
-/// <para>There is exactly ONE of these in a draw, which is the whole point of the pass - so the colours are kept as
+/// <para>There is exactly ONE of these in a draw, which is the whole point of the pass - so the colors are kept as
 /// float4 rather than packed into bytes: packing would save twenty-four bytes once and cost the question of how two
-/// four-byte colours align against the fields after them.</para>
+/// four-byte colors align against the fields after them.</para>
 /// </summary>
 [StructLayout(LayoutKind.Sequential)]
 public struct CanvasGridItem

@@ -20,7 +20,7 @@ public readonly struct StrokePoint(Vector2F at, float pressure = 1f)
     public float Pressure { get; } = pressure;
 }
 
-/// <summary>A trail of ink: a run of points with a width and a colour.
+/// <summary>A trail of ink: a run of points with a width and a color.
 /// <para>The points are FLOATS, and they are offsets from the stroke's own origin rather than places in the world. A
 /// stroke is a tight cluster a few hundred units across, so a float holds it to far better than a pixel - while the
 /// same numbers written absolutely would lose precision the further the drawing went from zero, and take twice the
@@ -54,6 +54,33 @@ public class StrokeItem : ICanvasItem
     public double Thickness { get; set; }
 
     public IReadOnlyList<StrokePoint> Points => _points;
+
+    /// <summary>Where it is and how big, one number at a time - what an inspector line binds to, since a box cannot be
+    /// written half at a time. Said in terms of <see cref="Bounds"/>, <see cref="Move"/> and <see cref="Resize"/>, so
+    /// it is the same four lines for every kind of item and a new kind can copy them.</summary>
+    public double X
+    {
+        get => Bounds.X;
+        set => Move(new Vector2(value - Bounds.X, 0));
+    }
+
+    public double Y
+    {
+        get => Bounds.Y;
+        set => Move(new Vector2(0, value - Bounds.Y));
+    }
+
+    public double Width
+    {
+        get => Bounds.Width;
+        set => Resize(new Rect(Bounds.X, Bounds.Y, Math.Max(1e-9, value), Bounds.Height));
+    }
+
+    public double Height
+    {
+        get => Bounds.Height;
+        set => Resize(new Rect(Bounds.X, Bounds.Y, Bounds.Width, Math.Max(1e-9, value)));
+    }
 
     public Rect Bounds
     {
@@ -136,11 +163,11 @@ public class StrokeItem : ICanvasItem
     /// far apart (they were thinned when the pen lifted), so dropping whole points would take out far more than the
     /// eraser covered and leave the cut ends wherever the thinning happened to have put them.</para>
     /// <returns>Whether anything was rubbed out at all.</returns></summary>
-    public bool Erase(Vector2 centre, double radius, List<StrokeItem> pieces)
+    public bool Erase(Vector2 center, double radius, List<StrokeItem> pieces)
     {
         if (_points.Count == 0 || radius <= 0) return false;
 
-        // The radius asked for is the hole in the PAINTED stroke, and the cut is made in its centreline - so the cut has
+        // The radius asked for is the hole in the PAINTED stroke, and the cut is made in its centerline - so the cut has
         // to go back by half the ink's width as well. The pieces left behind are drawn with ROUND ENDS, and each of
         // those reaches half a thickness back toward the middle: cutting at the bare radius let the two caps close the
         // hole again, and once the eraser was thinner than the line they closed it completely - the thinner the eraser,
@@ -155,7 +182,7 @@ public class StrokeItem : ICanvasItem
         // visible, so that is what the eraser has to touch.
         if (_points.Count == 1)
         {
-            if ((World(0) - centre).Length() > reach) return false;
+            if ((World(0) - center).Length() > reach) return false;
 
             cut = true;
         }
@@ -167,7 +194,7 @@ public class StrokeItem : ICanvasItem
 
             // Where this segment is INSIDE the circle, as the piece [enter, leave] of its length. Nothing means the
             // whole segment survives.
-            var inside = Inside(from, to, centre, reach);
+            var inside = Inside(from, to, center, reach);
             if (inside == null)
             {
                 run ??= new List<Vector2> { from };
@@ -208,7 +235,7 @@ public class StrokeItem : ICanvasItem
 
     // The piece of a segment that falls inside a circle, as a pair of fractions of its length, or nothing when none of
     // it does. Solving |A + t(B-A) - C| = R for t, and keeping only what lies on the segment itself.
-    private static (double Enter, double Leave)? Inside(Vector2 from, Vector2 to, Vector2 centre, double radius)
+    private static (double Enter, double Leave)? Inside(Vector2 from, Vector2 to, Vector2 center, double radius)
     {
         var dx = to.X - from.X;
         var dy = to.Y - from.Y;
@@ -216,10 +243,10 @@ public class StrokeItem : ICanvasItem
 
         // A segment of no length is a point: inside or out, with nothing to cut.
         if (a <= 1e-12)
-            return (from - centre).Length() <= radius ? (0.0, 1.0) : null;
+            return (from - center).Length() <= radius ? (0.0, 1.0) : null;
 
-        var fx = from.X - centre.X;
-        var fy = from.Y - centre.Y;
+        var fx = from.X - center.X;
+        var fy = from.Y - center.Y;
         var b = 2 * (fx * dx + fy * dy);
         var c = fx * fx + fy * fy - radius * radius;
 
@@ -436,7 +463,7 @@ public class StrokeItem : ICanvasItem
 
         _ink.Points = _screen;
         _ink.Count = _points.Count;
-        _ink.Color = ColourOf(Brush);
+        _ink.Color = ColorOf(Brush);
         // Never thinner than a pixel: ink zoomed out should thin to a hair, not disappear.
         _ink.Thickness = Math.Max(Thickness * canvas.Scale, 1.0);
         // The CONTENTS of the borrowed array just changed and its reference did not, so the paint has to be told - see
@@ -453,10 +480,10 @@ public class StrokeItem : ICanvasItem
             new Rect(topLeft.X, topLeft.Y, bottomRight.X - topLeft.X, bottomRight.Y - topLeft.Y));
     }
 
-    // What the ink pass paints with - a plain colour, because a capsule is shaded by a colour and not by a fill. A
+    // What the ink pass paints with - a plain color, because a capsule is shaded by a color and not by a fill. A
     // gradient or a picture would say nothing about where the ink is, so anything else comes out as nothing rather than
     // being approximated into something nobody asked for.
-    private static Color ColourOf(Brush brush) =>
+    private static Color ColorOf(Brush brush) =>
         brush is SolidColorBrush solid ? solid.Color : new Color(0, 0, 0, 0);
 
 

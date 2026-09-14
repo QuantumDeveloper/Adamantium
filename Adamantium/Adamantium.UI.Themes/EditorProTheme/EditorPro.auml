@@ -3,6 +3,7 @@
        xmlns:x="http://adamantium/ui/xaml/extensions"
        xmlns:editor="clr-namespace:Adamantium.UI.Themes.EditorProTheme"
        xmlns:fluent="clr-namespace:Adamantium.UI.Themes.FluentTheme"
+       xmlns:shared="clr-namespace:Adamantium.UI.Themes.Shared"
        Name="EditorPro"
        SystemLightVariant="Light"
        SystemDarkVariant="Dark"
@@ -32,6 +33,8 @@
          key, and this theme answers the same key names. Editor Pro will want sharper, smaller icons of its own, and
          that is a separate piece of work from the skin. -->
     <ResourceLink Source="{x:Type editor:Metrics}"/>
+    <!-- FIRST - see Fluent's. The canvas's pictures belong to no theme. -->
+    <ResourceLink Source="{x:Type shared:CanvasIcons}"/>
     <ResourceLink Source="{x:Type fluent:Icons}"/>
   </ResourceContext.Resources>
 
@@ -85,6 +88,7 @@
     <StyleInclude Source="{x:Type editor:ScrollViewerStyleSet}"/>
     <StyleInclude Source="{x:Type editor:ZoomBoxStyleSet}"/>
     <StyleInclude Source="{x:Type editor:InfiniteCanvasStyleSet}"/>
+    <StyleInclude Source="{x:Type editor:CanvasPaneStyleSet}"/>
     <StyleInclude Source="{x:Type editor:RingProgressBarStyleSet}"/>
     <StyleInclude Source="{x:Type editor:KeyTipAdornerStyleSet}"/>
     <StyleInclude Source="{x:Type editor:SlidePanelStyleSet}"/>

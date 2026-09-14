@@ -30,6 +30,19 @@ public class ElementTool : ICanvasTool
 
     public bool IsBusy => false;
 
+    /// <summary>How a rail shows this tool. No default picture and no default key: what control this tool puts down is
+    /// the application's choice, so what it is called and how it looks are its choice too.</summary>
+    public string Name { get; set; } = "Control";
+
+    public string Icon { get; set; } = string.Empty;
+
+    public Key Shortcut { get; set; } = Key.None;
+
+    public string Description { get; set; } = string.Empty;
+
+    /// <summary>A crosshair - a control is dragged out from an exact corner, like a shape.</summary>
+    public Cursor Cursor { get; set; } = Cursors.Crosshair;
+
     public void OnPressed(InfiniteCanvas canvas, CanvasPointerEventArgs e)
     {
         if (e.Button != MouseButtons.Left || canvas.Scene == null || _make == null) return;

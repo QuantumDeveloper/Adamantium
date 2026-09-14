@@ -11,6 +11,8 @@
          it would be a lie about the value being picked. -->
 
     <Style Selector="ColorPickerButton">
+        <!-- The inset the swatch sits in, read by the template below - see Fluent's set. -->
+        <Setter Property="Padding" Value="3"/>
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="ColorPickerButton">
@@ -20,7 +22,7 @@
                                 Background="{ResourceReference ControlFillColorDefault}"
                                 BorderBrush="{ResourceReference ControlStrokeColorDefault}"
                                 BorderThickness="{ResourceReference StrokeControl}"
-                                Padding="3">
+                                Padding="{TemplateBinding Padding}">
                             <Border Background="{TemplateBinding SelectedBrush}"
                                     CornerRadius="4"/>
                         </Border>

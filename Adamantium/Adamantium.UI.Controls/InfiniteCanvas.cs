@@ -1,5 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Collections.Specialized;
+using System.Linq;
+using Adamantium.Graphics.Fonts;
 using Adamantium.ProceduralGeometry.Shapes;
 using Adamantium.UI.Controls.Base;
 using Adamantium.UI.Controls.Primitives;
@@ -40,6 +43,19 @@ public class InfiniteCanvas : Control
 
     private CanvasElementLayer _elements;
     private readonly List<ElementItem> _visibleElements = new();
+
+    private CanvasChromeLayer _chromeLayer;
+    private CanvasPanes _chrome;
+    private CanvasTools _tools;
+    private readonly CanvasFrameGesture _frame = new();
+    private bool _publishing;
+
+    private TextLayout _readout;
+    private FontFamily _readoutFont;
+    private string _readoutText;
+    private Size _readoutSize;
+    private Vector2 _pointer;
+    private bool _pointerInside;
 
     private ContentPresenter _overlay;
     private InputUIComponent _overlayRoot;
@@ -107,6 +123,30 @@ public class InfiniteCanvas : Control
     public static readonly AdamantiumProperty OverlayProperty = AdamantiumProperty.Register(nameof(Overlay),
         typeof(object), typeof(InfiniteCanvas),
         new PropertyMetadata(null, PropertyMetadataOptions.AffectsMeasure, OnOverlayChanged));
+
+    /// <summary>The tools this canvas offers, in the order a rail should show them. Putting a tool here is what makes
+    /// it pickable by a button and by its own shortcut; <see cref="Tool"/> is which of them is in hand.
+    /// <para>A list on the canvas rather than buttons in markup, because everything a button needs - the name, the
+    /// picture, the key - is a fact about the tool, and mirroring those into commands and flags is work that goes out
+    /// of step the first time somebody adds a tool.</para></summary>
+    public static readonly AdamantiumProperty ToolsProperty = AdamantiumProperty.Register(nameof(Tools),
+        typeof(CanvasTools), typeof(InfiniteCanvas), new PropertyMetadata(null, OnToolsChanged));
+
+    /// <summary>Whether a tool's own <see cref="ICanvasTool.Shortcut"/> picks it. On by default; an application that
+    /// spends those keys on something else turns it off, and one that only disagrees about WHICH key sets a different
+    /// shortcut on the tool instead.</summary>
+    public static readonly AdamantiumProperty AreToolShortcutsEnabledProperty = AdamantiumProperty.Register(
+        nameof(AreToolShortcutsEnabled), typeof(Boolean), typeof(InfiniteCanvas), new PropertyMetadata(true));
+
+    /// <summary>The panels shown over the plane - a tool rail, an inspector, a context bar. The canvas owns WHERE each
+    /// one goes (<see cref="CanvasPane.Placement"/>) and the application owns what is in it.
+    /// <para>A collection and not one slot, because a canvas's chrome has three jobs with three different laws of
+    /// placement, and putting all three in one panel is how a tool panel turns into a column that does not fit. See
+    /// <see cref="CanvasPane"/>.</para>
+    /// <para><see cref="Overlay"/> still works and is the same thing said for one panel: keep it for a single floating
+    /// panel, use this when there is more than one.</para></summary>
+    public static readonly AdamantiumProperty ChromeProperty = AdamantiumProperty.Register(nameof(Chrome),
+        typeof(CanvasPanes), typeof(InfiniteCanvas), new PropertyMetadata(null, OnChromeChanged));
 
     /// <summary>Where the overlay sits in the viewport. Its own property rather than the content's alignment, because a
     /// floating panel is placed against the CANVAS and not against whatever it happens to contain.</summary>
@@ -292,6 +332,14 @@ public class InfiniteCanvas : Control
         Focusable = true;
         ClipToBounds = true;
 
+        // An empty one to start with, so that code can add to these without making the collection first - and written
+        // at DEFAULT priority, which is the whole point. Local(1) outranks Binding(2) permanently here, so a collection
+        // made the ordinary way - in the constructor, or lazily from the getter - masks {Binding} on that property for
+        // good. Measured exactly that: the view model held eleven tools and the canvas a different, empty list, and no
+        // binding could ever reach it again.
+        SetValue(ToolsProperty, new CanvasTools(), ValuePriority.Default);
+        SetValue(ChromeProperty, new CanvasPanes(), ValuePriority.Default);
+
         // Its OWN events, so nothing is unsubscribed: the canvas outlives none of these, and there is no template here
         // whose parts could come and go.
         MouseWheel += OnWheel;
@@ -350,6 +398,24 @@ public class InfiniteCanvas : Control
     {
         get => GetValue(OverlayProperty);
         set => SetValue(OverlayProperty, value);
+    }
+
+    public CanvasPanes Chrome
+    {
+        get => _chrome;
+        set => SetValue(ChromeProperty, value);
+    }
+
+    public CanvasTools Tools
+    {
+        get => _tools;
+        set => SetValue(ToolsProperty, value);
+    }
+
+    public Boolean AreToolShortcutsEnabled
+    {
+        get => GetValue<Boolean>(AreToolShortcutsEnabledProperty);
+        set => SetValue(AreToolShortcutsEnabledProperty, value);
     }
 
     public CanvasOverlayPlacement OverlayPlacement
@@ -501,8 +567,52 @@ public class InfiniteCanvas : Control
     }
 
     /// <summary>What is selected. The canvas holds it rather than the tool, because the frame that shows it is drawn
-    /// here and because a tool being swapped must not take the selection with it.</summary>
+    /// here and because a tool being swapped must not take the selection with it.
+    /// <para>A PROPERTY and not a plain list, so an inspector can follow it: a binding has to be told the selection
+    /// changed, and a list quietly edited in place tells nobody. Each change publishes a fresh snapshot - selection is
+    /// a thing a person does a few times a minute, so the copy costs nothing worth counting.</para></summary>
+    public static readonly AdamantiumProperty SelectionProperty = AdamantiumProperty.Register(nameof(Selection),
+        typeof(IReadOnlyList<ICanvasItem>), typeof(InfiniteCanvas),
+        new PropertyMetadata(null, PropertyMetadataOptions.BindsTwoWayByDefault, OnSelectionSet));
+
+    /// <summary>Whether a small plate follows the pointer showing where it is on the plane, while the grid is pulling.
+    /// <para>An OPTION and not a rule: a readout is what you want while you are placing something to a coordinate and
+    /// clutter the rest of the time, and only the application knows which of those its user is doing. Shown only under
+    /// <see cref="SnapToGrid"/>, because that is when the numbers are worth reading - free-hand they change with every
+    /// pixel and say nothing.</para></summary>
+    public static readonly AdamantiumProperty ShowsPointerReadoutProperty = AdamantiumProperty.Register(
+        nameof(ShowsPointerReadout), typeof(Boolean), typeof(InfiniteCanvas),
+        new PropertyMetadata(true, PropertyMetadataOptions.AffectsRender));
+
+    /// <summary>How big the readout's digits are, in screen pixels.</summary>
+    public static readonly AdamantiumProperty ReadoutSizeProperty = AdamantiumProperty.Register(nameof(ReadoutSize),
+        typeof(Double), typeof(InfiniteCanvas), new PropertyMetadata(12.0, PropertyMetadataOptions.AffectsRender));
+
+    public Boolean ShowsPointerReadout
+    {
+        get => GetValue<Boolean>(ShowsPointerReadoutProperty);
+        set => SetValue(ShowsPointerReadoutProperty, value);
+    }
+
+    public Double ReadoutSize
+    {
+        get => GetValue<Double>(ReadoutSizeProperty);
+        set => SetValue(ReadoutSizeProperty, value);
+    }
+
+    /// <summary>Whether anything is selected - the one question an inspector asks to know which of its two faces to
+    /// show, and a property so it can be asked by a binding.</summary>
+    public static readonly AdamantiumProperty HasSelectionProperty = AdamantiumProperty.Register(nameof(HasSelection),
+        typeof(Boolean), typeof(InfiniteCanvas),
+        new PropertyMetadata(false, PropertyMetadataOptions.BindsTwoWayByDefault));
+
     public IReadOnlyList<ICanvasItem> Selection => _selection;
+
+    public Boolean HasSelection
+    {
+        get => GetValue<Boolean>(HasSelectionProperty);
+        private set => SetValue(HasSelectionProperty, value);
+    }
 
     /// <summary>Raised when what is selected changes - so an application can show what is selected, or enable what only
     /// works on a selection.</summary>
@@ -623,8 +733,45 @@ public class InfiniteCanvas : Control
         return CanvasHandle.None;
     }
 
+    // Set from OUTSIDE - by an application restoring what was selected last time, or by a list beside the canvas. A
+    // two-way property that only ever published would be lying about being two-way, so what arrives is adopted; what
+    // the canvas published itself is recognised and ignored, or the two would push each other round in circles.
+    private static void OnSelectionSet(AdamantiumComponent component, AdamantiumPropertyChangedEventArgs e)
+    {
+        if (component is not InfiniteCanvas canvas || canvas._publishing) return;
+
+        var wanted = e.NewValue as IReadOnlyList<ICanvasItem>;
+        canvas._selection.Clear();
+
+        if (wanted != null)
+        {
+            foreach (var item in wanted)
+            {
+                if (item != null && !canvas._selection.Contains(item)) canvas._selection.Add(item);
+            }
+        }
+
+        canvas.HasSelection = canvas._selection.Count > 0;
+        canvas._chromeLayer?.SyncSelection();
+        canvas.SelectionChanged?.Invoke(canvas, EventArgs.Empty);
+        canvas.InvalidateRender(false);
+    }
+
     private void Selected()
     {
+        // A fresh snapshot, not the live list: a binding is told a property CHANGED, and the same list object handed
+        // over twice is not a change however different its contents.
+        _publishing = true;
+        SetCurrentValue(SelectionProperty, _selection.ToArray());
+        _publishing = false;
+
+        HasSelection = _selection.Count > 0;
+
+        // A pane that FOLLOWS the selection is shown by there being one, so the moment the selection changes is the
+        // moment to say so - and not the arrange pass, where writing a layout input would invalidate the pass running.
+        _chromeLayer?.SyncSelection();
+        _chromeLayer?.InvalidateArrange();
+
         SelectionChanged?.Invoke(this, EventArgs.Empty);
         InvalidateRender(false);
     }
@@ -708,18 +855,38 @@ public class InfiniteCanvas : Control
     /// <summary>Moves the camera by a distance measured on screen.</summary>
     public void PanBy(Vector2 screenDelta) => SetCurrentValue(OffsetProperty, Offset + screenDelta);
 
-    /// <summary>Puts the camera where the given piece of world fills the viewport, with room to spare around it.</summary>
+    /// <summary>The part of the viewport a person can actually see the plane through: everything a DOCKED pane has
+    /// taken is gone from it. In screen pixels, from the canvas's top-left.
+    /// <para>Public because it is the honest answer to "where is the middle" - a minimap, a ruler and anything else
+    /// drawn against the viewport wants this and not <see cref="Control.RenderSize"/>.</para></summary>
+    public Rect UsableBounds
+    {
+        get
+        {
+            var size = RenderSize;
+            var taken = _chromeLayer?.Inset() ?? new Thickness(0);
+
+            var width = Math.Max(1, size.Width - taken.Left - taken.Right);
+            var height = Math.Max(1, size.Height - taken.Top - taken.Bottom);
+
+            return new Rect(taken.Left, taken.Top, width, height);
+        }
+    }
+
+    /// <summary>Puts the camera where the given piece of world fills the viewport, with room to spare around it.
+    /// <para>Fills the USABLE viewport: a docked panel is a wall, and fitting behind one puts half the drawing
+    /// somewhere nobody can look at it.</para></summary>
     public void ScaleToFit(Rect world, Double padding = 24)
     {
-        var size = RenderSize;
-        if (world.Width <= 0 || world.Height <= 0 || size.Width <= 0 || size.Height <= 0) return;
+        var room = UsableBounds;
+        if (world.Width <= 0 || world.Height <= 0 || room.Width <= 0 || room.Height <= 0) return;
 
-        var usable = new Size(Math.Max(1, size.Width - padding * 2), Math.Max(1, size.Height - padding * 2));
+        var usable = new Size(Math.Max(1, room.Width - padding * 2), Math.Max(1, room.Height - padding * 2));
         var scale = Math.Clamp(Math.Min(usable.Width / world.Width, usable.Height / world.Height), MinScale, MaxScale);
 
         StopZoom();
         SetCurrentValue(ScaleProperty, scale);
-        CentreOn(new Vector2(world.X + world.Width / 2, world.Y + world.Height / 2));
+        CenterOn(new Vector2(world.X + world.Width / 2, world.Y + world.Height / 2));
     }
 
     /// <summary>Moves the camera - and only the camera - so a piece of world is on screen. Does not zoom: something
@@ -738,11 +905,15 @@ public class InfiniteCanvas : Control
         if (dx != 0 || dy != 0) PanBy(new Vector2(dx, dy));
     }
 
-    /// <summary>Puts a world point in the middle of the viewport.</summary>
-    public void CentreOn(Vector2 world)
+    /// <summary>Puts a world point in the middle of the USABLE viewport - the middle of what is not behind a docked
+    /// panel. With nothing docked that is the middle of the control, which is what it was before there were panes.
+    /// </summary>
+    public void CenterOn(Vector2 world)
     {
-        var size = RenderSize;
-        SetCurrentValue(OffsetProperty, new Vector2(size.Width / 2, size.Height / 2) - world * Scale);
+        var room = UsableBounds;
+        var middle = new Vector2(room.X + room.Width / 2, room.Y + room.Height / 2);
+
+        SetCurrentValue(OffsetProperty, middle - world * Scale);
     }
 
     /// <summary>Back to where everything starts: the world's origin in the middle of the viewport, at one to one.
@@ -752,11 +923,21 @@ public class InfiniteCanvas : Control
     {
         StopZoom();
         SetCurrentValue(ScaleProperty, Math.Clamp(1.0, MinScale, MaxScale));
-        CentreOn(Vector2.Zero);
+        CenterOn(Vector2.Zero);
     }
 
     /// <summary>Zooms about a point ON SCREEN, keeping the world under it still - what the wheel does, offered for a
     /// button or a test.</summary>
+    /// <summary>Zooms about the middle of what can be seen - what a plus or a minus button means, as against the wheel,
+    /// which zooms about the pointer. Writing <see cref="Scale"/> instead would zoom about the world's ORIGIN, which is
+    /// wherever it happens to be and usually not on screen at all.</summary>
+    public void ZoomBy(Double factor)
+    {
+        var room = UsableBounds;
+
+        ZoomAt(new Vector2(room.X + room.Width / 2, room.Y + room.Height / 2), factor);
+    }
+
     public void ZoomAt(Vector2 screen, Double factor)
     {
         var basis = _zoomActive ? _targetScale : Scale;
@@ -831,9 +1012,9 @@ public class InfiniteCanvas : Control
         _ground.Coarsening = GridCoarsening;
         _ground.MinPitch = MinGridPitch;
         _ground.MarkSize = GridStyle == CanvasGridStyle.Dots ? GridDotSize : GridThickness;
-        _ground.Background = ColourOf(Background, new Color(0, 0, 0, 0));
-        _ground.Color = ColourOf(GridBrush, new Color(0, 0, 0, 0));
-        _ground.AxisColor = ColourOf(AxisBrush, new Color(0, 0, 0, 0));
+        _ground.Background = ColorOf(Background, new Color(0, 0, 0, 0));
+        _ground.Color = ColorOf(GridBrush, new Color(0, 0, 0, 0));
+        _ground.AxisColor = ColorOf(AxisBrush, new Color(0, 0, 0, 0));
 
         session.DrawRectangle(_ground, new Rect(0, 0, size.Width, size.Height));
     }
@@ -849,6 +1030,74 @@ public class InfiniteCanvas : Control
 
         session.DrawEllipse(new Rect(mark.X - half, mark.Y - half, SnapMarkSize, SnapMarkSize),
             SnapMarkBrush, 0, 360, EllipseType.Sector);
+
+        DrawReadout(session, at);
+    }
+
+    // The plate that says where the pointer is, beside the pointer. Beside and not under it: a number drawn where the
+    // mark is would be covering the very crossing it is about.
+    private void DrawReadout(IDrawingSession session, Vector2 world)
+    {
+        if (!ShowsPointerReadout || !_pointerInside || ReadoutSize <= 0) return;
+        if (HandleBrush is not { } plate || SelectionBrush is not SolidColorBrush ink) return;
+
+        // INVARIANT, so the decimal separator is a point whatever the machine's language is. Under a locale that uses a
+        // comma the two numbers were "82,4, 59,8" - four commas doing two different jobs, and the pair read as one
+        // number with too many digits.
+        var text = string.Format(System.Globalization.CultureInfo.InvariantCulture, "{0:0.##}; {1:0.##}",
+            world.X, world.Y);
+        var size = ShapeReadout(text);
+        if (size.Width <= 0 || size.Height <= 0) return;
+
+        const double padding = 5;
+        const double away = 14;
+
+        var room = RenderSize;
+        var box = new Rect(_pointer.X + away, _pointer.Y + away,
+            size.Width + padding * 2, size.Height + padding * 2);
+
+        // Kept inside the canvas, and flipped to the other side of the pointer rather than merely clamped: a plate that
+        // slid along the edge would sit under the pointer at the corner, which is the one place it must not be.
+        if (box.X + box.Width > room.Width) box = new Rect(_pointer.X - away - box.Width, box.Y, box.Width, box.Height);
+        if (box.Y + box.Height > room.Height) box = new Rect(box.X, _pointer.Y - away - box.Height, box.Width, box.Height);
+
+        session.DrawRectangle(plate, box, PenOf(SelectionBrush, ref _selectionPen, ref _selectionPenBrush));
+
+        session.DrawText(
+            new TextRenderingParameters
+            {
+                HorizontalTextAlignment = HorizontalTextAlignment.Left,
+                VerticalTextAlignment = VerticalTextAlignment.Top,
+                TextTrimming = TextTrimming.None,
+                TextWrapping = TextWrapping.NoWrap,
+                Color = ink.Color,
+                TextArea = new Rectangle(
+                    new Vector2F((float)(box.X + padding), (float)(box.Y + padding)), size)
+            },
+            size, _readout, SelectionBrush, Brushes.Transparent, Brushes.Transparent);
+    }
+
+    // Shaped only when the digits actually change - the pointer moves far more often than the numbers it is over do,
+    // and re-shaping the same string every frame is the whole cost of a readout done badly.
+    private Size ShapeReadout(string text)
+    {
+        var font = UIComponent.DefaultFontFamily;
+        if (font == null) return default;
+
+        if (_readout == null || !ReferenceEquals(_readoutFont, font))
+        {
+            _readout = new TextLayout(font.Typeface, font.Fonts[0]);
+            _readoutFont = font;
+            _readoutText = null;
+        }
+
+        if (_readoutText == text) return _readoutSize;
+
+        _readoutSize = _readout.ProcessText(text, ReadoutSize, new Size(double.NaN, double.NaN), TextWrapping.NoWrap,
+            TextTrimming.None, HorizontalTextAlignment.Left, VerticalTextAlignment.Top, false);
+        _readoutText = text;
+
+        return _readoutSize;
     }
 
     // The manipulation frame: one box round everything selected, with eight grips on it. Drawn in SCREEN pixels and
@@ -881,17 +1130,17 @@ public class InfiniteCanvas : Control
         var middle = frame.X + frame.Width / 2;
         var right = frame.X + frame.Width;
         var top = frame.Y;
-        var centre = frame.Y + frame.Height / 2;
+        var center = frame.Y + frame.Height / 2;
         var bottom = frame.Y + frame.Height;
 
         yield return new Rect(left - half, top - half, side, side);
         yield return new Rect(middle - half, top - half, side, side);
         yield return new Rect(right - half, top - half, side, side);
-        yield return new Rect(right - half, centre - half, side, side);
+        yield return new Rect(right - half, center - half, side, side);
         yield return new Rect(right - half, bottom - half, side, side);
         yield return new Rect(middle - half, bottom - half, side, side);
         yield return new Rect(left - half, bottom - half, side, side);
-        yield return new Rect(left - half, centre - half, side, side);
+        yield return new Rect(left - half, center - half, side, side);
     }
 
     /// <summary>A world rectangle as it lands on screen.</summary>
@@ -917,9 +1166,9 @@ public class InfiniteCanvas : Control
     }
 
     // The grid is a shader, and a shader wants COLOURS. A gradient or a picture would say nothing about where a mark is,
-    // so anything that is not a plain colour falls back to nothing rather than being approximated into something the
+    // so anything that is not a plain color falls back to nothing rather than being approximated into something the
     // theme did not ask for.
-    private static Color ColourOf(Brush brush, Color fallback) =>
+    private static Color ColorOf(Brush brush, Color fallback) =>
         brush is SolidColorBrush solid ? solid.Color : fallback;
 
     private void OnWheel(object sender, MouseWheelEventArgs e)
@@ -994,9 +1243,29 @@ public class InfiniteCanvas : Control
         // everywhere, including over the things on it.
         if (FromGlass(e.OriginalSource)) return;
 
+        var at = e.GetPosition(this);
+
+        // A GRIP of the manipulation frame, before any tool sees the press. The frame is the canvas's - it draws it -
+        // so dragging one is the canvas's answer to give, and it is the same answer whatever tool is in hand. That is
+        // the point: having just dragged out a rectangle you can pull its corner straight away, instead of putting the
+        // shape tool down first to be allowed to. Only the GRIPS: a press inside the frame still means what the tool
+        // says it means, or a shape could never be drawn over something already selected.
+        if (e.ChangedButton == MouseButtons.Left && _selection.Count > 0)
+        {
+            var handle = HandleAt(at);
+            if (handle is not (CanvasHandle.None or CanvasHandle.Body))
+            {
+                _frame.Begin(this, handle, ScreenToWorld(at));
+                CaptureMouse();
+
+                e.Handled = true;
+                return;
+            }
+        }
+
         // Everything else is the TOOL's. The canvas keeps the wheel, the middle button, space and Home - how you look at
         // a drawing - and knows nothing about what the plain left button means.
-        var args = Describe(e.GetPosition(this), e.ChangedButton, e.ClickCount, e.Modifiers);
+        var args = Describe(at, e.ChangedButton, e.ClickCount, e.Modifiers);
         Tool?.OnPressed(this, args);
         if (args.Handled) e.Handled = true;
     }
@@ -1013,6 +1282,25 @@ public class InfiniteCanvas : Control
         }
 
         var pointer = e.GetPosition(this);
+        _pointer = pointer;
+
+        // OVER A PANEL the pointer is the panel's, not the plane's: a crosshair over an inspector says a press there
+        // would draw, and it would not - the press path has ignored the glass all along, and the pointer has to say the
+        // same thing the press will do. The mark and the readout go with it: a readout drawn under the panel is about a
+        // point nobody is aiming at. A drag keeps the capture, so its moves report the canvas and are unaffected.
+        if (FromGlass(e.OriginalSource))
+        {
+            var had = _snap != null || _pointerInside;
+
+            _snap = null;
+            _pointerInside = false;
+            Cursor = Cursors.Arrow;
+
+            if (had) InvalidateRender(false);
+            return;
+        }
+
+        _pointerInside = true;
 
         // Where the pointer would be PULLED to, worked out whatever the tool is doing - the mark has to appear before the
         // press, or nobody can aim at it.
@@ -1023,17 +1311,40 @@ public class InfiniteCanvas : Control
             InvalidateRender(false);
         }
 
+        // A grip taken before any tool saw the press is dragged before any tool sees the move.
+        if (_frame.IsActive)
+        {
+            _frame.MoveTo(this, ScreenToWorld(pointer));
+            e.Handled = true;
+            return;
+        }
+
+        ShowPointer(pointer);
+
         var args = Describe(pointer, MouseButtons.None, 0, e.Modifiers);
         Tool?.OnMoved(this, args);
         if (args.Handled) e.Handled = true;
     }
 
+    // What the pointer is ABOUT to do. A grip is eight pixels of glass and looks the same whichever corner it is, so
+    // the cursor is the only thing that says which way it will pull; anywhere else the pointer wears the TOOL, which is
+    // the one place a person is already looking to find out what is in hand. A tool put down by the right button
+    // announces itself nowhere else.
+    private void ShowPointer(Vector2 screen)
+    {
+        var overGrip = _selection.Count > 0 ? CanvasFrameGesture.CursorFor(HandleAt(screen)) : null;
+
+        Cursor = overGrip ?? Tool?.Cursor ?? Cursors.Arrow;
+    }
+
     private void OnPointerLeft(object sender, MouseEventArgs e)
     {
-        if (_snap == null) return;
+        var had = _snap != null || _pointerInside;
 
         _snap = null;
-        InvalidateRender(false);
+        _pointerInside = false;
+
+        if (had) InvalidateRender(false);
     }
 
     private void OnPointerUp(object sender, MouseButtonEventArgs e)
@@ -1042,6 +1353,15 @@ public class InfiniteCanvas : Control
         {
             _panning = false;
             ReleaseMouseCapture();
+            e.Handled = true;
+            return;
+        }
+
+        if (_frame.IsActive)
+        {
+            _frame.End();
+            ReleaseMouseCapture();
+
             e.Handled = true;
             return;
         }
@@ -1058,10 +1378,17 @@ public class InfiniteCanvas : Control
     // the event came from is the only thing there is to go on.
     private bool FromGlass(object source)
     {
-        if (_overlayRoot == null && _elements == null) return false;
+        if (_overlayRoot == null && _elements == null && _chromeLayer == null) return false;
 
         for (var at = source as IUIComponent; at != null; at = at.VisualParent)
         {
+            // A PANE is glass; the layer holding them is not. A panel in this engine catches the mouse across its whole
+            // bounds whether or not it has a background, and the chrome layer covers the entire canvas - so counting
+            // the layer itself as glass threw away every press that landed anywhere but on a panel, which is to say
+            // every press meant for the drawing. The pane is met first walking up, so this order is the whole fix.
+            if (at is CanvasPane) return true;
+            if (ReferenceEquals(at, _chromeLayer)) return false;
+
             if (ReferenceEquals(at, _overlayRoot) || ReferenceEquals(at, _elements)) return true;
         }
 
@@ -1100,6 +1427,15 @@ public class InfiniteCanvas : Control
             return;
         }
 
+        // AFTER the tool and BEFORE the canvas's own keys. After, because a tool with a caret in a word owns every
+        // letter while it is typing and a shortcut must not steal one. Before, because picking a tool is the commonest
+        // thing a person does here and the canvas's own keys are Delete, Escape and Home, which no tool wants.
+        if (PickByShortcut(e.Key))
+        {
+            e.Handled = true;
+            return;
+        }
+
         if (e.Key == Key.Delete)
         {
             if (_selection.Count == 0) return;
@@ -1131,6 +1467,25 @@ public class InfiniteCanvas : Control
 
         ResetCamera();
         e.Handled = true;
+    }
+
+    // The FIRST tool claiming the key wins, and a second one claiming the same key is simply never reached. Not an
+    // error to report: which keys a tool answers to is the application's to arrange, and a control that threw over it
+    // would be a control that cannot be experimented with.
+    private bool PickByShortcut(Key key)
+    {
+        if (!AreToolShortcutsEnabled || key == Key.None || _tools == null) return false;
+
+        foreach (var tool in _tools)
+        {
+            if (tool == null || tool.Shortcut != key) continue;
+            if (ReferenceEquals(tool, Tool)) return true;
+
+            SetCurrentValue(ToolProperty, tool);
+            return true;
+        }
+
+        return false;
     }
 
     private void OnKeyReleased(object sender, KeyEventArgs e)
@@ -1165,6 +1520,10 @@ public class InfiniteCanvas : Control
 
         _elements = GetTemplateChild("PART_Elements") as CanvasElementLayer;
         if (_elements != null) _elements.Owner = this;
+
+        _chromeLayer = GetTemplateChild("PART_Chrome") as CanvasChromeLayer;
+        if (_chromeLayer != null) _chromeLayer.Owner = this;
+        SyncChrome();
 
         ApplyDesignMode();
         SyncElements();
@@ -1207,7 +1566,16 @@ public class InfiniteCanvas : Control
 
         if (_elements != null) _elements.Owner = null;
 
+        if (_chromeLayer != null)
+        {
+            // The panes are the APPLICATION's - they are handed back rather than dropped, or a template swap would take
+            // the user's own panels with it.
+            _chromeLayer.Sync(null);
+            _chromeLayer.Owner = null;
+        }
+
         _elements = null;
+        _chromeLayer = null;
         _overlay = null;
         _overlayRoot = null;
         _overlayGrip = null;
@@ -1331,7 +1699,12 @@ public class InfiniteCanvas : Control
 
         // Gone ENTIRELY - grip and all - and collapsed rather than hidden, so it takes no place either. This is the
         // canvas as a bare sheet: whatever is steering it is somewhere else.
-        _overlayRoot.Visibility = IsOverlayVisible ? Visibility.Visible : Visibility.Collapsed;
+        //
+        // Gone as well when there is NOTHING in it. The grip exists to fold the panel away and bring it back, so with
+        // no panel behind it it is a handle that opens nothing - which is exactly what it looked like beside the panes
+        // once an application had moved its content into Chrome: two grips, one of them a lie.
+        var wanted = IsOverlayVisible && Overlay != null;
+        _overlayRoot.Visibility = wanted ? Visibility.Visible : Visibility.Collapsed;
 
         // Put somewhere by hand: it is held by its own margin from the top-left, which is the only placement that can
         // say "here" rather than "in that corner".
@@ -1347,14 +1720,14 @@ public class InfiniteCanvas : Control
         _overlayRoot.HorizontalAlignment = OverlayPlacement switch
         {
             CanvasOverlayPlacement.TopRight or CanvasOverlayPlacement.BottomRight => HorizontalAlignment.Right,
-            CanvasOverlayPlacement.TopCentre or CanvasOverlayPlacement.BottomCentre => HorizontalAlignment.Center,
+            CanvasOverlayPlacement.TopCenter or CanvasOverlayPlacement.BottomCenter => HorizontalAlignment.Center,
             _ => HorizontalAlignment.Left
         };
 
         _overlayRoot.VerticalAlignment = OverlayPlacement switch
         {
             CanvasOverlayPlacement.BottomLeft or CanvasOverlayPlacement.BottomRight
-                or CanvasOverlayPlacement.BottomCentre => VerticalAlignment.Bottom,
+                or CanvasOverlayPlacement.BottomCenter => VerticalAlignment.Bottom,
             _ => VerticalAlignment.Top
         };
     }
@@ -1376,11 +1749,64 @@ public class InfiniteCanvas : Control
         if (component is not InfiniteCanvas canvas) return;
 
         (e.OldValue as ICanvasTool)?.Cancel(canvas);
+
+        // The pointer wears the tool, so it changes WITH the tool and not at the next twitch of the mouse. Put down by
+        // the right button, the old tool would otherwise go on pointing at the drawing until something moved - which is
+        // exactly the moment a person needs telling that it is gone.
+        if (canvas._pointerInside) canvas.ShowPointer(canvas._pointer);
+
+        canvas.ToolChanged?.Invoke(canvas, EventArgs.Empty);
         canvas.InvalidateRender(false);
     }
 
+    /// <summary>The tool in hand changed - a rail marks a different button on it.</summary>
+    public event EventHandler ToolChanged;
+
     private static void OnOverlayChanged(AdamantiumComponent component, AdamantiumPropertyChangedEventArgs e) =>
         (component as InfiniteCanvas)?.PlaceOverlay();
+
+    private static void OnChromeChanged(AdamantiumComponent component, AdamantiumPropertyChangedEventArgs e)
+    {
+        if (component is not InfiniteCanvas canvas) return;
+
+        if (canvas._chrome != null) canvas._chrome.CollectionChanged -= canvas.OnChromeEdited;
+
+        canvas._chrome = e.NewValue as CanvasPanes;
+
+        if (canvas._chrome != null) canvas._chrome.CollectionChanged += canvas.OnChromeEdited;
+
+        canvas.SyncChrome();
+    }
+
+    private void OnChromeEdited(object sender, NotifyCollectionChangedEventArgs e) => SyncChrome();
+
+    private static void OnToolsChanged(AdamantiumComponent component, AdamantiumPropertyChangedEventArgs e)
+    {
+        if (component is not InfiniteCanvas canvas) return;
+
+        if (canvas._tools != null) canvas._tools.CollectionChanged -= canvas.OnToolsEdited;
+
+        canvas._tools = e.NewValue as CanvasTools;
+
+        if (canvas._tools != null) canvas._tools.CollectionChanged += canvas.OnToolsEdited;
+
+        canvas.ToolsChanged?.Invoke(canvas, EventArgs.Empty);
+    }
+
+    private void OnToolsEdited(object sender, NotifyCollectionChangedEventArgs e) =>
+        ToolsChanged?.Invoke(this, EventArgs.Empty);
+
+    /// <summary>The set of tools changed - a rail rebuilds its buttons on it.</summary>
+    public event EventHandler ToolsChanged;
+
+    private void SyncChrome()
+    {
+        if (_chromeLayer == null) return;
+
+        _chromeLayer.Sync(_chrome);
+        _chromeLayer.InvalidateMeasure();
+        _chromeLayer.InvalidateArrange();
+    }
 
     private static void OnSceneChanged(AdamantiumComponent component, AdamantiumPropertyChangedEventArgs e)
     {
@@ -1408,6 +1834,11 @@ public class InfiniteCanvas : Control
         _elements?.InvalidateMeasure();
         _elements?.InvalidateArrange();
 
+        // The same for a pane that follows the selection: an item moving moves the frame, and the bar sits on the
+        // frame. This is the one place every edit passes through - a drag, a resize, an inspector writing a number -
+        // so it is the one place that has to say so.
+        _chromeLayer?.InvalidateArrange();
+
         InvalidateRender(false);
     }
 
@@ -1425,6 +1856,12 @@ public class InfiniteCanvas : Control
         canvas.SyncElements();
         canvas._elements?.InvalidateArrange();
         if (e.Property == ScaleProperty) canvas._elements?.InvalidateMeasure();
+
+        // A pane that FOLLOWS THE SELECTION is placed from where the frame is on screen, and the camera is half of that
+        // sum - so moving the camera has to re-place it just as it re-places the controls. Without this the bar kept
+        // the pixels it had when the selection was made and slid off the frame at the first turn of the wheel: the
+        // frame is drawn every render, the panes only when something arranges them.
+        canvas._chromeLayer?.InvalidateArrange();
 
         canvas.InvalidateRender(false);
     }

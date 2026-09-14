@@ -11,7 +11,7 @@
 // where they are instead.
 //
 // HOW THE RECORDS ARE LAID OUT. There is one buffer, and it carries two kinds of record:
-//   - a HEADER, one per stroke: the box to cover, the width, the colour, and where its points start.
+//   - a HEADER, one per stroke: the box to cover, the width, the color, and where its points start.
 //   - a POINT, one per point of that stroke, written straight after its header.
 // The draw issues an instance for every record, header and point alike, because the buffer is one array and the count
 // is its length. A point record's vertex shader emits a quad of ZERO area, so it is thrown away before any fragment -
@@ -144,16 +144,20 @@ float4 InkSegmentPS(InkPSInput i) : SV_Target
     float coverage = saturate(0.5 - distance);
     if (coverage <= 0.0) discard;
 
-    float4 colour = it.Color;
-    colour.a *= coverage * i.Fade * ClipCoverage(i.Position.xy, i.ClipBox, i.ClipRadii);
-    if (colour.a <= 0.0) discard;
+    // NOT named "color". A pixel-stage local by that name makes this compile into a shader that loses the device -
+    // measured 6 starts of 6, against 0 of 6 for the same code under any other name. HLSL semantics are matched
+    // case-insensitively and COLOR is a legacy pixel-stage output semantic, so the front end evidently treats the name
+    // as one. Nothing else about the pass changes; only the name does.
+    float4 tint = it.Color;
+    tint.a *= coverage * i.Fade * ClipCoverage(i.Position.xy, i.ClipBox, i.ClipRadii);
+    if (tint.a <= 0.0) discard;
 
     // STRAIGHT, not premultiplied: the blend here is SrcAlpha/OneMinusSrcAlpha, so it does the multiply itself.
-    return float4(colour.rgb, colour.a);
+    return float4(tint.rgb, tint.a);
 }
 
 // =====================================================================================================================
-// TECHNIQUE - one pass. Ink is one thing done one way; what varies (where, how wide, what colour) varies per instance.
+// TECHNIQUE - one pass. Ink is one thing done one way; what varies (where, how wide, what color) varies per instance.
 // =====================================================================================================================
 technique Ink
 {

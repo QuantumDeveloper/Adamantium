@@ -1,4 +1,5 @@
 using Adamantium.Mathematics;
+using Adamantium.UI.Core;
 using Adamantium.UI.Core.Graphics;
 using Adamantium.UI.Core.Input;
 
@@ -20,6 +21,19 @@ public class PenTool : ICanvasTool
     private bool _chaining;
 
     public bool IsBusy => _chaining;
+
+    /// <summary>How a rail shows this tool - see <see cref="SelectTool.Name"/>.</summary>
+    public string Name { get; set; } = "Pen";
+
+    public string Icon { get; set; } = "ToolPenIcon";
+
+    public Key Shortcut { get; set; } = Key.P;
+
+    public string Description { get; set; } = "draw freehand, or point to point under a grid";
+
+    /// <summary>A crosshair: what a pen leaves starts exactly under the point, and an arrow's tip is not where a person
+    /// reads it as being.</summary>
+    public Cursor Cursor { get; set; } = Cursors.Crosshair;
 
     public void OnPressed(InfiniteCanvas canvas, CanvasPointerEventArgs e)
     {

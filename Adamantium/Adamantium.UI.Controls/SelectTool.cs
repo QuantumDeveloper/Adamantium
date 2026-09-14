@@ -27,6 +27,16 @@ public class SelectTool : ICanvasTool
     /// <summary>A gesture here lives inside one press, so nothing outlives the button.</summary>
     public bool IsBusy => false;
 
+    /// <summary>How a rail shows this tool. Settable, so an application that wants another name, another picture or
+    /// another key says so on the tool it built rather than anywhere else.</summary>
+    public string Name { get; set; } = "Select";
+
+    public string Icon { get; set; } = "ToolSelectIcon";
+
+    public Key Shortcut { get; set; } = Key.V;
+
+    public string Description { get; set; } = "select, move and resize";
+
     public void OnPressed(InfiniteCanvas canvas, CanvasPointerEventArgs e)
     {
         if (e.Button != MouseButtons.Left) return;
@@ -35,17 +45,9 @@ public class SelectTool : ICanvasTool
         _fromPointer = e.Pointer;
         _applied = Vector2.Zero;
 
-        // A GRIP first. It is drawn over the thing it belongs to, so it has to be asked about first too, or a frame
-        // round anything filled could be moved but never resized.
-        _grip = canvas.HandleAt(e.Screen);
-        if (_grip != CanvasHandle.None)
-        {
-            Begin(canvas);
-            canvas.CaptureMouse();
-            e.Handled = true;
-            return;
-        }
-
+        // No GRIP branch here any more: the frame belongs to the canvas, which answers presses on its grips before any
+        // tool is asked - so resizing works under every tool and not only under this one. What is left for the tool is
+        // what a press MEANS, which is its own business: pick something, drag what is picked, or open a band.
         var item = Topmost(canvas, e.Pointer);
         if (item != null)
         {

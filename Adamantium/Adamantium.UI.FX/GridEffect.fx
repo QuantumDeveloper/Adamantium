@@ -18,7 +18,7 @@
 #include "Includes/ClipMath.fxh"
 #include "Includes/ShapeMath.fxh"
 
-// One grid instance. All float4 - there is exactly ONE of these in a draw, so packing colours into bytes would buy
+// One grid instance. All float4 - there is exactly ONE of these in a draw, so packing colors into bytes would buy
 // nothing and cost the question of how the two of them align against the fields after.
 struct CanvasGridData
 {
@@ -139,12 +139,17 @@ float4 CanvasGridPS(GridPSInput i) : SV_Target
         coverage = max(coverage, LevelCoverage(world, step, pixelsPerUnit, halfWidth, marks) * blend);
     }
 
-    float4 marksColour = it.GridColor;
-    marksColour.a *= coverage;
+    float4 marksColor = it.GridColor;
+    marksColor.a *= coverage;
 
     // The marks OVER the ground, one composite - so the element is one draw and not two.
-    float4 colour = float4(lerp(it.Background.rgb, marksColour.rgb, marksColour.a),
-                           it.Background.a + marksColour.a * (1.0 - it.Background.a));
+    //
+    // NOT named "color". A pixel-stage local by that name makes this compile into a shader that loses the device -
+    // measured 6 starts of 6, against 0 of 6 for the same code under any other name, and 0 of 6 for a comment-only
+    // change, so it is the NAME and not the recompile. HLSL semantics are matched case-insensitively and COLOR is a
+    // legacy pixel-stage output semantic, so the front end evidently treats the name as one.
+    float4 composited = float4(lerp(it.Background.rgb, marksColor.rgb, marksColor.a),
+                           it.Background.a + marksColor.a * (1.0 - it.Background.a));
 
     // The world's OWN axes, over the grid: on a plane with no edges they are the only thing that says where the origin
     // is. Drawn as full lines whatever the marks are - an axis made of dots would not read as an axis.
@@ -155,19 +160,19 @@ float4 CanvasGridPS(GridPSInput i) : SV_Target
         float4 axis = it.AxisColor;
         axis.a *= onAxis;
         // OVER, not added: where an axis crosses a grid line the two must not brighten each other into a knot.
-        colour = float4(lerp(colour.rgb, axis.rgb, axis.a), colour.a + axis.a * (1.0 - colour.a));
+        composited = float4(lerp(composited.rgb, axis.rgb, axis.a), composited.a + axis.a * (1.0 - composited.a));
     }
 
-    colour.a *= i.Fade * ClipCoverage(i.Position.xy, i.ClipBox, i.ClipRadii);
-    if (colour.a <= 0.0) discard;
+    composited.a *= i.Fade * ClipCoverage(i.Position.xy, i.ClipBox, i.ClipRadii);
+    if (composited.a <= 0.0) discard;
 
     // STRAIGHT, not premultiplied - the blend is SrcAlpha/OneMinusSrcAlpha and does the multiply itself. Every other
     // pass in the engine returns straight for the same reason.
-    return float4(colour.rgb, colour.a);
+    return float4(composited.rgb, composited.a);
 }
 
 // =====================================================================================================================
-// TECHNIQUE - one pass. A grid is one thing done one way; what varies (dots or lines, how fine, what colour) varies per
+// TECHNIQUE - one pass. A grid is one thing done one way; what varies (dots or lines, how fine, what color) varies per
 // instance and not per shader.
 // =====================================================================================================================
 technique CanvasGrid

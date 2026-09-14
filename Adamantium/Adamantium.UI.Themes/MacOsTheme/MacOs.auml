@@ -14,6 +14,9 @@
        the numbers that differ override. -->
 
   <ResourceContext.Resources>
+    <!-- FIRST - see Fluent's. The canvas's pictures belong to no theme, so MacOsIcons can still override any of them.
+         -->
+    <ResourceLink Source="{x:Type shared:CanvasIcons}"/>
     <ResourceLink Source="{x:Type fluent:Icons}"/>
     <ResourceLink Source="{x:Type fluent:Metrics}"/>
     <ResourceLink Source="{x:Type fluent:Materials}"/>
@@ -59,6 +62,7 @@
         <StyleInclude Source="{x:Type mac:MacOsKeyTipAdornerStyleSet}"/>
         <StyleInclude Source="{x:Type mac:MacOsZoomBoxStyleSet}"/>
         <StyleInclude Source="{x:Type mac:MacOsInfiniteCanvasStyleSet}"/>
+        <StyleInclude Source="{x:Type mac:MacOsCanvasPaneStyleSet}"/>
         <StyleInclude Source="{x:Type mac:MacOsTilesHostStyleSet}"/>
         <StyleInclude Source="{x:Type mac:MacOsFlipTileStyleSet}"/>
         <StyleInclude Source="{x:Type mac:MacOsGridSplitterStyleSet}"/>
