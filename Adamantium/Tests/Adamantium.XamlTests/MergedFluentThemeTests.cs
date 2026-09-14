@@ -200,7 +200,9 @@ public class MergedFluentThemeTests
         // 52 with the TreeDataGrid, for exactly that reason again.
         // 54 with the Expander and the PropertyGrid - two new controls, two new sets.
         // 55 with the InfiniteCanvas, for the same reason again.
-        Assert.That(merged.StyleIncludes.Count, Is.EqualTo(55));
+        // 56 with the CanvasPane - the canvas's chrome became SEVERAL panels rather than one slot, and a panel is a
+        // control with a template of its own. Same spirit once more: a new control, a new set.
+        Assert.That(merged.StyleIncludes.Count, Is.EqualTo(56));
     }
 
     [Test]

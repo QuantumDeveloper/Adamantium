@@ -23,7 +23,30 @@ public class EraseTool : ICanvasTool
     private bool _over;
     private Vector2 _last;
 
-    public EraseTool(CanvasEraseMode mode = CanvasEraseMode.Point) => Mode = mode;
+    public EraseTool(CanvasEraseMode mode = CanvasEraseMode.Point)
+    {
+        Mode = mode;
+
+        var whole = mode == CanvasEraseMode.Stroke;
+        Name = whole ? "Erase stroke" : "Erase";
+        Icon = whole ? "ToolEraseStrokeIcon" : "ToolEraseIcon";
+        Shortcut = whole ? Key.D : Key.E;
+        Description = whole ? "takes the whole stroke it touches" : "rubs a hole where it is dragged";
+    }
+
+    /// <summary>How a rail shows this tool. Taken from the MODE by default - one class serves both erasers - and
+    /// settable, like every other tool's.</summary>
+    public string Name { get; set; }
+
+    public string Icon { get; set; }
+
+    public Key Shortcut { get; set; }
+
+    public string Description { get; set; }
+
+    /// <summary>NONE - the eraser draws its own ring, and a pointer on top of it would only hide the very thing that
+    /// shows how wide the rubber is.</summary>
+    public Cursor Cursor { get; set; } = Cursors.None;
 
     /// <summary>What this eraser takes. Set once, when the eraser is made: the two are separate TOOLS rather than one
     /// tool with a switch, so picking which one you want is the same act as picking any other tool.</summary>

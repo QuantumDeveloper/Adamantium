@@ -340,6 +340,158 @@ public class PropertyGridTests
         });
     }
 
+    // ...and it comes BACK. An inspector whose lines belong to what is selected turns them on and off while it is open,
+    // so the grid has to hear a definition change its mind - reading IsVisible once at build time made it a switch that
+    // only ever worked before anybody could see it.
+    [Test]
+    public void ALineTurnedVisibleGetsItsRow()
+    {
+        var target = new Target();
+        var hidden = new NumericProperty { Header = "Scale", Binding = new Binding("Scale"), IsVisible = false };
+        var grid = Built(Section(target, hidden));
+
+        Assert.That(RowOf(grid, hidden), Is.Null);
+
+        hidden.IsVisible = true;
+
+        Assert.That(RowOf(grid, hidden), Is.Not.Null, "the grid has to rebuild when a line says it is shown again");
+    }
+
+    // A rebuild asked for FROM INSIDE a rebuild - a definition whose IsVisible binding settles while the rows are being
+    // built - must not re-enter: the inner pass fills the host and the outer one, still holding its place, adds the rest
+    // of the sections a second time. A panel holding the same child twice makes the paint order's "next sibling" chain
+    // point at itself, and the frame recorder walks that chain for ever: the whole application freezes, on the first
+    // change that records a structural frame, with nothing in the stack to blame it on.
+    // Reading its one property asks a definition to become visible - which is what a binding settling mid-pass does,
+    // and the only way to ask for a rebuild from INSIDE one.
+    private sealed class Tripwire : INotifyPropertyChanged
+    {
+        private bool _tripped;
+
+        public PropertyDefinition Flip;
+
+        public string Name
+        {
+            get
+            {
+                if (!_tripped && Flip != null)
+                {
+                    _tripped = true;
+                    Flip.IsVisible = true;
+                }
+
+                return "tripwire";
+            }
+        }
+
+        public event PropertyChangedEventHandler PropertyChanged;
+    }
+
+    [Test]
+    public void ARebuildAskedForFromInsideOneDoesNotDoubleTheSections()
+    {
+        var target = new Tripwire();
+        var shown = new StringProperty { Header = "Name", Binding = new Binding("Name") };
+        var late = new StringProperty { Header = "Late", Binding = new Binding("Name"), IsVisible = false };
+        target.Flip = late;
+
+        var grid = Built(Section(target, shown, late));
+        var section = grid.Sections[0];
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(Count(grid, section), Is.EqualTo(1),
+                "the section is in the host ONCE, however many rebuilds were asked for while one was running");
+            Assert.That(RowOf(grid, late), Is.Not.Null, "and the line the inner pass asked for is there");
+        });
+    }
+
+    private static int Count(IUIComponent root, IUIComponent wanted)
+    {
+        var found = 0;
+        var stack = new Stack<IUIComponent>();
+        stack.Push(root);
+
+        while (stack.Count > 0)
+        {
+            var node = stack.Pop();
+            if (ReferenceEquals(node, wanted)) found++;
+            foreach (var child in node.VisualChildren) stack.Push(child);
+        }
+
+        return found;
+    }
+
+    // The WHOLE LINE opens a composite, not only the fourteen pixels of chevron beside it. Raised on the LABEL inside
+    // the name presenter, which is where a press actually lands - and the point of the test: MouseLeftButtonDown is
+    // DIRECT, so a handler on the presenter heard nothing at all, and only a bubbling event reaches the row from
+    // whatever the template put under the pointer.
+    [Test]
+    public void PressingTheNameOpensAComposite()
+    {
+        var target = new Target();
+        var x = new NumericProperty { Header = "X", Binding = new Binding("Scale") };
+        // The header IS the label, so the press can be raised on the very element the name presenter holds - which is
+        // where a real press lands, and the whole point of the test.
+        var label = new TextBlock { Text = "Position" };
+        var composite = new CompositeProperty { Header = label };
+        composite.Children.Add(x);
+
+        var grid = Built(Section(target, composite));
+        var row = RowOf(grid, composite);
+
+        row.Template = new Adamantium.UI.Core.Templates.ControlTemplate(() =>
+        {
+            var name = new ContentPresenter();
+            var result = new Adamantium.UI.Core.Templates.TemplateResult { RootComponent = name };
+            result.RegisterName("PART_Name", name);
+            return result;
+        });
+
+        row.Measure(new Size(400, 40), force: true);
+        row.Arrange(new Rect(0, 0, 400, 40));
+
+        ((IObservableComponent)label).RaiseEvent(new MouseButtonEventArgs(Mouse.PrimaryDevice, MouseButtons.Left,
+            MouseButtonState.Pressed, InputModifiers.LeftMouseButton, 0) { RoutedEvent = Mouse.MouseDownEvent });
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(composite.IsExpanded, Is.True);
+            Assert.That(RowOf(grid, x), Is.Not.Null);
+        });
+    }
+
+    // ...and anywhere ELSE on the line does too - the value half of a composite row holds no editor, so there is nothing
+    // there for a press to mean instead.
+    [Test]
+    public void PressingTheValueHalfOpensACompositeToo()
+    {
+        var target = new Target();
+        var x = new NumericProperty { Header = "X", Binding = new Binding("Scale") };
+        var composite = new CompositeProperty { Header = "Position" };
+        composite.Children.Add(x);
+
+        var grid = Built(Section(target, composite));
+        var row = RowOf(grid, composite);
+        var value = new TextBlock { Text = "-" };
+
+        row.Template = new Adamantium.UI.Core.Templates.ControlTemplate(() =>
+        {
+            var host = new ContentPresenter { Content = value };
+            var result = new Adamantium.UI.Core.Templates.TemplateResult { RootComponent = host };
+            result.RegisterName("PART_Layout", host);
+            return result;
+        });
+
+        row.Measure(new Size(400, 40), force: true);
+        row.Arrange(new Rect(0, 0, 400, 40));
+
+        ((IObservableComponent)value).RaiseEvent(new MouseButtonEventArgs(Mouse.PrimaryDevice, MouseButtons.Left,
+            MouseButtonState.Pressed, InputModifiers.LeftMouseButton, 0) { RoutedEvent = Mouse.MouseDownEvent });
+
+        Assert.That(composite.IsExpanded, Is.True);
+    }
+
     // A composite row is a node: folded it shows one line, opened it adds its children, indented one level.
     [Test]
     public void ACompositePropertyOpensIntoItsChildren()

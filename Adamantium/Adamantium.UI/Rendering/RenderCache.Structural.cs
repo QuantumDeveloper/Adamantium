@@ -151,6 +151,7 @@ public partial class RenderCache
     private bool PlanStructuralChange()
     {
         _needRenumber = false;
+        _rankWalkBroken = false;
         // The sibling index describes the tree as it stands NOW. A plan only reads the tree, so it is good for the whole
         // of one - but a renumber runs a SECOND plan, and between frames the tree really does change.
         _nextSibling.Clear();
@@ -199,6 +200,10 @@ public partial class RenderCache
 
         foreach (var (parent, _) in _addsByParent)
             if (!PlanNewChildren(parent)) return GaveUp($"newChildren<{parent.GetType().Name}>");
+
+        // A walk that ran past what the tree could hold says the tree is malformed - the same child twice under one
+        // parent, or a component that is its own ancestor. Nothing here can place that; the full walk can.
+        if (_rankWalkBroken) return GaveUp("cyclicTree");
 
         // 3. What LEFT the drawn set. The subtree is still intact (a detach doesn't tear it apart), so walk it; anything
         //    inside that actually MOVED was planned above and is skipped.
@@ -436,14 +441,45 @@ public partial class RenderCache
     // the root. long.MaxValue = nothing follows (the run appends at the very end).
     private long SuccessorRank(IUIComponent component)
     {
+        // BOUNDED, both walks. They follow links that are only ever as sound as the tree they were built from, and a
+        // tree can be malformed: a component that turns up TWICE among one parent's children makes its own "next
+        // sibling" point at itself, and one that is its own ancestor does the same to the climb. Either spins here for
+        // ever, on the record thread, with nothing in the stack that names the cause - an application frozen solid.
+        // The bounds are not arbitrary: a chain of links cannot honestly be longer than the number of links there are,
+        // and the climb cannot be longer than the tree is deep. Past them the plan is refused and the full walk - which
+        // re-derives everything from the components themselves - puts it right.
+        var steps = 0;
+        var links = _nextSibling.Count;
+
         for (var c = component; c?.VisualParent != null; c = c.VisualParent)
         {
+            if (++steps > MaxTreeDepth) return Broken();
+
             IndexSiblings(c.VisualParent);
+            links = _nextSibling.Count;
+
+            var walked = 0;
             for (var s = NextSibling(c); s != null; s = NextSibling(s))
+            {
+                if (++walked > links) return Broken();
                 if (s.Visibility == Visibility.Visible && TryPlannedRank(s, out var rank)) return rank;
+            }
         }
+
         return long.MaxValue;
+
+        long Broken()
+        {
+            _rankWalkBroken = true;
+            return long.MaxValue;
+        }
     }
+
+    // Deep enough for any real tree and far short of what a cycle reaches.
+    private const int MaxTreeDepth = 4096;
+
+    // A walk above ran past what the tree could honestly hold. The plan cannot be trusted and is given up.
+    private bool _rankWalkBroken;
 
     // WHO comes next among a parent's painted children - built ONCE per parent per plan. This used to be answered by
     // copying the whole child list and scanning it for `c`, per call, and the call is made once per parent being placed:

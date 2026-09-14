@@ -9,5 +9,9 @@ public enum CanvasShape
 
     /// <summary>A straight line from one corner of the box to the other. Its box is what the drag made, so which way it
     /// leans is remembered by the box being read either way round.</summary>
-    Line
+    Line,
+
+    /// <summary>A regular polygon inscribed in the box - a triangle, a pentagon, a hexagon. How many sides is
+    /// <see cref="ShapeItem.Sides"/>, so one shape covers all of them rather than an enum entry each.</summary>
+    Polygon
 }

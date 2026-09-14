@@ -283,6 +283,12 @@ public class NumericProperty : PropertyDefinition
     public static readonly AdamantiumProperty DecimalsProperty = AdamantiumProperty.Register(nameof(Decimals),
         typeof(Int32), typeof(NumericProperty), new PropertyMetadata(3));
 
+    /// <summary>Whether the line ends with the up and down buttons. ON by default, because a number a person nudges is
+    /// what a stepper is for - but they cost width, and in a narrow inspector that width comes out of the field the
+    /// number is actually read in. A panel that is short of room turns them off and keeps the digits.</summary>
+    public static readonly AdamantiumProperty ShowButtonsProperty = AdamantiumProperty.Register(nameof(ShowButtons),
+        typeof(Boolean), typeof(NumericProperty), new PropertyMetadata(true));
+
     private DataTemplate _editor;
 
     public Double Minimum
@@ -310,6 +316,12 @@ public class NumericProperty : PropertyDefinition
         set => SetValue(DecimalsProperty, value);
     }
 
+    public Boolean ShowButtons
+    {
+        get => GetValue<Boolean>(ShowButtonsProperty);
+        set => SetValue(ShowButtonsProperty, value);
+    }
+
     protected internal override DataTemplate DefaultEditorTemplate =>
         _editor ??= new DataTemplate(() => new TemplateResult { RootComponent = PropertyEditors.Number() });
 
@@ -320,6 +332,7 @@ public class NumericProperty : PropertyDefinition
         numeric.Minimum = Minimum;
         numeric.Maximum = Maximum;
         numeric.SmallChange = Step;
+        numeric.AreButtonsVisible = ShowButtons;
         // NULL, not zero, when there is nothing to show - the objects disagree. A zero here would be a number neither
         // of them holds, which is worse than an empty field: it reads as an answer.
         numeric.Value = value is IConvertible convertible

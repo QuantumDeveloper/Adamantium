@@ -118,6 +118,6 @@ internal sealed class CanvasGridCollector : SdfBatchCollector<CanvasGridItem>
         return true;
     }
 
-    private static Vector4F Straight(Color colour, float opacity) =>
-        new(colour.R / 255f, colour.G / 255f, colour.B / 255f, colour.A / 255f * opacity);
+    private static Vector4F Straight(Color color, float opacity) =>
+        new(color.R / 255f, color.G / 255f, color.B / 255f, color.A / 255f * opacity);
 }

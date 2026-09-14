@@ -20,6 +20,9 @@
        single template is rebuilt. See docs/THEME_VARIANTS_PLAN.md. -->
 
   <ResourceContext.Resources>
+    <!-- FIRST, so any theme can still override a key of its own: the canvas's pictures belong to the canvas and not to
+         this theme, so they live outside all three. -->
+    <ResourceLink Source="{x:Type shared:CanvasIcons}"/>
     <ResourceLink Source="{x:Type fluent:Icons}"/>
     <ResourceLink Source="{x:Type fluent:Metrics}"/>
     <ResourceLink Source="{x:Type fluent:Materials}"/>
@@ -45,6 +48,7 @@
         <StyleInclude Source="{x:Type fluent:ScrollViewerStyleSet}"/>
         <StyleInclude Source="{x:Type fluent:ZoomBoxStyleSet}"/>
         <StyleInclude Source="{x:Type fluent:InfiniteCanvasStyleSet}"/>
+        <StyleInclude Source="{x:Type fluent:CanvasPaneStyleSet}"/>
         <StyleInclude Source="{x:Type fluent:ToggleButtonStyleSet}"/>
         <StyleInclude Source="{x:Type fluent:CheckBoxStyleSet}"/>
         <StyleInclude Source="{x:Type fluent:RadioButtonStyleSet}"/>

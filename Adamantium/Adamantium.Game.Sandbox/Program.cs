@@ -14,6 +14,25 @@ public class Program
         // and never look at a bitmap. Off by default in the engine because it writes to disk - an application opts in.
         UI.Input.DragDropOptions.OfferImagesAsFiles = true;
 
+        // TEMP bisection: ADAM_OFF=InkCollector,CanvasGridCollector turns whole batches off by their static Enabled.
+        // One build and N cheap runs instead of N builds - which is the only affordable way to find the guilty pass
+        // when the failure is INTERMITTENT and each verdict needs half a dozen starts. Reflection because the
+        // collectors are internal to Adamantium.UI.
+        if (Environment.GetEnvironmentVariable("ADAM_OFF") is { Length: > 0 } off)
+        {
+            var assembly = typeof(UI.Controls.InfiniteCanvas).Assembly.GetName().Name == "Adamantium.UI"
+                ? typeof(UI.Controls.InfiniteCanvas).Assembly
+                : System.Reflection.Assembly.Load("Adamantium.UI");
+
+            foreach (var name in off.Split(',', StringSplitOptions.RemoveEmptyEntries))
+            {
+                var type = assembly.GetType("Adamantium.UI.Rendering." + name.Trim());
+                type?.GetField("Enabled", System.Reflection.BindingFlags.Public |
+                                          System.Reflection.BindingFlags.Static)?.SetValue(null, false);
+                Console.WriteLine($"ADAM_OFF: {name.Trim()} -> {(type == null ? "NOT FOUND" : "disabled")}");
+            }
+        }
+
         var gameApp = new AdamantiumGameApplication();
 
         // ADAM_START_TAB=<header>: open ON that tab instead of the first one. A measurement of a particular tab starts

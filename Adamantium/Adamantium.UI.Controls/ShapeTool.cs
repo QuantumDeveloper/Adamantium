@@ -14,12 +14,41 @@ public class ShapeTool : ICanvasTool
     private ShapeItem _making;
     private Vector2 _from;
 
-    public ShapeTool(CanvasShape shape) => Shape = shape;
+    public ShapeTool(CanvasShape shape)
+    {
+        Shape = shape;
+        Name = shape.ToString();
+        Icon = "Tool" + shape + "Icon";
+        Shortcut = shape switch
+        {
+            CanvasShape.Rectangle => Key.R,
+            CanvasShape.Ellipse => Key.O,
+            CanvasShape.Polygon => Key.G,
+            _ => Key.L
+        };
+    }
 
     public CanvasShape Shape { get; }
 
     /// <summary>A shape is one drag from press to release, so nothing here ever outlives the button.</summary>
     public bool IsBusy => false;
+
+    /// <summary>How a rail shows this tool. Taken from the SHAPE by default - one class serves three tools, and each
+    /// of the three is called and drawn after the shape it makes - and settable, like every other tool's.</summary>
+    public string Name { get; set; }
+
+    public string Icon { get; set; }
+
+    public Key Shortcut { get; set; }
+
+    public string Description { get; set; } = string.Empty;
+
+    /// <summary>A crosshair - a shape is dragged out from an exact corner.</summary>
+    public Cursor Cursor { get; set; } = Cursors.Crosshair;
+
+    /// <summary>How many sides the next POLYGON gets. On the tool rather than on the canvas, because it is a fact about
+    /// what this tool makes - the same place the shape itself is stated.</summary>
+    public int Sides { get; set; } = 5;
 
     public void OnPressed(InfiniteCanvas canvas, CanvasPointerEventArgs e)
     {
@@ -27,7 +56,10 @@ public class ShapeTool : ICanvasTool
 
         _from = e.World;
         _making = new ShapeItem(Shape, new Rect(_from.X, _from.Y, 0, 0), canvas.Ink,
-            canvas.ScreenToWorldLength(canvas.InkThickness), Shape == CanvasShape.Line ? null : canvas.ShapeFill);
+            canvas.ScreenToWorldLength(canvas.InkThickness), Shape == CanvasShape.Line ? null : canvas.ShapeFill)
+        {
+            Sides = Sides
+        };
 
         canvas.CaptureMouse();
         canvas.InvalidateRender(false);

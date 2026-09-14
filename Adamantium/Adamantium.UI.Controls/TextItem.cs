@@ -69,6 +69,32 @@ public class TextItem : ICanvasItem
         }
     }
 
+    /// <summary>Where it is and how big, one number at a time - see <see cref="StrokeItem.X"/>. Setting a size here
+    /// sets the FONT size, because that is what resizing a piece of text means.</summary>
+    public double X
+    {
+        get => Bounds.X;
+        set => Move(new Vector2(value - Bounds.X, 0));
+    }
+
+    public double Y
+    {
+        get => Bounds.Y;
+        set => Move(new Vector2(0, value - Bounds.Y));
+    }
+
+    public double Width
+    {
+        get => Bounds.Width;
+        set => Resize(new Rect(Bounds.X, Bounds.Y, Math.Max(1e-9, value), Bounds.Height));
+    }
+
+    public double Height
+    {
+        get => Bounds.Height;
+        set => Resize(new Rect(Bounds.X, Bounds.Y, Bounds.Width, Math.Max(1e-9, value)));
+    }
+
     public Rect Bounds
     {
         get

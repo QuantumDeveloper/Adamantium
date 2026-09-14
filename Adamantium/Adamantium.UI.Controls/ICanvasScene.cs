@@ -30,6 +30,14 @@ public interface ICanvasScene
     /// stroke that was behind a control has to stay behind it, in both halves.</para></summary>
     bool Replace(ICanvasItem item, IReadOnlyList<ICanvasItem> pieces);
 
+    /// <summary>Moves an item to the front or the back of PAINT order - what "bring to front" and "send to back" mean.
+    /// <para>Here rather than left to the application, because order in this scene IS paint order: taking an item out
+    /// and putting it back would raise it, and there is no way at all to lower one from outside. Both return false for
+    /// an item the scene does not hold, and do nothing for one already where it is asked to go.</para></summary>
+    bool BringToFront(ICanvasItem item);
+
+    bool SendToBack(ICanvasItem item);
+
     /// <summary>Says that something already in it has changed - an item moved or resized. The scene cannot notice on its
     /// own: what an item holds is the item's business.</summary>
     void Touch();

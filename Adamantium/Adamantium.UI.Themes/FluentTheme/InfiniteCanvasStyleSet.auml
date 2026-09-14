@@ -54,6 +54,12 @@
                             </Button>
                             <ContentPresenter x:Name="PART_Overlay"/>
                         </StackPanel>
+
+                        <!-- The PANES, above everything: several panels rather than one, each placed against the edge
+                             or the corner it asks for, and none of them stretched. The layer does the placing because
+                             it is the only thing that knows the viewport AND what the other panes have already taken -
+                             see CanvasChromeLayer. -->
+                        <CanvasChromeLayer x:Name="PART_Chrome" PaneInset="12" PaneGap="8"/>
                     </Grid>
                 </ControlTemplate>
             </Setter.Value>

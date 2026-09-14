@@ -9,11 +9,11 @@ public enum CanvasOverlayPlacement
     BottomLeft,
     BottomRight,
 
-    /// <summary>Along the top, centred - a toolbar rather than a panel.</summary>
-    TopCentre,
+    /// <summary>Along the top, centered - a toolbar rather than a panel.</summary>
+    TopCenter,
 
-    /// <summary>Along the bottom, centred.</summary>
-    BottomCentre,
+    /// <summary>Along the bottom, centered.</summary>
+    BottomCenter,
 
     /// <summary>Wherever it was put: <see cref="InfiniteCanvas.OverlayOffset"/> says where, in screen pixels from the
     /// canvas's top-left. Dragging the panel sets this - and because it is a property like any other, an application

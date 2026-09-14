@@ -100,6 +100,9 @@ public class PropertyGrid : Control
 
     private readonly List<PropertyRow> _rows = new();
     private readonly List<PropertySection> _openedBySearch = new();
+    private readonly List<PropertyDefinition> _watched = new();
+    private bool _rebuilding;
+    private bool _rebuildAgain;
     private Panel _host;
     private TextBox _search;
     private ButtonBase _clearSearch;
@@ -232,6 +235,42 @@ public class PropertyGrid : Control
     /// <summary>Rebuilds every section's rows - after the sections change, the object changes, or a composite folds.</summary>
     public void Rebuild()
     {
+        // ONE pass at a time. A rebuild clears the host and fills it again, and a definition that changes its mind while
+        // that is happening - an IsVisible binding settling, say - asks for another one from inside this one: the inner
+        // pass then fills the host completely and the outer pass, still holding its place in the loop, adds the rest of
+        // the sections A SECOND TIME. A panel with the same child twice makes the paint order's "next sibling" chain
+        // point at itself, and the record thread walks that chain forever - an application frozen solid with nothing in
+        // the stack to blame it on. Asked again from inside, this runs the pass again AFTER, which is what the caller
+        // actually wanted.
+        if (_rebuilding)
+        {
+            _rebuildAgain = true;
+            return;
+        }
+
+        _rebuilding = true;
+        try
+        {
+            do
+            {
+                _rebuildAgain = false;
+                RebuildCore();
+            }
+            while (_rebuildAgain);
+        }
+        finally
+        {
+            _rebuilding = false;
+        }
+    }
+
+    private void RebuildCore()
+    {
+        // BEFORE the guard, and over every definition rather than over the rows: a line that is hidden has no row, so a
+        // row could never hear the change that brings it back. This is what makes IsVisible mean anything after the
+        // first pass - an inspector whose lines come and go with what is selected asks for exactly that.
+        Watch();
+
         if (_host == null) return;
 
         _host.Children.Clear();
@@ -521,6 +560,28 @@ public class PropertyGrid : Control
         var inside = searching && Carries(composite.Header as String, wanted) ? null : wanted;
         foreach (var child in composite.Children) AddRow(host, child, targets, depth + 1, inside);
     }
+
+    private void Watch()
+    {
+        foreach (var definition in _watched) definition.LayoutChanged -= OnDefinitionLayoutChanged;
+
+        _watched.Clear();
+
+        foreach (var section in DisplayedSections())
+        {
+            foreach (var definition in section.Properties) Watch(definition);
+        }
+    }
+
+    private void Watch(PropertyDefinition definition)
+    {
+        definition.LayoutChanged += OnDefinitionLayoutChanged;
+        _watched.Add(definition);
+
+        foreach (var child in definition.Children) Watch(child);
+    }
+
+    private void OnDefinitionLayoutChanged(object sender, EventArgs e) => Rebuild();
 
     private void OnSectionsChanged(object sender, NotifyCollectionChangedEventArgs e) => Rebuild();
 

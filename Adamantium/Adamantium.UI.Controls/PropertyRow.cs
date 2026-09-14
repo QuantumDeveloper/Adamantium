@@ -64,6 +64,18 @@ public class PropertyRow : Control
     private double _gripFrom;
     private double _widthFrom;
 
+    public PropertyRow()
+    {
+        // The WHOLE LINE opens a composite, not the fourteen pixels of chevron beside its name: a composite row reads as
+        // a header, and a header is something you click. Taken on the ROW and through MouseDown, which BUBBLES - the
+        // press lands on whatever the template put under the pointer, and MouseLeftButtonDown is DIRECT, so a handler on
+        // the name presenter never heard a press that landed on the label inside it. In the CONSTRUCTOR, because the
+        // row's own event is the row's for its whole life and has nothing to do with the parts a theme gives it. A row
+        // with no children ignores it, so an ordinary line is still just a line - and a line WITH children has no editor
+        // in its other half to take the press instead.
+        MouseDown += OnRowPressed;
+    }
+
     /// <summary>What this row draws.</summary>
     public PropertyDefinition Definition { get; internal set; }
 
@@ -231,8 +243,6 @@ public class PropertyRow : Control
             if (_grip is UIComponent grip) grip.Cursor = Cursors.SizeEWE;
         }
 
-        if (_expander != null) _expander.MouseLeftButtonDown += OnExpanderPressed;
-
         _action = GetTemplateChild("PART_Action") as ButtonBase;
         if (_action != null) _action.Click += OnActionPressed;
 
@@ -364,7 +374,6 @@ public class PropertyRow : Control
     private void Unhook()
     {
         if (_grip != null) _grip.MouseLeftButtonDown -= OnGripPressed;
-        if (_expander != null) _expander.MouseLeftButtonDown -= OnExpanderPressed;
         if (_action != null) _action.Click -= OnActionPressed;
         if (_reset != null) _reset.Click -= OnResetPressed;
         UnhookEditor();
@@ -378,7 +387,13 @@ public class PropertyRow : Control
         {
             _nameHost.Content = Definition.Header;
             _nameHost.ContentTemplate = null;
+
         }
+
+        // The whole line of a COMPOSITE opens it, so the whole line says so. On the ROW, because that is the target:
+        // the chevron carried the hand all along and everything beside it did not, which is exactly the part of it
+        // nobody thought to press.
+        Cursor = HasChildren ? Cursors.Hand : Cursors.Arrow;
 
         if (_expander is MeasurableUIComponent strip) strip.Margin = new Thickness(Math.Max(0, Indent), 0, 0, 0);
         if (_valueHost == null) return;
@@ -576,11 +591,11 @@ public class PropertyRow : Control
         if (ResetToDefault()) e.Handled = true;
     }
 
-    private void OnExpanderPressed(object sender, MouseButtonEventArgs e)
+    private void OnRowPressed(object sender, MouseButtonEventArgs e)
     {
-        if (!HasChildren) return;
+        if (!HasChildren || e.ChangedButton != MouseButtons.Left || Owner == null) return;
 
-        Owner?.ToggleComposite(this);
+        Owner.ToggleComposite(this);
         e.Handled = true;
     }
 

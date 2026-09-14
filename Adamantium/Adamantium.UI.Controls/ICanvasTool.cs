@@ -1,3 +1,4 @@
+using Adamantium.UI.Core;
 using Adamantium.UI.Core.Graphics;
 using Adamantium.UI.Core.Input;
 using Adamantium.UI.Core.RoutedEvents;
@@ -16,6 +17,31 @@ public interface ICanvasTool
     /// The canvas asks so that swapping tools, or losing the pointer, can finish it rather than leave it hanging.
     /// </summary>
     bool IsBusy { get; }
+
+    /// <summary>What this tool is called, for the button that picks it and the tip that explains it.
+    /// <para>Stated by the TOOL and not by the markup around it, which is the whole point: adding a tool is a class,
+    /// not a class plus a command plus a flag plus a button plus an icon. What a tool is called and what it looks like
+    /// are facts about the tool.</para></summary>
+    string Name => GetType().Name;
+
+    /// <summary>The KEY of the picture to show - a theme resource, resolved live, so a tool keeps its look through a
+    /// theme swap and a theme can give it a different one. Empty means no picture, and the rail falls back to the
+    /// name.</summary>
+    string Icon => string.Empty;
+
+    /// <summary>The key that picks this tool, or <see cref="Key.None"/> for none. The canvas reads it and spends the
+    /// key only when no tool wanted it first; an application that disagrees sets a different one on the tool it
+    /// built.</summary>
+    Key Shortcut => Key.None;
+
+    /// <summary>A longer line for the tip, under the name. Empty by default - most tools are what their name says.
+    /// </summary>
+    string Description => string.Empty;
+
+    /// <summary>The pointer this tool wears. The arrow by default, and a tool that draws should say otherwise: which
+    /// tool is in hand is otherwise only told by a button in a rail the eye is not on, and a tool put down by the right
+    /// button announces itself nowhere at all. The pointer is the one place a person is already looking.</summary>
+    Cursor Cursor => Cursors.Arrow;
 
     void OnPressed(InfiniteCanvas canvas, CanvasPointerEventArgs e);
 

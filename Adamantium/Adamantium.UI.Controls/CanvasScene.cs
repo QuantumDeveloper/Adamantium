@@ -75,6 +75,24 @@ public class CanvasScene : ICanvasScene
         return null;
     }
 
+    /// <summary>To the end of the list, which is the front of paint order.</summary>
+    public bool BringToFront(ICanvasItem item) => MoveTo(item, _items.Count - 1);
+
+    /// <summary>To the start of the list, which is the back.</summary>
+    public bool SendToBack(ICanvasItem item) => MoveTo(item, 0);
+
+    private bool MoveTo(ICanvasItem item, int index)
+    {
+        var at = item == null ? -1 : _items.IndexOf(item);
+        if (at < 0 || at == index) return false;
+
+        _items.RemoveAt(at);
+        _items.Insert(index, item);
+
+        Changed?.Invoke(this, EventArgs.Empty);
+        return true;
+    }
+
     /// <summary>Says that something already in the scene has changed - a stroke still being drawn, an item moved. The
     /// scene itself cannot notice: what an item holds is the item's business.</summary>
     public void Touch() => Changed?.Invoke(this, EventArgs.Empty);

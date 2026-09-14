@@ -139,11 +139,11 @@ public class InfiniteCanvasTests
 
         canvas.ScaleToFit(wanted, padding: 0);
 
-        var centre = canvas.WorldToScreen(new Vector2(1100, 1050));
+        var center = canvas.WorldToScreen(new Vector2(1100, 1050));
         Assert.Multiple(() =>
         {
-            Assert.That(centre.X, Is.EqualTo(200).Within(1e-6));
-            Assert.That(centre.Y, Is.EqualTo(150).Within(1e-6));
+            Assert.That(center.X, Is.EqualTo(200).Within(1e-6));
+            Assert.That(center.Y, Is.EqualTo(150).Within(1e-6));
             Assert.That(canvas.Scale, Is.EqualTo(2).Within(1e-9), "the tighter of the two axes decides");
         });
     }
@@ -446,7 +446,7 @@ public class InfiniteCanvasTests
     }
 
     // The hole is the ERASER's, whatever the ink's width - and that is the whole of what was wrong: the cut was made in
-    // the centreline at the bare radius, and the round ends left on the two pieces reached back half a thickness each
+    // the centerline at the bare radius, and the round ends left on the two pieces reached back half a thickness each
     // and closed it again. An eraser thinner than the line closed it completely and appeared to do nothing.
     [TestCase(1.0)]
     [TestCase(8.0)]

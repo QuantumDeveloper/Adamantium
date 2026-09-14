@@ -35,6 +35,9 @@
                             </Button>
                             <ContentPresenter x:Name="PART_Overlay"/>
                         </StackPanel>
+
+                        <!-- The panes, above everything - see Fluent's set. Tighter inset, like everything here. -->
+                        <CanvasChromeLayer x:Name="PART_Chrome" PaneInset="8" PaneGap="6"/>
                     </Grid>
                 </ControlTemplate>
             </Setter.Value>
