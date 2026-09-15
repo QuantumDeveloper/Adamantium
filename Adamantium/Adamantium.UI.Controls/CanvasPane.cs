@@ -191,6 +191,7 @@ public class CanvasPane : ContentControl
             _snap.Click += OnSnapClicked;
         }
 
+
         _headerPart = GetTemplateChild("PART_Header") as IUIComponent;
         SyncHeader();
 

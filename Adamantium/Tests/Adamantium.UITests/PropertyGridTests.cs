@@ -175,6 +175,278 @@ public class PropertyGridTests
         });
     }
 
+    // A path that goes THROUGH a property whose declared type is an interface has to resolve the rest of it on what the
+    // object actually IS. An inspector points at an item that carries a control, and the control's own lines can only
+    // be reached that way - "Element.Accent" where Element is declared as IUIComponent and happens to be a node.
+    [Test]
+    public void APathThroughAnInterfaceResolvesOnTheRuntimeType()
+    {
+        var node = new CanvasNode { Accent = Brushes.Red };
+        var item = new ElementItem(node, new Rect(0, 0, 190, 110));
+        var accent = new SolidColorBrushProperty { Header = "Accent", Binding = new Binding("Element.Accent") };
+        var grid = Built(Section(item, accent));
+
+        Assert.That(RowOf(grid, accent)?.Value, Is.SameAs(node.Accent));
+    }
+
+    // ...and the swatch has to END UP wearing it. Reading the right brush and showing the wrong colour is the same
+    // thing to the person looking at the row.
+    [Test]
+    public void ASwatchWearsTheBrushItWasPointedAt()
+    {
+        var node = new CanvasNode { Accent = Brushes.Red };
+        var item = new ElementItem(node, new Rect(0, 0, 190, 110));
+        var accent = new SolidColorBrushProperty { Header = "Accent", Binding = new Binding("Element.Accent") };
+        var grid = Built(Section(item, accent));
+
+        TemplateRows(grid);
+
+        var swatch = RowOf(grid, accent)?.Editor as ColorPickerButton;
+
+        Assert.That(swatch, Is.Not.Null, "the row built no editor at all");
+        Assert.That(swatch.SelectedColor, Is.EqualTo(Colors.Red));
+    }
+
+    // A colour row writes INTO the brush it finds, so that everything painting with that brush follows - right when the
+    // object owns it, and wrong when it is the theme's. The theme hands one brush to everything that asks for that
+    // colour, so recolouring one node's title strip repainted every accent in the application. An edit there means the
+    // object OVERRIDES the theme: a new brush on the object, and the theme's left alone.
+    [Test]
+    public void EditingAThemeBrushLeavesTheThemesOwnBrushAlone()
+    {
+        var shared = new SolidColorBrush(Colors.Blue);
+        ((Brush)shared).IsShared = true;
+
+        var node = new CanvasNode { Accent = shared };
+        var item = new ElementItem(node, new Rect(0, 0, 190, 110));
+        var accent = new SolidColorBrushProperty { Header = "Accent", Binding = new Binding("Element.Accent") };
+        var grid = Built(Section(item, accent));
+
+        grid.Write(RowOf(grid, accent), Colors.Red);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(shared.Color, Is.EqualTo(Colors.Blue), "the theme's own brush was repainted");
+            Assert.That(node.Accent, Is.Not.SameAs(shared), "the node kept holding the theme's brush");
+            Assert.That((node.Accent as SolidColorBrush)?.Color, Is.EqualTo(Colors.Red));
+        });
+    }
+
+    // ...and a brush the object owns is still written into, which is what lets two shapes deliberately sharing one
+    // brush be recoloured together.
+    [Test]
+    public void EditingAnOwnedBrushStillWritesIntoIt()
+    {
+        var own = new SolidColorBrush(Colors.Blue);
+        var node = new CanvasNode { Accent = own };
+        var item = new ElementItem(node, new Rect(0, 0, 190, 110));
+        var accent = new SolidColorBrushProperty { Header = "Accent", Binding = new Binding("Element.Accent") };
+        var grid = Built(Section(item, accent));
+
+        grid.Write(RowOf(grid, accent), Colors.Red);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(node.Accent, Is.SameAs(own));
+            Assert.That(own.Color, Is.EqualTo(Colors.Red));
+        });
+    }
+
+    // A list of things that each have properties of their own could only be written out by hand, which means writing
+    // out a number of lines nobody knows in advance. One group of lines per item, each pointed at that item.
+    [Test]
+    public void AnItemsLineRepeatsItsChildrenPerElement()
+    {
+        var node = new CanvasNode { Inputs = 3, Outputs = 0 };
+        var item = new ElementItem(node, new Rect(0, 0, 190, 110));
+        var name = new StringProperty { Header = "Name", Binding = new Binding("Name") };
+        var sockets = new ItemsProperty
+        {
+            Header = "In",
+            IsExpanded = true,
+            Binding = new Binding("Element.InputPins"),
+            ItemHeader = new Binding("Name")
+        };
+        sockets.Children.Add(name);
+
+        var grid = Built(Section(item, sockets));
+
+        var rows = RowsOf(grid, name);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(rows.Count, Is.EqualTo(3), "one line per socket");
+            Assert.That(rows[0].Targets[0], Is.SameAs(node.InputPins[0]), "a line has to read the item, not the node");
+            Assert.That(rows[2].Targets[0], Is.SameAs(node.InputPins[2]));
+            Assert.That(rows[1].Value, Is.EqualTo("In 2"));
+        });
+    }
+
+    // Each group is named by the ITEM - a socket's own name over its own lines. Numbered when the items have nothing to
+    // be called.
+    [Test]
+    public void EachGroupIsNamedByItsItem()
+    {
+        var node = new CanvasNode { Inputs = 2, Outputs = 0 };
+        node.InputPins[0].Name = "Base";
+        var item = new ElementItem(node, new Rect(0, 0, 190, 110));
+        var sockets = new ItemsProperty
+        {
+            Header = "In",
+            IsExpanded = true,
+            Binding = new Binding("Element.InputPins"),
+            ItemHeader = new Binding("Name")
+        };
+        sockets.Children.Add(new StringProperty { Header = "Name", Binding = new Binding("Name") });
+
+        var grid = Built(Section(item, sockets));
+
+        Assert.That(Headers(grid), Does.Contain("Base"));
+    }
+
+    // Writing through one of those lines reaches the ITEM and nothing else - renaming the second socket leaves the
+    // first alone, which is the whole point of a line per item.
+    [Test]
+    public void WritingThroughAnItemsLineReachesThatItem()
+    {
+        var node = new CanvasNode { Inputs = 2, Outputs = 0 };
+        var item = new ElementItem(node, new Rect(0, 0, 190, 110));
+        var name = new StringProperty { Header = "Name", Binding = new Binding("Name") };
+        var sockets = new ItemsProperty
+        {
+            Header = "In",
+            IsExpanded = true,
+            Binding = new Binding("Element.InputPins"),
+            ItemHeader = new Binding("Name")
+        };
+        sockets.Children.Add(name);
+
+        var grid = Built(Section(item, sockets));
+
+        grid.Write(RowsOf(grid, name)[1], "Bias");
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(node.InputPins[1].Name, Is.EqualTo("Bias"));
+            Assert.That(node.InputPins[0].Name, Is.EqualTo("In 1"));
+        });
+    }
+
+    // A socket added or dropped is a LINE appearing or going, which no amount of re-reading values can do. The grid
+    // follows the collection it is showing and builds again.
+    [Test]
+    public void AddingToTheCollectionAddsItsLines()
+    {
+        var node = new CanvasNode { Inputs = 2, Outputs = 0 };
+        var item = new ElementItem(node, new Rect(0, 0, 190, 110));
+        var name = new StringProperty { Header = "Name", Binding = new Binding("Name") };
+        var sockets = new ItemsProperty
+        {
+            Header = "In",
+            IsExpanded = true,
+            Binding = new Binding("Element.InputPins"),
+            ItemHeader = new Binding("Name")
+        };
+        sockets.Children.Add(name);
+
+        var grid = Built(Section(item, sockets));
+
+        node.Inputs = 4;
+
+        Assert.That(RowsOf(grid, name).Count, Is.EqualTo(4));
+    }
+
+    // Three dots mean "there is more", and a button that silently drops something is not that. A list says what its
+    // per-item button does, and the lines it makes wear it - there is nowhere else to say it, because those lines are
+    // made as the grid builds.
+    [Test]
+    public void AnItemsLineCarriesWhatItsButtonDoes()
+    {
+        var node = new CanvasNode { Inputs = 1, Outputs = 0 };
+        var item = new ElementItem(node, new Rect(0, 0, 190, 110));
+        var sockets = new ItemsProperty
+        {
+            Header = "In",
+            IsExpanded = true,
+            Binding = new Binding("Element.InputPins"),
+            ItemHeader = new Binding("Name"),
+            ItemAction = new Doing(),
+            ItemActionIcon = "BinIcon",
+            ItemActionTip = "Remove this socket"
+        };
+        sockets.Children.Add(new StringProperty { Header = "Name", Binding = new Binding("Name") });
+
+        var grid = Built(Section(item, sockets));
+        var header = RowsWhoseHeaderIs(grid, "In 1");
+
+        Assert.That(header, Is.Not.Null, "no line for the socket at all");
+        Assert.Multiple(() =>
+        {
+            Assert.That(header.Definition.ShowActionButton, Is.True);
+            Assert.That(header.Definition.ActionIcon, Is.EqualTo("BinIcon"), "it would still be three dots");
+            Assert.That(header.Definition.ActionTip, Is.EqualTo("Remove this socket"));
+        });
+    }
+
+    private class Doing : ICommand
+    {
+        public event EventHandler CanExecuteChanged;
+
+        public bool CanExecute(object parameter) => true;
+
+        public void Execute(object parameter)
+        {
+        }
+
+        public void RaiseCanExecuteChanged() => CanExecuteChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    private static PropertyRow RowsWhoseHeaderIs(PropertyGrid grid, string header)
+    {
+        foreach (var section in grid.Sections)
+        {
+            if (section.Content is not IUIComponent host) continue;
+            foreach (var child in host.VisualChildren)
+            {
+                if (child is PropertyRow row && Equals(row.Definition?.Header, header)) return row;
+            }
+        }
+
+        return null;
+    }
+
+    private static List<PropertyRow> RowsOf(PropertyGrid grid, PropertyDefinition definition)
+    {
+        var found = new List<PropertyRow>();
+
+        foreach (var section in grid.Sections)
+        {
+            if (section.Content is not IUIComponent host) continue;
+            foreach (var child in host.VisualChildren)
+            {
+                if (child is PropertyRow row && ReferenceEquals(row.Definition, definition)) found.Add(row);
+            }
+        }
+
+        return found;
+    }
+
+    private static List<string> Headers(PropertyGrid grid)
+    {
+        var found = new List<string>();
+
+        foreach (var section in grid.Sections)
+        {
+            if (section.Content is not IUIComponent host) continue;
+            foreach (var child in host.VisualChildren)
+            {
+                if (child is PropertyRow row) found.Add(row.Definition?.Header as string);
+            }
+        }
+
+        return found;
+    }
+
     // The whole reason the value is a binding and not a member name: everything the binding system can do comes with
     // it. A converter is the plainest proof - a name could never carry one.
     [Test]

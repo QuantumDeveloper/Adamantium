@@ -49,6 +49,21 @@ public class SelectTool : ICanvasTool
         // tool is asked - so resizing works under every tool and not only under this one. What is left for the tool is
         // what a press MEANS, which is its own business: pick something, drag what is picked, or open a band.
         var item = Topmost(canvas, e.Pointer);
+
+        // INTO the group: a second click on a group that is already selected picks the thing inside it under the
+        // pointer. A mode would be the other way to do it, and a mode has to be left again - this one needs nothing
+        // remembered and nothing to get out of.
+        if (e.ClickCount > 1 && item is GroupItem group && canvas.IsSelected(group) &&
+            group.Pick(e.Pointer, canvas.ScreenToWorldLength(4)) is { } inside)
+        {
+            canvas.Select(inside, false);
+            _grip = CanvasHandle.Body;
+            Begin(canvas);
+            canvas.CaptureMouse();
+            e.Handled = true;
+            return;
+        }
+
         if (item != null)
         {
             // Already in the selection: the press starts a drag of the WHOLE selection and leaves it alone. Picking one

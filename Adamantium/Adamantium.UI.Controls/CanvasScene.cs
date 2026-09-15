@@ -63,6 +63,14 @@ public class CanvasScene : ICanvasScene
         Changed?.Invoke(this, EventArgs.Empty);
     }
 
+    public void Reset(IReadOnlyList<ICanvasItem> items)
+    {
+        _items.Clear();
+        if (items != null) _items.AddRange(items);
+
+        Changed?.Invoke(this, EventArgs.Empty);
+    }
+
     /// <summary>The topmost item under a world point, or nothing. Paint order is the list's order, so the LAST one that
     /// answers is the one on top.</summary>
     public ICanvasItem HitTest(Vector2 world, double tolerance)

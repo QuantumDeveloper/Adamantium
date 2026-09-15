@@ -40,6 +40,11 @@ public class ElementTool : ICanvasTool
 
     public string Description { get; set; } = string.Empty;
 
+    /// <summary>One family by default, because this is the tool that grows without limit: an application willing to put
+    /// its own controls on the plane has as many of these as it has controls, and a rail cannot hold them. Set it to
+    /// nothing and the tool takes a button of its own like any other.</summary>
+    public string Group { get; set; } = "Controls";
+
     /// <summary>A crosshair - a control is dragged out from an exact corner, like a shape.</summary>
     public Cursor Cursor { get; set; } = Cursors.Crosshair;
 

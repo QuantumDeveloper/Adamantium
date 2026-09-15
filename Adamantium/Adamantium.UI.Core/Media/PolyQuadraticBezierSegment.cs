@@ -18,8 +18,10 @@ public class PolyQuadraticBezierSegment : PathSegment
         IsStroked = isStroked;
     }
     
+    // Registered on THIS type, for the same reason the cubic one is: it does not derive from PolylineSegment either, so
+    // naming that as the owner made every write to Points throw.
     public static readonly AdamantiumProperty PointsProperty =
-        AdamantiumProperty.Register(nameof(Points), typeof(PointsCollection), typeof(PolylineSegment),
+        AdamantiumProperty.Register(nameof(Points), typeof(PointsCollection), typeof(PolyQuadraticBezierSegment),
             new PropertyMetadata(null, PropertyMetadataOptions.AffectsMeasure, PointsChangedCallback));
 
     private static void PointsChangedCallback(AdamantiumComponent a, AdamantiumPropertyChangedEventArgs e)

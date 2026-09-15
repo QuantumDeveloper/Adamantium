@@ -1,6 +1,8 @@
 using System.Collections.Generic;
 using Adamantium.Mathematics;
 using Adamantium.UI.Controls;
+using Adamantium.UI.Controls.Buttons;
+using Adamantium.UI.Controls.Decorators;
 using Adamantium.UI.Core;
 using Adamantium.UI.Core.Media;
 using Adamantium.ProceduralGeometry;
@@ -518,5 +520,180 @@ public class InfiniteCanvasTests
         Assert.That(stroke.Erase(new Vector2(50, 80), 10, pieces), Is.False);
         Assert.That(pieces, Is.Empty);
         Assert.That(stroke.Points, Has.Count.EqualTo(2));
+    }
+
+    // Going TO something: centred and filling the viewport. This is how a list of what is on the plane finds an item
+    // that was left far outside it.
+    [Test]
+    public void ZoomingToAnItemCentresItAndFillsTheView()
+    {
+        var canvas = Sized();
+        var item = new ShapeItem(CanvasShape.Rectangle, new Rect(4000, 4000, 100, 100), Brushes.White, 1);
+
+        canvas.ZoomTo(item);
+
+        var middle = canvas.WorldToScreen(new Vector2(4050, 4050));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(middle.X, Is.EqualTo(200).Within(0.5));
+            Assert.That(middle.Y, Is.EqualTo(150).Within(0.5));
+            Assert.That(canvas.Scale, Is.GreaterThan(1), "something 100 across fills 400 of viewport");
+        });
+    }
+
+    // A LINE has no height and fitting a box with a zero side does nothing at all - so a flat item is looked at through
+    // the square that holds it. Without this, double-clicking a horizontal arrow in a list would simply do nothing.
+    [Test]
+    public void ZoomingToAFlatItemStillMovesTheCamera()
+    {
+        var canvas = Sized();
+        var arrow = new ShapeItem(CanvasShape.Arrow, new Rect(-900, -900, 200, 0), Brushes.White, 2);
+        var before = canvas.Offset;
+
+        canvas.ZoomTo(arrow);
+
+        Assert.That(canvas.Offset, Is.Not.EqualTo(before));
+
+        var middle = canvas.WorldToScreen(new Vector2(-800, -900));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(middle.X, Is.EqualTo(200).Within(0.5));
+            Assert.That(middle.Y, Is.EqualTo(150).Within(0.5));
+        });
+    }
+
+    // What a control SAYS is how an item is named in the structure list and what the inspector's first line edits, and
+    // a node says it in Title - it holds no Content, so it answered with nothing and read as a nameless block in a
+    // graph where every block looks alike.
+    [Test]
+    public void ANodeIsNamedByItsTitle()
+    {
+        var item = new ElementItem(new CanvasNode { Title = "Multiply" }, new Rect(0, 0, 190, 110));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(item.Label, Is.EqualTo("Multiply"));
+            Assert.That(item.Title, Does.Contain("Multiply"), "the structure list shows the same name");
+        });
+    }
+
+    // ...and the line is an EDITOR, not a readout: renaming through it has to reach the strip across the node's top.
+    [Test]
+    public void RenamingANodeThroughTheItemReachesTheNode()
+    {
+        var node = new CanvasNode { Title = "Multiply" };
+        var item = new ElementItem(node, new Rect(0, 0, 190, 110));
+
+        item.Label = "Clamp";
+
+        Assert.That(node.Title, Is.EqualTo("Clamp"));
+    }
+
+    // A node's height is its SOCKET COUNT and nothing else, so its box has to follow the control rather than the other
+    // way round - asked for a fourth input in a box built for two, it drew four sockets in the room for two.
+    [Test]
+    public void ANodesBoxFollowsItsContent()
+    {
+        var item = new ElementItem(new CanvasNode(), new Rect(0, 0, 190, 110));
+
+        Assert.That(item.SizeFollowsContent, Is.True);
+    }
+
+    // ...and nothing else does. A button dragged out to fifty pixels is a fifty-pixel button; one that resized itself
+    // under the hand would be unusable.
+    [Test]
+    public void AnOrdinaryControlKeepsTheBoxItWasDraggedOut()
+    {
+        var item = new ElementItem(new Button { Content = "Press" }, new Rect(0, 0, 200, 50));
+
+        Assert.That(item.SizeFollowsContent, Is.False);
+    }
+
+    [Test]
+    public void AndTheApplicationCanSayOtherwise()
+    {
+        var item = new ElementItem(new CanvasNode(), new Rect(0, 0, 190, 110)) { SizeFollowsContent = false };
+
+        Assert.That(item.SizeFollowsContent, Is.False);
+    }
+
+    // The layer is where it actually happens: measured with no ceiling, and the box put where the control ended.
+    [Test]
+    public void TheLayerGrowsTheBoxOfAnItemThatFollowsItsContent()
+    {
+        var item = new ElementItem(new Border { Width = 190, Height = 130 }, new Rect(0, 0, 190, 110))
+        {
+            SizeFollowsContent = true
+        };
+
+        Laid(item);
+
+        Assert.That(item.World.Height, Is.EqualTo(130).Within(0.5));
+    }
+
+    // Shrinking counts too: taking sockets away has to give the room back, or every node ends up as tall as the most it
+    // ever held.
+    [Test]
+    public void AndShrinksItBackWhenTheContentDoes()
+    {
+        var control = new Border { Width = 190, Height = 80 };
+        var item = new ElementItem(control, new Rect(0, 0, 190, 200)) { SizeFollowsContent = true };
+
+        Laid(item);
+
+        Assert.That(item.World.Height, Is.EqualTo(80).Within(0.5));
+    }
+
+    [Test]
+    public void AndLeavesAnOrdinaryItemsBoxAlone()
+    {
+        var item = new ElementItem(new Border { Width = 190, Height = 130 }, new Rect(0, 0, 190, 110))
+        {
+            SizeFollowsContent = false
+        };
+
+        Laid(item);
+
+        Assert.That(item.World.Height, Is.EqualTo(110).Within(0.5));
+    }
+
+    // WIDER is allowed - long names, and room to read them - so a box dragged out past what the control needs keeps
+    // what it was given.
+    [Test]
+    public void ABoxWiderThanItsContentKeepsItsWidth()
+    {
+        var item = new ElementItem(new Border { Width = 120, Height = 80 }, new Rect(0, 0, 300, 80))
+        {
+            SizeFollowsContent = true
+        };
+
+        Laid(item);
+
+        Assert.That(item.World.Width, Is.EqualTo(300).Within(0.5));
+    }
+
+    // NARROWER is not. A box smaller than its control does not shrink the control - the control simply draws outside
+    // it, which is a node with its output socket and its label sitting past the frame that is supposed to hold them.
+    [Test]
+    public void ABoxNarrowerThanItsContentIsWidenedToIt()
+    {
+        var item = new ElementItem(new Border { Width = 190, Height = 80 }, new Rect(0, 0, 90, 80))
+        {
+            SizeFollowsContent = true
+        };
+
+        Laid(item);
+
+        Assert.That(item.World.Width, Is.EqualTo(190).Within(0.5));
+    }
+
+    private static void Laid(ElementItem item)
+    {
+        var layer = new CanvasElementLayer { Owner = Sized() };
+        layer.Sync(new List<ElementItem> { item });
+        layer.Measure(new Size(400, 300), force: true);
+        layer.Arrange(new Rect(0, 0, 400, 300));
     }
 }

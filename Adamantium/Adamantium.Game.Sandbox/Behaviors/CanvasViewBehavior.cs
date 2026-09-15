@@ -69,6 +69,26 @@ public class CanvasViewBehavior : Behavior<ButtonBase>
             case CanvasViewAction.Home:
                 canvas.ResetCamera();
                 break;
+
+            case CanvasViewAction.Delete:
+                canvas.RequestDeleteSelection();
+                break;
+
+            case CanvasViewAction.Group:
+                canvas.GroupSelection();
+                break;
+
+            case CanvasViewAction.Ungroup:
+                canvas.UngroupSelection();
+                break;
+
+            case CanvasViewAction.Undo:
+                canvas.Undo();
+                break;
+
+            case CanvasViewAction.Redo:
+                canvas.Redo();
+                break;
         }
     }
 }
@@ -78,5 +98,21 @@ public enum CanvasViewAction
 {
     ZoomIn,
     ZoomOut,
-    Home
+    Home,
+
+    /// <summary>Asks the canvas to take the selection out. Through the canvas rather than through the view model, so
+    /// that the button and the Delete key meet the same question.</summary>
+    Delete,
+
+    /// <summary>Makes one thing out of what is selected, and breaks one open again. On the canvas because grouping
+    /// moves things in and out of the scene in PAINT ORDER, which only the canvas and the scene can say.</summary>
+    Group,
+
+    Ungroup,
+
+    /// <summary>Puts the last step back, and takes it forward again. On the canvas because only the canvas knows where
+    /// one step ends and the next begins.</summary>
+    Undo,
+
+    Redo
 }

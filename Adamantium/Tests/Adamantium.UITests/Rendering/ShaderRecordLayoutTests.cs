@@ -33,6 +33,7 @@ public class ShaderRecordLayoutTests
         new(typeof(TextureItem), "Adamantium.UI.Effects.Generated.BrushEffect", "TexRectData"),
         new(typeof(FractalRectItem), "Adamantium.UI.Effects.Generated.BrushEffect", "FractalRectData"),
         new(typeof(MaterialRectItem), "Adamantium.UI.Effects.Generated.MaterialEffect", "MaterialRectData"),
+        new(typeof(CanvasArrowItem), "Adamantium.UI.Effects.Generated.ArrowEffect", "ArrowRecord"),
         new(typeof(GlyphItem), "Adamantium.FX.Effects.Generated.FontEffect", "GlyphData"),
         // The RETAINED families read their instances by BDA exactly as the SDF batches do, and were missed by the first
         // pass of this list because they live under Rendering/Retained and are named "...Instance" rather than "...Item".

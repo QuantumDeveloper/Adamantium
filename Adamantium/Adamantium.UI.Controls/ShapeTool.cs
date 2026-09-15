@@ -24,6 +24,7 @@ public class ShapeTool : ICanvasTool
             CanvasShape.Rectangle => Key.R,
             CanvasShape.Ellipse => Key.O,
             CanvasShape.Polygon => Key.G,
+            CanvasShape.Arrow => Key.A,
             _ => Key.L
         };
     }
@@ -50,15 +51,24 @@ public class ShapeTool : ICanvasTool
     /// what this tool makes - the same place the shape itself is stated.</summary>
     public int Sides { get; set; } = 5;
 
+    /// <summary>What the next ARROW wears on each end. On the tool for the same reason <see cref="Sides"/> is: an
+    /// application offering a plain arrow and a double-headed one builds two of this class.</summary>
+    public CanvasArrowHead StartHead { get; set; } = CanvasArrowHead.None;
+
+    public CanvasArrowHead EndHead { get; set; } = CanvasArrowHead.Triangle;
+
     public void OnPressed(InfiniteCanvas canvas, CanvasPointerEventArgs e)
     {
         if (e.Button != MouseButtons.Left || canvas.Scene == null) return;
 
         _from = e.World;
         _making = new ShapeItem(Shape, new Rect(_from.X, _from.Y, 0, 0), canvas.Ink,
-            canvas.ScreenToWorldLength(canvas.InkThickness), Shape == CanvasShape.Line ? null : canvas.ShapeFill)
+            canvas.ScreenToWorldLength(canvas.InkThickness),
+            Shape is CanvasShape.Line or CanvasShape.Arrow ? null : canvas.ShapeFill)
         {
-            Sides = Sides
+            Sides = Sides,
+            StartHead = StartHead,
+            EndHead = EndHead
         };
 
         canvas.CaptureMouse();

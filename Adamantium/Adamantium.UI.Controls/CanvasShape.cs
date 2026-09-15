@@ -13,5 +13,10 @@ public enum CanvasShape
 
     /// <summary>A regular polygon inscribed in the box - a triangle, a pentagon, a hexagon. How many sides is
     /// <see cref="ShapeItem.Sides"/>, so one shape covers all of them rather than an enum entry each.</summary>
-    Polygon
+    Polygon,
+
+    /// <summary>A line with a HEAD on one end, the other, or both - see <see cref="ShapeItem.StartHead"/> and
+    /// <see cref="ShapeItem.EndHead"/>. Its own shape rather than a switch on <see cref="Line"/>, so that an inspector
+    /// offering head settings offers them exactly where they mean something.</summary>
+    Arrow
 }

@@ -95,6 +95,12 @@ public class TextItem : ICanvasItem
         set => Resize(new Rect(Bounds.X, Bounds.Y, Bounds.Width, Math.Max(1e-9, value)));
     }
 
+    /// <summary>What it says, cut short. A list of pieces of text where every row reads "Text" is a list of nothing.
+    /// </summary>
+    public string Title => string.IsNullOrWhiteSpace(Text)
+        ? "Text"
+        : Text.Length <= 24 ? Text : Text[..24] + "...";
+
     public Rect Bounds
     {
         get

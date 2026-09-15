@@ -17,6 +17,8 @@ namespace Adamantium.UI.Controls;
 /// re-measure of what is inside it.</para></summary>
 public class ElementItem : ICanvasItem
 {
+    private Boolean? _sizeFollowsContent;
+
     public ElementItem(IUIComponent element, Rect world)
     {
         Element = element;
@@ -31,7 +33,35 @@ public class ElementItem : ICanvasItem
     /// canvas, rather than staying a fixed number of pixels the way the grips do.</summary>
     public Rect World { get; set; }
 
+    /// <summary>Whether the CONTROL decides the box rather than the box deciding the control.
+    /// <para>Not the same rule in both directions, because the two are not the same question. The height is EXACTLY
+    /// what the control asks for: a node is as tall as its sockets and there is no such thing as a node with room to
+    /// spare under them, so dragging the bottom edge has nothing to set. The width is a FLOOR: a node may well be
+    /// dragged wider - long names, and room to read them - but narrower than its own labels it simply spills out of its
+    /// frame, which is what a box smaller than its control always does.</para>
+    /// <para>Most controls do neither: a button dragged out to fifty pixels is a fifty-pixel button, and one that
+    /// resized itself under the hand would be unusable. Default, not law - an application with a control of its own
+    /// that behaves like a node says so here.</para></summary>
+    public Boolean SizeFollowsContent
+    {
+        get => _sizeFollowsContent ?? Element is CanvasNode;
+        set => _sizeFollowsContent = value;
+    }
+
     public Rect Bounds => World;
+
+    /// <summary>The control's own type, and what it says if it says anything: a page holding six buttons needs to tell
+    /// them apart, and the only thing that does is the words on them.</summary>
+    public string Title
+    {
+        get
+        {
+            var kind = Element?.GetType().Name ?? "Element";
+            var says = Label;
+
+            return string.IsNullOrWhiteSpace(says) ? kind : $"{kind} \"{says}\"";
+        }
+    }
 
     /// <summary>Where and how big, one number at a time. <see cref="World"/> is a rectangle and a rectangle cannot be
     /// half-written, so an inspector line that edits only the X of one has nothing to bind to - these are that line.
@@ -98,7 +128,8 @@ public class ElementItem : ICanvasItem
         }
     }
 
-    /// <summary>What the control SAYS - its content if it has content, its text if it is a box.
+    /// <summary>What the control SAYS - its content if it has content, its text if it is a box, the strip across its top
+    /// if it is a node.
     /// <para>Here rather than "inspect the control itself", because the thing selected on the plane is this item, and an
     /// inspector line binds against what is selected. A control that says nothing answers with nothing and takes
     /// nothing: a panel has no label and pretending it has one would only offer a line that does not work.</para>
@@ -108,6 +139,9 @@ public class ElementItem : ICanvasItem
         get => Element switch
         {
             TextBox box => box.Text,
+            // Before the content control: a node is not one, so without this it answered nothing and read in the
+            // structure list as a nameless "CanvasNode" - in a graph of fifty, fifty times over.
+            CanvasNode node => node.Title?.ToString(),
             IContentControl content => content.Content?.ToString(),
             _ => null
         };
@@ -117,6 +151,10 @@ public class ElementItem : ICanvasItem
             {
                 case TextBox box:
                     box.Text = value;
+                    break;
+
+                case CanvasNode node:
+                    node.Title = value;
                     break;
 
                 case IContentControl content:

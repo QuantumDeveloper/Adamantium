@@ -138,12 +138,17 @@ public class Theme : AdamantiumComponent, ITheme
     {
         if (GetValue(property) is SolidColorBrush brush)
         {
+            // Marked here as well as where one is made: a seed assigned to the theme from markup or from a theme's own
+            // constructor arrives as somebody else's brush and becomes the theme's the moment the ramp is derived from
+            // it. Missing that, the accent - the brush the most things in an application hold - would be the one brush
+            // an editor was still free to write into.
+            brush.IsShared = true;
             brush.Color = color;
             return;
         }
 
         // First time, or a theme that put something other than a solid brush there: there is no identity to keep yet.
-        SetValue(property, new SolidColorBrush(color));
+        SetValue(property, Shared(new SolidColorBrush(color)));
     }
 
     private static readonly Color Black = Color.FromRgba(0, 0, 0);
@@ -410,8 +415,16 @@ public class Theme : AdamantiumComponent, ITheme
                 colour = currentColour;
             }
 
-            _palette[entry.Key] = new SolidColorBrush(colour);
+            _palette[entry.Key] = Shared(new SolidColorBrush(colour));
         }
+    }
+
+    // MARKED as the theme's on the way out, at each of the three places one is made. Everything that receives a theme
+    // brush receives the same object, so an editor that writes into it recolours the application - see Brush.IsShared.
+    private static SolidColorBrush Shared(SolidColorBrush brush)
+    {
+        brush.IsShared = true;
+        return brush;
     }
 
     /// <summary>Every variant of a theme must answer the SAME set of keys. A key one variant declares and another does
@@ -462,7 +475,7 @@ public class Theme : AdamantiumComponent, ITheme
             }
 
             if (_palette.TryGetValue(entry.Key, out var brush)) brush.Color = entry.Color;
-            else _palette[entry.Key] = new SolidColorBrush(entry.Color);
+            else _palette[entry.Key] = Shared(new SolidColorBrush(entry.Color));
         }
 
         // ONCE, after the whole palette is in place, and only when something actually moved. Per key would re-resolve
@@ -476,7 +489,10 @@ public class Theme : AdamantiumComponent, ITheme
         {
             if (entry.Property == null) continue;
             var property = AdamantiumPropertyMap.FindRegistered(GetType(), entry.Property);
-            if (property != null) SetValue(property, entry.Value);
+            if (property == null) continue;
+
+            if (entry.Value is Brush handed) handed.IsShared = true;
+            SetValue(property, entry.Value);
         }
 
         return true;

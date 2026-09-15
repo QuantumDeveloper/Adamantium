@@ -82,6 +82,10 @@ public class StrokeItem : ICanvasItem
         set => Resize(new Rect(Bounds.X, Bounds.Y, Bounds.Width, Math.Max(1e-9, value)));
     }
 
+    /// <summary>How long the stroke is, because one stroke looks like another in a list and the count is the only
+    /// thing that tells them apart at a glance.</summary>
+    public string Title => $"Stroke ({_points.Count})";
+
     public Rect Bounds
     {
         get

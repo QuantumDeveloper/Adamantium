@@ -89,6 +89,7 @@
     <StyleInclude Source="{x:Type editor:ZoomBoxStyleSet}"/>
     <StyleInclude Source="{x:Type editor:InfiniteCanvasStyleSet}"/>
     <StyleInclude Source="{x:Type editor:CanvasPaneStyleSet}"/>
+    <StyleInclude Source="{x:Type editor:CanvasNodeStyleSet}"/>
     <StyleInclude Source="{x:Type editor:RingProgressBarStyleSet}"/>
     <StyleInclude Source="{x:Type editor:KeyTipAdornerStyleSet}"/>
     <StyleInclude Source="{x:Type editor:SlidePanelStyleSet}"/>

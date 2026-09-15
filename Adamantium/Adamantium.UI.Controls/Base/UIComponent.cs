@@ -535,7 +535,20 @@ public class UIComponent : FundamentalUIComponent, IUIComponent
     /// units are the same, and the GPU data they bake from the brush is all that is stale.</summary>
     public void InvalidatePaint() => VisualTreeNotifications.RaisePaintInvalidated(this);
 
-    public bool DrawsNothing { get; set; }
+    /// <summary>What the last record found: this element produced no draw commands, so a re-layout need not re-record
+    /// it - a resize can only invalidate geometry THROUGH what is drawn, and there is nothing drawn.
+    /// <para>Never latched from a record taken at NO SIZE. At zero by zero almost everything draws nothing, and that
+    /// says nothing whatever about what it draws once it has been given a size - but the flag is permanent, so one such
+    /// record used to silence the element for good: it was skipped at every later size, and only a full walk (a window
+    /// resize, say) ever drew it again. That is how a picture at the bottom of a scrolled column, recorded once before
+    /// it was arranged, stayed a blank square for the life of the application.</para></summary>
+    public bool DrawsNothing
+    {
+        get => _drawsNothing;
+        set => _drawsNothing = value && RenderSize.Width > 0 && RenderSize.Height > 0;
+    }
+
+    private bool _drawsNothing;
 
     public bool GeometryStaleByContent { get; private set; }
 

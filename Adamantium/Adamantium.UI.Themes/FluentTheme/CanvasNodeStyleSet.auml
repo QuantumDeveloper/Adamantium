@@ -1,0 +1,138 @@
+﻿<StyleSet xmlns="http://adamantium/ui"
+          xmlns:x="http://adamantium/ui/xaml/extensions">
+
+    <!-- A NODE of a graph, in the shape every graph editor has settled on - Unreal, Blender, Substance, n8n all draw
+         the same thing, because it is the shape that works: a coloured strip across the top saying WHAT the node is,
+         a body under it, and sockets down the sides.
+
+         The palette is the THEME's and not the editor's. A blueprint editor inside an application should look like the
+         application, so the body is the same surface a panel is, the border is the same stroke every control wears,
+         and the strip takes the accent - which is also what makes a node in the light theme readable, something a
+         hard-coded dark grey would not be. -->
+    <Style Selector="CanvasNode">
+        <Setter Property="Background" Value="{ObservableResource SolidBackgroundFillColorSecondary}"/>
+        <Setter Property="BorderBrush" Value="{ObservableResource ControlStrokeColorDefault}"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="CornerRadius" Value="6"/>
+        <Setter Property="Foreground" Value="{ObservableResource TextFillColorPrimary}"/>
+        <Setter Property="Accent" Value="{ThemeResource AccentFillColorDefault}"/>
+        <Setter Property="PinColor" Value="{ThemeResource AccentFillColorDefault}"/>
+        <Setter Property="MinWidth" Value="0"/>
+        <Setter Property="MinHeight" Value="0"/>
+        <Setter Property="FontSize" Value="{ResourceReference FontSizeBody}"/>
+
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="CanvasNode">
+                    <!-- The sockets sit ON the edge, half outside, so the node needs room round the body to draw them
+                         in. A margin on the body rather than padding on the sockets: the body is what a person reads as
+                         "the node", and it should be exactly as wide as it looks. -->
+                    <Border x:Name="PART_Body" Margin="6,0,6,0"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="{TemplateBinding CornerRadius}">
+                            <StackPanel Orientation="Vertical">
+                                <!-- THE STRIP. Square at the bottom and rounded at the top so it sits inside the body's
+                                     own corners instead of cutting them off. -->
+                                <Border x:Name="PART_Header"
+                                        Background="{TemplateBinding Accent}"
+                                        CornerRadius="5,5,0,0"
+                                        Padding="10,5">
+                                    <ContentPresenter Content="{TemplateBinding Title}"
+                                                      FontSize="{TemplateBinding FontSize}"
+                                                      Foreground="{ThemeResource AccentForegroundColor}"
+                                                      VerticalAlignment="Center"/>
+                                </Border>
+
+                                <!-- Inputs down the left and outputs down the right, each column as wide as it needs to
+                                     be. A Grid of two star columns would centre two short lists in the middle of a wide
+                                     node, which reads as one list of six rather than two of three. -->
+                                <Grid ColumnDefinitions="Auto,*,Auto" Margin="0,8,0,10" MinWidth="120">
+                                    <ItemsControl Grid.Column="0" ItemsSource="{TemplateBinding InputPins}">
+                                        <!-- Its OWN template: the stock one wraps the items in a ScrollViewer, and a scroller takes every pixel it is
+                                             offered - which made a node as tall as whatever it was measured against instead of as tall as its pins. -->
+                                        <ItemsControl.Template>
+                                            <ControlTemplate TargetType="ItemsControl">
+                                                <ItemsPresenter x:Name="PART_ItemsPresenter"/>
+                                            </ControlTemplate>
+                                        </ItemsControl.Template>
+                                        <ItemsControl.ItemsPanel>
+                                            <ItemsPanelTemplate>
+                                                <StackPanel Orientation="Vertical" IsVirtualizing="False"/>
+                                            </ItemsPanelTemplate>
+                                        </ItemsControl.ItemsPanel>
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <StackPanel Orientation="Horizontal" MarginBottom="4">
+                                                    <!-- HALF OUTSIDE: a socket drawn inside the body reads as a bullet
+                                                         point, and a connection would have to stop short of it.
+
+                                                         TWO rings, not one shape with a colour decided somewhere else:
+                                                         the outer one is the socket and always wears the pin's colour,
+                                                         the inner one is what a connection puts there and is simply not
+                                                         painted while the socket is empty. So hollow-when-loose and
+                                                         solid-when-taken falls out of one binding to a brush that is
+                                                         null, with no trigger and no converter in three themes.
+
+                                                         The hole takes the BODY's colour rather than nothing at all:
+                                                         the socket straddles the edge, so a see-through middle would
+                                                         show the body on one side, the plane on the other, and the
+                                                         body's own edge running between them. -->
+                                                    <Border Width="12" Height="12" CornerRadius="6" MarginLeft="-6"
+                                                            VerticalAlignment="Center"
+                                                            Background="{ObservableResource SolidBackgroundFillColorSecondary}"
+                                                            BorderBrush="{Binding Color}"
+                                                            BorderThickness="2">
+                                                        <Border CornerRadius="4" Background="{Binding Fill}"/>
+                                                    </Border>
+                                                    <TextBlock Text="{Binding Name}" MarginLeft="7"
+                                                               VerticalAlignment="Center"
+                                                               VerticalTextAlignment="Center"
+                                                               Foreground="{ObservableResource TextFillColorSecondary}"/>
+                                                </StackPanel>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+
+                                    <ItemsControl Grid.Column="2" ItemsSource="{TemplateBinding OutputPins}">
+                                        <!-- Its OWN template: the stock one wraps the items in a ScrollViewer, and a scroller takes every pixel it is
+                                             offered - which made a node as tall as whatever it was measured against instead of as tall as its pins. -->
+                                        <ItemsControl.Template>
+                                            <ControlTemplate TargetType="ItemsControl">
+                                                <ItemsPresenter x:Name="PART_ItemsPresenter"/>
+                                            </ControlTemplate>
+                                        </ItemsControl.Template>
+                                        <ItemsControl.ItemsPanel>
+                                            <ItemsPanelTemplate>
+                                                <StackPanel Orientation="Vertical" IsVirtualizing="False"/>
+                                            </ItemsPanelTemplate>
+                                        </ItemsControl.ItemsPanel>
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <StackPanel Orientation="Horizontal" MarginBottom="4"
+                                                            HorizontalAlignment="Right">
+                                                    <TextBlock Text="{Binding Name}" MarginRight="7"
+                                                               VerticalAlignment="Center"
+                                                               VerticalTextAlignment="Center"
+                                                               Foreground="{ObservableResource TextFillColorSecondary}"/>
+                                                    <Border Width="12" Height="12" CornerRadius="6" MarginRight="-6"
+                                                            VerticalAlignment="Center"
+                                                            Background="{ObservableResource SolidBackgroundFillColorSecondary}"
+                                                            BorderBrush="{Binding Color}"
+                                                            BorderThickness="2">
+                                                        <Border CornerRadius="4" Background="{Binding Fill}"/>
+                                                    </Border>
+                                                </StackPanel>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </Grid>
+                            </StackPanel>
+                        </Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+</StyleSet>

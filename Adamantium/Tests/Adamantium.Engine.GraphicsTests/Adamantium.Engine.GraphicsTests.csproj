@@ -19,6 +19,22 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- THE REAL UI SHADERS, linked rather than copied: whether this driver will create a pass at all is a question
+         only a device can answer, and it has to be asked of the file the application actually ships. A copy here would
+         answer for whatever it was a copy of the day it was made.
+
+         Which is not a hypothetical. The arrow pass took an access violation inside vkCreateShadersEXT - the driver's
+         shader-object compiler giving up on control flow in a fragment stage - and the first anyone knew of it was the
+         application dying on the first arrow drawn. -->
+    <Content Include="..\..\Adamantium.UI.FX\*.fx" LinkBase="EffectsData\UIFX">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <!-- FLAT, beside the .fx files rather than in an Includes folder of their own. Handed no list of includes the
+         compiler scans the shader's OWN directory and no deeper, while the resolver matches a request by file name
+         alone - so "Includes/ShapeMath.fxh" is found next door, and is not found one directory down. -->
+    <Content Include="..\..\Adamantium.UI.FX\Includes\*.fxh" LinkBase="EffectsData\UIFX">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
     <Content Include="EffectsData\UIEffect.fx">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>

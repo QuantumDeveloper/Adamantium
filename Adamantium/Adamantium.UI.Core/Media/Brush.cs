@@ -73,6 +73,18 @@ public abstract class Brush: AdamantiumComponent, IRenderAttachable
 
    public bool IsFrozen => _isFrozen;
 
+   /// <summary>Whether this brush belongs to something that HANDS IT OUT - a theme's palette - rather than to whoever is
+   /// holding it.
+   /// <para>Not the same as frozen. A theme brush is very much mutable: an accent change writes the new colour into the
+   /// brushes that already exist precisely so that everything painting with one simply repaints, with no identity to
+   /// push around. What this says is who is allowed to do that - the theme, and nobody else.</para>
+   /// <para>It matters wherever something offers to EDIT a colour it found on an object. Writing into the brush is the
+   /// cheap and usually right thing when the object owns it; on a theme brush it recolours the application. Editing one
+   /// node's title strip turned every accent in the window that colour, which is not a thing anybody asked for - such
+   /// an edit has to leave a NEW brush on the object instead, which is also what "this node overrides the theme"
+   /// means.</para></summary>
+   public bool IsShared { get; internal set; }
+
    /// <summary>The immutable snapshot of this brush's CURRENT appearance - what the bake/draw path reads. A frozen brush is
    /// its own snapshot. Null until the brush has been prepared for rendering, which every payload does in its constructor
    /// (see <see cref="ForRendering"/>), so a brush that can be drawn always has one.</summary>

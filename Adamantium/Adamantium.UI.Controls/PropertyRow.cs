@@ -371,6 +371,35 @@ public class PropertyRow : Control
         ApplyContent();
     }
 
+    // What the action button LOOKS like, which is the only thing a person has to go on before pressing it. A line that
+    // names a picture gets that picture and its own words; one that names neither keeps the three dots and "More" the
+    // theme put there, which is the honest look for "there is more here".
+    private void ApplyAction()
+    {
+        if (_action == null) return;
+
+        ToolTipService.SetToolTip(_action, string.IsNullOrEmpty(Definition.ActionTip) ? "More" : Definition.ActionTip);
+
+        if (string.IsNullOrEmpty(Definition.ActionIcon))
+        {
+            _action.Content = "...";
+            return;
+        }
+
+        // LIVE against the theme, like every other picture in the application: a theme swap has to reach this one too,
+        // and the line names a key precisely so the theme can answer differently.
+        var image = new Image
+        {
+            Width = 11,
+            Height = 11,
+            HorizontalAlignment = HorizontalAlignment.Center,
+            VerticalAlignment = VerticalAlignment.Center
+        };
+
+        new Core.Resources.ObservableResource(Definition.ActionIcon).Apply(image, nameof(Image.Source));
+        _action.Content = image;
+    }
+
     private void Unhook()
     {
         if (_grip != null) _grip.MouseLeftButtonDown -= OnGripPressed;
@@ -387,8 +416,14 @@ public class PropertyRow : Control
         {
             _nameHost.Content = Definition.Header;
             _nameHost.ContentTemplate = null;
-
         }
+
+        ApplyAction();
+
+        // The DESCRIPTION becomes the row's tip. The property has been on the definition from the start and nothing
+        // read it, which made it a line of markup that quietly did nothing; and the name column is narrow enough that a
+        // header often has to be short, so somewhere to say the rest of it is exactly what an inspector needs.
+        ToolTip = Definition.Description;
 
         // The whole line of a COMPOSITE opens it, so the whole line says so. On the ROW, because that is the target:
         // the chevron carried the hand all along and everything beside it did not, which is exactly the part of it

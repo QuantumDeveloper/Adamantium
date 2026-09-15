@@ -1,0 +1,114 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<StyleSet xmlns="http://adamantium/ui"
+          xmlns:x="http://adamantium/ui/xaml/extensions">
+
+    <!-- A NODE of a graph - see Fluent's set for what the parts are and why the palette is the theme's rather than the
+         editor's. Rounder and roomier, like everything in this theme, and the sockets are circles: this theme has no
+         square corners to speak of anywhere else either. -->
+    <Style Selector="CanvasNode">
+        <Setter Property="Background" Value="{ObservableResource SolidBackgroundFillColorSecondary}"/>
+        <Setter Property="BorderBrush" Value="{ObservableResource ControlStrokeColorDefault}"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="CornerRadius" Value="10"/>
+        <Setter Property="Foreground" Value="{ObservableResource TextFillColorPrimary}"/>
+        <Setter Property="Accent" Value="{ThemeResource AccentFillColorDefault}"/>
+        <Setter Property="PinColor" Value="{ThemeResource AccentFillColorDefault}"/>
+        <Setter Property="MinWidth" Value="0"/>
+        <Setter Property="MinHeight" Value="0"/>
+        <Setter Property="FontSize" Value="{ResourceReference FontSizeBody}"/>
+
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="CanvasNode">
+                    <Border x:Name="PART_Body" Margin="7,0,7,0"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="{TemplateBinding CornerRadius}">
+                            <StackPanel Orientation="Vertical">
+                                <Border x:Name="PART_Header"
+                                        Background="{TemplateBinding Accent}"
+                                        CornerRadius="9,9,0,0"
+                                        Padding="12,6">
+                                    <ContentPresenter Content="{TemplateBinding Title}"
+                                                      FontSize="{TemplateBinding FontSize}"
+                                                      Foreground="{ThemeResource AccentForegroundColor}"
+                                                      VerticalAlignment="Center"/>
+                                </Border>
+
+                                <Grid ColumnDefinitions="Auto,*,Auto" Margin="0,10,0,12" MinWidth="132">
+                                    <ItemsControl Grid.Column="0" ItemsSource="{TemplateBinding InputPins}">
+                                        <!-- Its OWN template: the stock one wraps the items in a ScrollViewer, and a scroller takes every pixel it is
+                                             offered - which made a node as tall as whatever it was measured against instead of as tall as its pins. -->
+                                        <ItemsControl.Template>
+                                            <ControlTemplate TargetType="ItemsControl">
+                                                <ItemsPresenter x:Name="PART_ItemsPresenter"/>
+                                            </ControlTemplate>
+                                        </ItemsControl.Template>
+                                        <ItemsControl.ItemsPanel>
+                                            <ItemsPanelTemplate>
+                                                <StackPanel Orientation="Vertical" IsVirtualizing="False"/>
+                                            </ItemsPanelTemplate>
+                                        </ItemsControl.ItemsPanel>
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <StackPanel Orientation="Horizontal" MarginBottom="5">
+                                                    <!-- Hollow while nothing is docked - see Fluent's set for how the
+                                                         two rings work. -->
+                                                    <Border Width="14" Height="14" CornerRadius="7" MarginLeft="-7"
+                                                            VerticalAlignment="Center"
+                                                            Background="{ObservableResource SolidBackgroundFillColorSecondary}"
+                                                            BorderBrush="{Binding Color}"
+                                                            BorderThickness="2">
+                                                        <Border CornerRadius="5" Background="{Binding Fill}"/>
+                                                    </Border>
+                                                    <TextBlock Text="{Binding Name}" MarginLeft="8"
+                                                               VerticalAlignment="Center"
+                                                               VerticalTextAlignment="Center"
+                                                               Foreground="{ObservableResource TextFillColorSecondary}"/>
+                                                </StackPanel>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+
+                                    <ItemsControl Grid.Column="2" ItemsSource="{TemplateBinding OutputPins}">
+                                        <!-- Its OWN template: the stock one wraps the items in a ScrollViewer, and a scroller takes every pixel it is
+                                             offered - which made a node as tall as whatever it was measured against instead of as tall as its pins. -->
+                                        <ItemsControl.Template>
+                                            <ControlTemplate TargetType="ItemsControl">
+                                                <ItemsPresenter x:Name="PART_ItemsPresenter"/>
+                                            </ControlTemplate>
+                                        </ItemsControl.Template>
+                                        <ItemsControl.ItemsPanel>
+                                            <ItemsPanelTemplate>
+                                                <StackPanel Orientation="Vertical" IsVirtualizing="False"/>
+                                            </ItemsPanelTemplate>
+                                        </ItemsControl.ItemsPanel>
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <StackPanel Orientation="Horizontal" MarginBottom="5"
+                                                            HorizontalAlignment="Right">
+                                                    <TextBlock Text="{Binding Name}" MarginRight="8"
+                                                               VerticalAlignment="Center"
+                                                               VerticalTextAlignment="Center"
+                                                               Foreground="{ObservableResource TextFillColorSecondary}"/>
+                                                    <Border Width="14" Height="14" CornerRadius="7" MarginRight="-7"
+                                                            VerticalAlignment="Center"
+                                                            Background="{ObservableResource SolidBackgroundFillColorSecondary}"
+                                                            BorderBrush="{Binding Color}"
+                                                            BorderThickness="2">
+                                                        <Border CornerRadius="5" Background="{Binding Fill}"/>
+                                                    </Border>
+                                                </StackPanel>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </Grid>
+                            </StackPanel>
+                        </Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+</StyleSet>
