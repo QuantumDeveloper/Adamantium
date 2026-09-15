@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using Adamantium.UI.Controls;
+using Adamantium.UI.Controls.Text;
 using Adamantium.UI.Core.Data;
 using Adamantium.UI.Core.Input;
 using NUnit.Framework;
@@ -96,6 +97,30 @@ public class ExpanderTests
     public void ItIsAKeyboardStop()
     {
         Assert.That(new Expander().Focusable, Is.True, "a header that answers Space has to be reachable by Tab");
+    }
+
+    // A key event travels UP from whatever had the keyboard, so every space typed into a field inside a section reached
+    // the section's own header - and folded the section away in the middle of a word.
+    [Test]
+    [TestCase(Key.Space)]
+    [TestCase(Key.Enter)]
+    public void AKeyFromInsideTheContentIsNotTheHeadersKey(Key key)
+    {
+        var box = new TextBox();
+        var expander = new Expander { Content = box };
+        var args = new KeyEventArgs(KeyboardDevice.CurrentDevice, key, InputModifiers.None, 0)
+        {
+            RoutedEvent = Keyboard.KeyDownEvent,
+            OriginalSource = box
+        };
+
+        expander.RaiseEvent(args);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(expander.IsExpanded, Is.False, "typing in a field does not fold the section it is in");
+            Assert.That(args.Handled, Is.False, "and the key is left for whoever is typing");
+        });
     }
 
     private sealed class Fold : INotifyPropertyChanged

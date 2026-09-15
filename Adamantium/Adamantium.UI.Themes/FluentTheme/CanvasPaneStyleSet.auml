@@ -25,6 +25,16 @@
                          a second column - it just runs off the bottom of the canvas, taking its last tools with it. A
                          dock hands the fill child what is actually left. -->
                     <DockPanel LastChildFill="True">
+                        <!-- The edge that widens the panel, and FIRST: docking takes from what is left, so an edge
+                             taken after the handles row would cut its strip out of the body alone and stand the
+                             handles seven pixels to the left of the plate they belong to. Docked and not overlaid,
+                             because a strip lying on top of the body covers the first few pixels of every row under
+                             it - and the rows are what the panel is for. Which side it goes on is the pane's, and it
+                             is the side facing into the canvas. -->
+                        <Border x:Name="PART_Sizer" DockPanel.Dock="Left" Width="7" Visibility="Collapsed"
+                                Background="Transparent" Cursor="SizeEWE"
+                                ToolTip="Drag to set how wide the panel is"/>
+
                         <!-- The grip carries and folds; the turn button is beside it and does the one other thing a
                              panel can be asked about itself. Both above the body, so a folded pane is its handles. -->
                         <!-- The handles ride in a row of their OWN, named so it can be collapsed whole. Hiding only the

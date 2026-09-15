@@ -175,6 +175,58 @@ public class PropertyGridTests
         });
     }
 
+    // A ROW IS A SHAPE, NOT A VALUE. Pointed at a different object, the same line is the same row re-aimed - so a
+    // rebuild that finds the same lines must keep the rows it already has.
+    //
+    // Measured before this was so: one click on the plane rebuilt the inspector, and that rebuild made about two
+    // hundred and fifty controls and built two hundred and thirty templates, with a property write per part of each and
+    // thousands of layout invalidations behind them. That was the whole of what a slow click was.
+    [Test]
+    public void RebuildingWithTheSameLinesKeepsTheRowsItHas()
+    {
+        var first = new Target { Name = "one" };
+        var second = new Target { Name = "two" };
+        var name = new StringProperty { Header = "Name", Binding = new Binding("Name") };
+        var scale = new NumericProperty { Header = "Scale", Binding = new Binding("Scale") };
+
+        var section = Section(first, name, scale);
+        var grid = Built(section);
+
+        var was = RowOf(grid, name);
+        Assert.That(was, Is.Not.Null);
+
+        // The same lines, a different object: what selecting something else on a plane does.
+        section.Target = second;
+        grid.Rebuild();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(RowOf(grid, name), Is.SameAs(was), "the row was thrown away and built again");
+            Assert.That(was.Targets[0], Is.SameAs(second), "...and it was not re-aimed at the new object");
+        });
+    }
+
+    // ...and it still gets rid of what is no longer wanted, or a panel would only ever grow.
+    [Test]
+    public void RebuildingWithFewerLinesDropsTheExtraRows()
+    {
+        var target = new Target();
+        var name = new StringProperty { Header = "Name", Binding = new Binding("Name") };
+        var scale = new NumericProperty { Header = "Scale", Binding = new Binding("Scale") };
+
+        var section = Section(target, name, scale);
+        var grid = Built(section);
+
+        scale.IsVisible = false;
+        grid.Rebuild();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(RowOf(grid, scale), Is.Null, "a line nobody asked for is still shown");
+            Assert.That(RowOf(grid, name), Is.Not.Null);
+        });
+    }
+
     // A path that goes THROUGH a property whose declared type is an interface has to resolve the rest of it on what the
     // object actually IS. An inspector points at an item that carries a control, and the control's own lines can only
     // be reached that way - "Element.Accent" where Element is declared as IUIComponent and happens to be a node.

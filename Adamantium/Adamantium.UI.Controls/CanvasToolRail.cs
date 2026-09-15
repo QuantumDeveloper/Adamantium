@@ -112,6 +112,7 @@ public class CanvasToolRail : WrapPanel
         {
             rail._canvas.ToolsChanged -= rail.OnToolsChanged;
             rail._canvas.ToolChanged -= rail.OnToolChanged;
+            rail._canvas.ModeChanged -= rail.OnToolsChanged;
         }
 
         rail._canvas = e.NewValue as InfiniteCanvas;
@@ -120,6 +121,8 @@ public class CanvasToolRail : WrapPanel
         {
             rail._canvas.ToolsChanged += rail.OnToolsChanged;
             rail._canvas.ToolChanged += rail.OnToolChanged;
+            // A mode change is a change to WHICH tools there are, which is the same rebuild.
+            rail._canvas.ModeChanged += rail.OnToolsChanged;
         }
 
         rail.Rebuild();
@@ -151,9 +154,13 @@ public class CanvasToolRail : WrapPanel
         var families = new Dictionary<string, List<ICanvasTool>>();
         var order = new List<object>();
 
+        // Only what this MODE admits. A rail is the list of what the canvas can do, and half of it greyed out or doing
+        // nothing says less than a shorter list that is all true.
+        var mode = _canvas.Mode;
+
         foreach (var tool in tools)
         {
-            if (tool == null) continue;
+            if (tool == null || !tool.WorksIn(mode)) continue;
 
             var group = tool.Group;
             if (string.IsNullOrEmpty(group))

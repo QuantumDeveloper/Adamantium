@@ -46,6 +46,11 @@ public interface ICanvasTool
     /// </summary>
     string Group => string.Empty;
 
+    /// <summary>Whether this tool has anything to do in a given mode. Everywhere by default - select, pan and delete
+    /// mean the same thing whatever is on the plane - and a tool that makes one KIND of thing says where it belongs.
+    /// The rail offers only what the canvas's mode admits.</summary>
+    bool WorksIn(CanvasMode mode) => true;
+
     /// <summary>The pointer this tool wears. The arrow by default, and a tool that draws should say otherwise: which
     /// tool is in hand is otherwise only told by a button in a rail the eye is not on, and a tool put down by the right
     /// button announces itself nowhere at all. The pointer is the one place a person is already looking.</summary>

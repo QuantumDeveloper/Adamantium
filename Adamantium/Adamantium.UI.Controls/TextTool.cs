@@ -41,6 +41,9 @@ public class TextTool : ICanvasTool
     /// <summary>The I-beam every text cursor is, so a click that is about to start typing looks like one.</summary>
     public Cursor Cursor { get; set; } = Cursors.IBeam;
 
+    /// <summary>Loose text on the plane is part of a drawing; what a node says, a node says itself.</summary>
+    public bool WorksIn(CanvasMode mode) => mode == CanvasMode.Drawing;
+
     public void OnPressed(InfiniteCanvas canvas, CanvasPointerEventArgs e)
     {
         if (e.Button != MouseButtons.Left || canvas.Scene == null) return;
@@ -200,7 +203,7 @@ public class TextTool : ICanvasTool
         var probe = new Rect(world.X - reach, world.Y - reach, reach * 2, reach * 2);
 
         TextItem found = null;
-        foreach (var item in canvas.Scene.ItemsIn(probe))
+        foreach (var item in canvas.ItemsHere(probe))
         {
             if (item is TextItem text && text.HitTest(world, reach)) found = text;
         }

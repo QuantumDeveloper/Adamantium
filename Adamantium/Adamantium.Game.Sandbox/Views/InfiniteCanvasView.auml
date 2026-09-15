@@ -5,23 +5,14 @@
 
         <TextBlock Grid.Row="0" Text="InfiniteCanvas" FontSize="18"/>
         <TextBlock Grid.Row="1" Margin="0,4,0,12" TextWrapping="WrapByWords"
-                   Text="A plane with no edges: the wheel zooms toward the cursor, the middle button or space pans, and neither runs into anything. What the plain left button does belongs to the TOOL - select, pen, or a shape. What is selected gets a frame with grips, in screen pixels; dragging those moves and resizes the whole selection at once. Delete removes it, Escape lets go."/>
+                   Text="A plane with no edges: the wheel zooms toward the cursor, the middle button or space pans, and Home - or a double click of the middle button - returns to the origin. What the plain left button does belongs to the TOOL - select, pen, or a shape. What is selected gets a frame with grips, in screen pixels; dragging those moves and resizes the whole selection at once. Delete removes it, Escape lets go."/>
 
-        <!-- Everything that steers the canvas lives in the canvas's own panel: the point of the overlay is that a tool
-             panel belongs ON the surface it works. These two are the exception, and not an arbitrary one - they are the
-             switches that can TAKE THE PANEL AWAY, and a switch inside the thing it hides can only ever be used once. -->
-        <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="0,0,0,10">
-            <CheckBox Content="Whiteboard" VerticalAlignment="Center"
-                      ToolTip="The canvas becomes glass over the controls behind it - no ground, no axes, no grid"
-                      IsChecked="{Binding Whiteboard, Mode=TwoWay}"/>
-            <CheckBox Content="Tool panel" MarginLeft="20" VerticalAlignment="Center"
-                      ToolTip="Off, the canvas carries nothing of its own and is steered only from out here"
-                      IsChecked="{Binding ShowPanel, Mode=TwoWay}"/>
-
-            <TextBlock Margin="24,0,0,0" VerticalAlignment="Center"
-                       Text="Home - or a double click of the middle button - returns to the origin"
-                       Foreground="{ObservableResource TextFillColorSecondary}"/>
-        </StackPanel>
+        <!-- EVERYTHING that steers the canvas is in the canvas's own panel, with no exceptions out here: a tool panel
+             belongs ON the surface it works, and a row of switches above the frame is a second place to look.
+             The two that stood here are gone rather than moved. One of them was the whiteboard, which is the Grid row
+             of the inspector saying Transparent and was never anything else. The other hid the tool panel, and that one
+             could NOT come inside: a switch that takes away the panel it lives in can be used exactly once. The panel
+             folds by its own grip, which is the same thing and comes back.  -->
 
         <Border Grid.Row="3" BorderThickness="1" CornerRadius="0"
                 BorderBrush="{ObservableResource ControlStrokeColorDefault}">
@@ -46,6 +37,7 @@
                  the drawing. -->
             <InfiniteCanvas x:Name="Canvas"
                             GridStyle="{Binding GridStyle}"
+                            Mode="{Binding Mode, Mode=TwoWay}"
                             Scene="{Binding Scene}"
                             History="{Binding History}"
                             Tools="{Binding Tools}"
@@ -58,7 +50,6 @@
                             TextSize="{Binding TextSize}"
                             EraserSize="{Binding EraserSize}"
                             IsDesignMode="{Binding DesignMode}"
-                            IsOverlayVisible="{Binding ShowPanel}"
                             SnapToGrid="{Binding SnapToGrid}"
                             ShowsPointerReadout="{Binding ShowReadout}"
                             MaxScale="{Binding MaxZoom}"
@@ -94,7 +85,68 @@
                     <!-- The panel NAMES itself with whatever it is about - the tool in hand, or what is selected. That
                          caption is what makes the change of contents read as one panel following you rather than two
                          panels taking turns. -->
-                    <CanvasPane Placement="TopRight" Kind="Sheet" Header="{Binding Face}">
+                    <!-- Width is the PANE's and not the rows': a node's sockets carry names, and a name column fixed
+                         at whatever fitted the pen settings is a column that truncates every one of them. The edge is
+                         draggable, and what is inside stretches to what the edge is set to. -->
+                    <CanvasPane Placement="TopRight" Kind="Sheet" Header="{Binding Face}"
+                                CanResize="True" Width="300" MinResizeWidth="200">
+                        <DockPanel LastChildFill="True">
+
+                        <!-- WHICH FACE, and it is the only thing in the panel the user chooses outright - properties
+                             follow what is selected, the list does not follow anything. RADIOS and not two toggles:
+                             one of them is always on, and a radio is the control that cannot be clicked into a state
+                             where neither is. -->
+                        <!-- TWO CHOICES IN ONE ROW, told apart by a rule rather than by a line break: what the canvas
+                             is being used AS - a drawing or a graph - and which face of the panel is showing. Four
+                             buttons with words on them took two rows of a panel whose whole job is the rows below
+                             them; a pictogram says the same thing in a quarter of the width, and the tip says it in
+                             words for whoever wants them. -->
+                        <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" MarginBottom="8">
+                            <RadioButton Classes="Toggle" GroupName="CanvasMode"
+                                         Width="28" Height="24" MinWidth="0" MinHeight="0" Padding="0"
+                                         ToolTip="Drawing - ink, shapes and text"
+                                         IsChecked="{Binding IsDrawing, Mode=TwoWay}">
+                                <Image Source="{ObservableResource ToolPenIcon}" Width="13" Height="13"/>
+                            </RadioButton>
+                            <RadioButton Classes="Toggle" GroupName="CanvasMode" MarginLeft="4"
+                                         Width="28" Height="24" MinWidth="0" MinHeight="0" Padding="0"
+                                         ToolTip="Graph - nodes and the wires between them"
+                                         IsChecked="{Binding IsGraph, Mode=TwoWay}">
+                                <Image Source="{ObservableResource ToolNodeIcon}" Width="13" Height="13"/>
+                            </RadioButton>
+
+                            <Separator Orientation="Vertical" MarginLeft="6" MarginRight="6"/>
+
+                            <RadioButton Classes="Toggle" GroupName="CanvasInspectorFace"
+                                         Width="28" Height="24" MinWidth="0" MinHeight="0" Padding="0"
+                                         ToolTip="Properties of what is selected"
+                                         IsChecked="{Binding ShowsProperties, Mode=TwoWay}">
+                                <Image Source="{ObservableResource FaceInspectorIcon}" Width="13" Height="13"/>
+                            </RadioButton>
+                            <RadioButton Classes="Toggle" GroupName="CanvasInspectorFace" MarginLeft="4"
+                                         Width="28" Height="24" MinWidth="0" MinHeight="0" Padding="0"
+                                         ToolTip="Everything on the plane, topmost first"
+                                         IsChecked="{Binding ShowsStructure, Mode=TwoWay}">
+                                <Image Source="{ObservableResource FaceStructureIcon}" Width="13" Height="13"/>
+                            </RadioButton>
+                        </StackPanel>
+
+                        <!-- The commands that are about a GRAPH and nothing else. They live with the mode rather than
+                             in the general chrome, which is the point of having a mode at all. -->
+                        <StackPanel DockPanel.Dock="Bottom" Orientation="Vertical" MarginTop="8"
+                                    Visibility="{Binding GraphFace}">
+                            <StackPanel Orientation="Horizontal">
+                                <Button Content="Save" Height="26" MinWidth="0" Padding="10,0"
+                                        Command="{Binding SaveGraphCommand}"
+                                        CommandParameter="{Binding ElementName=Canvas}"/>
+                                <Button Content="Load" Height="26" MinWidth="0" Padding="10,0" MarginLeft="4"
+                                        Command="{Binding LoadGraphCommand}"
+                                        CommandParameter="{Binding ElementName=Canvas}"/>
+                            </StackPanel>
+                            <TextBlock Text="{Binding GraphStatus}" FontSize="11" MarginTop="6"
+                                       TextTrimming="CharEllipses"/>
+                        </StackPanel>
+
                         <Grid>
                         <!-- The panel holds more than a small viewport has room for, and a tool panel that runs off the
                              bottom is one whose last button cannot be pressed. It SCROLLS rather than being trimmed or
@@ -110,7 +162,7 @@
                         <Grid RowDefinitions="*,Auto" Visibility="{Binding ToolFace}">
                         <ScrollViewer Grid.Row="0" MaxHeight="300"
                                       VerticalScrollBarVisibility="Hidden" HorizontalScrollBarVisibility="Disabled">
-                        <StackPanel Orientation="Vertical" Width="228">
+                        <StackPanel Orientation="Vertical">
 
                             <!-- THE SAME INSPECTOR as the second face, pointed at the page instead of at a selection.
                                  That is what makes the change seamless: one name column, one row height, one kind of
@@ -182,7 +234,7 @@
                              value they share and says "different" when they do not, and writes to every one of them.
                              A section per KIND, shown when the selection holds one; a mixed selection honestly shows
                              several. -->
-                        <PropertyGrid Width="228" Visibility="{Binding SelectionFace}"
+                        <PropertyGrid Visibility="{Binding SelectionFace}"
                                       SelectedObjects="{Binding Selection}"
                                       NameColumnWidth="92" ShowSearch="False">
                             <!-- Items on a canvas are DATA and say nothing when they are written to - which is what
@@ -254,11 +306,15 @@
                                                     ItemsSource="{Binding ArrowHeads}"/>
                                     <ChoiceProperty Header="End" Binding="{Binding EndHead}"
                                                     ItemsSource="{Binding ArrowHeads}"/>
+                                    <!-- A head is measured in LINE THICKNESSES, so a long thin arrow needs a lot of
+                                         them before its head is something you can see: twenty of a two-unit line is
+                                         forty units of head on an arrow that may be a thousand long. The ceiling is
+                                         the room the head has, not a round number. -->
                                     <NumericProperty Header="Length" Binding="{Binding HeadLength}"
-                                                     Minimum="0.5" Maximum="20" Step="0.2" ShowButtons="False"
+                                                     Minimum="0.5" Maximum="200" Step="0.5" ShowButtons="False"
                                                      Description="How long the head is, measured in line thicknesses"/>
                                     <NumericProperty Header="Width" Binding="{Binding HeadWidth}"
-                                                     Minimum="0.5" Maximum="20" Step="0.2" ShowButtons="False"
+                                                     Minimum="0.5" Maximum="200" Step="0.5" ShowButtons="False"
                                                      Description="How wide the head is across its base, in line thicknesses"/>
                                 </CompositeProperty>
                                 <CompositeProperty Header="Position">
@@ -312,6 +368,13 @@
                                                  Minimum="0.1" Maximum="400" Step="1" ShowButtons="False"/>
                                 <NumericProperty Header="Points" Binding="{Binding Count}" IsReadOnly="True"
                                                  Decimals="0" ShowButtons="False"/>
+                                <!-- READ ONLY, and that is the honest answer: a Bezier through N+1 points is of degree
+                                     N and can be nothing else. The way to ask for a quadratic is to draw it with three
+                                     points. -->
+                                <NumericProperty Header="Order" Binding="{Binding Degree}" IsReadOnly="True"
+                                                 Decimals="0" ShowButtons="False"
+                                                 IsVisible="{Binding IsBezier}"
+                                                 Description="A Bezier through N+1 points is of degree N - add or remove a point to change it"/>
                                 <NumericProperty Header="Degree" Binding="{Binding Degree}"
                                                  Minimum="0" Maximum="16" Step="1" Decimals="0" ShowButtons="False"
                                                  IsVisible="{Binding IsNurbs}"
@@ -448,7 +511,25 @@
                                 </ItemsProperty>
                             </PropertySection>
                         </PropertyGrid>
+
+                        <!-- The THIRD face: what is on the plane, topmost first - the same order the drawing is
+                             stacked in, so "bring to front" needs no explaining. Clicking a row selects it on the
+                             plane, because there is one selection and not two; a DOUBLE click takes the camera to it,
+                             which is the only way to find something left far outside the viewport. -->
+                        <ListBox MaxHeight="300" MinWidth="0" Visibility="{Binding StructureFace}"
+                                 ItemsSource="{Binding Structure}"
+                                 SelectedItem="{Binding Listed, Mode=TwoWay}">
+                            <ListBox.Behaviors>
+                                <behaviors:CanvasZoomToBehavior Canvas="{Binding ElementName=Canvas}"/>
+                            </ListBox.Behaviors>
+                            <ListBox.ItemTemplate>
+                                <DataTemplate>
+                                    <TextBlock Text="{Binding Title}" TextTrimming="CharEllipses"/>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
                         </Grid>
+                        </DockPanel>
                     </CanvasPane>
 
                     <!-- A SECOND pane, and the point of the collection: the view controls belong along the bottom, not
@@ -519,28 +600,6 @@
                          part of the edge, and writing Scale by hand would zoom about the world's origin instead -
                          wherever that happens to be, usually off screen. Hence a behavior, like every other
                          no-code-behind wiring here. -->
-                    <!-- WHAT IS ON THE PLANE, topmost first - the same order the drawing is stacked in, so "bring to
-                         front" needs no explaining. Clicking a row selects it on the plane, because there is one
-                         selection and not two; a DOUBLE click takes the camera to it, which is the only way to find
-                         something that has been left far outside the viewport. -->
-                    <!-- FOLDED to begin with, and under the inspector in the same slot: both are tall, and a panel
-                         that is wanted now and then should not take the room of one that is wanted always. The grip
-                         above it brings it back. -->
-                    <CanvasPane Placement="TopRight" Kind="Sheet" Header="Structure" CanDrag="True" IsOpen="False">
-                        <ListBox Width="212" MaxHeight="190" MinWidth="0"
-                                 ItemsSource="{Binding Structure}"
-                                 SelectedItem="{Binding Listed, Mode=TwoWay}">
-                            <ListBox.Behaviors>
-                                <behaviors:CanvasZoomToBehavior Canvas="{Binding ElementName=Canvas}"/>
-                            </ListBox.Behaviors>
-                            <ListBox.ItemTemplate>
-                                <DataTemplate>
-                                    <TextBlock Text="{Binding Title}" TextTrimming="CharEllipses"/>
-                                </DataTemplate>
-                            </ListBox.ItemTemplate>
-                        </ListBox>
-                    </CanvasPane>
-
                     <CanvasPane Placement="BottomCenter" Kind="Bar" IsDocked="True" MinWidth="248">
                         <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
                             <!-- Undo and redo live BESIDE the view controls, not in the selection bar: they are about

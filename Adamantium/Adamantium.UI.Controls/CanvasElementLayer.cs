@@ -41,6 +41,8 @@ public class CanvasElementLayer : Panel
 
     protected override Size MeasureOverride(Size availableSize)
     {
+        Core.Diagnostics.LayoutTrace.Count(typeof(CanvasElementLayer), "measure-pass");
+
         // Measured at its WORLD size, which does not change when the camera does - so a control is laid out once and the
         // zoom never re-measures what is inside it. That is not only cheaper, it is the only way the size is honest:
         // measured at the SCREEN size instead, a control zoomed out was handed a box smaller than its own text and its

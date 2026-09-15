@@ -215,6 +215,54 @@ public class InstancedFillCollectorTests
         foreach (var unit in units) unit.Dispose();
     }
 
+    // THE CACHE HAS TO FORGET. It is keyed by the CONTENT of a mesh, which is what makes a hundred identical icons one
+    // draw - and what makes anything whose content CHANGES leave a new key behind every time it changes, with a ring of
+    // GPU buffers on it. Every following frame then walks all of them, so the frame cost grows for as long as the
+    // application runs. One curve rebuilt per frame was enough to bring it down.
+    [Test]
+    public void AKeyNobodyDrawsIsEventuallyForgotten()
+    {
+        using var collector = NewCollector();
+        var units = new List<GeometryRenderUnit>();
+
+        // Fifty DIFFERENT shapes, the way a line being dragged leaves fifty different meshes behind.
+        for (var i = 0; i < 50; i++)
+        {
+            var unit = Unit(Brushes.Red, 10 + i);
+            units.Add(unit);
+            collector.TryAdd(unit, Matrix4x4F.Identity, NoScissor, new Rect(0, 0, 10 + i, 10 + i), transformSlot: 0);
+        }
+
+        Assert.That(collector.CachedKeys, Is.EqualTo(50), "fifty shapes, fifty meshes");
+
+        // Nothing is drawn again, and nothing was ever flushed - so no record is holding any of them.
+        for (var frame = 0; frame < 800; frame++) collector.BeginFrame();
+
+        Assert.That(collector.CachedKeys, Is.Zero, "the cache kept every mesh nobody had drawn for hundreds of frames");
+
+        foreach (var unit in units) unit.Dispose();
+    }
+
+    // ...but only what nobody wants. A key drawn again on every frame is a key in use, however long the application has
+    // been running.
+    [Test]
+    public void AKeyThatKeepsBeingDrawnIsKept()
+    {
+        using var collector = NewCollector();
+        var unit = Unit(Brushes.Red, 10);
+
+        for (var frame = 0; frame < 800; frame++)
+        {
+            collector.BeginFrame();
+            collector.TryAdd(unit, Matrix4x4F.Identity, NoScissor, new Rect(0, 0, 10, 10), transformSlot: 0);
+        }
+
+        Assert.That(collector.CachedKeys, Is.EqualTo(1), "a mesh drawn every frame was swept out from under the frame");
+        Assert.That(collector.InstanceCountOf(KeyOf(unit)), Is.EqualTo(1), "and it still takes instances");
+
+        unit.Dispose();
+    }
+
     private sealed class StubResourceFactory : IResourceFactory
     {
         public ITexture CreateTexture(TextureDescription description, byte[] pixelData) => throw new NotSupportedException();

@@ -112,10 +112,23 @@
     <Style Selector="Separator">
         <Setter Property="Template">
             <Setter.Value>
+                <!-- The rule takes its LENGTH from the way it runs - see Fluent's set. -->
                 <ControlTemplate TargetType="Separator">
-                    <Border Height="{ResourceReference StrokeThinValue}"
-                            Margin="{ResourceReference MenuSeparatorMargin}"
-                            Background="{ResourceReference ControlStrokeColorDefault}"/>
+                    <Border x:Name="PART_Rule" Background="{ResourceReference ControlStrokeColorDefault}"/>
+
+                    <ControlTemplate.Triggers>
+                        <PropertyTrigger Property="Orientation" Value="Horizontal">
+                            <Setter TargetName="PART_Rule" Property="Height" Value="{ResourceReference StrokeThinValue}"/>
+                            <Setter TargetName="PART_Rule" Property="HorizontalAlignment" Value="Stretch"/>
+                            <Setter TargetName="PART_Rule" Property="Margin" Value="{ResourceReference MenuSeparatorMargin}"/>
+                        </PropertyTrigger>
+
+                        <PropertyTrigger Property="Orientation" Value="Vertical">
+                            <Setter TargetName="PART_Rule" Property="Width" Value="{ResourceReference StrokeThinValue}"/>
+                            <Setter TargetName="PART_Rule" Property="VerticalAlignment" Value="Stretch"/>
+                            <Setter TargetName="PART_Rule" Property="Margin" Value="4 2 4 2"/>
+                        </PropertyTrigger>
+                    </ControlTemplate.Triggers>
                 </ControlTemplate>
             </Setter.Value>
         </Setter>

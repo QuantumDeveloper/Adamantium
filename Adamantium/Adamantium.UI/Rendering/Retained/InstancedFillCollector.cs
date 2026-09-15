@@ -67,6 +67,10 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
         public Buffer RingBuffer;
         public uint RingVertexCount;
 
+        // The frame this key last had an instance appended to it. A key is kept by being USED and by nothing else - see
+        // Sweep for why the cache has to forget.
+        public long LastUsed;
+
         public GeometryInstance[] Items = new GeometryInstance[64];
         public int Count;        // instances appended this frame (across all this key's flushes)
         public int Flushed;      // instances already drawn this frame (= firstInstance for the next flush)
@@ -397,9 +401,95 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
         _hasFringeUnion = false;
         _flushCount = 0;   // pooled flush records reused from index 0 this frame
         _groupRef = 0;     // the stencil is cleared with the frame, so coverage marks start over with it
+
+        // LAST, so the pending lists are already empty and only the flush records can still be holding a key.
+        _frame++;
+        if (_frame >= _sweepAt)
+        {
+            _sweepAt = _frame + SweepEvery;
+            Sweep();
+        }
     }
 
     private int _writeCursor;   // which ring copy the next walk writes (see BeginFrame)
+
+    // How long a key nobody draws is kept, and how often the cache is looked over. Both in FRAMES, and both generous:
+    // forgetting a mesh costs re-tessellating it once, so the only thing a short memory would buy is a stutter when
+    // something scrolls back into view.
+    private const long ColdFrames = 600;
+    private const long SweepEvery = 120;
+
+    private long _frame;
+    private long _sweepAt = SweepEvery;
+    private readonly HashSet<KeySegment> _live = new();
+    private readonly List<GeometryKey> _cold = new();
+
+    /// <summary>How many shared meshes the cache is holding - what <see cref="Sweep"/> keeps from growing without end.
+    /// </summary>
+    internal int CachedKeys => _keys.Count;
+
+    /// <summary>Forgets the keys nobody has drawn for a long time.
+    /// <para>The cache is keyed by the CONTENT of a mesh, which is exactly right for what it is for - a hundred
+    /// identical icons are one mesh and one draw - and exactly wrong without this: anything whose content CHANGES leaves
+    /// a new key behind every time it changes, with a ring of GPU buffers on it, and every following frame walks all of
+    /// them. A curve rebuilt per frame, a shape being dragged, an animated path - each of them turned the cache into a
+    /// list that only grew, and the frame cost grew with it.</para>
+    /// <para>A key referenced by a live flush record is never taken, however cold it looks. Records are what a CLEAN
+    /// frame replays, and on such a frame nothing is appended to any key at all - so "not used lately" alone would take
+    /// the meshes out from under a still scene the moment it stopped changing.</para></summary>
+    private void Sweep()
+    {
+        _live.Clear();
+        foreach (var record in _flushRecords)
+        {
+            foreach (var run in record.Keys) _live.Add(run.Seg);
+            foreach (var run in record.GradKeys) _live.Add(run.Seg);
+            foreach (var run in record.PatKeys) _live.Add(run.Seg);
+            foreach (var run in record.TexKeys) _live.Add(run.Seg);
+            foreach (var run in record.MatKeys) _live.Add(run.Seg);
+        }
+
+        _cold.Clear();
+        foreach (var pair in _keys)
+        {
+            if (_frame - pair.Value.LastUsed >= ColdFrames && !_live.Contains(pair.Value)) _cold.Add(pair.Key);
+        }
+
+        foreach (var key in _cold)
+        {
+            if (!_keys.Remove(key, out var seg)) continue;
+
+            Release(seg);
+        }
+
+        _live.Clear();
+        _cold.Clear();
+    }
+
+    // Everything a key owns. The instance rings go through the DEFERRED queue because frames in flight may still be
+    // reading them; the mesh buffers are reusable ones this collector registered for disposal, so they leave the same
+    // way they arrived.
+    private void Release(KeySegment seg)
+    {
+        if (seg.GpuRing != null) DeferRing(seg.GpuRing);
+        if (seg.GradGpuRing != null) DeferRing(seg.GradGpuRing);
+        if (seg.PatGpuRing != null) DeferRing(seg.PatGpuRing);
+        if (seg.TexGpuRing != null) DeferRing(seg.TexGpuRing);
+        if (seg.MatGpuRing != null) DeferRing(seg.MatGpuRing);
+
+        seg.GpuRing = seg.GradGpuRing = seg.PatGpuRing = seg.TexGpuRing = seg.MatGpuRing = null;
+        seg.Gpu = seg.GradGpu = seg.PatGpu = seg.TexGpu = seg.MatGpu = null;
+        seg.GpuCapacity = seg.GradGpuCapacity = seg.PatGpuCapacity = seg.TexGpuCapacity = seg.MatGpuCapacity = 0;
+
+        if (seg.Vtx != null) RemoveAndDispose(ref seg.Vtx);
+        if (seg.Idx != null) RemoveAndDispose(ref seg.Idx);
+        if (seg.Ring != null) RemoveAndDispose(ref seg.Ring);
+
+        seg.VtxBuffer = null;
+        seg.IdxBuffer = null;
+        seg.RingBuffer = null;
+        seg.MeshUploaded = false;
+    }
 
     // An outgoing ring may still be read by frames in flight - hand it to the device's deferred queue, never Dispose here.
     private void DeferRing(Buffer[] ring)
@@ -1329,7 +1419,11 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
     // Build (once) the immutable vtx/idx buffers for a key's shared local mesh. Returns null until it has a drawable mesh.
     private KeySegment GetOrCreate(GeometryKey key, FrozenMesh mesh)
     {
-        if (_keys.TryGetValue(key, out var seg) && seg.MeshUploaded) return seg;
+        if (_keys.TryGetValue(key, out var seg) && seg.MeshUploaded)
+        {
+            seg.LastUsed = _frame;
+            return seg;
+        }
 
         var vertices = mesh.Vertices;
         if (vertices.Length == 0) return null;
@@ -1362,6 +1456,7 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
 
         seg.Topology = mesh.Topology;
         seg.MeshUploaded = true;
+        seg.LastUsed = _frame;
         _keys[key] = seg;
         return seg;
     }

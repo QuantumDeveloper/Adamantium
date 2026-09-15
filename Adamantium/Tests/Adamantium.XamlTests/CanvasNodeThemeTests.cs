@@ -315,6 +315,118 @@ public class CanvasNodeThemeTests
         Assert.That(node.InputPins[2].Name, Is.EqualTo("In 2"), "it took a name already on the list");
     }
 
+    // The template puts a SOCKET per pin, and it is a socket rather than an anonymous border - which is what makes it
+    // findable at all. Asked first, because everything below depends on it and answers "null" if it is not so.
+    [TestCase("Fluent")]
+    [TestCase("EditorPro")]
+    [TestCase("MacOs")]
+    public void EveryPinGetsASocketInTheTree(string theme)
+    {
+        Use(ThemeNamed(theme));
+
+        var node = new CanvasNode { Inputs = 2, Outputs = 1 };
+        // WITH AN OWNER: the layer places its children from the camera, and one without a camera arranges nothing at
+        // all - so everything inside a node stays at no size, which is not a state it is ever in on screen.
+        var layer = new CanvasElementLayer { Owner = new InfiniteCanvas() };
+        layer.Sync(new List<ElementItem> { new(node, new Rect(0, 0, 190, 110)) });
+
+        var window = new Window { Width = 600, Height = 600, Content = layer };
+        Settle(window);
+
+        var sockets = Sockets(node);
+
+        Assert.That(sockets, Has.Count.EqualTo(3));
+
+        // ...and each one KNOWS which pin it stands for. Without that the discs are three anonymous circles and
+        // nothing can say which of them a connection is held by.
+        Assert.Multiple(() =>
+        {
+            foreach (var socket in sockets)
+            {
+                Assert.That(socket.Pin, Is.Not.Null, "a socket that does not know its own pin");
+                Assert.That(socket.RenderSize.Width, Is.GreaterThan(0), "a socket that was never given a size");
+                Assert.That(node.Where(socket.Pin), Is.Not.Null, "a socket the node cannot place");
+            }
+        });
+    }
+
+    private static List<CanvasNodeSocket> Sockets(IUIComponent within)
+    {
+        var found = new List<CanvasNodeSocket>();
+        Gather(within, found);
+        return found;
+    }
+
+    private static void Gather(IUIComponent within, List<CanvasNodeSocket> found)
+    {
+        if (within is CanvasNodeSocket socket) found.Add(socket);
+
+        foreach (var child in within.VisualChildren)
+        {
+            if (child is IUIComponent visual) Gather(visual, found);
+        }
+    }
+
+    // WHERE a socket is, which a connection cannot work out for itself: which side it is on, how far down and how far
+    // it hangs over the edge are facts about the TEMPLATE, and each theme answers them differently.
+    [TestCase("Fluent")]
+    [TestCase("EditorPro")]
+    [TestCase("MacOs")]
+    public void ANodeSaysWhereItsSocketsAre(string theme)
+    {
+        Use(ThemeNamed(theme));
+
+        var node = new CanvasNode { Inputs = 2, Outputs = 1 };
+        // WITH AN OWNER: the layer places its children from the camera, and one without a camera arranges nothing at
+        // all - so everything inside a node stays at no size, which is not a state it is ever in on screen.
+        var layer = new CanvasElementLayer { Owner = new InfiniteCanvas() };
+        layer.Sync(new List<ElementItem> { new(node, new Rect(0, 0, 190, 110)) });
+
+        var window = new Window { Width = 600, Height = 600, Content = layer };
+        Settle(window);
+
+        var first = node.Where(node.InputPins[0]);
+        var second = node.Where(node.InputPins[1]);
+        var output = node.Where(node.OutputPins[0]);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(first, Is.Not.Null, "the node cannot find its own socket");
+            Assert.That(second, Is.Not.Null);
+            Assert.That(output, Is.Not.Null);
+
+            Assert.That(second.Value.Y, Is.GreaterThan(first.Value.Y), "the second input is below the first");
+            Assert.That(output.Value.X, Is.GreaterThan(first.Value.X), "an output is on the other side");
+            Assert.That(first.Value.X, Is.LessThan(20), "an input sits on the node's left edge");
+        });
+    }
+
+    // ...and WHICH socket is under a point, which is how a connection is started by aiming at one.
+    [TestCase("Fluent")]
+    [TestCase("EditorPro")]
+    [TestCase("MacOs")]
+    public void ANodeSaysWhichSocketIsUnderAPoint(string theme)
+    {
+        Use(ThemeNamed(theme));
+
+        var node = new CanvasNode { Inputs = 2, Outputs = 1 };
+        // WITH AN OWNER: the layer places its children from the camera, and one without a camera arranges nothing at
+        // all - so everything inside a node stays at no size, which is not a state it is ever in on screen.
+        var layer = new CanvasElementLayer { Owner = new InfiniteCanvas() };
+        layer.Sync(new List<ElementItem> { new(node, new Rect(0, 0, 190, 110)) });
+
+        var window = new Window { Width = 600, Height = 600, Content = layer };
+        Settle(window);
+
+        var at = node.Where(node.InputPins[1]).Value;
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(node.PinAt(at), Is.SameAs(node.InputPins[1]));
+            Assert.That(node.PinAt(new Vector2(at.X + 60, at.Y)), Is.Null, "the middle of the node is not a socket");
+        });
+    }
+
     // The middle follows the colour too: recolouring a docked pin has to repaint what is in it, not just its ring.
     [TestCase("Fluent")]
     [TestCase("EditorPro")]

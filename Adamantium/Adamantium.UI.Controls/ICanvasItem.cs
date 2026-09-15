@@ -24,6 +24,15 @@ public interface ICanvasItem
     /// wants; something reshaped another way - by its own points, or by whatever it is attached to - says so.</summary>
     CanvasHandles Handles => CanvasHandles.All;
 
+    /// <summary>Which side of the canvas's hosted controls this is drawn on. BEHIND them by default: what is on the
+    /// plane is the drawing, and a control put there is part of the same picture rather than a pane over it.</summary>
+    CanvasBand Band => CanvasBand.Under;
+
+    /// <summary>Which kind of work this belongs to. A DRAWING by default, because that is what almost everything on a
+    /// plane is; a node and the wire between two of them say otherwise. The canvas shows, picks and selects only what
+    /// belongs to the mode it is in - see <see cref="CanvasMode"/>.</summary>
+    CanvasMode Mode => CanvasMode.Drawing;
+
     /// <summary>Whether a world point is ON this item. The tolerance is a WORLD length the canvas works out from a
     /// screen one - what counts as a hit has to be the same distance under the cursor at any zoom.</summary>
     bool HitTest(Vector2 world, double tolerance);

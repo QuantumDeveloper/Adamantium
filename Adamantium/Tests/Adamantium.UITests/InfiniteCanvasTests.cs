@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using Adamantium.Mathematics;
 using Adamantium.UI.Controls;
@@ -687,6 +688,60 @@ public class InfiniteCanvasTests
         Laid(item);
 
         Assert.That(item.World.Width, Is.EqualTo(190).Within(0.5));
+    }
+
+    // A thing sized by its own CONTENT has a size in the WORLD, and the camera must not get a say in it. Dropped by a
+    // click, its size used to be worked out in screen pixels like everything else - so the same node came out a third
+    // as wide when made zoomed in and three times as wide when made zoomed out.
+    [Test]
+    public void ANodeDroppedByAClickIsTheSameSizeAtEveryZoom()
+    {
+        var near = Dropped(4);
+        var far = Dropped(0.25);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(far.World.Width, Is.EqualTo(near.World.Width).Within(0.5), "its width followed the camera");
+            Assert.That(far.World.Height, Is.EqualTo(near.World.Height).Within(0.5));
+        });
+    }
+
+    // ...and an ordinary control still takes its size in SCREEN pixels: a button dropped at any zoom should look the
+    // same size to whoever is looking at it.
+    [Test]
+    public void AButtonDroppedByAClickTakesTheSizeItLooks()
+    {
+        var near = Dropped(4, () => new Button { Content = "Press" });
+        var far = Dropped(0.25, () => new Button { Content = "Press" });
+
+        Assert.That(far.World.Width, Is.GreaterThan(near.World.Width * 4), "zoomed out, it has to be wider in world");
+    }
+
+    private static ElementItem Dropped(double scale, Func<IUIComponent> what = null)
+    {
+        var canvas = Sized();
+        canvas.Scene = new CanvasScene();
+        canvas.Scale = scale;
+
+        var tool = new ElementTool(what ?? (() => new CanvasNode()), new Size(190, 110));
+        var at = new Vector2(0, 0);
+        var args = new CanvasPointerEventArgs
+        {
+            World = at,
+            Pointer = at,
+            Screen = canvas.WorldToScreen(at),
+            Button = Adamantium.UI.Core.Input.MouseButtons.Left
+        };
+
+        tool.OnPressed(canvas, args);
+        tool.OnReleased(canvas, args);
+
+        foreach (var item in canvas.Scene.ItemsIn(new Rect(-9000, -9000, 18000, 18000)))
+        {
+            if (item is ElementItem made) return made;
+        }
+
+        return null;
     }
 
     private static void Laid(ElementItem item)

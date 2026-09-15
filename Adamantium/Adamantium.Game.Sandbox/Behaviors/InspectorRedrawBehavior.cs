@@ -36,8 +36,14 @@ public class InspectorRedrawBehavior : Behavior<PropertyGrid>
 
     private void OnValueChanged(object sender, PropertyValuesChangedEventArgs e)
     {
-        // Whatever was edited, the scene is told once. Which item it was does not matter here: the canvas keeps no copy
-        // of the scene, so it simply draws it again.
-        if (e.Target is ICanvasItem) Scene?.Touch();
+        // WHATEVER was edited. It used to ask whether the thing written to was an item on the plane, and that was
+        // wrong twice over: the inspector reaches THROUGH an item to the control inside it, and through a node to one
+        // of its sockets - and a socket is not an item. So recolouring a socket repainted the socket, because that is a
+        // control and repaints itself, and left the WIRE hanging off it the old colour until the plane was redrawn for
+        // some other reason.
+        //
+        // Nothing is saved by asking. This is the canvas's own inspector, everything it edits is on the plane or about
+        // it, and being told twice costs one repaint of what is visible.
+        Scene?.Touch();
     }
 }

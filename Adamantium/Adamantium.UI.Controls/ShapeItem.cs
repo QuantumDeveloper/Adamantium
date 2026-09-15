@@ -554,7 +554,11 @@ public class ShapeItem : ICanvasItem, ICanvasTransformed, ICanvasPoints
 
     // The box and the two bits that hold a line running between these two points. The box is normalised, so the points
     // themselves cannot be stored: this is what turns them back into one.
-    private void SetEnds(Vector2 from, Vector2 to)
+    //
+    // INTERNAL, because the tool that drags a shape out has the same two points and must arrive at the same three
+    // values. It used to set the box and the lean by hand and leave Reversed alone, so a fresh arrow dragged up and to
+    // the left put its head back where the drag STARTED - pointing at the hand instead of away from it.
+    internal void SetEnds(Vector2 from, Vector2 to)
     {
         World = new Rect(Math.Min(from.X, to.X), Math.Min(from.Y, to.Y),
             Math.Abs(to.X - from.X), Math.Abs(to.Y - from.Y));

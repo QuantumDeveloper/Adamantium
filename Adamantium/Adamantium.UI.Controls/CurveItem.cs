@@ -15,15 +15,13 @@ namespace Adamantium.UI.Controls;
 /// points bend it, and the two gestures do not fight.</para></summary>
 public class CurveItem : ICanvasItem, ICanvasPoints
 {
-    // The outline, rebuilt only when what it is made of changes - a pen is immutable-per-change, so one per frame per
-    // curve would allocate for every curve on screen every frame.
-    private Pen _pen;
-    private double _penWidth = double.NaN;
-    private Brush _penBrush;
-    private StreamGeometry _path;
+    // What the curve is DRAWN with: a polyline handed to the ink pass as data. See Render for why it is not a geometry.
+    private readonly InkBrush _ink = new();
+    private Vector2F[] _screen;
 
     private readonly List<Vector2> _points = new();
 
+    private CanvasCurve _kind;
     private int _degree;
 
     public CurveItem(CanvasCurve kind, IEnumerable<Vector2> points, Brush stroke, double thickness)
@@ -37,7 +35,11 @@ public class CurveItem : ICanvasItem, ICanvasPoints
 
     /// <summary>Which curve is drawn through the points. Settable: it is chosen by looking at the line, not before
     /// drawing it.</summary>
-    public CanvasCurve Kind { get; set; }
+    public CanvasCurve Kind
+    {
+        get => _kind;
+        set => _kind = value;
+    }
 
     public IReadOnlyList<Vector2> Points => _points;
 
@@ -46,11 +48,15 @@ public class CurveItem : ICanvasItem, ICanvasPoints
     /// <summary>How wide the line is, in WORLD units - it belongs to the drawing, so it grows with the zoom.</summary>
     public double Thickness { get; set; }
 
-    /// <summary>The degree of a <see cref="CanvasCurve.Nurbs"/>, or zero to let it follow the number of points. Means
-    /// nothing to the other two.</summary>
+    /// <summary>The degree of the curve. A <see cref="CanvasCurve.Nurbs"/> is ASKED for one, and zero lets it follow
+    /// the number of points; a <see cref="CanvasCurve.Bezier"/> only REPORTS one, because a Bezier through N+1 points
+    /// is of degree N and can be nothing else. Means nothing to a B-spline.</summary>
     public int Degree
     {
-        get => _degree;
+        // A Bezier's degree is COUNTED, not chosen: a curve through N+1 points is of degree N, and there is no other
+        // answer - one point fewer or more is a different curve. Choosing it would mean either putting anchors along
+        // the line, which is not what a Bezier is, or quietly leaving points out.
+        get => _kind == CanvasCurve.Bezier ? Math.Max(1, _points.Count - 1) : _degree;
         set => _degree = Math.Max(0, value);
     }
 
@@ -150,95 +156,107 @@ public class CurveItem : ICanvasItem, ICanvasPoints
         if (canvas == null) return;
 
         var count = _points.Count + (extra.HasValue ? 1 : 0);
-        if (count < 2) return;
+        if (count < 2 || Stroke is not SolidColorBrush solid || Thickness <= 0) return;
 
         // Never thinner than a pixel: a line zoomed out should thin to a hair, not vanish.
         var width = Math.Max(Thickness * canvas.Scale, 1.0);
-        var pen = PenFor(width);
-        if (pen == null) return;
 
-        // In SCREEN coordinates, and the curve itself is built by the DRAWING rather than by the walk below: the
-        // engine resamples a segment at device resolution, so the line stays smooth at any zoom, while the walk is
-        // there to answer where the line IS - a question the drawing cannot be asked.
-        var screen = new Vector2[count];
-        for (var i = 0; i < _points.Count; i++) screen[i] = canvas.WorldToScreen(_points[i]);
-        if (extra.HasValue) screen[count - 1] = canvas.WorldToScreen(extra.Value);
+        // The control points in SCREEN coordinates - the curve is then walked in the same units, so how finely it is
+        // sampled follows how big it actually is on screen rather than how big it is on the plane.
+        var control = new List<Vector2>(count);
+        for (var i = 0; i < _points.Count; i++) control.Add(canvas.WorldToScreen(_points[i]));
+        if (extra.HasValue) control.Add(canvas.WorldToScreen(extra.Value));
 
-        _path ??= new StreamGeometry();
-        var figure = _path.Open().BeginFigure(screen[0], false, false);
-        var rest = new Vector2[screen.Length - 1];
-        Array.Copy(screen, 1, rest, 0, rest.Length);
+        var along = Walk(control, Kind, Degree, IsUniform, StepsFor(control));
+        if (along.Count < 2) return;
 
-        switch (Kind)
+        // INK, and not a geometry, and this is the whole point of the class's drawing. Stroked as a path it cost the
+        // frame and cost more the longer the application ran: a geometry is cached by its CONTENT, this one is built
+        // in screen coordinates and so has different content after every pan and every turn of the wheel, and that
+        // cache is never emptied and is walked once per frame. One curve on the plane was enough to bring the whole
+        // thing to a crawl.
+        //
+        // The ink pass has none of that: the points ARE the parameter block, one instance draws the whole polyline,
+        // and nothing is built, cached or left behind. It is the pass a pen stroke already goes through.
+        if (_screen == null || _screen.Length < along.Count)
+            Array.Resize(ref _screen, Math.Max(64, along.Count * 2));
+
+        var lowX = double.MaxValue;
+        var lowY = double.MaxValue;
+        var highX = double.MinValue;
+        var highY = double.MinValue;
+
+        for (var i = 0; i < along.Count; i++)
         {
-            case CanvasCurve.BSpline:
-                figure.BSplineTo(rest);
-                break;
+            _screen[i] = new Vector2F((float)along[i].X, (float)along[i].Y);
 
-            case CanvasCurve.Nurbs:
-                figure.NurbsTo(rest, IsUniform, Degree > 0, Degree);
-                break;
-
-            default:
-                // A cubic takes THREE points per span. What is left over at the end - one or two - is joined straight:
-                // dropping it would make the line end somewhere the last point is not, which reads as a bug in the
-                // drawing rather than as arithmetic.
-                var spans = rest.Length / 3 * 3;
-                if (spans > 0)
-                {
-                    var curved = new Vector2[spans];
-                    Array.Copy(rest, curved, spans);
-                    figure.PolyCubicBezierTo(curved);
-                }
-
-                for (var i = spans; i < rest.Length; i++) figure.LineTo(rest[i]);
-                break;
+            if (along[i].X < lowX) lowX = along[i].X;
+            if (along[i].Y < lowY) lowY = along[i].Y;
+            if (along[i].X > highX) highX = along[i].X;
+            if (along[i].Y > highY) highY = along[i].Y;
         }
 
-        session.DrawGeometry(null, _path, pen);
+        _ink.Points = _screen;
+        _ink.Count = along.Count;
+        _ink.Color = solid.Color;
+        _ink.Thickness = width;
+
+        // The CONTENTS of the borrowed array just changed and its reference did not, so the paint has to be told - see
+        // InkBrush.Revision. Without it the curve stays baked wherever it first was.
+        _ink.Revision++;
+
+        // The rectangle is the curve's own box on screen: what the record measures overlap and clipping by. The pass
+        // places the line from the points rather than from it.
+        var half = width / 2 + 1;
+
+        session.DrawRectangle(_ink, new Rect(lowX - half, lowY - half,
+            highX - lowX + 2 * half, highY - lowY + 2 * half));
     }
 
-    // The curve as a polyline in WORLD units - what hit-testing measures against, so what is picked is what is seen.
-    private List<Vector2> Walk()
+    // How finely to sample, from how long the line through the control points is ON SCREEN: about a sample every four
+    // pixels, floored so a short curve is still a curve and capped so a curve dragged across a wall of monitors does
+    // not hand the pass a polyline nobody can see the detail of.
+    private static int StepsFor(List<Vector2> control)
     {
-        if (_points.Count < 2) return _points;
+        double reach = 0;
+        for (var i = 1; i < control.Count; i++) reach += (control[i] - control[i - 1]).Length();
 
-        switch (Kind)
+        return (int)Math.Clamp(reach / 4, 32, 512);
+    }
+
+    // The curve as a polyline - what is DRAWN and what hit-testing measures against, in whatever units it was handed.
+    // One walk for both, so what is picked is exactly what is seen.
+    private static List<Vector2> Walk(List<Vector2> points, CanvasCurve kind, int degree, bool uniform, int steps)
+    {
+        if (points.Count < 2) return points;
+
+        switch (kind)
         {
             case CanvasCurve.BSpline:
-                return MathHelper.GetBSpline2(_points, 128);
+                return MathHelper.GetBSpline2(points, (uint)steps);
 
             case CanvasCurve.Nurbs:
-                return new List<Vector2>(MathHelper.GetNurbsCurve(_points,
-                    Degree > 0 ? Degree : _points.Count - 1, IsUniform, 1.0 / 128.0));
+                return new List<Vector2>(MathHelper.GetNurbsCurve(points,
+                    degree > 0 ? degree : points.Count - 1, uniform, 1.0 / steps));
 
             default:
-                var walked = new List<Vector2> { _points[0] };
-                var at = 1;
-
-                while (at + 2 < _points.Count)
-                {
-                    walked.AddRange(MathHelper.GetCubicBezier(_points[at - 1], _points[at], _points[at + 1],
-                        _points[at + 2], 32));
-                    at += 3;
-                }
-
-                for (; at < _points.Count; at++) walked.Add(_points[at]);
-                return walked;
+                // ONE Bezier over ALL the points, and that is what makes it a Bezier: every point but the first and the
+                // last PULLS the line without being on it.
+                //
+                // A CHAIN of spans stood here, with the degree of a span chosen in the inspector, and it was wrong on
+                // exactly that point - the place where one span ends and the next begins lies ON the curve, so a curve
+                // of three cubic spans had two of its interior points sitting on the line and a corner at each of them.
+                // A Bezier has no interior anchors; a line that is anchored at points along its length is a spline, and
+                // both of those are in the list beside this one.
+                //
+                // So the degree is not a choice: a Bezier through N+1 points is of degree N, and the way to ask for a
+                // quadratic is to draw it with three points. See CurveItem.Degree.
+                return MathHelper.GetBezier(points, (uint)steps);
         }
     }
 
-    private Pen PenFor(double width)
-    {
-        if (Stroke == null || Thickness <= 0) return null;
-        if (_pen != null && ReferenceEquals(_penBrush, Stroke) && Math.Abs(_penWidth - width) < 1e-6) return _pen;
-
-        _penBrush = Stroke;
-        _penWidth = width;
-        _pen = new Pen(Stroke, width, penLineJoin: PenLineJoin.Round);
-
-        return _pen;
-    }
+    // The curve in WORLD units, sampled finely enough that picking it agrees with seeing it at any zoom.
+    private List<Vector2> Walk() => Walk(_points, Kind, Degree, IsUniform, 128);
 
     private static double Distance(Vector2 point, Vector2 from, Vector2 to)
     {

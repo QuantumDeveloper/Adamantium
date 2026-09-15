@@ -48,6 +48,7 @@ public class InfiniteCanvas : Control
     private Dictionary<ICanvasItem, Rect> _editWasAt;
 
     private CanvasElementLayer _elements;
+    private CanvasFrontLayer _front;
     private readonly List<ElementItem> _visibleElements = new();
 
     private CanvasChromeLayer _chromeLayer;
@@ -177,6 +178,24 @@ public class InfiniteCanvas : Control
     public static readonly AdamantiumProperty SceneProperty = AdamantiumProperty.Register(nameof(Scene),
         typeof(ICanvasScene), typeof(InfiniteCanvas),
         new PropertyMetadata(null, PropertyMetadataOptions.AffectsRender, OnSceneChanged));
+
+    /// <summary>What the canvas is being used AS - a drawing, or a graph of nodes. See <see cref="CanvasMode"/> for why
+    /// this is a mode and not a filter the user sets.
+    /// <para>What is not of the current mode is not drawn, not picked, not selected and not listed. It is not deleted
+    /// either: a scene may hold both, and switching back brings the other one out again untouched.</para></summary>
+    public static readonly AdamantiumProperty ModeProperty = AdamantiumProperty.Register(nameof(Mode),
+        typeof(CanvasMode), typeof(InfiniteCanvas),
+        new PropertyMetadata(CanvasMode.Drawing,
+            PropertyMetadataOptions.AffectsRender | PropertyMetadataOptions.BindsTwoWayByDefault, OnModeChanged));
+
+    public CanvasMode Mode
+    {
+        get => GetValue<CanvasMode>(ModeProperty);
+        set => SetValue(ModeProperty, value);
+    }
+
+    /// <summary>Raised after <see cref="Mode"/> changes, so a rail can offer the tools that mode admits.</summary>
+    public event EventHandler ModeChanged;
 
     /// <summary>Where what was done is remembered, or null for a canvas that remembers nothing.
     /// <para>The APPLICATION's, like the scene: undo belongs to whoever owns the drawing. Given one, the canvas opens a
@@ -764,7 +783,7 @@ public class InfiniteCanvas : Control
 
         if (kept.Count != _selection.Count) SelectMany(kept, false);
 
-        InvalidateRender(false);
+        Repaint();
     }
 
     /// <summary>Makes ONE thing out of what is selected, and selects it. Null when there is nothing to group.
@@ -1047,7 +1066,7 @@ public class InfiniteCanvas : Control
         canvas.HasSelection = canvas._selection.Count > 0;
         canvas._chromeLayer?.SyncSelection();
         canvas.SelectionChanged?.Invoke(canvas, EventArgs.Empty);
-        canvas.InvalidateRender(false);
+        canvas.Repaint();
     }
 
     private void Selected()
@@ -1066,7 +1085,7 @@ public class InfiniteCanvas : Control
         _chromeLayer?.InvalidateArrange();
 
         SelectionChanged?.Invoke(this, EventArgs.Empty);
-        InvalidateRender(false);
+        Repaint();
     }
 
     public CanvasGridStyle GridStyle
@@ -1291,13 +1310,7 @@ public class InfiniteCanvas : Control
         // it does not have.
         if (GridStyle != CanvasGridStyle.Transparent) DrawGround(session, size);
 
-        // Only what can be SEEN. The cost of a frame follows the viewport, not the drawing: a scene of a hundred
-        // thousand strokes on a plane the size of a town draws the dozen under the camera.
-        if (Scene is { } scene)
-        {
-            var visible = VisibleWorld;
-            foreach (var item in scene.ItemsIn(visible)) item.Render(session, this);
-        }
+        DrawBand(session, CanvasBand.Under);
 
         // What the TOOL is making but has not put in the scene yet - a stroke still under the pen, a shape being dragged
         // out, the selection band. It goes in when the gesture ends, so a half-made thing cannot be hit-tested, saved or
@@ -1308,6 +1321,52 @@ public class InfiniteCanvas : Control
         // pixels, and it never scales - a mark that grew with the zoom would be part of the drawing, which is exactly
         // what it is not.
         DrawOverlay(session);
+    }
+
+    // What the canvas draws is drawn in TWO places - here, and in the layer that stands in front of the controls - so
+    // the two are marked together. Anything that changes the picture goes through this rather than InvalidateRender,
+    // or the band in front stays as it was and the drawing comes apart into two ages of itself.
+    private void Repaint()
+    {
+        InvalidateRender(false);
+        _front?.InvalidateRender(false);
+    }
+
+    /// <summary>What is on the plane inside a world rectangle AND belongs to the mode the canvas is in.
+    /// <para>THE one place the mode is applied. Every walk over the scene - drawing it, picking in it, erasing, hosting
+    /// its controls - goes through here rather than asking the scene directly, or a mode would mean something slightly
+    /// different to each of them and the one that forgot would hand back a node to a pen.</para>
+    /// <para>A scene may hold both a drawing and a graph; what is not of the current mode is simply not offered, and
+    /// switching back offers it again untouched.</para></summary>
+    /// <summary>Everything of the current mode, wherever it is - what a whole graph is, as against what can be seen of
+    /// one. Saving a document is the case: a node left three screens away is still in it.</summary>
+    public IEnumerable<ICanvasItem> ItemsHere() => ItemsHere(Everything);
+
+    public IEnumerable<ICanvasItem> ItemsHere(Rect world)
+    {
+        if (Scene is not { } scene) yield break;
+
+        var mode = Mode;
+        foreach (var item in scene.ItemsIn(world))
+        {
+            if (item.Mode == mode) yield return item;
+        }
+    }
+
+    /// <summary>Draws the items of one BAND - what is behind the hosted controls, or what is in front of them.
+    /// <para>Only what can be SEEN. The cost of a frame follows the viewport, not the drawing: a scene of a hundred
+    /// thousand strokes on a plane the size of a town draws the dozen under the camera.</para>
+    /// <para>Public because the front band is drawn by a layer of the template and not by the canvas: a layer is one
+    /// place in paint order, so the only way for an item to be in front of a control is for something in front of that
+    /// control to draw it. See <see cref="CanvasFrontLayer"/>.</para></summary>
+    public void DrawBand(IDrawingSession session, CanvasBand band)
+    {
+        if (session == null) return;
+
+        foreach (var item in ItemsHere(VisibleWorld))
+        {
+            if (item.Band == band) item.Render(session, this);
+        }
     }
 
     // ONE rectangle for the whole ground: the shader decides per pixel, from the world coordinate under it, whether it
@@ -1571,7 +1630,122 @@ public class InfiniteCanvas : Control
 
     // Middle button, or space and the left one. Both, because both are what people already do - and the left button on
     // its own is left alone, because that is what the tools will want.
+    // WHAT A PRESS COSTS, when somebody is asking. Written to the file named by ADAM_CANVAS_PRESSLOG and not shown on
+    // screen: a plate over the drawing is in the way of the very thing being measured, and a number that scrolls past
+    // settles nothing anyway. Off unless the variable is set, so an ordinary run pays a null check.
+    private static readonly string PressLog = Environment.GetEnvironmentVariable("ADAM_CANVAS_PRESSLOG");
+
+    private readonly System.Diagnostics.Stopwatch _sinceLastPress = new();
+    private long _measuresAtLastPress;
+    private long _templatesAtLastPress;
+    private long _madeAtLastPress;
+    private long _rebuildsAtLastPress;
+    private long _refreshesAtLastPress;
+
+    // Counting is what names the culprit, and it costs an interlocked increment per invalidation - nothing next to what
+    // it is being used to find, and too much to leave on for a run nobody is measuring.
+    static InfiniteCanvas()
+    {
+        if (PressLog == null) return;
+
+        Core.Diagnostics.LayoutTrace.Counting = true;
+
+        // ...and WHO CALLED, when asked for. A count names the type being re-measured; only the stack names the thing
+        // doing it, and a type appears in a dozen places at once - the same Button is in the tool rail and on the plane.
+        //
+        // It walks the stack PER EVENT, and this application raises thousands a second: switched on, it turned a
+        // running stand into one that took fifty-five seconds between two clicks. It answers the question and it cannot
+        // be left on, so it says both here.
+        Core.Diagnostics.LayoutTrace.CountCallers =
+            Environment.GetEnvironmentVariable("ADAM_CANVAS_PRESSCALLERS") == "1";
+    }
+
     private void OnPointerDown(object sender, MouseButtonEventArgs e)
+    {
+        if (PressLog == null)
+        {
+            PointerDown(sender, e);
+            return;
+        }
+
+        var clock = System.Diagnostics.Stopwatch.StartNew();
+        var wasMeasures = MeasurableUIComponent.TotalMeasureCores;
+
+        // What happened BETWEEN this press and the last one, which is where the cost of a press actually lands: the
+        // handler returns at once and leaves a layout pass and a re-record behind it. Measured this way round because
+        // there is nowhere inside a press to stand and watch the frame that follows it.
+        var since = wasMeasures - _measuresAtLastPress;
+        var gap = _sinceLastPress.IsRunning ? _sinceLastPress.Elapsed.TotalMilliseconds : 0;
+
+        PointerDown(sender, e);
+
+        clock.Stop();
+
+        _measuresAtLastPress = MeasurableUIComponent.TotalMeasureCores;
+        _sinceLastPress.Restart();
+
+        try
+        {
+            // ...and WHO. A count of measures says the application is busy; it does not say what it is busy with, and
+            // the difference between those two is the whole job. The counters are keyed by the type and the property
+            // that caused the invalidation, so the busiest line here names the thing to fix.
+            var busiest = Core.Diagnostics.LayoutTrace.DumpCounts();
+            Core.Diagnostics.LayoutTrace.ResetCounts();
+
+            // The AGGREGATES first - "this type was invalidated N times" - and then the same list with them taken out.
+            // A type says where the work landed; only the PROPERTY says what caused it, and the aggregates are by
+            // definition the biggest numbers, so a plain top-of-the-list shows nothing else at all.
+            var lines = busiest.Split('\n');
+            var top = new System.Text.StringBuilder();
+            var named = new System.Text.StringBuilder();
+            var shown = 0;
+            var namedShown = 0;
+
+            for (var i = 0; i < lines.Length; i++)
+            {
+                if (lines[i].Length == 0) continue;
+
+                var aggregate = lines[i].Contains('*');
+
+                if (aggregate && shown < 6)
+                {
+                    top.Append("    ").Append(lines[i]).Append("\r\n");
+                    shown++;
+                }
+                else if (!aggregate && namedShown < 10)
+                {
+                    named.Append("      by ").Append(lines[i].Trim()).Append("\r\n");
+                    namedShown++;
+                }
+            }
+
+            top.Append(named);
+
+            // TEMPLATES BUILT and CONTROLS MADE, which is the difference between "something was written to" and
+            // "everything was built again". The properties in the list above - Child, Content, CornerRadius, Width -
+            // are what a template's assembly writes, so this says whether that is what is happening.
+            var builtNow = Base.TemplatedUIComponent.TemplatesBuilt;
+            var madeNow = Base.TemplatedUIComponent.TemplatedControlsMade;
+
+            System.IO.File.AppendAllText(PressLog,
+                $"press {clock.Elapsed.TotalMilliseconds:F3} ms, measures in it {MeasurableUIComponent.TotalMeasureCores - wasMeasures}" +
+                $" | since the last press: {since} measures over {gap:F0} ms" +
+                $", templates built {builtNow - _templatesAtLastPress}, controls made {madeNow - _madeAtLastPress}" +
+                $", inspector rebuilds {PropertyGrid.Rebuilds - _rebuildsAtLastPress}" +
+                $", refreshes {PropertyGrid.Refreshes - _refreshesAtLastPress}\r\n" + top);
+
+            _templatesAtLastPress = builtNow;
+            _madeAtLastPress = madeNow;
+            _rebuildsAtLastPress = PropertyGrid.Rebuilds;
+            _refreshesAtLastPress = PropertyGrid.Refreshes;
+        }
+        catch
+        {
+            // An instrument that throws is worse than one that says nothing.
+        }
+    }
+
+    private void PointerDown(object sender, MouseButtonEventArgs e)
     {
         if (e.Handled) return;
 
@@ -1696,7 +1870,7 @@ public class InfiniteCanvas : Control
             _pointerInside = false;
             Cursor = Cursors.Arrow;
 
-            if (had) InvalidateRender(false);
+            if (had) Repaint();
             return;
         }
 
@@ -1708,7 +1882,7 @@ public class InfiniteCanvas : Control
         if (pulled != _snap)
         {
             _snap = pulled;
-            InvalidateRender(false);
+            Repaint();
         }
 
         // A POINT taken before any tool saw the press is dragged before any tool sees the move. Pulled to the grid like
@@ -1754,6 +1928,10 @@ public class InfiniteCanvas : Control
     // few pixels where a drag would do something, and finding that edge means pressing and seeing.</para>
     private Cursor OverSelection(Vector2 screen)
     {
+        // A SOCKET first, and whether anything is selected or not: a wire is pulled out of one with the select tool in
+        // hand, so what says the pointer has reached one has to be the same whatever else is going on.
+        if (Tool is SelectTool select && select.Wires.Under(this, ScreenToWorld(screen)) != null) return Cursors.Crosshair;
+
         if (_selection.Count == 0) return null;
 
         if (PointHandleAt(screen) >= 0) return Cursors.Crosshair;
@@ -1780,7 +1958,7 @@ public class InfiniteCanvas : Control
         _snap = null;
         _pointerInside = false;
 
-        if (had) InvalidateRender(false);
+        if (had) Repaint();
     }
 
     private void OnPointerUp(object sender, MouseButtonEventArgs e)
@@ -1999,6 +2177,9 @@ public class InfiniteCanvas : Control
 
         _elements = GetTemplateChild("PART_Elements") as CanvasElementLayer;
         if (_elements != null) _elements.Owner = this;
+
+        _front = GetTemplateChild("PART_Front") as CanvasFrontLayer;
+        if (_front != null) _front.Owner = this;
 
         _chromeLayer = GetTemplateChild("PART_Chrome") as CanvasChromeLayer;
         if (_chromeLayer != null) _chromeLayer.Owner = this;
@@ -2235,7 +2416,7 @@ public class InfiniteCanvas : Control
         if (canvas._pointerInside) canvas.ShowPointer(canvas._pointer);
 
         canvas.ToolChanged?.Invoke(canvas, EventArgs.Empty);
-        canvas.InvalidateRender(false);
+        canvas.Repaint();
     }
 
     /// <summary>The tool in hand changed - a rail marks a different button on it.</summary>
@@ -2287,6 +2468,49 @@ public class InfiniteCanvas : Control
         _chromeLayer.InvalidateArrange();
     }
 
+    // Changing what the canvas is being used AS changes everything that follows from it: what can be selected, which
+    // tool is in hand, which controls the layer hosts and what is drawn.
+    private static void OnModeChanged(AdamantiumComponent component, AdamantiumPropertyChangedEventArgs e)
+    {
+        if (component is not InfiniteCanvas canvas) return;
+
+        // LET GO FIRST. What was selected belongs to the mode that has just been left, and a frame round something the
+        // canvas no longer draws is a frame round nothing that still answers Delete.
+        canvas.ClearSelection();
+
+        // ...and put down a tool that has nothing to do here. A pen in a graph would draw ink into a scene the graph
+        // never shows again.
+        if (canvas.Tool is { } tool && !tool.WorksIn(canvas.Mode))
+        {
+            tool.Cancel(canvas);
+            canvas.SetCurrentValue(ToolProperty, canvas.FirstToolFor(canvas.Mode));
+        }
+
+        canvas.SyncElements();
+        canvas._elements?.InvalidateMeasure();
+        canvas._elements?.InvalidateArrange();
+        canvas.Repaint();
+
+        canvas.ModeChanged?.Invoke(canvas, EventArgs.Empty);
+    }
+
+    // The tool to fall back on when the one in hand does not belong: the default if it fits, else the first offered
+    // tool that does, else none at all - a canvas with no tool still pans, zooms and shows what is on it.
+    private ICanvasTool FirstToolFor(CanvasMode mode)
+    {
+        if (DefaultTool is { } fallback && fallback.WorksIn(mode)) return fallback;
+
+        if (Tools is { } tools)
+        {
+            foreach (var tool in tools)
+            {
+                if (tool != null && tool.WorksIn(mode)) return tool;
+            }
+        }
+
+        return null;
+    }
+
     private static void OnSceneChanged(AdamantiumComponent component, AdamantiumPropertyChangedEventArgs e)
     {
         if (component is not InfiniteCanvas canvas) return;
@@ -2300,7 +2524,7 @@ public class InfiniteCanvas : Control
         canvas._elements?.InvalidateMeasure();
         canvas._elements?.InvalidateArrange();
 
-        canvas.InvalidateRender(false);
+        canvas.Repaint();
     }
 
     private void OnSceneEdited(object sender, EventArgs e)
@@ -2318,7 +2542,7 @@ public class InfiniteCanvas : Control
         // so it is the one place that has to say so.
         _chromeLayer?.InvalidateArrange();
 
-        InvalidateRender(false);
+        Repaint();
     }
 
     private static void OnCameraChanged(AdamantiumComponent component, AdamantiumPropertyChangedEventArgs e)
@@ -2342,7 +2566,7 @@ public class InfiniteCanvas : Control
         // frame is drawn every render, the panes only when something arranges them.
         canvas._chromeLayer?.InvalidateArrange();
 
-        canvas.InvalidateRender(false);
+        canvas.Repaint();
     }
 
     private static void OnDesignModeChanged(AdamantiumComponent component, AdamantiumPropertyChangedEventArgs e)
@@ -2357,7 +2581,7 @@ public class InfiniteCanvas : Control
     {
         if (_elements != null) _elements.IsHitTestVisible = !IsDesignMode;
 
-        InvalidateRender(false);
+        Repaint();
     }
 
     // The controls that are ON SCREEN, handed to the layer. Only the visible ones, like everything else here: the cost
@@ -2368,13 +2592,9 @@ public class InfiniteCanvas : Control
         if (_elements == null) return;
 
         _visibleElements.Clear();
-        if (Scene is { } scene)
+        foreach (var item in ItemsHere(VisibleWorld))
         {
-            var visible = VisibleWorld;
-            foreach (var item in scene.ItemsIn(visible))
-            {
-                if (item is ElementItem element) _visibleElements.Add(element);
-            }
+            if (item is ElementItem element) _visibleElements.Add(element);
         }
 
         _elements.Sync(_visibleElements);

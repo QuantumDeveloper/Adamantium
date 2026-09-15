@@ -25,7 +25,7 @@ public class SelectTool : ICanvasTool
     private bool _bandExtends;
 
     /// <summary>A gesture here lives inside one press, so nothing outlives the button.</summary>
-    public bool IsBusy => false;
+    public bool IsBusy => Wires.IsBusy;
 
     /// <summary>How a rail shows this tool. Settable, so an application that wants another name, another picture or
     /// another key says so on the tool it built rather than anywhere else.</summary>
@@ -37,9 +37,23 @@ public class SelectTool : ICanvasTool
 
     public string Description { get; set; } = "select, move and resize";
 
+    /// <summary>Pulling a WIRE out of a socket, which this tool offers the press to FIRST.
+    /// <para>Here rather than in a tool of its own because that is what a node editor is: nothing to switch to, the
+    /// socket itself is the offer, and you drag off it with whatever is already in hand. The knowledge of what a socket
+    /// is stays in the gesture - this tool only asks whether the press was one.</para></summary>
+    public ConnectGesture Wires { get; } = new();
+
     public void OnPressed(InfiniteCanvas canvas, CanvasPointerEventArgs e)
     {
         if (e.Button != MouseButtons.Left) return;
+
+        // A SOCKET first, and nothing else if it was one: a press on a socket means a wire, never a drag of the node
+        // it belongs to. Picking would be the wrong answer to a gesture aimed at something a dozen pixels across.
+        if (Wires.Press(canvas, e.Pointer))
+        {
+            e.Handled = true;
+            return;
+        }
 
         _from = e.World;
         _fromPointer = e.Pointer;
@@ -95,6 +109,12 @@ public class SelectTool : ICanvasTool
 
     public void OnMoved(InfiniteCanvas canvas, CanvasPointerEventArgs e)
     {
+        if (Wires.Move(canvas, e.Pointer))
+        {
+            e.Handled = true;
+            return;
+        }
+
         if (_band != null)
         {
             // The band follows the POINTER and not the snap: it is a thing being aimed with, and one that jumped from
@@ -133,6 +153,12 @@ public class SelectTool : ICanvasTool
 
     public void OnReleased(InfiniteCanvas canvas, CanvasPointerEventArgs e)
     {
+        if (Wires.Release(canvas, e.Pointer))
+        {
+            e.Handled = true;
+            return;
+        }
+
         canvas.ReleaseMouseCapture();
 
         if (_band is { } band)
@@ -166,6 +192,8 @@ public class SelectTool : ICanvasTool
 
     public void Render(IDrawingSession session, InfiniteCanvas canvas)
     {
+        Wires.Draw(session, canvas);
+
         if (_band is not { } band || canvas.RubberBandBrush == null && canvas.SelectionBrush == null) return;
 
         var topLeft = canvas.WorldToScreen(new Vector2(band.X, band.Y));
@@ -178,6 +206,8 @@ public class SelectTool : ICanvasTool
 
     public void Cancel(InfiniteCanvas canvas)
     {
+        Wires.Cancel(canvas);
+
         _band = null;
         _grip = CanvasHandle.None;
         _startBounds.Clear();
@@ -247,7 +277,7 @@ public class SelectTool : ICanvasTool
         var probe = new Rect(world.X - reach, world.Y - reach, reach * 2, reach * 2);
 
         ICanvasItem found = null;
-        foreach (var item in canvas.Scene.ItemsIn(probe))
+        foreach (var item in canvas.ItemsHere(probe))
         {
             if (item.HitTest(world, reach)) found = item;
         }
@@ -261,6 +291,6 @@ public class SelectTool : ICanvasTool
     {
         if (canvas.Scene == null) yield break;
 
-        foreach (var item in canvas.Scene.ItemsIn(band)) yield return item;
+        foreach (var item in canvas.ItemsHere(band)) yield return item;
     }
 }

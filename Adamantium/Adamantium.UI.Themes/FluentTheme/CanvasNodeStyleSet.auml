@@ -79,13 +79,13 @@
                                                          the socket straddles the edge, so a see-through middle would
                                                          show the body on one side, the plane on the other, and the
                                                          body's own edge running between them. -->
-                                                    <Border Width="12" Height="12" CornerRadius="6" MarginLeft="-6"
+                                                    <CanvasNodeSocket Width="12" Height="12" CornerRadius="6" MarginLeft="-6"
                                                             VerticalAlignment="Center"
                                                             Background="{ObservableResource SolidBackgroundFillColorSecondary}"
                                                             BorderBrush="{Binding Color}"
                                                             BorderThickness="2">
                                                         <Border CornerRadius="4" Background="{Binding Fill}"/>
-                                                    </Border>
+                                                    </CanvasNodeSocket>
                                                     <TextBlock Text="{Binding Name}" MarginLeft="7"
                                                                VerticalAlignment="Center"
                                                                VerticalTextAlignment="Center"
@@ -116,13 +116,13 @@
                                                                VerticalAlignment="Center"
                                                                VerticalTextAlignment="Center"
                                                                Foreground="{ObservableResource TextFillColorSecondary}"/>
-                                                    <Border Width="12" Height="12" CornerRadius="6" MarginRight="-6"
+                                                    <CanvasNodeSocket Width="12" Height="12" CornerRadius="6" MarginRight="-6"
                                                             VerticalAlignment="Center"
                                                             Background="{ObservableResource SolidBackgroundFillColorSecondary}"
                                                             BorderBrush="{Binding Color}"
                                                             BorderThickness="2">
                                                         <Border CornerRadius="4" Background="{Binding Fill}"/>
-                                                    </Border>
+                                                    </CanvasNodeSocket>
                                                 </StackPanel>
                                             </DataTemplate>
                                         </ItemsControl.ItemTemplate>

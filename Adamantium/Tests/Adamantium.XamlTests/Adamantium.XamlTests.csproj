@@ -26,6 +26,14 @@
     </ItemGroup>
 
     <ItemGroup>
+      <!-- LINKED, not copied. Asking what an item DRAWS is the same question in both test assemblies, and the ones
+           that need a theme to draw at all have to be asked here - a second copy of the recorder is a second thing to
+           keep in step with the drawing interface. -->
+      <Compile Include="..\Adamantium.UITests\Rendering\RecordingDrawingSession.cs"
+               Link="Rendering\RecordingDrawingSession.cs" />
+    </ItemGroup>
+
+    <ItemGroup>
       <None Remove="XamlTest1.xml" />
       <Content Include="XamlTest1.xml">
         <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>

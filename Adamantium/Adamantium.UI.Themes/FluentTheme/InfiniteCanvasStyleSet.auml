@@ -45,6 +45,12 @@
                              panel is the glass in front of it. The canvas places them from the camera. -->
                         <CanvasElementLayer x:Name="PART_Elements"/>
 
+                        <!-- What is drawn IN FRONT of those controls. A layer is one place in paint order, so
+                             everything the canvas draws itself is behind every control on the plane - and the only way
+                             for an item to be in front of one is for something standing in front of it to draw the
+                             item. This is that something, and it takes no part in hit-testing. -->
+                        <CanvasFrontLayer x:Name="PART_Front"/>
+
                         <StackPanel x:Name="PART_OverlayRoot" Orientation="Vertical" Margin="12">
                             <Button x:Name="PART_OverlayGrip" Width="30" Height="24"
                                     MinWidth="0" MinHeight="0" Padding="0"

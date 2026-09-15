@@ -509,6 +509,11 @@ public partial class RenderCache
     private bool HasRank(IUIComponent component) => _orderByControl.ContainsKey(component);
     private long RankOf(IUIComponent component) => _orderByControl[component];
 
+    /// <summary>Where a component's drawing sits in PAINT ORDER, or null if it has none - what decides which of two
+    /// overlapping things is in front. Readable so a test can ask the question the eye asks.</summary>
+    internal long? PaintRankOf(IUIComponent component) =>
+        component != null && _orderByControl.TryGetValue(component, out var rank) ? rank : null;
+
     // The rank a component has, OR the one THIS plan is about to give it: a panel's later run of new tiles must rank
     // against tiles an EARLIER run of the same plan just planned (not yet in _orderByControl). Without this the frame
     // falls back to re-recording the whole tree.

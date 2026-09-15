@@ -95,9 +95,25 @@
     <Style Selector="Separator">
         <Setter Property="Template">
             <Setter.Value>
+                <!-- The rule takes its LENGTH from the way it runs, and is given neither by default: a length written
+                     into the template would be a number that has to be right in a menu, in a toolbar and in whatever
+                     else holds one. Each direction stretches along itself and is one pixel across. -->
                 <ControlTemplate TargetType="Separator">
-                    <Border Height="1" Margin="8 4 8 4"
-                            Background="{ResourceReference ControlStrokeColorDefault}"/>
+                    <Border x:Name="PART_Rule" Background="{ResourceReference ControlStrokeColorDefault}"/>
+
+                    <ControlTemplate.Triggers>
+                        <PropertyTrigger Property="Orientation" Value="Horizontal">
+                            <Setter TargetName="PART_Rule" Property="Height" Value="1"/>
+                            <Setter TargetName="PART_Rule" Property="HorizontalAlignment" Value="Stretch"/>
+                            <Setter TargetName="PART_Rule" Property="Margin" Value="8 4 8 4"/>
+                        </PropertyTrigger>
+
+                        <PropertyTrigger Property="Orientation" Value="Vertical">
+                            <Setter TargetName="PART_Rule" Property="Width" Value="1"/>
+                            <Setter TargetName="PART_Rule" Property="VerticalAlignment" Value="Stretch"/>
+                            <Setter TargetName="PART_Rule" Property="Margin" Value="4 2 4 2"/>
+                        </PropertyTrigger>
+                    </ControlTemplate.Triggers>
                 </ControlTemplate>
             </Setter.Value>
         </Setter>

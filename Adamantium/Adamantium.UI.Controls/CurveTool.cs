@@ -39,6 +39,10 @@ public class CurveTool : ICanvasTool
 
     public Cursor Cursor { get; set; } = Cursors.Crosshair;
 
+    /// <summary>A curve drawn by hand is part of a drawing. The curve between two sockets is a WIRE, and it is drawn by
+    /// the gesture that joins them rather than by a tool of its own.</summary>
+    public bool WorksIn(CanvasMode mode) => mode == CanvasMode.Drawing;
+
     public void OnPressed(InfiniteCanvas canvas, CanvasPointerEventArgs e)
     {
         if (e.Button != MouseButtons.Left || canvas.Scene == null) return;

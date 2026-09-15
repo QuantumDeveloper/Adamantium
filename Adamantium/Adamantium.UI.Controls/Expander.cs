@@ -126,11 +126,15 @@ public class Expander : ContentControl
         _header = null;
     }
 
-    /// <summary>Space and Enter fold the section, as they do on any header that is a button in all but name.</summary>
+    /// <summary>Space and Enter fold the section, as they do on any header that is a button in all but name.
+    /// <para>Only when the section ITSELF has the keyboard. A key event travels up from wherever it happened, so this
+    /// used to hear every space typed into every field inside the section - and folded the section away in the middle
+    /// of a word. What is inside an expander belongs to what is inside it.</para></summary>
     protected override void OnKeyDown(KeyEventArgs e)
     {
         base.OnKeyDown(e);
         if (e.Handled || !IsEnabled) return;
+        if (!ReferenceEquals(e.OriginalSource, this)) return;
 
         if (e.Key is Key.Space or Key.Enter) e.Handled = Toggle();
     }
