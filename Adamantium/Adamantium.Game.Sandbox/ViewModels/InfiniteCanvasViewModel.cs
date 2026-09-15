@@ -1,5 +1,7 @@
 using System.Collections.Generic;
+using System.Threading.Tasks;
 using Adamantium.Mathematics;
+using Adamantium.Navigation;
 using Adamantium.MVVM;
 using Adamantium.UI.Controls;
 using Adamantium.UI.Controls.Buttons;
@@ -31,10 +33,13 @@ public partial class InfiniteCanvasViewModel : TabPageViewModel
         Tools.Add(RectangleTool);
         Tools.Add(EllipseTool);
         Tools.Add(LineTool);
+        Tools.Add(ArrowTool);
+        Tools.Add(CurveTool);
         Tools.Add(PolygonTool);
         Tools.Add(ButtonTool);
         Tools.Add(CheckTool);
         Tools.Add(BoxTool);
+        Tools.Add(NodeTool);
 
         Tool = SelectTool;
 
@@ -71,6 +76,38 @@ public partial class InfiniteCanvasViewModel : TabPageViewModel
                 // NO outline at all: the fill has to keep the whole box, since there is nothing to make room for.
                 Scene.Add(new ShapeItem(CanvasShape.Rectangle, new Rect(100, 150, 140, 100),
                     new SolidColorBrush(Colors.Orange), 0, new SolidColorBrush(Colors.DeepPink)));
+
+                // A NODE of a graph, to see the control against the theme it is in. Its sockets take the theme's accent,
+                // which is what a node says with when nothing has said otherwise.
+                Scene.Add(new ElementItem(
+                    new CanvasNode { Title = "Multiply", Inputs = 2, Outputs = 1 },
+                    new Rect(-60, 180, 190, 120)));
+
+                // And the other case: sockets coloured PER PIN, the way a graph editor says what may be joined to what,
+                // with two of them docked so hollow and solid can be told apart side by side.
+                var clamp = new CanvasNode { Title = "Clamp", Inputs = 3, Outputs = 2 };
+                clamp.InputPins[0].Color = new SolidColorBrush(Colors.MediumSpringGreen);
+                clamp.InputPins[1].Color = new SolidColorBrush(Colors.Orange);
+                clamp.InputPins[2].Color = new SolidColorBrush(Colors.Orange);
+                clamp.OutputPins[0].Color = new SolidColorBrush(Colors.MediumSpringGreen);
+                clamp.InputPins[0].IsConnected = true;
+                clamp.OutputPins[0].IsConnected = true;
+                Scene.Add(new ElementItem(clamp, new Rect(200, 180, 190, 160)));
+
+                // Two arrows, one of each head, so both can be seen against the same line thickness.
+                Scene.Add(new ShapeItem(CanvasShape.Arrow, new Rect(-420, 330, 200, 0),
+                    new SolidColorBrush(Colors.White), 3));
+
+                // FAT barbs, which is where the corner at the tip either closes or does not.
+                Scene.Add(new ShapeItem(CanvasShape.Arrow, new Rect(-160, 330, 200, 60),
+                    new SolidColorBrush(Colors.MediumSpringGreen), 18)
+                { StartHead = CanvasArrowHead.Barbs, EndHead = CanvasArrowHead.Barbs });
+
+                // A plain LINE beside them, because a line and a straight ink stroke look alike on screen and behave
+                // nothing alike: the line is reshaped by its two ends and wears no frame, the stroke is ink and keeps
+                // its box. Without one here there is nothing to check that against.
+                Scene.Add(new ShapeItem(CanvasShape.Line, new Rect(100, 330, 220, 70),
+                    new SolidColorBrush(Colors.DeepSkyBlue), 6));
             }
 
             // A stroke laid ACROSS the controls, to see which of them ends up on top, plus three of decreasing alpha, to
@@ -130,10 +167,56 @@ public partial class InfiniteCanvasViewModel : TabPageViewModel
         Tool = SelectTool;
     }
 
-    private void OnSceneChanged(object sender, System.EventArgs e) => RaisePropertyChanged(nameof(Drawn));
+    private void OnSceneChanged(object sender, System.EventArgs e)
+    {
+        RaisePropertyChanged(nameof(Drawn));
+        RefreshStructure();
+    }
+
+    /// <summary>What is on the plane, TOPMOST FIRST. Reversed from paint order on purpose: the list reads top to
+    /// bottom the way the drawing is stacked front to back, which is what every editor's layer list does and what
+    /// "bring to front" then means without explanation.
+    /// <para>A fresh array every time, not the scene's own list: the same instance handed over twice is not a change,
+    /// and a list bound to it would never notice anything.</para></summary>
+    public IReadOnlyList<ICanvasItem> Structure { get; private set; } = System.Array.Empty<ICanvasItem>();
+
+    private void RefreshStructure()
+    {
+        var items = Scene.Items;
+        var listed = new ICanvasItem[items.Count];
+
+        for (var i = 0; i < items.Count; i++) listed[i] = items[items.Count - 1 - i];
+
+        Structure = listed;
+        RaisePropertyChanged(nameof(Structure));
+
+        // The row that stands for what is selected follows the selection rather than the other way round here: the
+        // list was rebuilt, and a stale row would point at an object that has left the drawing.
+        RaisePropertyChanged(nameof(Listed));
+    }
+
+    /// <summary>The row the list has picked out. Writing it selects on the plane; reading it follows what the canvas
+    /// selected, however that happened - clicking the drawing and clicking the list are one selection, not two.</summary>
+    public ICanvasItem Listed
+    {
+        get => _selection is { Count: 1 } one ? one[0] : null;
+        set
+        {
+            if (value == null || (_selection is { Count: 1 } already && ReferenceEquals(already[0], value))) return;
+
+            Selection = new[] { value };
+        }
+    }
 
     public IReadOnlyList<CanvasGridStyle> GridStyles { get; } =
         [CanvasGridStyle.Dots, CanvasGridStyle.Lines, CanvasGridStyle.None, CanvasGridStyle.Transparent];
+
+    public IReadOnlyList<CanvasArrowHead> ArrowHeads { get; } =
+        [CanvasArrowHead.None, CanvasArrowHead.Barbs, CanvasArrowHead.Triangle];
+
+    /// <summary>What was done to this drawing. The PAGE's, like the scene - undo belongs to whoever owns the drawing,
+    /// and the canvas only says where one step ends and the next begins.</summary>
+    public CanvasHistory History { get; } = new();
 
     /// <summary>The whiteboard switch: the canvas becomes glass over whatever is behind it. It writes the SAME property
     /// the grid drop-down does, because it is the same setting said two ways - and putting the mode back where it was
@@ -180,6 +263,14 @@ public partial class InfiniteCanvasViewModel : TabPageViewModel
     /// own.</summary>
     public ICanvasTool PolygonTool { get; } = new ShapeTool(CanvasShape.Polygon);
 
+    /// <summary>An arrow. Which head each end wears is a setting, so an application wanting a double-headed one beside
+    /// this builds a second of the same class.</summary>
+    public ICanvasTool ArrowTool { get; } = new ShapeTool(CanvasShape.Arrow);
+
+    /// <summary>A curve. ONE button for all three kinds - which one suits a line is decided by looking at it, so the
+    /// kind is changed in the panel afterwards rather than chosen in advance.</summary>
+    public ICanvasTool CurveTool { get; } = new CurveTool { Name = "Curve" };
+
     public ICanvasTool TextTool { get; } = new TextTool();
 
     /// <summary>Two erasers and not one with a switch: which of them you want is the same kind of choice as which tool
@@ -204,6 +295,13 @@ public partial class InfiniteCanvasViewModel : TabPageViewModel
     public ICanvasTool BoxTool { get; } =
         new ElementTool(() => new TextBox { Text = "Editable" }, new Size(160, 30))
         { Name = "Text box", Icon = "ToolTextBoxIcon", Description = "drag out a text box" };
+
+    /// <summary>A NODE of a graph. The same tool as the three above and not a mechanism of its own: a node IS a
+    /// control, which was the point of building it as one - so putting it on the plane needs nothing the canvas did not
+    /// already have.</summary>
+    public ICanvasTool NodeTool { get; } =
+        new ElementTool(() => new CanvasNode { Title = "Node", Inputs = 2, Outputs = 1 }, new Size(190, 110))
+        { Name = "Node", Icon = "ToolNodeIcon", Description = "drag out a graph node" };
 
     /// <summary>The tools the canvas offers, in the order its rail shows them. THE list - there is no second copy of
     /// it in the markup, because everything a button needs (the name, the picture, the key) is a fact about the tool.
@@ -309,10 +407,48 @@ public partial class InfiniteCanvasViewModel : TabPageViewModel
         var many => $"{many} items"
     };
 
-    [Command]
-    private void Erase()
+    /// <summary>WHAT is selected, by name.
+    /// <para>Two things that look alike on screen can be different kinds and behave differently - a straight ink stroke
+    /// and a line are the same picture, and one is reshaped by a box while the other is reshaped by its ends. Without
+    /// this the only way to tell them apart is to try a gesture and see, which is how an afternoon goes to arguing
+    /// about which of them is in front of you.</para></summary>
+    public string Chosen
     {
-        Scene.Clear();
+        get
+        {
+            if (_selection is not { Count: > 0 } chosen) return string.Empty;
+
+            return chosen.Count > 1 ? $"{chosen.Count} selected" : "Selected: " + chosen[0].Title;
+        }
+    }
+
+    /// <summary>Whether ONE object is worth a question before it goes. A switch, because with undo in place being asked
+    /// every time is noise - and which of the two a drawing wants is not knowable in advance. Clearing the WHOLE scene
+    /// always asks: there is no gesture that does it by accident, so being asked is never a surprise, and there is a lot
+    /// on the other side of the answer.</summary>
+    [Bindable] private bool _asksBeforeDelete = true;
+
+    [Command]
+    private async Task Erase()
+    {
+        if (Scene.Items.Count == 0) return;
+
+        // Resolved here rather than taken in the constructor: this page is built with `new` by the gallery, so there is
+        // nothing to inject it through, and threading a service through the gallery to reach one dialog is worse than
+        // asking the application that owns both.
+        var dialogs = Adamantium.UI.UIApplication.Current?.Container?.Resolve<IDialogService>();
+        if (dialogs != null)
+        {
+            var result = await dialogs.ShowDialogAsync<ConfirmDialogViewModel>(new NavigationParameters()
+                .Add("title", "Clear the canvas")
+                .Add("message", $"Remove all {Scene.Items.Count} objects?"));
+
+            if (result.Result != DialogButtonResult.Ok) return;
+        }
+
+        // Through the HISTORY: clearing a drawing is the one action most worth being able to take back.
+        History.Record(Scene, "Clear", Scene.Clear);
+        Selection = System.Array.Empty<ICanvasItem>();
         RaisePropertyChanged(nameof(Drawn));
     }
 
@@ -351,8 +487,16 @@ public partial class InfiniteCanvasViewModel : TabPageViewModel
         RaisePropertyChanged(nameof(ShapeSection));
         RaisePropertyChanged(nameof(TextSection));
         RaisePropertyChanged(nameof(ElementSection));
+        RaisePropertyChanged(nameof(GroupSection));
+        RaisePropertyChanged(nameof(CurveSection));
+        RaisePropertyChanged(nameof(NodeSection));
+        RaisePropertyChanged(nameof(HasPlainLabel));
+        RaisePropertyChanged(nameof(Chosen));
+        RaisePropertyChanged(nameof(IsNurbs));
         RaisePropertyChanged(nameof(HasCorners));
         RaisePropertyChanged(nameof(HasSides));
+        RaisePropertyChanged(nameof(HasHeads));
+        RaisePropertyChanged(nameof(Listed));
         RaisePropertyChanged(nameof(Face));
     }
 
@@ -373,6 +517,53 @@ public partial class InfiniteCanvasViewModel : TabPageViewModel
 
     public Visibility ElementSection => Shown<ElementItem>();
 
+    /// <summary>The node's OWN lines, under the ones every control has. A node is an ElementItem like a button is, so
+    /// the section above already gives it a place and a size; what this adds is the handful of things that make it a
+    /// node - what it is called, how many sockets down each side, and the two colours it is read by.</summary>
+    public Visibility NodeSection => ShownElement<CanvasNode>();
+
+    /// <summary>Whether the generic "what the control says" line belongs in the panel at all. A node says it in its own
+    /// Title line, and the same name written on two lines is a panel that contradicts itself the moment one of them is
+    /// edited - which it did, showing the old name above the new one.</summary>
+    public bool HasPlainLabel
+    {
+        get
+        {
+            if (_selection == null) return false;
+
+            foreach (var item in _selection)
+            {
+                if (item is ElementItem and not ElementItem { Element: CanvasNode }) return true;
+            }
+
+            return false;
+        }
+    }
+
+    public Visibility GroupSection => Shown<GroupItem>();
+
+    public Visibility CurveSection => Shown<CurveItem>();
+
+    public IReadOnlyList<CanvasCurve> Curves { get; } =
+        [CanvasCurve.Bezier, CanvasCurve.BSpline, CanvasCurve.Nurbs];
+
+    /// <summary>Degree and evenness belong to a NURBS and to nothing else - the other two curves would show two lines
+    /// that do nothing.</summary>
+    public bool IsNurbs
+    {
+        get
+        {
+            if (_selection == null) return false;
+
+            foreach (var item in _selection)
+            {
+                if (item is CurveItem { Kind: CanvasCurve.Nurbs }) return true;
+            }
+
+            return false;
+        }
+    }
+
     // Within the one Shape section, the lines that belong to ONE shape. Rounding is a rectangle's and sides are a
     // polygon's; an ellipse has neither. A line that means nothing to what is selected is worse than no line, because
     // it invites a number that will quietly do nothing.
@@ -380,22 +571,54 @@ public partial class InfiniteCanvasViewModel : TabPageViewModel
 
     public bool HasSides => HasShape(CanvasShape.Polygon);
 
+    public bool HasHeads => HasShape(CanvasShape.Arrow);
+
+    /// <summary>Takes one socket off the node holding it. The row's button hands over the socket and nothing else, so
+    /// which node it belongs to is asked of the selection - the only nodes on screen whose sockets are being shown.
+    /// <para>ASKS FIRST, under the same switch as deleting anything else on the plane. Dropping a socket takes its name,
+    /// its colour and whatever is wired to it with it, there is no undo reaching in here yet, and the button sits one
+    /// row away from the one that renames it.</para></summary>
+    [Command]
+    private async Task RemoveSocket(object which)
+    {
+        if (which is not CanvasNodePin pin || _selection == null) return;
+
+        CanvasNode holder = null;
+        foreach (var item in _selection)
+        {
+            if (item is not ElementItem { Element: CanvasNode node } || !node.Holds(pin)) continue;
+
+            holder = node;
+            break;
+        }
+
+        if (holder == null) return;
+
+        if (AsksBeforeDelete)
+        {
+            var dialogs = Adamantium.UI.UIApplication.Current?.Container?.Resolve<IDialogService>();
+            if (dialogs != null)
+            {
+                var result = await dialogs.ShowDialogAsync<ConfirmDialogViewModel>(new NavigationParameters()
+                    .Add("title", "Remove socket")
+                    .Add("message", $"Remove \"{pin.Name}\" from {holder.Title}?"));
+
+                if (result.Result != DialogButtonResult.Ok) return;
+            }
+        }
+
+        holder.Remove(pin);
+        Scene.Touch();
+    }
+
     // The CONTEXT BAR's actions. Actions and not properties: what a thing looks like is the inspector's business and
     // saying it twice would be two places to keep in step - what belongs beside the selection is what you do to it.
     [Command] private void BringToFront() => Reorder(front: true);
 
     [Command] private void SendToBack() => Reorder(front: false);
 
-    [Command] private void DeleteSelected()
-    {
-        if (_selection is not { Count: > 0 } chosen) return;
-
-        foreach (var item in chosen) Scene.Remove(item);
-
-        // Cleared THROUGH the property, because that is the one the canvas is bound to - clearing a local copy would
-        // leave a frame drawn round things that are no longer in the scene.
-        Selection = System.Array.Empty<ICanvasItem>();
-    }
+    // Deleting the selection is NOT here any more: it goes through the canvas, which asks first, so that a button and
+    // the Delete key meet the same question. See CanvasViewBehavior with Does="Delete".
 
     // Back to front when raising and front to back when lowering, so a group keeps its own order instead of being
     // reversed by each item leapfrogging the last.
@@ -477,6 +700,20 @@ public partial class InfiniteCanvasViewModel : TabPageViewModel
         foreach (var item in _selection)
         {
             if (item is T) return Visibility.Visible;
+        }
+
+        return Visibility.Collapsed;
+    }
+
+    // The same question one level down: not what KIND of item is selected, but what kind of control one of them is
+    // carrying. Every control on the plane is the same item, so its own lines can only be found this way.
+    private Visibility ShownElement<T>()
+    {
+        if (_selection == null) return Visibility.Collapsed;
+
+        foreach (var item in _selection)
+        {
+            if (item is ElementItem { Element: T }) return Visibility.Visible;
         }
 
         return Visibility.Collapsed;

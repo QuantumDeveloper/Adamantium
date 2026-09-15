@@ -96,6 +96,7 @@ public partial class RenderCache
                             case 13: _materialBatch.DrawRecordedSegment(device, op.SegId, fullScissor, _projectionMatrix); break;
                             case 14: _canvasGridBatch.DrawRecordedSegment(device, op.SegId, fullScissor, _projectionMatrix); break;
                             case 15: _inkBatch.DrawRecordedSegment(device, op.SegId, fullScissor, _projectionMatrix); break;
+                            case 16: _arrowBatch.DrawRecordedSegment(device, op.SegId, fullScissor, _projectionMatrix); break;
                             default: _textBatch.DrawRecordedSegment(device, op.SegId, fullScissor, _projectionMatrix); break;
                         }
                         break;
@@ -322,6 +323,8 @@ public partial class RenderCache
         // INK after the ground it is drawn on - and after every other fill, for the same reason the grid is: what it
         // covers is settled by OverlapsHigherLayer, not by where it flushes.
         if (_inkBatch != null) RecordSegment(15, _inkBatch.Flush(device, fullScissor, _projectionMatrix));
+        // ARROWS and plain lines beside the ink, on the same layer and settled the same way.
+        if (_arrowBatch != null) RecordSegment(16, _arrowBatch.Flush(device, fullScissor, _projectionMatrix));
         // The general instanced-fill flush is retained too: Flush records the group and returns its index, replayed via
         // ReplayFlush - so a vector icon no longer disables replay for the whole window.
         if (_instancedFill != null)

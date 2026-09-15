@@ -49,6 +49,7 @@
         <StyleInclude Source="{x:Type fluent:ZoomBoxStyleSet}"/>
         <StyleInclude Source="{x:Type fluent:InfiniteCanvasStyleSet}"/>
         <StyleInclude Source="{x:Type fluent:CanvasPaneStyleSet}"/>
+        <StyleInclude Source="{x:Type fluent:CanvasNodeStyleSet}"/>
         <StyleInclude Source="{x:Type fluent:ToggleButtonStyleSet}"/>
         <StyleInclude Source="{x:Type fluent:CheckBoxStyleSet}"/>
         <StyleInclude Source="{x:Type fluent:RadioButtonStyleSet}"/>

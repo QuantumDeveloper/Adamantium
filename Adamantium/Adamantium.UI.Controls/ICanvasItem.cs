@@ -15,6 +15,15 @@ public interface ICanvasItem
     /// this is what makes the cost of a frame depend on what is visible rather than on what exists.</summary>
     Rect Bounds { get; }
 
+    /// <summary>What to call it in a list of what is on the plane. The type's name by default, so a third-party item
+    /// shows something sensible without being asked to; anything that can say more - which shape it is, what the text
+    /// says - should.</summary>
+    string Title => GetType().Name;
+
+    /// <summary>Which grips of the manipulation frame this item offers. Everything by default, which is what a box
+    /// wants; something reshaped another way - by its own points, or by whatever it is attached to - says so.</summary>
+    CanvasHandles Handles => CanvasHandles.All;
+
     /// <summary>Whether a world point is ON this item. The tolerance is a WORLD length the canvas works out from a
     /// screen one - what counts as a hit has to be the same distance under the cursor at any zoom.</summary>
     bool HitTest(Vector2 world, double tolerance);

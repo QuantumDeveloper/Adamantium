@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using Adamantium.Mathematics;
 using Adamantium.UI.Controls.Panels;
@@ -46,8 +47,39 @@ public class CanvasElementLayer : Panel
         // floors and its content won, so it stopped shrinking and appeared to GROW as everything around it got smaller.
         for (var i = 0; i < Children.Count && i < _items.Count; i++)
         {
-            var world = _items[i].World;
-            Children[i].Measure(new Size(world.Width, world.Height));
+            var item = _items[i];
+            var world = item.World;
+
+            if (!item.SizeFollowsContent)
+            {
+                Children[i].Measure(new Size(world.Width, world.Height));
+                continue;
+            }
+
+            // WITH NOTHING IMPOSED, because a measure is clamped to what it was offered: asking a control inside its own
+            // box can only ever answer "it fits", which is what a node with four sockets in a two-socket box said while
+            // drawing them over each other, and what a node narrower than its own labels said while spilling out of its
+            // frame.
+            Children[i].Measure(new Size(Double.PositiveInfinity, Double.PositiveInfinity));
+            var natural = Children[i].DesiredSize;
+
+            var width = Math.Max(world.Width, natural.Width);
+            var height = natural.Height;
+
+            // Dragged WIDER than it needs - which is allowed, and often wanted. The height then has to be asked again
+            // at that width, because a control given more room can use it and come out shorter.
+            if (width - natural.Width > 0.5)
+            {
+                Children[i].Measure(new Size(width, Double.PositiveInfinity), force: true);
+                height = Children[i].DesiredSize.Height;
+            }
+
+            if (height <= 0) continue;
+
+            if (Math.Abs(width - world.Width) > 0.5 || Math.Abs(height - world.Height) > 0.5)
+            {
+                item.World = new Rect(world.X, world.Y, width, height);
+            }
         }
 
         // Nothing of its own: the layer is a place, not a thing with a size. Asking for room would push the canvas's

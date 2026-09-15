@@ -64,6 +64,7 @@ public partial class RenderCache
     private FractalRectCollector _fractalBatch;   // SDF family: rounded rects with an escape-time FRACTAL fill (Julia/Mandelbrot)
     private CanvasGridCollector _canvasGridBatch;   // the canvas GROUND: one quad, the fragment deciding if it is on a mark
     private InkCollector _inkBatch;   // INK: a capsule per segment of a stroke, all of them one instanced draw
+    private CanvasArrowCollector _arrowBatch;   // ARROWS and plain lines: one quad each, shaft and heads decided per pixel
     private TextureBatchCollector _texRectBatch;   // SDF family: rounded rects whose fill is SAMPLED from a texture (ImageBrush / NineSliceBrush)
     // The soft band (aura / shadow) in its TWO paint positions. An OUTER band goes under every fill; an INNER one over
     // them - drawn under, it would simply be covered by the shape's own fill. Both lazy: most windows have neither.
@@ -488,6 +489,7 @@ public partial class RenderCache
         if (_fractalBatch != null) _fractalBatch.TransformsAddress = address;
         if (_canvasGridBatch != null) _canvasGridBatch.TransformsAddress = address;
         if (_inkBatch != null) _inkBatch.TransformsAddress = address;
+        if (_arrowBatch != null) _arrowBatch.TransformsAddress = address;
         if (_texRectBatch != null) _texRectBatch.TransformsAddress = address;
         if (_materialBatch != null)
         {
@@ -790,9 +792,10 @@ public partial class RenderCache
             _haloRunsByUnit.Clear();
             _unitsByBrush.Clear();
             _brushPaintBaked.Clear();
-            _walkGroup = null; 
+            _walkGroup = null;
             _walkVersion++;
             _nodeAllAware.Clear();
+            _culledWhenRecorded.Clear();
             _nodeStragglers.Clear();   // recorded per walk, exactly like the answers above it
             _movedNodesBuf.Clear();   // a full walk re-bakes fresh node matrices - pending node moves are subsumed
             _movedOwnersBuf.Clear();  // ...and every mover's subtree along with them
@@ -824,6 +827,7 @@ public partial class RenderCache
             _fractalBatch ??= new FractalRectCollector { BatchId = 6 };
             _canvasGridBatch ??= new CanvasGridCollector { BatchId = 14 };
             _inkBatch ??= new InkCollector { BatchId = 15 };
+            _arrowBatch ??= new CanvasArrowCollector { BatchId = 16 };
             // Lazy, like the textured batch: a material owns a capture texture, and a tree without one should not pay
             // for it.
             if (_materialBatch != null) _materialBatch.BeginFrame(device);
@@ -837,6 +841,7 @@ public partial class RenderCache
             _fractalBatch.BeginFrame(device);
             _canvasGridBatch.BeginFrame(device);
             _inkBatch.BeginFrame(device);
+            _arrowBatch.BeginFrame(device);
             // Created lazily (below, on the first textured fill) - but once it exists it needs its frame reset like any
             // other collector. Leaving it out is what made a nine-slice draw for exactly ONE frame and then vanish.
             _texRectBatch?.BeginFrame(device);
@@ -942,6 +947,13 @@ public partial class RenderCache
                     // scrolled-out included) left their nodes un-aware -> every mouse frame bailed to a full walk.
                     if (_recording && NodeOf(unit.Component) is { } culledNode)
                         _nodeAllAware.TryAdd(culledNode.RenderId, true);
+
+                    // ...and REMEMBERED, for exactly as long as this op stream lives: it has no op in it, so nothing can
+                    // ever re-point it into view. A later frame that moves it back inside must WALK, not patch - see
+                    // CollectMovedSubtree, which refuses on this. Without it, a picture at the bottom of a scrolled
+                    // column that was below the fold when the stream was built stayed a blank square for good: scrolling
+                    // it into view patched a draw that had never been written.
+                    if (_recording) _culledWhenRecorded.Add(unit);
                     continue;
                 }
             }
@@ -1041,6 +1053,32 @@ public partial class RenderCache
                     continue;
                 }
                 iru.EnsureMachinery();
+                unit.Update(wt, _projectionMatrix, _renderScale);
+            }
+            else if (device != null && unit is RectangleRenderUnit aru && _arrowBatch.CanBatch(aru.RectPayload))
+            {
+                // AN ARROW or a plain LINE: one rectangle becomes one instance, and the fragment decides the whole
+                // shape - shaft and both heads - from the two ends written into it.
+                var arrowBounds = LogicalBounds(unit.Component, wt);
+                if (ClipGroupChanged(scissor, unit.Component) || OverlapsHigherLayer(9, arrowBounds, unit.Component))
+                    FlushBatches(device, fullScissor, ref scissorNarrowed);
+
+                var arrowBakeWorld = ResolveBake(device, unit.Component, wt, out var slot4Arrow);
+                FadeBySlot(unit);
+                if (_arrowBatch.TryAdd(aru.RectPayload, arrowBakeWorld, aru.FillOpacity, scissor, arrowBounds,
+                        slot4Arrow, aru.FadeSlot, RoundedClipSlot(unit.Component, fullScissor)))
+                {
+                    if (_recording)
+                    {
+                        NoteBatched(group, _arrowBatch, _arrowBatch.LastSlot);
+                        IndexUnitBrush(unit.Component, unit, aru.RectPayload.LiveBrush);
+                    }
+                    _batchScissor = scissor;
+                    _batchClip = ClipOwnerOf(unit.Component);
+                    _batchOpen = true;
+                    continue;
+                }
+                aru.EnsureMachinery();
                 unit.Update(wt, _projectionMatrix, _renderScale);
             }
             else if (device != null && unit is RectangleRenderUnit cgru && _canvasGridBatch.CanBatch(cgru.RectPayload))
@@ -1846,6 +1884,12 @@ public partial class RenderCache
         // INK, drawn on the ground and after every other fill. Same rule as the grid above: anything batched alongside
         // that was painted EARLIER has to be flushed out first, or the ink covers it.
         if (layer < 9 && (_inkBatch?.OverlapsPending(lb) ?? false))
+        {
+            return true;
+        }
+
+        // ARROWS and plain lines, on the same layer and for the same reason as the ink beside them.
+        if (layer < 9 && (_arrowBatch?.OverlapsPending(lb) ?? false))
         {
             return true;
         }
@@ -3104,6 +3148,7 @@ public partial class RenderCache
         13 => _materialBatch,
         14 => _canvasGridBatch,
         15 => _inkBatch,
+        16 => _arrowBatch,
         _ => _textBatch
     };
 

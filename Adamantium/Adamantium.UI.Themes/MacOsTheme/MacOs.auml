@@ -63,6 +63,7 @@
         <StyleInclude Source="{x:Type mac:MacOsZoomBoxStyleSet}"/>
         <StyleInclude Source="{x:Type mac:MacOsInfiniteCanvasStyleSet}"/>
         <StyleInclude Source="{x:Type mac:MacOsCanvasPaneStyleSet}"/>
+        <StyleInclude Source="{x:Type mac:MacOsCanvasNodeStyleSet}"/>
         <StyleInclude Source="{x:Type mac:MacOsTilesHostStyleSet}"/>
         <StyleInclude Source="{x:Type mac:MacOsFlipTileStyleSet}"/>
         <StyleInclude Source="{x:Type mac:MacOsGridSplitterStyleSet}"/>

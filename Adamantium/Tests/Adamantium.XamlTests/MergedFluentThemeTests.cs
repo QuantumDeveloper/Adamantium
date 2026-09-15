@@ -202,7 +202,9 @@ public class MergedFluentThemeTests
         // 55 with the InfiniteCanvas, for the same reason again.
         // 56 with the CanvasPane - the canvas's chrome became SEVERAL panels rather than one slot, and a panel is a
         // control with a template of its own. Same spirit once more: a new control, a new set.
-        Assert.That(merged.StyleIncludes.Count, Is.EqualTo(56));
+        // 57 with the CanvasNode - the block a graph editor is made of, which is a control like any other and wears the
+        // theme's own palette rather than an editor's.
+        Assert.That(merged.StyleIncludes.Count, Is.EqualTo(57));
     }
 
     [Test]

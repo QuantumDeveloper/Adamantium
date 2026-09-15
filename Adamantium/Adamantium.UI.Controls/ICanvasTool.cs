@@ -38,6 +38,14 @@ public interface ICanvasTool
     /// </summary>
     string Description => string.Empty;
 
+    /// <summary>The name of the FAMILY this tool belongs to, or empty for a tool that stands on its own.
+    /// <para>Tools sharing a group take ONE button on the rail, which opens a list of them. A rail is a column beside
+    /// the drawing and it is always too short: a family that can grow without limit - every control an application is
+    /// willing to put on the plane, say - would push everything else off the end. Which tools are in a family, and
+    /// whether there is a family at all, is the application's to say; the rail only shows what it is given.</para>
+    /// </summary>
+    string Group => string.Empty;
+
     /// <summary>The pointer this tool wears. The arrow by default, and a tool that draws should say otherwise: which
     /// tool is in hand is otherwise only told by a button in a rail the eye is not on, and a tool put down by the right
     /// button announces itself nowhere at all. The pointer is the one place a person is already looking.</summary>

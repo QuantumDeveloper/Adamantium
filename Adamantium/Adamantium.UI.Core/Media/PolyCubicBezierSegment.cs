@@ -18,8 +18,10 @@ public class PolyCubicBezierSegment : PathSegment
         IsStroked = isStroked;
     }
     
+    // Registered on THIS type. It said PolylineSegment - which this does not derive from - so every write to Points
+    // threw "not registered", and PolyCubicBezierTo has therefore never drawn anything at all.
     public static readonly AdamantiumProperty PointsProperty =
-        AdamantiumProperty.Register(nameof(Points), typeof(PointsCollection), typeof(PolylineSegment),
+        AdamantiumProperty.Register(nameof(Points), typeof(PointsCollection), typeof(PolyCubicBezierSegment),
             new PropertyMetadata(null, PropertyMetadataOptions.AffectsMeasure, PointsChangedCallback));
 
     private static void PointsChangedCallback(AdamantiumComponent a, AdamantiumPropertyChangedEventArgs e)

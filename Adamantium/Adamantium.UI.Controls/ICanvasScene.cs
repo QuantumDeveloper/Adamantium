@@ -38,6 +38,13 @@ public interface ICanvasScene
 
     bool SendToBack(ICanvasItem item);
 
+    /// <summary>Puts the scene in EXACTLY this state: these items, in this order, and nothing else.
+    /// <para>What undo needs, and the one thing the rest of this contract cannot express. Membership can be rebuilt
+    /// from <see cref="Add"/> and <see cref="Remove"/>, but ORDER cannot - and order here is paint order, so a step put
+    /// back in the wrong order is a different drawing. One call rather than a storm of them, so a scene with fifty
+    /// thousand things in it raises <see cref="Changed"/> once.</para></summary>
+    void Reset(IReadOnlyList<ICanvasItem> items);
+
     /// <summary>Says that something already in it has changed - an item moved or resized. The scene cannot notice on its
     /// own: what an item holds is the item's business.</summary>
     void Touch();

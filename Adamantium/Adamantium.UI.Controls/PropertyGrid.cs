@@ -5,6 +5,7 @@ using Adamantium.UI.Controls.Panels;
 using Adamantium.UI.Controls.Primitives;
 using Adamantium.UI.Controls.Text;
 using Adamantium.UI.Core;
+using Adamantium.UI.Core.Data;
 using Adamantium.UI.Core.Input;
 using Adamantium.UI.Core.RoutedEvents;
 
@@ -13,15 +14,21 @@ namespace Adamantium.UI.Controls;
 /// <summary>What was written, and to what. A null <see cref="Property"/> means every property of that object.</summary>
 public class PropertyValuesChangedEventArgs : EventArgs
 {
-    public PropertyValuesChangedEventArgs(object target = null, PropertyDefinition property = null)
+    public PropertyValuesChangedEventArgs(object target = null, PropertyDefinition property = null,
+        IReadOnlyList<object> targets = null)
     {
         Target = target;
         Property = property;
+        Targets = targets ?? (target == null ? Array.Empty<object>() : new[] { target });
     }
 
     public object Target { get; }
 
     public PropertyDefinition Property { get; }
+
+    /// <summary>EVERY object the write goes to. One line of an inspector can be pointed at a whole selection, and
+    /// something recording the change - undo - has to know about all of them, not only the first.</summary>
+    public IReadOnlyList<object> Targets { get; }
 }
 
 /// <summary>An inspector: names on the left, values on the right, one draggable grip between them, rows grouped into
@@ -101,6 +108,7 @@ public class PropertyGrid : Control
     private readonly List<PropertyRow> _rows = new();
     private readonly List<PropertySection> _openedBySearch = new();
     private readonly List<PropertyDefinition> _watched = new();
+    private readonly List<INotifyCollectionChanged> _followed = new();
     private bool _rebuilding;
     private bool _rebuildAgain;
     private Panel _host;
@@ -232,6 +240,10 @@ public class PropertyGrid : Control
     /// <summary>Raised after a value has been written.</summary>
     public event EventHandler<PropertyValuesChangedEventArgs> ValueChanged;
 
+    /// <summary>Raised BEFORE a value is written - the one moment at which what is about to be replaced can still be
+    /// read. Not cancellable: it exists so a change can be REMEMBERED, not refused.</summary>
+    public event EventHandler<PropertyValuesChangedEventArgs> ValueChanging;
+
     /// <summary>Rebuilds every section's rows - after the sections change, the object changes, or a composite folds.</summary>
     public void Rebuild()
     {
@@ -270,6 +282,7 @@ public class PropertyGrid : Control
         // row could never hear the change that brings it back. This is what makes IsVisible mean anything after the
         // first pass - an inspector whose lines come and go with what is selected asks for exactly that.
         Watch();
+        Unfollow();
 
         if (_host == null) return;
 
@@ -345,16 +358,36 @@ public class PropertyGrid : Control
 
     /// <summary>What a definition holds on ONE object, read through its binding. For a question asked once - a test, a
     /// report; a row on screen keeps its bindings live instead.</summary>
-    public object ValueOf(object target, PropertyDefinition definition)
+    public object ValueOf(object target, PropertyDefinition definition) => Read(target, definition?.Binding);
+
+    /// <summary>What a BINDING answers on one object, asked once. The same question <see cref="ValueOf"/> asks, for a
+    /// caller holding a binding that belongs to no line of its own - an items list naming each of its items.</summary>
+    public object Read(object target, BindingBase binding)
     {
-        if (target == null || definition?.Binding == null) return null;
+        if (target == null || binding == null) return null;
 
         var probe = new BoundValue();
-        probe.PointAt(target, definition.Binding);
+        probe.PointAt(target, binding);
         var value = probe.Value;
         probe.Release();
 
         return value;
+    }
+
+    /// <summary>Writes one value to ONE object through a definition's binding - the mirror of <see cref="ValueOf"/>,
+    /// and for the same kind of caller: something that knows what it wants written and has no row to write it through.
+    /// <para>Undo is that caller. A step that puts a colour back cannot go through a ROW, because by then the rows may
+    /// be showing something else entirely - or nothing.</para></summary>
+    public bool WriteTo(object target, PropertyDefinition definition, object value)
+    {
+        if (target == null || definition?.Binding == null) return false;
+
+        var probe = new BoundValue();
+        probe.PointAt(target, definition.Binding);
+        probe.Value = value;
+        probe.Release();
+
+        return true;
     }
 
     /// <summary>What a definition holds across SEVERAL objects: their common value, or nothing at all when they differ -
@@ -383,13 +416,20 @@ public class PropertyGrid : Control
     {
         if (row?.Definition == null || row.IsReadOnly) return false;
 
+        var about = new PropertyValuesChangedEventArgs(row.Targets.Count > 0 ? row.Targets[0] : null,
+            row.Definition, row.Targets);
+
+        // BEFORE anything is written, because that is the only moment the previous value still exists. Undo is what
+        // wants it: a colour or a width leaves no trace in a comparison of where things are, so the only way to take
+        // one back is to have read it while it was still there.
+        ValueChanging?.Invoke(this, about);
+
         // INTO the value first, where the definition says the value is an object with parts rather than a thing to be
         // replaced. Nothing is written through the binding then: the property still points at the same object, which is
         // the whole point - everything else holding it follows.
         if (row.Definition.WriteInto(row.Value, edited))
         {
-            ValueChanged?.Invoke(this, new PropertyValuesChangedEventArgs(row.Targets.Count > 0 ? row.Targets[0] : null,
-                row.Definition));
+            ValueChanged?.Invoke(this, about);
             Refresh(null, row.Definition);
             return true;
         }
@@ -398,8 +438,7 @@ public class PropertyGrid : Control
         if (!row.Definition.TryConvert(edited, row.ValueType, out var value)) return false;
         if (!row.WriteValue(value)) return false;
 
-        ValueChanged?.Invoke(this, new PropertyValuesChangedEventArgs(row.Targets.Count > 0 ? row.Targets[0] : null,
-            row.Definition));
+        ValueChanged?.Invoke(this, about);
         Refresh(null, row.Definition);
         return true;
     }
@@ -558,8 +597,67 @@ public class PropertyGrid : Control
         if (!composite.IsExpanded && !searching) return;
 
         var inside = searching && Carries(composite.Header as String, wanted) ? null : wanted;
+
+        if (definition is ItemsProperty items)
+        {
+            AddItemRows(host, items, targets, depth, inside);
+            return;
+        }
+
         foreach (var child in composite.Children) AddRow(host, child, targets, depth + 1, inside);
     }
+
+    // A group of rows PER ELEMENT: the same child definitions over and over, each time pointed at one item. Nothing is
+    // copied - a definition already serves several targets at once, which is what multi-selection is - so a list of
+    // twenty sockets costs twenty sets of rows and not twenty sets of definitions.
+    private void AddItemRows(Panel host, ItemsProperty items, IReadOnlyList<object> targets, int depth, String wanted)
+    {
+        // ONE object's list, not several. Two selected nodes have two lists of sockets and no common one, and showing
+        // either of them under a heading that claims to be about both would be a lie an edit then acts on.
+        if (targets.Count != 1 || ValueOf(targets[0], items) is not IEnumerable source) return;
+
+        Follow(source);
+
+        var index = 0;
+        foreach (var item in source)
+        {
+            if (item == null) continue;
+
+            index++;
+
+            var label = new ItemHeaderLine
+            {
+                Header = Read(item, items.ItemHeader) ?? index.ToString(),
+                ShowActionButton = items.ItemAction != null,
+                ActionCommand = items.ItemAction,
+                ActionIcon = items.ItemActionIcon,
+                ActionTip = items.ItemActionTip
+            };
+
+            AddRow(host, label, new[] { item }, depth + 1, wanted);
+
+            foreach (var child in items.Children) AddRow(host, child, new[] { item }, depth + 2, wanted);
+        }
+    }
+
+    // The collections an ItemsProperty is showing, for as long as it is showing them. A socket added or dropped is a
+    // ROW appearing or going, which no amount of re-reading values can do - the rows have to be built again.
+    private void Follow(IEnumerable source)
+    {
+        if (source is not INotifyCollectionChanged live || _followed.Contains(live)) return;
+
+        live.CollectionChanged += OnFollowedChanged;
+        _followed.Add(live);
+    }
+
+    private void Unfollow()
+    {
+        foreach (var live in _followed) live.CollectionChanged -= OnFollowedChanged;
+
+        _followed.Clear();
+    }
+
+    private void OnFollowedChanged(object sender, NotifyCollectionChangedEventArgs e) => Rebuild();
 
     private void Watch()
     {

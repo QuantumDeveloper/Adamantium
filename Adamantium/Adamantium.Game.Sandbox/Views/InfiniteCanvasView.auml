@@ -47,6 +47,7 @@
             <InfiniteCanvas x:Name="Canvas"
                             GridStyle="{Binding GridStyle}"
                             Scene="{Binding Scene}"
+                            History="{Binding History}"
                             Tools="{Binding Tools}"
                             Selection="{Binding Selection, Mode=TwoWay}"
                             Tool="{Binding Tool}"
@@ -66,6 +67,13 @@
                             OverlayPlacement="TopLeft"
                             Scale="{Binding Scale, Mode=TwoWay}"
                             Offset="{Binding Offset, Mode=TwoWay}">
+                <!-- The question before anything leaves the drawing. On the CANVAS, because a dialog is answered later
+                     and a key press cannot be held open while it is: the canvas hands the deletion over and the
+                     behavior does it when the answer arrives. -->
+                <InfiniteCanvas.Behaviors>
+                    <behaviors:CanvasConfirmDeleteBehavior Asks="{Binding AsksBeforeDelete}"/>
+                </InfiniteCanvas.Behaviors>
+
                 <!-- The OVERLAY: on the glass, not on the plane. It neither moves nor scales with the camera, and the
                      canvas carries the LAYER while this content is the page's - which is how somebody who wants
                      different tools puts their own here instead of building a panel around the canvas. The grip above
@@ -98,7 +106,9 @@
                         <!-- MAX height, not height. A stated height is claimed whether or not there is anything to put
                              in it, so a short face left a tall empty strip under the last row - the panel looked like
                              it had lost something. A ceiling shrinks to the content and still scrolls past it. -->
-                        <ScrollViewer MaxHeight="300" Visibility="{Binding ToolFace}"
+                        <!-- The rows SCROLL and the bin does NOT. -->
+                        <Grid RowDefinitions="*,Auto" Visibility="{Binding ToolFace}">
+                        <ScrollViewer Grid.Row="0" MaxHeight="300"
                                       VerticalScrollBarVisibility="Hidden" HorizontalScrollBarVisibility="Disabled">
                         <StackPanel Orientation="Vertical" Width="228">
 
@@ -143,6 +153,10 @@
                                                     ItemsSource="{Binding GridStyles}"/>
                                     <BooleanProperty Header="Snap" Binding="{Binding SnapToGrid}"/>
                                     <BooleanProperty Header="Readout" Binding="{Binding ShowReadout}"/>
+                                    <!-- Only for ONE object. Clearing the whole scene always asks, and that is not a
+                                         setting: nothing does it by accident, so the question is never a surprise. -->
+                                    <BooleanProperty Header="Confirm" Binding="{Binding AsksBeforeDelete}"
+                                                     Description="Ask before removing what is selected. Clearing the whole canvas always asks."/>
                                     <ColorProperty Header="Snap mark" Binding="{Binding SnapColor}"/>
                                     <NumericProperty Header="Mark size" Binding="{Binding SnapMarkSize}"
                                                      Minimum="3" Maximum="24" Step="1" ShowButtons="False"/>
@@ -151,16 +165,18 @@
                                     <BooleanProperty Header="Design" Binding="{Binding DesignMode}"/>
                                 </PropertySection>
                             </PropertyGrid>
-
-                            <!-- The BIN is not a setting and not a tool: it is one action on the whole drawing, so it
-                                 stands apart from the rows rather than pretending to be one. -->
-                            <Button Width="30" Height="28" MinWidth="0" MinHeight="0" Padding="0"
-                                    HorizontalAlignment="Left" Margin="0,10,0,0" ToolTip="Clear the canvas"
-                                    Command="{Binding EraseCommand}">
-                                <Image Source="{ObservableResource ClearAllIcon}" Width="13" Height="13"/>
-                            </Button>
                         </StackPanel>
                         </ScrollViewer>
+
+                        <!-- The BIN is not a setting and not a tool: it is one action on the whole drawing, so it
+                             stands apart from the rows rather than pretending to be one - and it stays put while
+                             they scroll, because an action that has to be scrolled to is one nobody finds. -->
+                        <Button Grid.Row="1" Width="30" Height="28" MinWidth="0" MinHeight="0" Padding="0"
+                                HorizontalAlignment="Left" Margin="0,10,0,0" ToolTip="Clear the canvas"
+                                Command="{Binding EraseCommand}">
+                            <Image Source="{ObservableResource BinIcon}" Width="13" Height="13"/>
+                        </Button>
+                        </Grid>
 
                         <!-- The SECOND face. Several objects at once are not a special case here - the grid shows the
                              value they share and says "different" when they do not, and writes to every one of them.
@@ -174,6 +190,10 @@
                                  item and nobody repaints; this tells the scene, and the canvas draws it again. -->
                             <PropertyGrid.Behaviors>
                                 <behaviors:InspectorRedrawBehavior Scene="{Binding Scene}"/>
+                                <!-- ...and into the history. A comparison of where things are cannot see a colour or a
+                                     thickness change, so a line written here records its own step. -->
+                                <behaviors:InspectorHistoryBehavior History="{Binding History}"
+                                                                    Scene="{Binding Scene}"/>
                             </PropertyGrid.Behaviors>
 
                             <!-- No steppers on the numbers here. They cost width, and in a panel this narrow that
@@ -227,6 +247,20 @@
                                 <NumericProperty Header="Sides" Binding="{Binding Sides}"
                                                  Minimum="3" Maximum="64" Step="1" Decimals="0"
                                                  ShowButtons="False" IsVisible="{Binding HasSides}"/>
+                                <!-- The head is measured in LINE THICKNESSES, so it stays part of its own line however
+                                     thick the line is made. -->
+                                <CompositeProperty Header="Head" IsVisible="{Binding HasHeads}">
+                                    <ChoiceProperty Header="Start" Binding="{Binding StartHead}"
+                                                    ItemsSource="{Binding ArrowHeads}"/>
+                                    <ChoiceProperty Header="End" Binding="{Binding EndHead}"
+                                                    ItemsSource="{Binding ArrowHeads}"/>
+                                    <NumericProperty Header="Length" Binding="{Binding HeadLength}"
+                                                     Minimum="0.5" Maximum="20" Step="0.2" ShowButtons="False"
+                                                     Description="How long the head is, measured in line thicknesses"/>
+                                    <NumericProperty Header="Width" Binding="{Binding HeadWidth}"
+                                                     Minimum="0.5" Maximum="20" Step="0.2" ShowButtons="False"
+                                                     Description="How wide the head is across its base, in line thicknesses"/>
+                                </CompositeProperty>
                                 <CompositeProperty Header="Position">
                                     <NumericProperty Header="X" Binding="{Binding X}" Step="1" ShowButtons="False"/>
                                     <NumericProperty Header="Y" Binding="{Binding Y}" Step="1" ShowButtons="False"/>
@@ -236,6 +270,18 @@
                                                      Minimum="0.01" ShowButtons="False"/>
                                     <NumericProperty Header="Height" Binding="{Binding Height}" Step="1"
                                                      Minimum="0.01" ShowButtons="False"/>
+                                </CompositeProperty>
+                                <!-- ONE transform, not two tools: a turn and a lean are the same kind of statement
+                                     about a shape, and kept apart they would be two coordinate systems in one item.
+                                     About the MIDDLE of its own box, which is what turning means to a hand. -->
+                                <CompositeProperty Header="Transform">
+                                    <NumericProperty Header="Angle" Binding="{Binding Angle}"
+                                                     Minimum="-360" Maximum="360" Step="5" ShowButtons="False"
+                                                     Description="Degrees clockwise, about the middle of the shape"/>
+                                    <NumericProperty Header="Skew X" Binding="{Binding SkewX}"
+                                                     Minimum="-89" Maximum="89" Step="5" ShowButtons="False"/>
+                                    <NumericProperty Header="Skew Y" Binding="{Binding SkewY}"
+                                                     Minimum="-89" Maximum="89" Step="5" ShowButtons="False"/>
                                 </CompositeProperty>
                             </PropertySection>
 
@@ -254,9 +300,58 @@
                             <!-- A CONTROL on the plane. Its label first, because that is the thing a person wants to
                                  change about a button they have just put down and the one thing there was no way to
                                  change at all; then where it is and how big, one number at a time. -->
+                            <!-- A CURVE is one item for three kinds, and the kind is CHANGED here: which curve suits a
+                                 line is decided by looking at it, not before drawing it. Degree and evenness belong to
+                                 a NURBS alone. -->
+                            <PropertySection Header="Curve" IsExpanded="True"
+                                             Visibility="{Binding CurveSection}">
+                                <ChoiceProperty Header="Kind" Binding="{Binding Kind}"
+                                                ItemsSource="{Binding Curves}"/>
+                                <SolidColorBrushProperty Header="Stroke" Binding="{Binding Stroke}"/>
+                                <NumericProperty Header="Thickness" Binding="{Binding Thickness}"
+                                                 Minimum="0.1" Maximum="400" Step="1" ShowButtons="False"/>
+                                <NumericProperty Header="Points" Binding="{Binding Count}" IsReadOnly="True"
+                                                 Decimals="0" ShowButtons="False"/>
+                                <NumericProperty Header="Degree" Binding="{Binding Degree}"
+                                                 Minimum="0" Maximum="16" Step="1" Decimals="0" ShowButtons="False"
+                                                 IsVisible="{Binding IsNurbs}"
+                                                 Description="Zero lets the degree follow the number of points"/>
+                                <BooleanProperty Header="Even" Binding="{Binding IsUniform}"
+                                                 IsVisible="{Binding IsNurbs}"
+                                                 Description="Whether the knots are evenly spaced"/>
+                                <CompositeProperty Header="Position">
+                                    <NumericProperty Header="X" Binding="{Binding Bounds.X}" IsReadOnly="True"
+                                                     ShowButtons="False"/>
+                                    <NumericProperty Header="Y" Binding="{Binding Bounds.Y}" IsReadOnly="True"
+                                                     ShowButtons="False"/>
+                                </CompositeProperty>
+                            </PropertySection>
+
+                            <!-- A GROUP has no colour and no thickness of its own - what it has is a place, a size and
+                                 a count. Without this section the panel went blank the moment anything was grouped,
+                                 which reads as something broken rather than as "nothing to set here". -->
+                            <PropertySection Header="Group" IsExpanded="True"
+                                             Visibility="{Binding GroupSection}">
+                                <NumericProperty Header="Holds" Binding="{Binding Count}" IsReadOnly="True"
+                                                 Decimals="0" ShowButtons="False"/>
+                                <CompositeProperty Header="Position">
+                                    <NumericProperty Header="X" Binding="{Binding X}" Step="1" ShowButtons="False"/>
+                                    <NumericProperty Header="Y" Binding="{Binding Y}" Step="1" ShowButtons="False"/>
+                                </CompositeProperty>
+                                <CompositeProperty Header="Size">
+                                    <NumericProperty Header="Width" Binding="{Binding Width}" Step="1"
+                                                     Minimum="0.01" ShowButtons="False"/>
+                                    <NumericProperty Header="Height" Binding="{Binding Height}" Step="1"
+                                                     Minimum="0.01" ShowButtons="False"/>
+                                </CompositeProperty>
+                            </PropertySection>
+
                             <PropertySection Header="Control" IsExpanded="True"
                                              Visibility="{Binding ElementSection}">
-                                <StringProperty Header="Label" Binding="{Binding Label}"/>
+                                <!-- Hidden for a NODE, which has a Title line of its own: the two wrote the same name,
+                                     and two lines writing one thing disagree the moment one of them is used. -->
+                                <StringProperty Header="Label" Binding="{Binding Label}"
+                                                IsVisible="{Binding HasPlainLabel}"/>
                                 <CompositeProperty Header="Position">
                                     <NumericProperty Header="X" Binding="{Binding X}" Step="1"
                                                      ShowButtons="False"/>
@@ -301,6 +396,57 @@
                                                      Minimum="0" Maximum="40" Step="1" ShowButtons="False"/>
                                 </CompositeProperty>
                             </PropertySection>
+
+                            <!-- THE NODE's own lines, under the ones every control has - a node is an ElementItem like
+                                 a button is, so its place and size are already stated above and only what makes it a
+                                 node is here. Straight THROUGH to the control, the same way the Look lines above reach
+                                 it: what is selected on the plane is the item, so the path starts at Element. -->
+                            <PropertySection Header="Node" IsExpanded="True"
+                                             Visibility="{Binding NodeSection}">
+                                <StringProperty Header="Title" Binding="{Binding Element.Title}"/>
+
+                                <!-- The strip's colour: what a graph editor says the KIND of a node with, and the reason
+                                     a screenful of them can be read at a glance. -->
+                                <SolidColorBrushProperty Header="Accent" Binding="{Binding Element.Accent}"/>
+
+                                <!-- How many, and what a new one is coloured. Growing a count keeps the sockets that
+                                     survive, so a name or a colour put on the first three is not lost by asking for a
+                                     fourth. -->
+                                <CompositeProperty Header="Sockets">
+                                    <NumericProperty Header="Inputs" Binding="{Binding Element.Inputs}"
+                                                     Minimum="0" Maximum="32" Step="1" Decimals="0"
+                                                     ShowButtons="False"/>
+                                    <NumericProperty Header="Outputs" Binding="{Binding Element.Outputs}"
+                                                     Minimum="0" Maximum="32" Step="1" Decimals="0"
+                                                     ShowButtons="False"/>
+                                    <SolidColorBrushProperty Header="Color" Binding="{Binding Element.PinColor}"/>
+                                </CompositeProperty>
+
+                                <!-- THE SOCKETS THEMSELVES, one group of lines each. A count can say how many there are
+                                     and nothing else - what each one is CALLED and what colour it wears are the things
+                                     a graph is actually read by, and they are per socket. The button beside a socket's
+                                     name drops THAT one: asked through the count, "drop the second of three" takes the
+                                     third away and leaves the second sitting there. -->
+                                <ItemsProperty Header="In" IsExpanded="True"
+                                               Binding="{Binding Element.InputPins}"
+                                               ItemHeader="{Binding Name}"
+                                               ItemAction="{Binding RemoveSocketCommand}"
+                                               ItemActionIcon="BinIcon"
+                                               ItemActionTip="Remove this socket">
+                                    <StringProperty Header="Name" Binding="{Binding Name}"/>
+                                    <SolidColorBrushProperty Header="Color" Binding="{Binding Color}"/>
+                                </ItemsProperty>
+
+                                <ItemsProperty Header="Out" IsExpanded="True"
+                                               Binding="{Binding Element.OutputPins}"
+                                               ItemHeader="{Binding Name}"
+                                               ItemAction="{Binding RemoveSocketCommand}"
+                                               ItemActionIcon="BinIcon"
+                                               ItemActionTip="Remove this socket">
+                                    <StringProperty Header="Name" Binding="{Binding Name}"/>
+                                    <SolidColorBrushProperty Header="Color" Binding="{Binding Color}"/>
+                                </ItemsProperty>
+                            </PropertySection>
                         </PropertyGrid>
                         </Grid>
                     </CanvasPane>
@@ -326,15 +472,45 @@
                                                VerticalAlignment="Stretch"
                                                ToolTip="Color of what is selected"
                                                SelectedColor="{Binding SelectionColor, Mode=TwoWay}"/>
-                            <Button Content="Front" Height="24" MinWidth="0" MarginLeft="4" Padding="7,0"
+                            <!-- PICTURES, not words. The bar stands over the drawing and follows what is selected, so
+                                 every pixel of it covers something worth seeing; and the rest of the chrome is already
+                                 on pictures, so three words in the middle of it read as a different control. What each
+                                 one does is said by its tooltip, which is where a word belongs. -->
+                            <Button Width="26" Height="24" MinWidth="0" MinHeight="0" MarginLeft="4" Padding="0"
                                     ToolTip="Bring to the front of paint order"
-                                    Command="{Binding BringToFrontCommand}"/>
-                            <Button Content="Back" Height="24" MinWidth="0" MarginLeft="4" Padding="7,0"
+                                    Command="{Binding BringToFrontCommand}">
+                                <Image Source="{ObservableResource BringToFrontIcon}" Width="13" Height="13"/>
+                            </Button>
+                            <Button Width="26" Height="24" MinWidth="0" MinHeight="0" MarginLeft="4" Padding="0"
                                     ToolTip="Send to the back"
-                                    Command="{Binding SendToBackCommand}"/>
-                            <Button Content="Delete" Height="24" MinWidth="0" MarginLeft="4" Padding="7,0"
-                                    ToolTip="Remove it from the drawing"
-                                    Command="{Binding DeleteSelectedCommand}"/>
+                                    Command="{Binding SendToBackCommand}">
+                                <Image Source="{ObservableResource SendToBackIcon}" Width="13" Height="13"/>
+                            </Button>
+                            <Button Width="26" Height="24" MinWidth="0" MinHeight="0" MarginLeft="4" Padding="0"
+                                    ToolTip="Make one thing of it (Ctrl+G)">
+                                <Button.Behaviors>
+                                    <behaviors:CanvasViewBehavior Canvas="{Binding ElementName=Canvas}" Does="Group"/>
+                                </Button.Behaviors>
+                                <Image Source="{ObservableResource GroupIcon}" Width="13" Height="13"/>
+                            </Button>
+                            <Button Width="26" Height="24" MinWidth="0" MinHeight="0" MarginLeft="4" Padding="0"
+                                    ToolTip="Break it open again (Ctrl+Shift+G)">
+                                <Button.Behaviors>
+                                    <behaviors:CanvasViewBehavior Canvas="{Binding ElementName=Canvas}" Does="Ungroup"/>
+                                </Button.Behaviors>
+                                <Image Source="{ObservableResource UngroupIcon}" Width="13" Height="13"/>
+                            </Button>
+
+                            <!-- Through the CANVAS, not through a command on the page: the canvas asks before it takes
+                                 anything out, and a button that went round it would be a second way to delete that
+                                 never met the question. -->
+                            <Button Width="26" Height="24" MinWidth="0" MinHeight="0" MarginLeft="4" Padding="0"
+                                    ToolTip="Remove it from the drawing">
+                                <Button.Behaviors>
+                                    <behaviors:CanvasViewBehavior Canvas="{Binding ElementName=Canvas}" Does="Delete"/>
+                                </Button.Behaviors>
+                                <Image Source="{ObservableResource BinIcon}" Width="13" Height="13"/>
+                            </Button>
                         </StackPanel>
                     </CanvasPane>
 
@@ -343,8 +519,48 @@
                          part of the edge, and writing Scale by hand would zoom about the world's origin instead -
                          wherever that happens to be, usually off screen. Hence a behavior, like every other
                          no-code-behind wiring here. -->
-                    <CanvasPane Placement="BottomCenter" Kind="Bar" IsDocked="True" MinWidth="188">
+                    <!-- WHAT IS ON THE PLANE, topmost first - the same order the drawing is stacked in, so "bring to
+                         front" needs no explaining. Clicking a row selects it on the plane, because there is one
+                         selection and not two; a DOUBLE click takes the camera to it, which is the only way to find
+                         something that has been left far outside the viewport. -->
+                    <!-- FOLDED to begin with, and under the inspector in the same slot: both are tall, and a panel
+                         that is wanted now and then should not take the room of one that is wanted always. The grip
+                         above it brings it back. -->
+                    <CanvasPane Placement="TopRight" Kind="Sheet" Header="Structure" CanDrag="True" IsOpen="False">
+                        <ListBox Width="212" MaxHeight="190" MinWidth="0"
+                                 ItemsSource="{Binding Structure}"
+                                 SelectedItem="{Binding Listed, Mode=TwoWay}">
+                            <ListBox.Behaviors>
+                                <behaviors:CanvasZoomToBehavior Canvas="{Binding ElementName=Canvas}"/>
+                            </ListBox.Behaviors>
+                            <ListBox.ItemTemplate>
+                                <DataTemplate>
+                                    <TextBlock Text="{Binding Title}" TextTrimming="CharEllipses"/>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
+                    </CanvasPane>
+
+                    <CanvasPane Placement="BottomCenter" Kind="Bar" IsDocked="True" MinWidth="248">
                         <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                            <!-- Undo and redo live BESIDE the view controls, not in the selection bar: they are about
+                                 the drawing as a whole, and the selection bar is not there when there is nothing
+                                 selected - which is exactly when the last thing done often needs taking back. -->
+                            <Button Width="28" Height="26" MinWidth="0" Padding="0" MarginRight="6"
+                                    ToolTip="Undo (Ctrl+Z)">
+                                <Button.Behaviors>
+                                    <behaviors:CanvasViewBehavior Canvas="{Binding ElementName=Canvas}" Does="Undo"/>
+                                </Button.Behaviors>
+                                <Image Source="{ObservableResource UndoIcon}" Width="13" Height="13"/>
+                            </Button>
+                            <Button Width="28" Height="26" MinWidth="0" Padding="0" MarginRight="10"
+                                    ToolTip="Redo (Ctrl+Y)">
+                                <Button.Behaviors>
+                                    <behaviors:CanvasViewBehavior Canvas="{Binding ElementName=Canvas}" Does="Redo"/>
+                                </Button.Behaviors>
+                                <Image Source="{ObservableResource RedoIcon}" Width="13" Height="13"/>
+                            </Button>
+
                             <Button Content="-" Width="28" Height="26" MinWidth="0" Padding="0"
                                     ToolTip="Zoom out">
                                 <Button.Behaviors>
@@ -383,6 +599,10 @@
             <TextBlock Text="{Binding Camera}" Foreground="{ObservableResource TextFillColorSecondary}"/>
             <TextBlock Text="{Binding Drawn}" Margin="24,0,0,0"
                        Foreground="{ObservableResource TextFillColorSecondary}"/>
+            <!-- WHAT is selected. A straight ink stroke and a line are the same picture on screen and are reshaped in
+                 different ways, so which one is in front of you has to be readable rather than guessed at. -->
+            <TextBlock Text="{Binding Chosen}" Margin="24,0,0,0"
+                       Foreground="{ObservableResource TextFillColorPrimary}"/>
         </StackPanel>
     </Grid>
 </View>

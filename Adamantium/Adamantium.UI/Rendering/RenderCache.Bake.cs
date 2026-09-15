@@ -48,6 +48,10 @@ public partial class RenderCache
     // moved node with ANY non-aware content (world-baked text, per-unit draws) can't take the slot-write fast path -> the
     // frame falls back to the full walk.
     private readonly Dictionary<Guid, bool> _nodeAllAware = new();
+
+    // The units this op stream left OUT because they were entirely outside their clip. They have no op in it, so nothing
+    // can re-point them into view: a frame that moves one back inside has to walk. Lives exactly as long as the stream.
+    private readonly HashSet<Core.Graphics.IRenderUnit> _culledWhenRecorded = new();
     // ...and WHO they are. A "no" used to be a bare bool, so a node that could not move all of its content by writing
     // one matrix surrendered the whole frame to the walk - and one turned label inside a sliding view is enough for
     // that (measured on the stand: "ViewboxView <- Border", every frame of every slide involving that tab). Knowing
@@ -821,8 +825,10 @@ public partial class RenderCache
                 // of walking there was nothing left to bring those icons in. Measured: clip 54,168,1172,498 against
                 // icons at y=716..1164, and the page came right only when a 4K window made the viewport tall enough to
                 // cull nothing. Asked of the CURRENT world, so it catches both directions.
+                // Culled NOW - it is on its way out and a patch would leave its old draw behind. Culled WHEN THE STREAM
+                // WAS BUILT - it is on its way in and there is no draw to patch at all. Both want the walk.
                 ResolveScissor(u.Component, World(u.Component), _cullScissor, out _, out var culled);
-                if (culled) return false;
+                if (culled || _culledWhenRecorded.Contains(u)) return false;
 
                 if (HoldsInstances(u) && !IsSlotPatchable(u)) return false;
             }

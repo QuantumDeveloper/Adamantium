@@ -76,6 +76,19 @@ public abstract class PropertyDefinition : FundamentalUIComponent
     public static readonly AdamantiumProperty ActionCommandParameterProperty = AdamantiumProperty.Register(
         nameof(ActionCommandParameter), typeof(object), typeof(PropertyDefinition), new PropertyMetadata(null));
 
+    /// <summary>The KEY of the picture on the action button, resolved live against the theme. Empty leaves the three
+    /// dots the button wears by default.
+    /// <para>Three dots mean "there is more" - a file to pick, a longer form to open. A button that DOES something on
+    /// the spot has to look like the thing it does, or the first press is the way you find out: a dotted button that
+    /// silently dropped a socket is not an inspector row, it is a trap.</para></summary>
+    public static readonly AdamantiumProperty ActionIconProperty = AdamantiumProperty.Register(nameof(ActionIcon),
+        typeof(String), typeof(PropertyDefinition), new PropertyMetadata(null));
+
+    /// <summary>What the action button says it will do, on hover. "More" is what an undecorated one says, and it is a
+    /// promise the button has to keep.</summary>
+    public static readonly AdamantiumProperty ActionTipProperty = AdamantiumProperty.Register(nameof(ActionTip),
+        typeof(String), typeof(PropertyDefinition), new PropertyMetadata(null));
+
     /// <summary>What the value looks like when nobody is editing it. Null means the default look for its kind.</summary>
     public static readonly AdamantiumProperty ValueTemplateProperty = AdamantiumProperty.Register(nameof(ValueTemplate),
         typeof(DataTemplate), typeof(PropertyDefinition), new PropertyMetadata(null));
@@ -133,6 +146,18 @@ public abstract class PropertyDefinition : FundamentalUIComponent
     {
         get => GetValue<ICommand>(ActionCommandProperty);
         set => SetValue(ActionCommandProperty, value);
+    }
+
+    public String ActionIcon
+    {
+        get => GetValue<String>(ActionIconProperty);
+        set => SetValue(ActionIconProperty, value);
+    }
+
+    public String ActionTip
+    {
+        get => GetValue<String>(ActionTipProperty);
+        set => SetValue(ActionTipProperty, value);
     }
 
     public object ActionCommandParameter
@@ -464,14 +489,23 @@ public class SolidColorBrushProperty : PropertyDefinition
 
     protected internal override bool WriteInto(object current, object edited)
     {
-        if (current is not SolidColorBrush { IsFrozen: false } brush || edited is not Color colour) return false;
+        // NOT into a brush the object is only holding. A theme's brush is handed to everything that asks for that
+        // colour, so writing into it recoloured the whole application from one node's title strip - and the two lines
+        // of a node that both start at the accent looked like one line, because they were pointed at one object. An
+        // edit there means "this object overrides the theme", which is a NEW brush on the object and nothing else
+        // touched.
+        if (current is not SolidColorBrush { IsFrozen: false, IsShared: false } brush ||
+            edited is not Color colour)
+        {
+            return false;
+        }
 
         brush.Color = colour;
         return true;
     }
 
-    // Reached only when the brush would not take the colour - it is frozen, or there was no brush there at all. A new
-    // one then, because refusing here would be the line quietly doing nothing.
+    // Reached only when the brush would not take the colour - it is frozen, it belongs to the theme, or there was no
+    // brush there at all. A new one then, because refusing here would be the line quietly doing nothing.
     protected internal override bool TryConvert(object edited, Type target, out object value)
     {
         if (edited is Color colour)
@@ -509,6 +543,69 @@ public class CompositeProperty : PropertyDefinition
         get => GetValue<bool>(IsExpandedProperty);
         set => SetValue(IsExpandedProperty, value);
     }
+}
+
+/// <summary>A group of rows PER ELEMENT of a collection: the lines written inside it are repeated for every item, each
+/// one pointed at that item rather than at what is selected.
+/// <para>What an inspector has no other way of showing. Everything else here is one line about one property of one
+/// object, so a list of things that each have properties of their own - the sockets of a node, the stops of a gradient,
+/// the columns of a table - could only be written out by hand, which means writing out a number of lines nobody knows
+/// in advance. The count is data; the lines have to be data too.</para>
+/// <para>Its own <see cref="PropertyDefinition.Binding"/> is what it reads the collection through, against whatever the
+/// section is pointed at; its <see cref="Children"/> are the lines to repeat. The child lines bind against the ITEM -
+/// <c>{Binding Name}</c> on a socket is the socket's name - which is the whole trick, and it costs the grid nothing
+/// but a different set of targets.</para></summary>
+public class ItemsProperty : CompositeProperty
+{
+    public static readonly AdamantiumProperty ItemHeaderProperty = AdamantiumProperty.Register(nameof(ItemHeader),
+        typeof(BindingBase), typeof(ItemsProperty), new PropertyMetadata(null));
+
+    public static readonly AdamantiumProperty ItemActionProperty = AdamantiumProperty.Register(nameof(ItemAction),
+        typeof(ICommand), typeof(ItemsProperty), new PropertyMetadata(null));
+
+    public static readonly AdamantiumProperty ItemActionIconProperty = AdamantiumProperty.Register(
+        nameof(ItemActionIcon), typeof(String), typeof(ItemsProperty), new PropertyMetadata(null));
+
+    public static readonly AdamantiumProperty ItemActionTipProperty = AdamantiumProperty.Register(
+        nameof(ItemActionTip), typeof(String), typeof(ItemsProperty), new PropertyMetadata(null));
+
+    /// <summary>What each item is CALLED, read off the item itself - the socket's own name over its two lines. Nothing
+    /// numbers them instead, which is what a list whose items have no names of their own wants.</summary>
+    public BindingBase ItemHeader
+    {
+        get => GetValue<BindingBase>(ItemHeaderProperty);
+        set => SetValue(ItemHeaderProperty, value);
+    }
+
+    /// <summary>What the button beside each item's name does, given that item.
+    /// <para>The reason a list needs one: the COUNT can only take things off the end. Asked to drop the second of three
+    /// sockets, a count says nothing at all - it drops the third and leaves the second where it was.</para></summary>
+    public ICommand ItemAction
+    {
+        get => GetValue<ICommand>(ItemActionProperty);
+        set => SetValue(ItemActionProperty, value);
+    }
+
+    /// <summary>The picture on that button and the words it says on hover - see <see cref="PropertyDefinition.ActionIcon"/>.
+    /// Stated on the LIST, because the lines the button sits on are made as the grid builds and there is nowhere else to
+    /// say it.</summary>
+    public String ItemActionIcon
+    {
+        get => GetValue<String>(ItemActionIconProperty);
+        set => SetValue(ItemActionIconProperty, value);
+    }
+
+    public String ItemActionTip
+    {
+        get => GetValue<String>(ItemActionTipProperty);
+        set => SetValue(ItemActionTipProperty, value);
+    }
+}
+
+// The line that carries ONE item's name inside an ItemsProperty. Made by the grid as it builds, and holding nothing
+// worth keeping between passes - the item's own lines are the ones that read and write anything.
+internal sealed class ItemHeaderLine : PropertyDefinition
+{
 }
 
 // Every editor in an inspector is the SAME HEIGHT, and that height is the row's: they stretch into it rather than

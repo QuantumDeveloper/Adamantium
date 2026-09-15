@@ -41,6 +41,12 @@ public class InfiniteCanvas : Control
     private Pen _selectionPen;
     private Brush _selectionPenBrush;
 
+    private int _draggingPoint = -1;
+    private int _editDepth;
+    private string _editReason;
+    private List<ICanvasItem> _editBefore;
+    private Dictionary<ICanvasItem, Rect> _editWasAt;
+
     private CanvasElementLayer _elements;
     private readonly List<ElementItem> _visibleElements = new();
 
@@ -171,6 +177,12 @@ public class InfiniteCanvas : Control
     public static readonly AdamantiumProperty SceneProperty = AdamantiumProperty.Register(nameof(Scene),
         typeof(ICanvasScene), typeof(InfiniteCanvas),
         new PropertyMetadata(null, PropertyMetadataOptions.AffectsRender, OnSceneChanged));
+
+    /// <summary>Where what was done is remembered, or null for a canvas that remembers nothing.
+    /// <para>The APPLICATION's, like the scene: undo belongs to whoever owns the drawing. Given one, the canvas opens a
+    /// step around every gesture; given none, it does not even look at what changed.</para></summary>
+    public static readonly AdamantiumProperty HistoryProperty = AdamantiumProperty.Register(nameof(History),
+        typeof(CanvasHistory), typeof(InfiniteCanvas), new PropertyMetadata(null));
 
     /// <summary>Whether what the pointer is doing snaps to the grid - to its crossings, which are the points a drawing
     /// is measured against.
@@ -442,6 +454,13 @@ public class InfiniteCanvas : Control
         set => SetValue(SceneProperty, value);
     }
 
+    /// <summary>Where what was done is remembered. Null means nothing is.</summary>
+    public CanvasHistory History
+    {
+        get => GetValue<CanvasHistory>(HistoryProperty);
+        set => SetValue(HistoryProperty, value);
+    }
+
     public Boolean SnapToGrid
     {
         get => GetValue<Boolean>(SnapToGridProperty);
@@ -683,23 +702,292 @@ public class InfiniteCanvas : Control
         Selected();
     }
 
-    /// <summary>Takes everything selected out of the scene.</summary>
+    /// <summary>Opens an EDIT: everything that happens until it is closed is one step of undo.
+    /// <para>The canvas opens one around every gesture on its own - one drag of ten things is one step, not ten
+    /// thousand - and this is here so an application can put its own changes in a step too: a clear, a paste, a line
+    /// written in a panel. Opened inside an open one, it joins it rather than starting a second.</para>
+    /// <para>Costs nothing at all with no <see cref="History"/>: there is nobody to tell, so nothing is snapshotted.
+    /// </para></summary>
+    public void BeginEdit(String reason)
+    {
+        if (History == null || Scene == null) return;
+
+        if (_editDepth++ > 0) return;
+
+        _editReason = reason;
+        CanvasStep.Snapshot(Scene, out _editBefore, out _editWasAt);
+    }
+
+    /// <summary>Closes the edit and records it, if anything actually changed.</summary>
+    public void EndEdit()
+    {
+        if (History == null || Scene == null || _editDepth == 0) return;
+        if (--_editDepth > 0) return;
+
+        CanvasStep.Snapshot(Scene, out var after, out var isAt);
+        History.Push(new CanvasStep(_editReason, _editBefore, after, _editWasAt, isAt));
+
+        _editBefore = null;
+        _editWasAt = null;
+    }
+
+    /// <summary>Puts the last step back. What Ctrl+Z is wired to, and what a button calls.</summary>
+    public bool Undo()
+    {
+        if (History?.Undo(Scene) != true) return false;
+
+        // What was selected may have left the drawing - a frame drawn round something the scene no longer holds is a
+        // frame round nothing.
+        Reselect();
+        return true;
+    }
+
+    public bool Redo()
+    {
+        if (History?.Redo(Scene) != true) return false;
+
+        Reselect();
+        return true;
+    }
+
+    // Everything selected that the scene still holds. Undo and redo both add and remove things, and the selection must
+    // not point at what is gone.
+    private void Reselect()
+    {
+        var alive = new HashSet<ICanvasItem>(Scene.ItemsIn(Everything));
+        var kept = new List<ICanvasItem>();
+
+        foreach (var item in _selection)
+        {
+            if (alive.Contains(item)) kept.Add(item);
+        }
+
+        if (kept.Count != _selection.Count) SelectMany(kept, false);
+
+        InvalidateRender(false);
+    }
+
+    /// <summary>Makes ONE thing out of what is selected, and selects it. Null when there is nothing to group.
+    /// <para>The children LEAVE the scene: what is drawn stays one flat list the renderer can walk without asking
+    /// anything about groups, and the group takes the place of the topmost of them in paint order, so a group does not
+    /// jump to the front merely by being made.</para></summary>
+    public GroupItem GroupSelection()
+    {
+        if (_selection.Count < 2 || Scene == null) return null;
+
+        BeginEdit("Group");
+        try
+        {
+            return Gather();
+        }
+        finally
+        {
+            EndEdit();
+        }
+    }
+
+    private GroupItem Gather()
+    {
+        // In PAINT order, taken from the scene rather than from the selection: what was selected first is not what is
+        // drawn first, and a group that reordered its own contents would change the drawing by being made.
+        var ordered = new List<ICanvasItem>();
+        foreach (var item in Scene.ItemsIn(Everything))
+        {
+            if (_selection.Contains(item)) ordered.Add(item);
+        }
+
+        if (ordered.Count < 2) return null;
+
+        var group = new GroupItem(ordered);
+        var topmost = ordered[^1];
+
+        if (!Scene.Replace(topmost, new ICanvasItem[] { group })) return null;
+
+        foreach (var child in ordered)
+        {
+            if (!ReferenceEquals(child, topmost)) Scene.Remove(child);
+        }
+
+        Select(group, false);
+        return group;
+    }
+
+    /// <summary>Breaks the selected groups open, putting their children back exactly where the group was, and selects
+    /// what came out. False when nothing selected was a group.</summary>
+    public bool UngroupSelection()
+    {
+        if (_selection.Count == 0 || Scene == null) return false;
+
+        BeginEdit("Ungroup");
+        try
+        {
+            return Scatter();
+        }
+        finally
+        {
+            EndEdit();
+        }
+    }
+
+    private bool Scatter()
+    {
+        var freed = new List<ICanvasItem>();
+        var kept = new List<ICanvasItem>();
+
+        foreach (var item in _selection.ToArray())
+        {
+            if (item is GroupItem group && Scene.Replace(group, group.Children)) freed.AddRange(group.Children);
+            else kept.Add(item);
+        }
+
+        if (freed.Count == 0) return false;
+
+        kept.AddRange(freed);
+        SelectMany(kept, false);
+        return true;
+    }
+
+    // Everything there is. The scene answers by VISIBLE region, and grouping is about what is selected wherever it
+    // happens to be - including the part of it that is off screen.
+    private static Rect Everything =>
+        new(Double.MinValue / 4, Double.MinValue / 4, Double.MaxValue / 2, Double.MaxValue / 2);
+
+    /// <summary>Raised before anything is taken out, so the application can ask first. See
+    /// <see cref="CanvasDeleteRequestedEventArgs"/> for what answering means.</summary>
+    public event EventHandler<CanvasDeleteRequestedEventArgs> DeleteRequested;
+
+    /// <summary>Asks to take everything selected out - what `Delete` and a delete button both go through. A handler of
+    /// <see cref="DeleteRequested"/> may take the job over; with none, this deletes straight away.</summary>
+    public bool RequestDeleteSelection()
+    {
+        if (_selection.Count == 0 || Scene == null) return false;
+
+        var asked = new CanvasDeleteRequestedEventArgs(_selection.ToArray());
+        DeleteRequested?.Invoke(this, asked);
+        if (asked.Handled) return false;
+
+        DeleteSelection();
+        return true;
+    }
+
+    /// <summary>Takes everything selected out of the scene, asking nobody. What a handler of
+    /// <see cref="DeleteRequested"/> calls once it has its answer.</summary>
     public void DeleteSelection()
     {
         if (_selection.Count == 0 || Scene == null) return;
 
-        foreach (var item in _selection) Scene.Remove(item);
+        BeginEdit("Delete");
+        try
+        {
+            Remove();
+        }
+        finally
+        {
+            EndEdit();
+        }
+    }
+
+    private void Remove()
+    {
+        foreach (var item in _selection)
+        {
+            // What the scene refuses is inside a GROUP - a group's children leave the scene when it is made. Without
+            // this, deleting something reached by entering a group would quietly do nothing at all.
+            if (!Scene.Remove(item)) RemoveFromGroups(item);
+        }
 
         _selection.Clear();
         Selected();
+        Scene.Touch();
+    }
+
+    private void RemoveFromGroups(ICanvasItem item)
+    {
+        // Taken as a LIST first: the walk is over the scene's own store, and emptying a group removes it from that
+        // store - changing what is being walked while it is walked.
+        var tops = new List<ICanvasItem>(Scene.ItemsIn(Everything));
+
+        foreach (var top in tops)
+        {
+            if (top is not GroupItem group || !group.Remove(item)) continue;
+
+            // A group with nothing left is not a group; leaving it would put an invisible thing in the paint order that
+            // can still be selected by its own empty box.
+            if (group.Children.Count == 0) Scene.Remove(group);
+            return;
+        }
     }
 
     /// <summary>Which grip of the manipulation frame a SCREEN point is on, or <see cref="CanvasHandle.None"/>.
     /// <para>Asked in screen pixels and not in the world on purpose: a grip is something the hand aims at, so how close
     /// counts as on it is a distance on the glass at any zoom.</para></summary>
+    /// <summary>The turn a single selected item wears, or nothing. A frame round SEVERAL things is never turned: their
+    /// turns are not one turn, and a box that pretended otherwise would lie about every one of them.</summary>
+    private CanvasTransform? SelectionTurn =>
+        _selection.Count == 1 && _selection[0] is ICanvasTransformed { Transform.IsSomething: true } turned
+            ? turned.Transform
+            : null;
+
+    // The middle of what is selected, in WORLD units - what a turn turns about.
+    private Vector2 SelectionMiddle
+    {
+        get
+        {
+            var box = SelectionBounds ?? default;
+            return new Vector2(box.X + box.Width / 2, box.Y + box.Height / 2);
+        }
+    }
+
+    // A pointer position in the SHAPE's OWN frame. A grip drag is arithmetic on a box that stands square, so a turned
+    // shape is resized by un-turning the pointer rather than by teaching the gesture about angles - which is also what
+    // makes a drag of the top edge of a turned box move its top edge, not the world's.
+    private Vector2 InShapeSpace(Vector2 world) =>
+        SelectionTurn is { } turn ? turn.Undo(world, SelectionMiddle) : world;
+
+    /// <summary>Which of a single selected item's POINTS a screen position is on, or -1. Only one item at a time offers
+    /// them: the points of two things at once are not one shape, and a frame is what a several-thing selection is.
+    /// </summary>
+    public int PointHandleAt(Vector2 screen)
+    {
+        if (_selection.Count != 1 || _selection[0] is not ICanvasPoints shaped) return -1;
+
+        var reach = Math.Max(4, HandleSize) / 2 + 2;
+        var points = shaped.Points;
+
+        for (var i = 0; i < points.Count; i++)
+        {
+            var at = WorldToScreen(points[i]);
+            if (Math.Abs(screen.X - at.X) <= reach && Math.Abs(screen.Y - at.Y) <= reach) return i;
+        }
+
+        return -1;
+    }
+
+    /// <summary>Which grips what is selected offers - the AND of what every selected item offers, because a frame round
+    /// several things can only do what all of them can.</summary>
+    public CanvasHandles OfferedHandles
+    {
+        get
+        {
+            if (_selection.Count == 0) return CanvasHandles.None;
+
+            var offered = CanvasHandles.All;
+            foreach (var item in _selection) offered &= item.Handles;
+
+            return offered;
+        }
+    }
+
     public CanvasHandle HandleAt(Vector2 screen)
     {
         if (SelectionBounds is not { } bounds) return CanvasHandle.None;
+
+        var offered = OfferedHandles;
+        if (offered == CanvasHandles.None) return CanvasHandle.None;
+
+        // Asked in the SHAPE's own frame: the grips are drawn on the turned box, so the pointer has to be brought back
+        // to where the box stands square before it is compared with anything.
+        if (SelectionTurn != null) screen = WorldToScreen(InShapeSpace(ScreenToWorld(screen)));
 
         var topLeft = WorldToScreen(new Vector2(bounds.X, bounds.Y));
         var bottomRight = WorldToScreen(new Vector2(bounds.X + bounds.Width, bounds.Y + bounds.Height));
@@ -717,10 +1005,15 @@ public class InfiniteCanvas : Control
 
         // Corners before edges: at a corner both an edge grip and a corner grip are under the pointer, and the corner is
         // the one that was aimed at - it is the only one that resizes both ways.
-        if (left && top) return CanvasHandle.TopLeft;
-        if (right && top) return CanvasHandle.TopRight;
-        if (left && bottom) return CanvasHandle.BottomLeft;
-        if (right && bottom) return CanvasHandle.BottomRight;
+        if (offered.HasFlag(CanvasHandles.Corners))
+        {
+            if (left && top) return CanvasHandle.TopLeft;
+            if (right && top) return CanvasHandle.TopRight;
+            if (left && bottom) return CanvasHandle.BottomLeft;
+            if (right && bottom) return CanvasHandle.BottomRight;
+        }
+
+        if (!offered.HasFlag(CanvasHandles.Sides)) return CanvasHandle.None;
 
         var midX = Math.Abs(screen.X - (topLeft.X + bottomRight.X) / 2) <= reach;
         var midY = Math.Abs(screen.Y - (topLeft.Y + bottomRight.Y) / 2) <= reach;
@@ -887,6 +1180,25 @@ public class InfiniteCanvas : Control
         StopZoom();
         SetCurrentValue(ScaleProperty, scale);
         CenterOn(new Vector2(world.X + world.Width / 2, world.Y + world.Height / 2));
+    }
+
+    /// <summary>Puts the camera on ONE item: centred, and zoomed so it fills the usable viewport.
+    /// <para>Not simply <see cref="ScaleToFit"/> of its bounds, because a line has no height and a point has neither,
+    /// and fitting to a box with a zero side does nothing at all. A flat item is looked at through the square that
+    /// holds it.</para></summary>
+    public void ZoomTo(ICanvasItem item, Double padding = 40)
+    {
+        if (item == null) return;
+
+        var box = item.Bounds;
+        if (box.Width > 0 && box.Height > 0)
+        {
+            ScaleToFit(box, padding);
+            return;
+        }
+
+        var span = Math.Max(Math.Max(box.Width, box.Height), 1);
+        ScaleToFit(new Rect(box.X + box.Width / 2 - span / 2, box.Y + box.Height / 2 - span / 2, span, span), padding);
     }
 
     /// <summary>Moves the camera - and only the camera - so a piece of world is on screen. Does not zoom: something
@@ -1114,11 +1426,81 @@ public class InfiniteCanvas : Control
         var pen = PenOf(SelectionBrush, ref _selectionPen, ref _selectionPenBrush);
         var frame = ToScreen(bounds);
 
-        session.DrawRectangle(null, frame, pen);
+        // TURNED, the frame is four lines and not a rectangle: a rectangle stands square by definition, and a square
+        // frame round a turned shape says the shape is somewhere it is not.
+        if (SelectionTurn is { } turn)
+        {
+            var about = WorldToScreen(SelectionMiddle);
+            var corner = new[]
+            {
+                turn.Apply(new Vector2(frame.X, frame.Y), about),
+                turn.Apply(new Vector2(frame.X + frame.Width, frame.Y), about),
+                turn.Apply(new Vector2(frame.X + frame.Width, frame.Y + frame.Height), about),
+                turn.Apply(new Vector2(frame.X, frame.Y + frame.Height), about)
+            };
+
+            for (var i = 0; i < 4; i++) session.DrawLine(corner[i], corner[(i + 1) % 4], pen);
+
+            if (HandleSize > 0 && OfferedHandles.HasFlag(CanvasHandles.Corners))
+            {
+                var side = HandleSize;
+                var half = side / 2;
+
+                foreach (var grip in corner)
+                {
+                    session.DrawRectangle(HandleBrush ?? SelectionBrush,
+                        new Rect(grip.X - half, grip.Y - half, side, side), pen);
+                }
+            }
+
+            return;
+        }
+
+        // Only the grips that would ANSWER. A grip drawn where nothing can be dragged is worse than no grip: it is an
+        // invitation to a gesture that does nothing.
+        var offered = OfferedHandles;
+        var corners = offered.HasFlag(CanvasHandles.Corners);
+        var sides = offered.HasFlag(CanvasHandles.Sides);
+
+        // ...and a frame that offers NO grip is the same mistake one size larger. A frame is a thing to grab; round a
+        // line it is not even where the line is - the box of a diagonal is a huge rectangle, most of which is nowhere
+        // near the shape, and it reads as though the line were everywhere inside it. What says a line or a curve is
+        // selected is its own ends, which are drawn below.
+        if (corners || sides) session.DrawRectangle(null, frame, pen);
 
         if (HandleSize <= 0) return;
 
-        foreach (var grip in Grips(frame)) session.DrawRectangle(HandleBrush ?? SelectionBrush, grip, pen);
+        // BEFORE the frame's own grips, and outside the test below: an item reshaped by its points usually offers no
+        // frame grips at all, and drawing its points only when the frame has some would hide them on exactly the items
+        // that have nothing else.
+        DrawPointHandles(session, pen);
+
+        if (!corners && !sides) return;
+
+        var at = 0;
+        foreach (var grip in Grips(frame))
+        {
+            // Grips come round the frame, so they ALTERNATE: corner, middle, corner, middle.
+            var wanted = at++ % 2 == 0 ? corners : sides;
+            if (wanted) session.DrawRectangle(HandleBrush ?? SelectionBrush, grip, pen);
+        }
+    }
+
+    // The POINTS of a single selected item that has them. In screen pixels like every other grip - a point handle is
+    // something the hand aims at, so it is the same size however far out the camera is.
+    private void DrawPointHandles(IDrawingSession session, Pen pen)
+    {
+        if (_selection.Count != 1 || _selection[0] is not ICanvasPoints shaped) return;
+
+        var side = HandleSize;
+        var half = side / 2;
+        var brush = HandleBrush ?? SelectionBrush;
+
+        foreach (var point in shaped.Points)
+        {
+            var at = WorldToScreen(point);
+            session.DrawEllipse(new Rect(at.X - half, at.Y - half, side, side), brush, 0, 360, EllipseType.Sector, pen);
+        }
     }
 
     private IEnumerable<Rect> Grips(Rect frame)
@@ -1193,6 +1575,11 @@ public class InfiniteCanvas : Control
     {
         if (e.Handled) return;
 
+        // ONE STEP per gesture. A press is where a change to the drawing begins and the release is where it ends, so
+        // that is what a step is: dragging ten things across the plane is one thing to undo, not one per mouse move.
+        // Opened before anything is asked of the tool, so whatever the tool does is inside it.
+        BeginEdit("Gesture");
+
         // Any press takes the focus, not only one that pans: the keys the canvas answers - Home, and space to pan with -
         // are useless until it has the focus, and nobody drags a canvas to be allowed to press Home.
         Focus();
@@ -1252,10 +1639,23 @@ public class InfiniteCanvas : Control
         // says it means, or a shape could never be drawn over something already selected.
         if (e.ChangedButton == MouseButtons.Left && _selection.Count > 0)
         {
+            // POINT handles first. They sit inside the frame, so asking about the box first would answer "the body" and
+            // start a move - and a curve would be impossible to reshape without moving it.
+            var point = PointHandleAt(at);
+            if (point >= 0)
+            {
+                BeginEdit("Reshape");
+                _draggingPoint = point;
+                CaptureMouse();
+
+                e.Handled = true;
+                return;
+            }
+
             var handle = HandleAt(at);
             if (handle is not (CanvasHandle.None or CanvasHandle.Body))
             {
-                _frame.Begin(this, handle, ScreenToWorld(at));
+                _frame.Begin(this, handle, InShapeSpace(ScreenToWorld(at)));
                 CaptureMouse();
 
                 e.Handled = true;
@@ -1311,10 +1711,21 @@ public class InfiniteCanvas : Control
             InvalidateRender(false);
         }
 
+        // A POINT taken before any tool saw the press is dragged before any tool sees the move. Pulled to the grid like
+        // everything else the hand places: a point of a curve is a place on the plane, not a place on the glass.
+        if (_draggingPoint >= 0 && _selection.Count == 1 && _selection[0] is ICanvasPoints shaped)
+        {
+            shaped.MovePoint(_draggingPoint, pulled ?? ScreenToWorld(pointer));
+            Scene?.Touch();
+
+            e.Handled = true;
+            return;
+        }
+
         // A grip taken before any tool saw the press is dragged before any tool sees the move.
         if (_frame.IsActive)
         {
-            _frame.MoveTo(this, ScreenToWorld(pointer));
+            _frame.MoveTo(this, InShapeSpace(ScreenToWorld(pointer)));
             e.Handled = true;
             return;
         }
@@ -1334,7 +1745,32 @@ public class InfiniteCanvas : Control
     {
         var overGrip = _selection.Count > 0 ? CanvasFrameGesture.CursorFor(HandleAt(screen)) : null;
 
-        Cursor = overGrip ?? Tool?.Cursor ?? Cursors.Arrow;
+        Cursor = overGrip ?? OverSelection(screen) ?? Tool?.Cursor ?? Cursors.Arrow;
+    }
+
+    // What is under the pointer WITHIN the selection: one of its points, or the thing itself.
+    // <para>The only thing that says so on a line. A box says where it can be grabbed by being drawn; a line has no box
+    // - and now no frame either - so without this there is nothing at all to tell a hand that it has crossed into the
+    // few pixels where a drag would do something, and finding that edge means pressing and seeing.</para>
+    private Cursor OverSelection(Vector2 screen)
+    {
+        if (_selection.Count == 0) return null;
+
+        if (PointHandleAt(screen) >= 0) return Cursors.Crosshair;
+
+        // Only what MOVES with a press here. A press inside the frame of something that offers no body drag does
+        // nothing, and a cursor promising otherwise is the same lie a grip drawn where nothing drags would be.
+        if (!OfferedHandles.HasFlag(CanvasHandles.Body)) return null;
+
+        var world = ScreenToWorld(screen);
+        var reach = ScreenToWorldLength(Math.Max(4, HandleSize) / 2 + 2);
+
+        foreach (var item in _selection)
+        {
+            if (item.HitTest(InShapeSpace(world), reach)) return Cursors.SizeAll;
+        }
+
+        return null;
     }
 
     private void OnPointerLeft(object sender, MouseEventArgs e)
@@ -1349,26 +1785,43 @@ public class InfiniteCanvas : Control
 
     private void OnPointerUp(object sender, MouseButtonEventArgs e)
     {
-        if (_panning)
+        // The step the press opened is closed HERE whatever the release turns out to mean - a pan, a grip, a tool. A
+        // gesture that changed nothing records nothing, so closing one that was only a click costs a comparison.
+        try
         {
-            _panning = false;
-            ReleaseMouseCapture();
-            e.Handled = true;
-            return;
-        }
+            if (_draggingPoint >= 0)
+            {
+                _draggingPoint = -1;
+                ReleaseMouseCapture();
+                e.Handled = true;
+                return;
+            }
 
-        if (_frame.IsActive)
+            if (_panning)
+            {
+                _panning = false;
+                ReleaseMouseCapture();
+                e.Handled = true;
+                return;
+            }
+
+            if (_frame.IsActive)
+            {
+                _frame.End();
+                ReleaseMouseCapture();
+
+                e.Handled = true;
+                return;
+            }
+
+            var args = Describe(e.GetPosition(this), e.ChangedButton, e.ClickCount, e.Modifiers);
+            Tool?.OnReleased(this, args);
+            if (args.Handled) e.Handled = true;
+        }
+        finally
         {
-            _frame.End();
-            ReleaseMouseCapture();
-
-            e.Handled = true;
-            return;
+            EndEdit();
         }
-
-        var args = Describe(e.GetPosition(this), e.ChangedButton, e.ClickCount, e.Modifiers);
-        Tool?.OnReleased(this, args);
-        if (args.Handled) e.Handled = true;
     }
 
     // Whether an event came from something the canvas CARRIES rather than from the plane: the tool panel on the glass,
@@ -1427,6 +1880,31 @@ public class InfiniteCanvas : Control
             return;
         }
 
+        // GROUPING and UNDO, before the tool shortcuts: Ctrl+G and Ctrl+Z are keys a shape tool would otherwise take
+        // for itself, and a tool letter with Ctrl held has never meant the tool anywhere.
+        var control = (e.Modifiers & (InputModifiers.LeftControl | InputModifiers.RightControl)) != 0;
+        var shift = (e.Modifiers & (InputModifiers.LeftShift | InputModifiers.RightShift)) != 0;
+
+        if (control && e.Key == Key.G)
+        {
+            if (shift) UngroupSelection();
+            else GroupSelection();
+
+            e.Handled = true;
+            return;
+        }
+
+        // Ctrl+Z, and BOTH of the two things the world calls redo: Ctrl+Y and Ctrl+Shift+Z. Which one a person reaches
+        // for depends on what they used last, and there is nothing to be gained by insisting on one.
+        if (control && (e.Key == Key.Z || e.Key == Key.Y))
+        {
+            if (e.Key == Key.Y || shift) Redo();
+            else Undo();
+
+            e.Handled = true;
+            return;
+        }
+
         // AFTER the tool and BEFORE the canvas's own keys. After, because a tool with a caret in a word owns every
         // letter while it is typing and a shortcut must not steal one. Before, because picking a tool is the commonest
         // thing a person does here and the canvas's own keys are Delete, Escape and Home, which no tool wants.
@@ -1440,7 +1918,8 @@ public class InfiniteCanvas : Control
         {
             if (_selection.Count == 0) return;
 
-            DeleteSelection();
+            // Through the REQUEST, so a key press meets the same question a button does.
+            RequestDeleteSelection();
             e.Handled = true;
             return;
         }
