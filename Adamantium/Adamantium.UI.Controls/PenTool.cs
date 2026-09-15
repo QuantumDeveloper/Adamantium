@@ -35,6 +35,9 @@ public class PenTool : ICanvasTool
     /// reads it as being.</summary>
     public Cursor Cursor { get; set; } = Cursors.Crosshair;
 
+    /// <summary>INK, and ink is a drawing. There is no such thing as a pen stroke in a graph.</summary>
+    public bool WorksIn(CanvasMode mode) => mode == CanvasMode.Drawing;
+
     public void OnPressed(InfiniteCanvas canvas, CanvasPointerEventArgs e)
     {
         if (e.Button != MouseButtons.Left || canvas.Scene == null || canvas.Ink == null) return;

@@ -17,6 +17,11 @@
                 <ControlTemplate TargetType="CanvasPane">
                     <!-- Dock and not a stack - see Fluent's set for why a wrapping rail needs to be told its height. -->
                     <DockPanel LastChildFill="True">
+                        <!-- The edge that widens the panel, and FIRST - see Fluent's set for why the order matters. -->
+                        <Border x:Name="PART_Sizer" DockPanel.Dock="Left" Width="7" Visibility="Collapsed"
+                                Background="Transparent" Cursor="SizeEWE"
+                                ToolTip="Drag to set how wide the panel is"/>
+
                         <!-- The handles in a row of their own, collapsed whole - see Fluent's set. -->
                         <StackPanel x:Name="PART_Handles" Orientation="Horizontal" DockPanel.Dock="Top"
                                     HorizontalAlignment="Left" MarginBottom="8">

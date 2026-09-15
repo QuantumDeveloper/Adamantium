@@ -26,6 +26,9 @@
                         <!-- The controls on the plane, under the panel - see Fluent's set. -->
                         <CanvasElementLayer x:Name="PART_Elements"/>
 
+                        <!-- The items drawn IN FRONT of those controls - see Fluent's set for why it takes a layer. -->
+                        <CanvasFrontLayer x:Name="PART_Front"/>
+
                         <StackPanel x:Name="PART_OverlayRoot" Orientation="Vertical" Margin="8">
                             <Button x:Name="PART_OverlayGrip" Width="28" Height="22"
                                     MinWidth="0" MinHeight="0" Padding="0"

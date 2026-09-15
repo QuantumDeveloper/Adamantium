@@ -1,4 +1,6 @@
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using Adamantium.Mathematics;
 using Adamantium.UI.Controls.Base;
 using Adamantium.UI.Core;
 using Adamantium.UI.Core.Media;
@@ -18,6 +20,10 @@ public class CanvasNode : Control
 {
     private readonly ObservableCollection<CanvasNodePin> _inputs = new();
     private readonly ObservableCollection<CanvasNodePin> _outputs = new();
+    private readonly Dictionary<CanvasNodePin, Vector2> _places = new();
+
+    private bool _placed;
+    private double _reach;
 
     public static readonly AdamantiumProperty TitleProperty = AdamantiumProperty.Register(nameof(Title),
         typeof(Object), typeof(CanvasNode),
@@ -145,6 +151,80 @@ public class CanvasNode : Control
     /// <summary>Whether this node is the one holding that socket. What an application asks when something hands it a
     /// pin and nothing else - a button in an inspector row, which knows the socket it sits on and no more.</summary>
     public Boolean Holds(CanvasNodePin pin) => pin != null && (_inputs.Contains(pin) || _outputs.Contains(pin));
+
+    /// <summary>WHERE a socket is, in this node's own coordinates. Null before the node has been laid out, and for a
+    /// pin that is not on it.
+    /// <para>Asked of the node because the node is what knows: where a socket sits is a fact about the TEMPLATE - which
+    /// side, how far down, how far it hangs over the edge - and each theme answers it differently. A connection that
+    /// worked it out for itself would be a second copy of every template's arithmetic, wrong the moment a theme changed
+    /// a margin.</para>
+    /// <para>Answered from a record taken ONCE PER LAYOUT rather than by looking each time. What looking costs is a
+    /// walk of the node's whole visual tree and a walk back up it per socket, and this is asked on every mouse move
+    /// (for the cursor), on every press, and twice per wire per pass of the scene. Sockets do not move between
+    /// arrangements, so asking again between them can only produce the same answer more slowly.</para></summary>
+    public Vector2? Where(CanvasNodePin pin)
+    {
+        if (pin == null) return null;
+
+        if (!_placed) Place();
+
+        return _places.TryGetValue(pin, out var at) ? at : null;
+    }
+
+    /// <summary>Which socket is at a point given in this node's own coordinates, or null. What the gesture that draws
+    /// connections asks: a socket is a small thing to aim at, so <paramref name="reach"/> widens it by however much the
+    /// hand is allowed to miss by.</summary>
+    public CanvasNodePin PinAt(Vector2 local, Double reach = 0)
+    {
+        if (!_placed) Place();
+
+        foreach (var (pin, at) in _places)
+        {
+            var wide = _reach + reach;
+
+            if (Math.Abs(local.X - at.X) <= wide && Math.Abs(local.Y - at.Y) <= wide) return pin;
+        }
+
+        return null;
+    }
+
+    protected override Size ArrangeOverride(Size finalSize)
+    {
+        var size = base.ArrangeOverride(finalSize);
+
+        // The sockets have just been put somewhere, so whatever was recorded about where they were is now a guess. The
+        // record is not rebuilt here - it is rebuilt when somebody next asks, which for a node nobody is wiring is
+        // never.
+        _placed = false;
+
+        return size;
+    }
+
+    // ONE walk, recording every socket's middle. A socket is a CanvasNodeSocket - see the type's own note for why it is
+    // a type at all - and it knows which pin it stands for.
+    private void Place()
+    {
+        _places.Clear();
+        _reach = 0;
+
+        Gather(this);
+
+        _placed = true;
+    }
+
+    private void Gather(IUIComponent within)
+    {
+        if (within is CanvasNodeSocket socket && socket.Pin != null && socket.MiddleIn(this) is { } middle)
+        {
+            _places[socket.Pin] = middle;
+            _reach = Math.Max(_reach, Math.Max(socket.RenderSize.Width, socket.RenderSize.Height) / 2);
+        }
+
+        foreach (var child in within.VisualChildren)
+        {
+            if (child is IUIComponent visual) Gather(visual);
+        }
+    }
 
     private static void OnPinCountChanged(AdamantiumComponent component, AdamantiumPropertyChangedEventArgs e)
     {

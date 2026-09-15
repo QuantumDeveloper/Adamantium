@@ -1058,6 +1058,41 @@ namespace Adamantium.Mathematics
         return knots.ToArray();
     }
 
+        /// <summary>A Bezier span of ANY degree, sampled along its length. The span is the start point, its controls
+        /// and its end - four points is the cubic, three the quadratic, five the quartic, and so on.
+        /// <para>De Casteljau rather than the polynomial: it is the same curve, it needs no binomial coefficients, and
+        /// it stays numerically well behaved at the degrees where writing the polynomial out starts to lose digits.</para>
+        /// </summary>
+        public static List<Vector2> GetBezier(IReadOnlyList<Vector2> span, uint sampleRate)
+        {
+            if (span == null || span.Count < 2) return new List<Vector2>(span ?? []);
+            if (sampleRate < 2) return new List<Vector2>(span);
+
+            var sampled = new List<Vector2>((int)sampleRate + 1);
+            var work = new Vector2[span.Count];
+            var step = 1.0 / sampleRate;
+
+            for (uint i = 0; i <= sampleRate; i++)
+            {
+                var d = i * step;
+
+                for (var k = 0; k < span.Count; k++) work[k] = span[k];
+
+                for (var level = span.Count - 1; level > 0; level--)
+                {
+                    for (var k = 0; k < level; k++) work[k] = work[k] + (work[k + 1] - work[k]) * d;
+                }
+
+                sampled.Add(work[0]);
+            }
+
+            // because of possible float pointing precision issues
+            sampled[0] = span[0];
+            sampled[sampled.Count - 1] = span[span.Count - 1];
+
+            return sampled;
+        }
+
         public static List<Vector2> GetQuadraticBezier(Vector2 start, Vector2 control, Vector2 end, uint sampleRate)
         {
             if (sampleRate < 2) return new List<Vector2>() { start, control, end };

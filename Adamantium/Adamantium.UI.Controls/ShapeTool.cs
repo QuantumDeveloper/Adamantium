@@ -47,6 +47,9 @@ public class ShapeTool : ICanvasTool
     /// <summary>A crosshair - a shape is dragged out from an exact corner.</summary>
     public Cursor Cursor { get; set; } = Cursors.Crosshair;
 
+    /// <summary>A shape is part of a drawing. A graph is made of nodes and wires and of nothing else.</summary>
+    public bool WorksIn(CanvasMode mode) => mode == CanvasMode.Drawing;
+
     /// <summary>How many sides the next POLYGON gets. On the tool rather than on the canvas, because it is a fact about
     /// what this tool makes - the same place the shape itself is stated.</summary>
     public int Sides { get; set; } = 5;
@@ -124,13 +127,14 @@ public class ShapeTool : ICanvasTool
         shape ??= _making;
         if (shape == null) return;
 
-        // Which way the drag went, kept before the box is squared up: a line leans the other way when it is dragged up
-        // and to the right, and a normalised box cannot say that on its own.
-        shape.Flipped = (to.X - _from.X) * (to.Y - _from.Y) < 0;
-
-        // The box itself, not the bounds: while a shape is being dragged out, the box IS what the drag made, and going
-        // through Resize would take the outline's width off it on every single move.
-        shape.World = new Rect(Math.Min(_from.X, to.X), Math.Min(_from.Y, to.Y),
-            Math.Abs(to.X - _from.X), Math.Abs(to.Y - _from.Y));
+        // The two points of the drag, handed to the shape whole. A normalised box cannot say which way the drag went,
+        // so the shape keeps that as two bits beside it - which way the line leans, and which end of it the hand is at
+        // - and it is the SHAPE that works both out. Set here by hand, the lean was right and the direction was never
+        // written at all: an arrow dragged up and to the left put its head back at the start of the drag, pointing at
+        // the hand rather than away from it.
+        //
+        // Not Resize: while a shape is being dragged out, the box IS what the drag made, and going through Resize
+        // would take the outline's width off it on every single move.
+        shape.SetEnds(_from, to);
     }
 }

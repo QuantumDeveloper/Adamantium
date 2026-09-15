@@ -22,16 +22,20 @@ public class CanvasPane : ContentControl
     private ButtonBase _turn;
     private ToggleButton _snap;
     private IUIComponent _headerPart;
+    private IUIComponent _sizer;
     private bool _dragging;
+    private bool _sizing;
     private bool _moved;
     private bool _captured;
+    private double _wide;
     private Vector2 _from;
     private Vector2 _at;
 
     public static readonly AdamantiumProperty PlacementProperty = AdamantiumProperty.Register(nameof(Placement),
         typeof(CanvasPanePlacement), typeof(CanvasPane),
         new PropertyMetadata(CanvasPanePlacement.TopLeft,
-            PropertyMetadataOptions.AffectsParentArrange | PropertyMetadataOptions.BindsTwoWayByDefault));
+            PropertyMetadataOptions.AffectsParentArrange | PropertyMetadataOptions.BindsTwoWayByDefault,
+            OnPlacementChanged));
 
     public static readonly AdamantiumProperty KindProperty = AdamantiumProperty.Register(nameof(Kind),
         typeof(CanvasPaneKind), typeof(CanvasPane),
@@ -57,6 +61,16 @@ public class CanvasPane : ContentControl
 
     public static readonly AdamantiumProperty SnapDistanceProperty = AdamantiumProperty.Register(nameof(SnapDistance),
         typeof(Double), typeof(CanvasPane), new PropertyMetadata(28.0));
+
+    /// <summary>Whether the pane's inner edge can be dragged to widen it. OFF by default - a rail and a bar are as wide
+    /// as what is in them, and a grip on either is a strip of nothing to catch the mouse on.</summary>
+    public static readonly AdamantiumProperty CanResizeProperty = AdamantiumProperty.Register(nameof(CanResize),
+        typeof(Boolean), typeof(CanvasPane), new PropertyMetadata(false, OnCanResizeChanged));
+
+    /// <summary>The narrowest the pane may be dragged, in screen pixels. A panel pulled to nothing is a panel with no
+    /// edge left to pull back out by.</summary>
+    public static readonly AdamantiumProperty MinResizeWidthProperty = AdamantiumProperty.Register(
+        nameof(MinResizeWidth), typeof(Double), typeof(CanvasPane), new PropertyMetadata(160.0));
 
     /// <summary>Whether letting a pane go near an edge sticks it to that edge. OFF by default, and deliberately.
     /// <para>A panel on a canvas is moved often, and a panel that jumps to an edge whenever it passes near one is a
@@ -163,6 +177,20 @@ public class CanvasPane : ContentControl
         set => SetValue(SnapDistanceProperty, value);
     }
 
+    /// <summary>Whether the pane's inner edge widens it when dragged.</summary>
+    public Boolean CanResize
+    {
+        get => GetValue<Boolean>(CanResizeProperty);
+        set => SetValue(CanResizeProperty, value);
+    }
+
+    /// <summary>The narrowest the pane may be dragged, in screen pixels.</summary>
+    public Double MinResizeWidth
+    {
+        get => GetValue<Double>(MinResizeWidthProperty);
+        set => SetValue(MinResizeWidthProperty, value);
+    }
+
     /// <summary>What the header shows. Nothing by default, which is what a bar and a rail want.</summary>
     public Object Header
     {
@@ -195,6 +223,9 @@ public class CanvasPane : ContentControl
         _headerPart = GetTemplateChild("PART_Header") as IUIComponent;
         SyncHeader();
 
+        _sizer = GetTemplateChild("PART_Sizer") as IUIComponent;
+        SyncSizer();
+
         MouseDown += OnPressed;
         MouseMove += OnMoved;
         MouseUp += OnReleased;
@@ -216,6 +247,7 @@ public class CanvasPane : ContentControl
         _turn = null;
         _snap = null;
         _headerPart = null;
+        _sizer = null;
     }
 
     // An EMPTY presenter is not free: it draws nothing but keeps its margin, so a pane with no header stood its content
@@ -230,6 +262,38 @@ public class CanvasPane : ContentControl
 
     private static void OnHeaderChanged(AdamantiumComponent component, AdamantiumPropertyChangedEventArgs e) =>
         (component as CanvasPane)?.SyncHeader();
+
+    // The grip goes on the side that faces INTO the canvas, which is the side there is room to pull towards: a panel
+    // against the right edge widens leftwards, one against the left edge rightwards. Put on the outer side it would
+    // either hang off the viewport or make the pane walk across the screen as it grew.
+    private void SyncSizer()
+    {
+        if (_sizer == null) return;
+
+        var wanted = CanResize ? Visibility.Visible : Visibility.Collapsed;
+        if (_sizer.Visibility != wanted) _sizer.Visibility = wanted;
+
+        DockPanel.SetDock(_sizer, Inner() < 0 ? Dock.Left : Dock.Right);
+    }
+
+    // How wide the pane becomes when its edge has been dragged `reach` pixels along X from a width of `from`. The
+    // ceiling is the viewport: a panel wider than the canvas leaves nothing behind it to look at.
+    internal double Widened(double from, double reach, double room) =>
+        Math.Clamp(from + reach * Inner(), MinResizeWidth, Math.Max(MinResizeWidth, room));
+
+    // -1 when the pane's own inner edge is its LEFT one, +1 when it is its right one. Also the sign a drag along X has
+    // to be multiplied by to become a change in width.
+    private int Inner() => Placement switch
+    {
+        CanvasPanePlacement.TopRight or CanvasPanePlacement.Right or CanvasPanePlacement.BottomRight => -1,
+        _ => 1
+    };
+
+    private static void OnCanResizeChanged(AdamantiumComponent component, AdamantiumPropertyChangedEventArgs e) =>
+        (component as CanvasPane)?.SyncSizer();
+
+    private static void OnPlacementChanged(AdamantiumComponent component, AdamantiumPropertyChangedEventArgs e) =>
+        (component as CanvasPane)?.SyncSizer();
 
     /// <summary>What this pane takes out of the canvas's usable area - all zero unless it is docked.</summary>
     internal Thickness Reserved()
@@ -288,7 +352,21 @@ public class CanvasPane : ContentControl
         e.Handled = true;
         _moved = false;
 
-        if (!CanDrag || e.ChangedButton != MouseButtons.Left || Layer == null) return;
+        if (e.ChangedButton != MouseButtons.Left || Layer == null) return;
+
+        // The edge is asked about FIRST and answers for itself. It is inside the pane, so a press on it is also a press
+        // on the pane, and whichever of the two gestures is read first is the only one the hand can ever get.
+        if (CanResize && Within(e.OriginalSource, _sizer))
+        {
+            _from = e.GetPosition(Layer);
+            _wide = ActualWidth;
+            _sizing = true;
+            _captured = true;
+            CaptureMouse();
+            return;
+        }
+
+        if (!CanDrag) return;
 
         var onGrip = OnGrip(e.OriginalSource);
         if (!onGrip && !IsChrome(e.OriginalSource)) return;
@@ -306,6 +384,13 @@ public class CanvasPane : ContentControl
 
     private void OnMoved(object sender, MouseEventArgs e)
     {
+        if (_sizing && Layer != null)
+        {
+            Width = Widened(_wide, (e.GetPosition(Layer) - _from).X, Layer.RenderSize.Width);
+            e.Handled = true;
+            return;
+        }
+
         if (!_dragging || Layer == null) return;
 
         var now = e.GetPosition(Layer);
@@ -330,6 +415,15 @@ public class CanvasPane : ContentControl
     private void OnReleased(object sender, MouseButtonEventArgs e)
     {
         e.Handled = true;
+
+        if (_sizing)
+        {
+            _sizing = false;
+            if (_captured) ReleaseMouseCapture();
+            _captured = false;
+            return;
+        }
+
         if (!_dragging) return;
 
         _dragging = false;
@@ -402,13 +496,17 @@ public class CanvasPane : ContentControl
 
     private static int Band(double at, double of) => at < of / 3 ? -1 : at > of * 2 / 3 ? 1 : 0;
 
-    private bool OnGrip(object source)
+    private bool OnGrip(object source) => Within(source, _grip);
+
+    // Whether a press landed on one named part of the template, or on anything that part is made of. Stopping at the
+    // pane itself, so the walk cannot wander out into whatever the pane happens to be sitting in.
+    private bool Within(object source, object part)
     {
-        if (_grip == null) return false;
+        if (part == null) return false;
 
         for (var at = source as IUIComponent; at != null; at = at.VisualParent)
         {
-            if (ReferenceEquals(at, _grip)) return true;
+            if (ReferenceEquals(at, part)) return true;
             if (ReferenceEquals(at, this)) return false;
         }
 

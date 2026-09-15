@@ -164,4 +164,56 @@ public class CanvasChromeTests
 
         Assert.That(pane.Visibility, Is.EqualTo(Visibility.Collapsed));
     }
+
+    // Widening is a drag along X read against the side the pane's inner edge is on: a panel against the RIGHT edge gets
+    // wider when its edge is pulled LEFT, and one against the left edge the other way round.
+    [Test]
+    public void APaneAgainstTheRightEdgeWidensWhenItsEdgeIsPulledLeft()
+    {
+        var pane = Pane(CanvasPanePlacement.TopRight, width: 200);
+        pane.MinResizeWidth = 100;
+
+        Assert.That(pane.Widened(200, -60, Room), Is.EqualTo(260));
+        Assert.That(pane.Widened(200, 60, Room), Is.EqualTo(140));
+    }
+
+    [Test]
+    public void APaneAgainstTheLeftEdgeWidensTheOtherWay()
+    {
+        var pane = Pane(CanvasPanePlacement.TopLeft, width: 200);
+        pane.MinResizeWidth = 100;
+
+        Assert.That(pane.Widened(200, 60, Room), Is.EqualTo(260));
+        Assert.That(pane.Widened(200, -60, Room), Is.EqualTo(140));
+    }
+
+    // A panel pulled to nothing is a panel with no edge left to pull back out by.
+    [Test]
+    public void ItCannotBePulledNarrowerThanItsFloor()
+    {
+        var pane = Pane(CanvasPanePlacement.TopRight, width: 200);
+        pane.MinResizeWidth = 160;
+
+        Assert.That(pane.Widened(200, 400, Room), Is.EqualTo(160));
+    }
+
+    // ...nor wider than the canvas, which would leave nothing behind it to look at.
+    [Test]
+    public void ItCannotBePulledWiderThanTheViewport()
+    {
+        var pane = Pane(CanvasPanePlacement.TopRight, width: 200);
+
+        Assert.That(pane.Widened(200, -5000, Room), Is.EqualTo(Room));
+    }
+
+    // A viewport narrower than the floor: the floor wins, because Clamp throws when the ceiling is below it - and a
+    // window dragged very narrow is not a reason for the canvas to fall over.
+    [Test]
+    public void AViewportNarrowerThanTheFloorDoesNotBreakTheArithmetic()
+    {
+        var pane = Pane(CanvasPanePlacement.TopRight, width: 200);
+        pane.MinResizeWidth = 160;
+
+        Assert.That(pane.Widened(200, -5000, room: 40), Is.EqualTo(160));
+    }
 }

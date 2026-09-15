@@ -109,6 +109,13 @@ public class PropertyGrid : Control
     private readonly List<PropertySection> _openedBySearch = new();
     private readonly List<PropertyDefinition> _watched = new();
     private readonly List<INotifyCollectionChanged> _followed = new();
+
+    /// <summary>How many times the whole panel has been torn down and put back, and how many times it has only re-read
+    /// what it shows. The difference between the two is most of what an inspector costs, and nothing said which was
+    /// happening - so a click that rebuilt the panel looked exactly like a click that did nothing.</summary>
+    public static long Rebuilds;
+
+    public static long Refreshes;
     private bool _rebuilding;
     private bool _rebuildAgain;
     private Panel _host;
@@ -247,6 +254,8 @@ public class PropertyGrid : Control
     /// <summary>Rebuilds every section's rows - after the sections change, the object changes, or a composite folds.</summary>
     public void Rebuild()
     {
+        Rebuilds++;
+
         // ONE pass at a time. A rebuild clears the host and fills it again, and a definition that changes its mind while
         // that is happening - an IsVisible binding settling, say - asks for another one from inside this one: the inner
         // pass then fills the host completely and the outer pass, still holding its place in the loop, adds the rest of
@@ -301,19 +310,37 @@ public class PropertyGrid : Control
             // A section named for what is being looked for keeps all of its properties: asking for "Transform" means
             // the whole of it, not the one row that happens to repeat the word.
             var whole = searching && Carries(section.Header as String, wanted);
-            var rows = new StackPanel { Orientation = Orientation.Vertical };
+
+            // THE SAME PANEL AND THE SAME ROWS as last time, wherever the shape has not changed.
+            //
+            // This used to build a panel and a row per line on every pass, and a pass happens whenever the selection
+            // changes - so ONE CLICK made about two hundred and fifty controls and built two hundred and thirty
+            // templates, and everything that follows from that: a property write per part of each, and thousands of
+            // layout invalidations behind them. That is what a click that felt slow was made of, measured rather than
+            // guessed at.
+            //
+            // A row is a shape, not a value: the same line pointed at a different object is the same row re-aimed, and
+            // Attach already knows the difference - same definition and same targets is a re-read, anything else a
+            // rebind. Left in place it also keeps its template, which is the expensive half.
+            var rows = section.Content as StackPanel;
+            if (rows == null)
+            {
+                rows = new StackPanel { Orientation = Orientation.Vertical };
+                section.Content = rows;
+            }
 
             // A section may inspect something of its own; the rest follow the selection - all of it.
             var targets = section.Target != null ? new[] { section.Target } : Targets;
+            var at = 0;
 
             foreach (var definition in section.Properties)
             {
-                AddRow(rows, definition, targets, 0, whole ? null : wanted);
+                AddRow(rows, definition, targets, 0, whole ? null : wanted, ref at);
             }
 
-            // Assigned BEFORE the section may be dropped: a section left holding the rows of the last pass would keep
-            // answering with them long after the search stopped agreeing.
-            section.Content = rows;
+            // Whatever the last pass left beyond what this one wanted. Taken off the END, so the rows that stayed keep
+            // their places and their templates.
+            while (rows.Children.Count > at) rows.Children.RemoveAt(rows.Children.Count - 1);
 
             // A section with nothing in it is not an empty section, it is one the search has no answer from - and a
             // column of empty headers reads as a result.
@@ -468,6 +495,8 @@ public class PropertyGrid : Control
     /// <summary>Re-reads one property, or every one when told nothing in particular.</summary>
     public void Refresh(object target = null, PropertyDefinition definition = null)
     {
+        Refreshes++;
+
         foreach (var row in _rows)
         {
             if (definition != null && !ReferenceEquals(row.Definition, definition)) continue;
@@ -577,17 +606,29 @@ public class PropertyGrid : Control
     }
 
     private void AddRow(Panel host, PropertyDefinition definition, IReadOnlyList<object> targets, int depth,
-        String wanted)
+        String wanted, ref int at)
     {
         if (!definition.IsVisible) return;
 
         var searching = !String.IsNullOrEmpty(wanted);
         if (searching && !Answers(definition, wanted)) return;
 
-        var row = new PropertyRow();
-        row.Attach(this, definition, targets, depth * Indent);
+        // The row already at this place, if there is one. Re-aimed rather than replaced - see the note where the panel
+        // is kept.
+        PropertyRow row;
+        if (at < host.Children.Count && host.Children[at] is PropertyRow standing)
+        {
+            row = standing;
+        }
+        else
+        {
+            row = new PropertyRow();
+            host.Children.Insert(Math.Min(at, host.Children.Count), row);
+        }
 
-        host.Children.Add(row);
+        at++;
+
+        row.Attach(this, definition, targets, depth * Indent);
         _rows.Add(row);
 
         if (definition is not CompositeProperty composite) return;
@@ -600,17 +641,18 @@ public class PropertyGrid : Control
 
         if (definition is ItemsProperty items)
         {
-            AddItemRows(host, items, targets, depth, inside);
+            AddItemRows(host, items, targets, depth, inside, ref at);
             return;
         }
 
-        foreach (var child in composite.Children) AddRow(host, child, targets, depth + 1, inside);
+        foreach (var child in composite.Children) AddRow(host, child, targets, depth + 1, inside, ref at);
     }
 
     // A group of rows PER ELEMENT: the same child definitions over and over, each time pointed at one item. Nothing is
     // copied - a definition already serves several targets at once, which is what multi-selection is - so a list of
     // twenty sockets costs twenty sets of rows and not twenty sets of definitions.
-    private void AddItemRows(Panel host, ItemsProperty items, IReadOnlyList<object> targets, int depth, String wanted)
+    private void AddItemRows(Panel host, ItemsProperty items, IReadOnlyList<object> targets, int depth, String wanted,
+        ref int at)
     {
         // ONE object's list, not several. Two selected nodes have two lists of sockets and no common one, and showing
         // either of them under a heading that claims to be about both would be a lie an edit then acts on.
@@ -634,9 +676,9 @@ public class PropertyGrid : Control
                 ActionTip = items.ItemActionTip
             };
 
-            AddRow(host, label, new[] { item }, depth + 1, wanted);
+            AddRow(host, label, new[] { item }, depth + 1, wanted, ref at);
 
-            foreach (var child in items.Children) AddRow(host, child, new[] { item }, depth + 2, wanted);
+            foreach (var child in items.Children) AddRow(host, child, new[] { item }, depth + 2, wanted, ref at);
         }
     }
 

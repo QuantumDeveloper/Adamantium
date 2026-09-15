@@ -53,6 +53,8 @@ public class PropertyRow : Control
     private IInputComponent _grip;
     private IInputComponent _expander;
     private ButtonBase _action;
+    private string _actionIcon;
+    private string _actionTip;
     private ButtonBase _reset;
     private IInputComponent _editor;
     private ContentPresenter _valueHost;
@@ -378,9 +380,21 @@ public class PropertyRow : Control
     {
         if (_action == null) return;
 
-        ToolTipService.SetToolTip(_action, string.IsNullOrEmpty(Definition.ActionTip) ? "More" : Definition.ActionTip);
+        var icon = Definition.ActionIcon;
 
-        if (string.IsNullOrEmpty(Definition.ActionIcon))
+        // NOTHING unless it CHANGED. This runs on every refresh of the row, and a refresh happens whenever anything the
+        // row is pointed at is re-read - which on a busy inspector is constant. Building a picture and handing it over
+        // each time is a new object on the button every time, and a new object is a changed property: the button
+        // invalidates, its parents invalidate, and the pass runs again. A row that had not changed at all was the
+        // busiest thing in the application.
+        if (_actionIcon == icon && _actionTip == Definition.ActionTip) return;
+
+        _actionIcon = icon;
+        _actionTip = Definition.ActionTip;
+
+        ToolTipService.SetToolTip(_action, string.IsNullOrEmpty(_actionTip) ? "More" : _actionTip);
+
+        if (string.IsNullOrEmpty(icon))
         {
             _action.Content = "...";
             return;
@@ -396,7 +410,7 @@ public class PropertyRow : Control
             VerticalAlignment = VerticalAlignment.Center
         };
 
-        new Core.Resources.ObservableResource(Definition.ActionIcon).Apply(image, nameof(Image.Source));
+        new Core.Resources.ObservableResource(icon).Apply(image, nameof(Image.Source));
         _action.Content = image;
     }
 

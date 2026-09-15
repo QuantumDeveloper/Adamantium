@@ -48,6 +48,10 @@ public class EraseTool : ICanvasTool
     /// shows how wide the rubber is.</summary>
     public Cursor Cursor { get; set; } = Cursors.None;
 
+    /// <summary>An eraser rubs OUT, which is a thing you do to ink. A node is removed by being selected and deleted -
+    /// a wire has two ends and a node has an identity, and neither of those is rubbed out by degrees.</summary>
+    public bool WorksIn(CanvasMode mode) => mode == CanvasMode.Drawing;
+
     /// <summary>What this eraser takes. Set once, when the eraser is made: the two are separate TOOLS rather than one
     /// tool with a switch, so picking which one you want is the same act as picking any other tool.</summary>
     public CanvasEraseMode Mode { get; }
@@ -126,7 +130,7 @@ public class EraseTool : ICanvasTool
         // What the eraser touches, taken out of the scene FIRST: editing a scene while walking it is how a walk ends up
         // skipping half of what it was asked about.
         var touched = new List<ICanvasItem>();
-        foreach (var item in scene.ItemsIn(reach))
+        foreach (var item in canvas.ItemsHere(reach))
         {
             if (item.HitTest(world, radius)) touched.Add(item);
         }

@@ -169,6 +169,22 @@
                          StrokeThickness="1.2"/>
     </DrawingImage>
 
+    <!-- The INSPECTOR: rows of a name and a value beside it, which is what a property panel looks like from across the
+         room and the only thing about one that survives being drawn ten pixels wide. -->
+    <DrawingImage x:Key="FaceInspectorIcon">
+        <GeometryDrawing Geometry="M0.8,2.2 L4.2,2.2 M5.8,2.2 L9.2,2.2 M0.8,5 L4.2,5 M5.8,5 L9.2,5 M0.8,7.8 L4.2,7.8 M5.8,7.8 L9.2,7.8"
+                         Stroke="{ResourceReference TextFillColorSecondary}"
+                         StrokeThickness="1.1"/>
+    </DrawingImage>
+
+    <!-- WHAT IS ON THE PLANE, stacked: a plate seen at an angle with more of them under it. Not another list of rows -
+         the panel beside this one is already that, and two icons of rows say nothing about which is which. -->
+    <DrawingImage x:Key="FaceStructureIcon">
+        <GeometryDrawing Geometry="M5,1.2 L9.2,3.3 L5,5.4 L0.8,3.3 Z M0.8,5.4 L5,7.5 L9.2,5.4 M0.8,7.2 L5,9.3 L9.2,7.2"
+                         Stroke="{ResourceReference TextFillColorSecondary}"
+                         StrokeThickness="1.1"/>
+    </DrawingImage>
+
     <!-- Paint ORDER, and the arrow is what carries it: the bars are the stack and the arrow says which way this one
          goes through it. Fill emphasis - a solid square over an outlined one - reads as nothing at all at this size,
          while up and down are unmistakable. -->

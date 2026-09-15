@@ -57,13 +57,13 @@
                                                          socket is not a box but the end of a wire, and every graph
                                                          editor draws it round for that reason. Hollow while nothing is
                                                          docked - see Fluent's set for how the two rings work. -->
-                                                    <Border Width="10" Height="10" CornerRadius="5" MarginLeft="-5"
+                                                    <CanvasNodeSocket Width="10" Height="10" CornerRadius="5" MarginLeft="-5"
                                                             VerticalAlignment="Center"
                                                             Background="{ObservableResource SolidBackgroundFillColorSecondary}"
                                                             BorderBrush="{Binding Color}"
                                                             BorderThickness="2">
                                                         <Border CornerRadius="3" Background="{Binding Fill}"/>
-                                                    </Border>
+                                                    </CanvasNodeSocket>
                                                     <TextBlock Text="{Binding Name}" MarginLeft="6"
                                                                VerticalAlignment="Center"
                                                                VerticalTextAlignment="Center"
@@ -94,13 +94,13 @@
                                                                VerticalAlignment="Center"
                                                                VerticalTextAlignment="Center"
                                                                Foreground="{ObservableResource TextFillColorSecondary}"/>
-                                                    <Border Width="10" Height="10" CornerRadius="5" MarginRight="-5"
+                                                    <CanvasNodeSocket Width="10" Height="10" CornerRadius="5" MarginRight="-5"
                                                             VerticalAlignment="Center"
                                                             Background="{ObservableResource SolidBackgroundFillColorSecondary}"
                                                             BorderBrush="{Binding Color}"
                                                             BorderThickness="2">
                                                         <Border CornerRadius="3" Background="{Binding Fill}"/>
-                                                    </Border>
+                                                    </CanvasNodeSocket>
                                                 </StackPanel>
                                             </DataTemplate>
                                         </ItemsControl.ItemTemplate>

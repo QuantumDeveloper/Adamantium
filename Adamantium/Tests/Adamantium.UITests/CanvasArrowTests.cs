@@ -1,6 +1,7 @@
 using Adamantium.Mathematics;
 using Adamantium.UI.Controls;
 using Adamantium.UI.Core;
+using Adamantium.UI.Core.Input;
 using Adamantium.UI.Core.Media;
 using Adamantium.UITests.Rendering;
 using NUnit.Framework;
@@ -285,6 +286,43 @@ public class CanvasArrowTests
             Assert.That(painted.StartHead, Is.EqualTo(0));
         });
     }
+
+    // THE HEAD GOES WHERE THE HAND IS. An arrow is dragged out the way it is meant to point, so the end under the
+    // pointer is its END - the tool used to set the box and the lean and leave the direction unwritten, and every arrow
+    // dragged leftwards or upwards came out pointing back at the hand that drew it.
+    [TestCase(80, 60, TestName = "down and to the right")]
+    [TestCase(-80, -60, TestName = "up and to the left")]
+    [TestCase(-80, 60, TestName = "down and to the left")]
+    [TestCase(80, -60, TestName = "up and to the right")]
+    [TestCase(-80, 0, TestName = "straight left")]
+    [TestCase(0, -60, TestName = "straight up")]
+    public void AnArrowDraggedOutPointsAtThePointer(double dx, double dy)
+    {
+        var canvas = Sized();
+        var scene = new CanvasScene();
+        canvas.Scene = scene;
+
+        var tool = new ShapeTool(CanvasShape.Arrow);
+        var from = new Vector2(100, 100);
+        var to = new Vector2(100 + dx, 100 + dy);
+
+        tool.OnPressed(canvas, Press(from));
+        tool.OnMoved(canvas, Press(to));
+        tool.OnReleased(canvas, Press(to));
+
+        var arrow = scene.Items[^1] as ShapeItem;
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(arrow.Points[1].X, Is.EqualTo(to.X).Within(0.001), "the head is not under the pointer");
+            Assert.That(arrow.Points[1].Y, Is.EqualTo(to.Y).Within(0.001));
+            Assert.That(arrow.Points[0].X, Is.EqualTo(from.X).Within(0.001), "the tail is not where the drag began");
+            Assert.That(arrow.Points[0].Y, Is.EqualTo(from.Y).Within(0.001));
+        });
+    }
+
+    private static CanvasPointerEventArgs Press(Vector2 world) =>
+        new() { World = world, Pointer = world, Button = MouseButtons.Left };
 
     // A box round a line offers grips on corners that are not on the shape at all, and dragging one moves both ends -
     // the gesture that fights the one that means something.

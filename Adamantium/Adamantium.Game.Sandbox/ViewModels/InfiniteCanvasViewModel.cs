@@ -173,6 +173,26 @@ public partial class InfiniteCanvasViewModel : TabPageViewModel
         RefreshStructure();
     }
 
+    /// <summary>Which face of the inspector is showing: the list of what is on the plane, or the properties. The two
+    /// are one choice, so the toggles that drive them only answer to being turned ON - a radio never unchecks itself,
+    /// and pressing the face that is already showing leaves it showing.</summary>
+    [Bindable] private bool _showsStructure;
+
+    public bool ShowsProperties
+    {
+        get => !ShowsStructure;
+        set { if (value) ShowsStructure = false; }
+    }
+
+    partial void OnShowsStructureChanged(bool value)
+    {
+        RaisePropertyChanged(nameof(ShowsProperties));
+        RaisePropertyChanged(nameof(ToolFace));
+        RaisePropertyChanged(nameof(SelectionFace));
+        RaisePropertyChanged(nameof(StructureFace));
+        RaisePropertyChanged(nameof(Face));
+    }
+
     /// <summary>What is on the plane, TOPMOST FIRST. Reversed from paint order on purpose: the list reads top to
     /// bottom the way the drawing is stacked front to back, which is what every editor's layer list does and what
     /// "bring to front" then means without explanation.
@@ -182,10 +202,15 @@ public partial class InfiniteCanvasViewModel : TabPageViewModel
 
     private void RefreshStructure()
     {
+        // Of the MODE in hand: the list says what is on the plane, and what the plane is not showing is not on it as
+        // far as anyone looking is concerned.
         var items = Scene.Items;
-        var listed = new ICanvasItem[items.Count];
+        var listed = new List<ICanvasItem>(items.Count);
 
-        for (var i = 0; i < items.Count; i++) listed[i] = items[items.Count - 1 - i];
+        for (var i = items.Count - 1; i >= 0; i--)
+        {
+            if (items[i].Mode == Mode) listed.Add(items[i]);
+        }
 
         Structure = listed;
         RaisePropertyChanged(nameof(Structure));
@@ -218,29 +243,9 @@ public partial class InfiniteCanvasViewModel : TabPageViewModel
     /// and the canvas only says where one step ends and the next begins.</summary>
     public CanvasHistory History { get; } = new();
 
-    /// <summary>The whiteboard switch: the canvas becomes glass over whatever is behind it. It writes the SAME property
-    /// the grid drop-down does, because it is the same setting said two ways - and putting the mode back where it was
-    /// when the switch goes off is why the old one is remembered rather than assumed.</summary>
-    [Bindable] private bool _whiteboard;
-
-    private CanvasGridStyle _gridBeforeWhiteboard = CanvasGridStyle.Dots;
-
-    partial void OnWhiteboardChanged(bool value)
-    {
-        if (value)
-        {
-            _gridBeforeWhiteboard = GridStyle;
-            GridStyle = CanvasGridStyle.Transparent;
-        }
-        else if (GridStyle == CanvasGridStyle.Transparent)
-        {
-            GridStyle = _gridBeforeWhiteboard;
-        }
-    }
-
-    /// <summary>Whether the canvas carries its own tool panel. Off, everything is steered from out here - which is the
-    /// case the whiteboard mode is for.</summary>
-    [Bindable] private bool _showPanel = true;
+    // The WHITEBOARD switch and the one that hid the tool panel stood here and are gone. The whiteboard was the grid
+    // set to Transparent said a second way, and the inspector's own Grid row says it; the other could not move into
+    // the panel it hides, and the panel already folds by its grip. See the note at the top of the view.
 
     /// <summary>What is drawn on the plane. The PAGE holds it, not the canvas - undo, saving and everything else a
     /// drawing is for belong to whoever owns the drawing, which is why the control only ever asks what is visible.
@@ -273,6 +278,7 @@ public partial class InfiniteCanvasViewModel : TabPageViewModel
 
     public ICanvasTool TextTool { get; } = new TextTool();
 
+
     /// <summary>Two erasers and not one with a switch: which of them you want is the same kind of choice as which tool
     /// you want, so it is made in the same place and in the same way.</summary>
     public ICanvasTool ErasePointTool { get; } = new EraseTool(CanvasEraseMode.Point);
@@ -299,9 +305,17 @@ public partial class InfiniteCanvasViewModel : TabPageViewModel
     /// <summary>A NODE of a graph. The same tool as the three above and not a mechanism of its own: a node IS a
     /// control, which was the point of building it as one - so putting it on the plane needs nothing the canvas did not
     /// already have.</summary>
+    /// <summary>The one tool of the GRAPH, and the only one of these that says so: a rail offers what its canvas's mode
+    /// admits, and a node has no business in a drawing any more than a pen has in a graph.</summary>
     public ICanvasTool NodeTool { get; } =
         new ElementTool(() => new CanvasNode { Title = "Node", Inputs = 2, Outputs = 1 }, new Size(190, 110))
-        { Name = "Node", Icon = "ToolNodeIcon", Description = "drag out a graph node" };
+        {
+            Name = "Node",
+            Icon = "ToolNodeIcon",
+            Description = "drag out a graph node",
+            Mode = CanvasMode.Nodes,
+            Group = string.Empty
+        };
 
     /// <summary>The tools the canvas offers, in the order its rail shows them. THE list - there is no second copy of
     /// it in the markup, because everything a button needs (the name, the picture, the key) is a fact about the tool.
@@ -335,9 +349,38 @@ public partial class InfiniteCanvasViewModel : TabPageViewModel
     /// <summary>A caption over the rows, and NULL whenever it would only repeat them. The sections already name what
     /// they hold - "Pen", "Control" - so a caption saying the same word above them is noise; several objects at once
     /// is the one case the sections cannot state, because then there are several of them.</summary>
-    public string Face => _selection is { Count: > 1 } many ? $"{many.Count} objects selected" : null;
+    public string Face =>
+        ShowsProperties && _selection is { Count: > 1 } many ? $"{many.Count} objects selected" : null;
 
     /// <summary>Whether a press on a control on the plane MOVES it or presses it.</summary>
+    /// <summary>What the canvas is being used AS. Two-way to the canvas, and the pair of toggles that drive it are one
+    /// choice - the same shape as the inspector's faces.</summary>
+    [Bindable] private CanvasMode _mode = CanvasMode.Drawing;
+
+    public bool IsDrawing
+    {
+        get => Mode == CanvasMode.Drawing;
+        set { if (value) Mode = CanvasMode.Drawing; }
+    }
+
+    public bool IsGraph
+    {
+        get => Mode == CanvasMode.Nodes;
+        set { if (value) Mode = CanvasMode.Nodes; }
+    }
+
+    partial void OnModeChanged(CanvasMode value)
+    {
+        RaisePropertyChanged(nameof(IsDrawing));
+        RaisePropertyChanged(nameof(IsGraph));
+        RaisePropertyChanged(nameof(GraphFace));
+        RefreshStructure();
+    }
+
+    /// <summary>The commands that are about a GRAPH and nothing else - saving it, loading it - shown only while one is
+    /// what the canvas is holding.</summary>
+    public Visibility GraphFace => Mode == CanvasMode.Nodes ? Visibility.Visible : Visibility.Collapsed;
+
     [Bindable] private bool _designMode = true;
 
     [Bindable] private Color _inkColor = Colors.White;
@@ -454,11 +497,6 @@ public partial class InfiniteCanvasViewModel : TabPageViewModel
 
     [Bindable] private CanvasGridStyle _gridStyle = CanvasGridStyle.Dots;
 
-    // Picking the mode straight off the drop-down keeps the switch honest: choose Transparent there and the whiteboard
-    // box is ticked, choose anything else and it is not. One state said two ways, and neither way lies about it.
-    partial void OnGridStyleChanged(CanvasGridStyle value) =>
-        Whiteboard = value == CanvasGridStyle.Transparent;
-
     [Bindable] private double _scale = 1;
 
     [Bindable] private Vector2 _offset;
@@ -493,6 +531,7 @@ public partial class InfiniteCanvasViewModel : TabPageViewModel
         RaisePropertyChanged(nameof(HasPlainLabel));
         RaisePropertyChanged(nameof(Chosen));
         RaisePropertyChanged(nameof(IsNurbs));
+        RaisePropertyChanged(nameof(IsBezier));
         RaisePropertyChanged(nameof(HasCorners));
         RaisePropertyChanged(nameof(HasSides));
         RaisePropertyChanged(nameof(HasHeads));
@@ -500,12 +539,17 @@ public partial class InfiniteCanvasViewModel : TabPageViewModel
         RaisePropertyChanged(nameof(Face));
     }
 
-    // The inspector has TWO faces and one place. With nothing selected it shows what you are working WITH - the tool
-    // and its settings; with something selected, what you are working ON. One panel, never empty, and the settings
-    // that belong to a tool stop having to live somewhere else.
-    public Visibility ToolFace => Anything ? Visibility.Collapsed : Visibility.Visible;
+    // The inspector has ONE place and several faces. Which one is on is partly the user's - properties or the list of
+    // what is on the plane - and partly the drawing's: on properties, with nothing selected it shows what you are
+    // working WITH, and with something selected what you are working ON.
+    //
+    // ONE panel and not several, because a second panel beside the first is a second panel to move, to fold and to
+    // find room for - and folded it is a pair of buttons over the drawing that say nothing about what is behind them.
+    public Visibility ToolFace => ShowsProperties && !Anything ? Visibility.Visible : Visibility.Collapsed;
 
-    public Visibility SelectionFace => Anything ? Visibility.Visible : Visibility.Collapsed;
+    public Visibility SelectionFace => ShowsProperties && Anything ? Visibility.Visible : Visibility.Collapsed;
+
+    public Visibility StructureFace => ShowsStructure ? Visibility.Visible : Visibility.Collapsed;
 
     // A section per KIND, shown when the selection holds one. Several kinds at once show several sections, which is
     // what a mixed selection honestly is.
@@ -547,21 +591,24 @@ public partial class InfiniteCanvasViewModel : TabPageViewModel
     public IReadOnlyList<CanvasCurve> Curves { get; } =
         [CanvasCurve.Bezier, CanvasCurve.BSpline, CanvasCurve.Nurbs];
 
-    /// <summary>Degree and evenness belong to a NURBS and to nothing else - the other two curves would show two lines
-    /// that do nothing.</summary>
-    public bool IsNurbs
+    /// <summary>Evenness belongs to a NURBS and to nothing else - the other two curves would show a line that does
+    /// nothing.</summary>
+    public bool IsNurbs => AnyCurve(CanvasCurve.Nurbs);
+
+    /// <summary>Whether the order is worth showing: a Bezier has one that follows from its points, and the other two
+    /// kinds say what they are some other way.</summary>
+    public bool IsBezier => AnyCurve(CanvasCurve.Bezier);
+
+    private bool AnyCurve(CanvasCurve kind)
     {
-        get
+        if (_selection == null) return false;
+
+        foreach (var item in _selection)
         {
-            if (_selection == null) return false;
-
-            foreach (var item in _selection)
-            {
-                if (item is CurveItem { Kind: CanvasCurve.Nurbs }) return true;
-            }
-
-            return false;
+            if (item is CurveItem curve && curve.Kind == kind) return true;
         }
+
+        return false;
     }
 
     // Within the one Shape section, the lines that belong to ONE shape. Rounding is a rectangle's and sides are a
@@ -609,6 +656,57 @@ public partial class InfiniteCanvasViewModel : TabPageViewModel
 
         holder.Remove(pin);
         Scene.Touch();
+    }
+
+    /// <summary>Where the graph is kept between runs. A path and not a stream: the application decides WHEN and WHERE,
+    /// the engine decides WHAT - see <see cref="CanvasGraphSerializer"/>.</summary>
+    public string GraphPath { get; set; } =
+        System.IO.Path.Combine(System.IO.Path.GetTempPath(), "adamantium-graph.json");
+
+    /// <summary>What the last save or load did, in words, so the stand says something rather than appearing to do
+    /// nothing.</summary>
+    [Bindable] private string _graphStatus = "not saved yet";
+
+    // The CANVAS is handed in by the view. The page does not hold one - a view-model that reached for a control would
+    // be a view-model that has to be given one before it can answer anything - and the button that saves is standing
+    // next to it anyway.
+    [Command]
+    private void SaveGraph(object which)
+    {
+        if (which is not InfiniteCanvas canvas) return;
+
+        try
+        {
+            System.IO.File.WriteAllText(GraphPath, CanvasGraphSerializer.Save(canvas));
+            GraphStatus = $"saved to {GraphPath}";
+        }
+        catch (System.IO.IOException e)
+        {
+            GraphStatus = $"could not save: {e.Message}";
+        }
+    }
+
+    [Command]
+    private void LoadGraph(object which)
+    {
+        if (which is not InfiniteCanvas canvas) return;
+
+        try
+        {
+            if (!System.IO.File.Exists(GraphPath))
+            {
+                GraphStatus = "nothing saved yet";
+                return;
+            }
+
+            GraphStatus = CanvasGraphSerializer.Load(canvas, System.IO.File.ReadAllText(GraphPath))
+                ? $"loaded from {GraphPath}"
+                : "that file is not a graph this version can read";
+        }
+        catch (System.IO.IOException e)
+        {
+            GraphStatus = $"could not load: {e.Message}";
+        }
     }
 
     // The CONTEXT BAR's actions. Actions and not properties: what a thing looks like is the inspector's business and

@@ -55,13 +55,13 @@
                                                 <StackPanel Orientation="Horizontal" MarginBottom="5">
                                                     <!-- Hollow while nothing is docked - see Fluent's set for how the
                                                          two rings work. -->
-                                                    <Border Width="14" Height="14" CornerRadius="7" MarginLeft="-7"
+                                                    <CanvasNodeSocket Width="14" Height="14" CornerRadius="7" MarginLeft="-7"
                                                             VerticalAlignment="Center"
                                                             Background="{ObservableResource SolidBackgroundFillColorSecondary}"
                                                             BorderBrush="{Binding Color}"
                                                             BorderThickness="2">
                                                         <Border CornerRadius="5" Background="{Binding Fill}"/>
-                                                    </Border>
+                                                    </CanvasNodeSocket>
                                                     <TextBlock Text="{Binding Name}" MarginLeft="8"
                                                                VerticalAlignment="Center"
                                                                VerticalTextAlignment="Center"
@@ -92,13 +92,13 @@
                                                                VerticalAlignment="Center"
                                                                VerticalTextAlignment="Center"
                                                                Foreground="{ObservableResource TextFillColorSecondary}"/>
-                                                    <Border Width="14" Height="14" CornerRadius="7" MarginRight="-7"
+                                                    <CanvasNodeSocket Width="14" Height="14" CornerRadius="7" MarginRight="-7"
                                                             VerticalAlignment="Center"
                                                             Background="{ObservableResource SolidBackgroundFillColorSecondary}"
                                                             BorderBrush="{Binding Color}"
                                                             BorderThickness="2">
                                                         <Border CornerRadius="5" Background="{Binding Fill}"/>
-                                                    </Border>
+                                                    </CanvasNodeSocket>
                                                 </StackPanel>
                                             </DataTemplate>
                                         </ItemsControl.ItemTemplate>

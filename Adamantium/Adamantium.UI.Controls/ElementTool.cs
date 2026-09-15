@@ -48,6 +48,13 @@ public class ElementTool : ICanvasTool
     /// <summary>A crosshair - a control is dragged out from an exact corner, like a shape.</summary>
     public Cursor Cursor { get; set; } = Cursors.Crosshair;
 
+    /// <summary>Which mode this tool belongs to. SAID and not guessed from what it makes: asking the factory would mean
+    /// building a control to find out, every time a rail is rebuilt, for every tool it holds. The application knows
+    /// what it is putting on the plane.</summary>
+    public CanvasMode Mode { get; set; } = CanvasMode.Drawing;
+
+    public bool WorksIn(CanvasMode mode) => mode == Mode;
+
     public void OnPressed(InfiniteCanvas canvas, CanvasPointerEventArgs e)
     {
         if (e.Button != MouseButtons.Left || canvas.Scene == null || _make == null) return;
@@ -76,22 +83,38 @@ public class ElementTool : ICanvasTool
         _box = null;
         canvas.ReleaseMouseCapture();
 
+        var element = _make();
+        if (element == null)
+        {
+            canvas.InvalidateRender(false);
+            e.Handled = true;
+            return;
+        }
+
+        var item = new ElementItem(element, box);
+
         // A press that never moved is a CLICK, and a click drops the control at the size it asks for rather than at
-        // nothing. Measured in screen pixels, because "did not move" is a fact about the hand.
+        // nothing.
         var least = canvas.ScreenToWorldLength(3);
         if (box.Width < least || box.Height < least)
         {
-            box = new Rect(_from.X, _from.Y,
-                canvas.ScreenToWorldLength(Natural.Width), canvas.ScreenToWorldLength(Natural.Height));
+            // In SCREEN pixels for an ordinary control - a button dropped at 1:1 and one dropped zoomed right out
+            // should look the same size when you are looking at them, and "did not move" is a fact about the hand.
+            //
+            // In WORLD units for one sized by its own CONTENT. Its width is a floor its content sets, and a floor is a
+            // world measurement: scaled by the camera as well, the same node came out a third as wide when made zoomed
+            // in and three times as wide when made zoomed out - the same node, different sizes, depending on nothing
+            // but when it was made.
+            box = item.SizeFollowsContent
+                ? new Rect(_from.X, _from.Y, Natural.Width, Natural.Height)
+                : new Rect(_from.X, _from.Y,
+                    canvas.ScreenToWorldLength(Natural.Width), canvas.ScreenToWorldLength(Natural.Height));
+
+            item.World = box;
         }
 
-        var element = _make();
-        if (element != null)
-        {
-            var item = new ElementItem(element, box);
-            canvas.Scene?.Add(item);
-            canvas.Select(item, false);
-        }
+        canvas.Scene?.Add(item);
+        canvas.Select(item, false);
 
         canvas.InvalidateRender(false);
         e.Handled = true;
