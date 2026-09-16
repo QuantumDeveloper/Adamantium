@@ -55,7 +55,7 @@ public class TemplateBindingExpression : BindingExpressionBase
     {
         if (TryCoerce(Target.GetValue(TargetProperty), SourceProperty.PropertyType, out var value))
         {
-            Source.SetValue(SourceProperty, value, ValuePriority.Template);
+            Source.SetCurrentValue(SourceProperty, value);
         }
     }
 

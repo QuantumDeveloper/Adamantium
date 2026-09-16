@@ -32,6 +32,37 @@ public class InputHitTestTests
         Assert.That(hit, Is.SameAs(inner), "the button inside the Border must be the hit target, not the Grid");
     }
 
+    // A RENDER TRANSFORM moves what you see, so it must move what you can hit. Scaled up, the element was still
+    // hit-tested where it was LAID OUT - so an infinite canvas that scales the controls it hosts could be operated at
+    // 1:1 and nowhere else, and the miss grew with the distance from the element's own origin.
+    [Test]
+    public void HitTest_FindsAScaledElementWhereItIsDrawn()
+    {
+        var inner = new Button { Width = 40, Height = 20 };
+        var holder = new Grid { Width = 40, Height = 20 };
+        holder.Children.Add(inner);
+
+        var root = new Grid { Width = 400, Height = 300 };
+        root.Children.Add(holder);
+
+        root.Measure(new Size(400, 300));
+        root.Arrange(new Rect(0, 0, 400, 300));
+
+        // Doubled about its own top-left corner, so what was drawn at (30,10) is now drawn at (60,20).
+        holder.RenderTransformOrigin = Vector2.Zero;
+        holder.RenderTransform = new Transform { ScaleX = 2, ScaleY = 2 };
+
+        var at = holder.Bounds.Location;
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(((IInputComponent)root).HitTest(new Vector2(at.X + 60, at.Y + 20)), Is.SameAs(inner),
+                "the scaled element was not found where it is drawn");
+            Assert.That(((IInputComponent)root).HitTest(new Vector2(at.X + 90, at.Y + 50)), Is.Not.SameAs(inner),
+                "it was found outside the box it is drawn in");
+        });
+    }
+
     // A control painted ON TOP of a full-size background panel (overlapping siblings): clicking it must hit the control,
     // not the panel behind it. (Designer repro: selecting a control kept selecting the background panel.)
     [Test]

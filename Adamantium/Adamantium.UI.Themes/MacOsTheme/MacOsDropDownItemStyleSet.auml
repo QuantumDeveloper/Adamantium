@@ -33,6 +33,9 @@
         <Setter Property="BorderThickness" Value="0"/>
         <Setter Property="CornerRadius" Value="{ResourceReference CornerRadiusDefault}"/>
         <Setter Property="Padding" Value="{ResourceReference PaddingRow}"/>
+        <!-- A ROW IS A ROW whatever is in it - see Fluent's set. An empty entry left to its content shrinks to its
+             padding, and a virtualizing list gives every row the height of the one it probed. -->
+        <Setter Property="MinHeight" Value="{ResourceReference ControlHeightCompact}"/>
         <Setter Property="HorizontalContentAlignment" Value="Left"/>
         <Setter Property="VerticalContentAlignment" Value="Center"/>
     </Style>

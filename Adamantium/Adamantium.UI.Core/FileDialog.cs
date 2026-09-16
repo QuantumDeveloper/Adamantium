@@ -21,4 +21,7 @@ public static class FileDialog
     /// <summary>Asks where to save, and returns the full path the user chose - or null if they chose nothing. Null is
     /// the only refusal: nothing is written, and there is no error to report, because cancelling is not one.</summary>
     public static string Save(SaveFileRequest request) => Platform?.Save(request);
+
+    /// <summary>Asks which file to open, and returns its full path - or null if the user chose nothing.</summary>
+    public static string Open(OpenFileRequest request) => Platform?.Open(request);
 }

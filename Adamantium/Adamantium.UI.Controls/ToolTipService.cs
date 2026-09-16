@@ -102,7 +102,11 @@ public static class ToolTipService
         if (_popup != null) return;
 
         // The card's entire look is themed (the ToolTip style); the service only fills its Content and positions it.
-        _toolTip = new ToolTip();
+        //
+        // NOT A TARGET. A tooltip is shown NEXT TO the pointer and often under it, and one that answers the mouse takes
+        // both the hover and the press away from the control it is describing: the control's highlight blinked as the
+        // card came and went, and a click that landed while it was up did nothing at all.
+        _toolTip = new ToolTip { IsHitTestVisible = false };
         _popup = new Popup { Child = _toolTip, VerticalOffset = 4 };
 
         _timer = new DispatcherTimer();

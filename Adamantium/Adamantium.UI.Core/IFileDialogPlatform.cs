@@ -6,4 +6,7 @@ public interface IFileDialogPlatform
     /// <summary>Shows the platform's save dialog and returns the chosen path, or null when the user cancelled. Modal to
     /// the window the user pressed from, and called on the UI thread.</summary>
     string Save(SaveFileRequest request);
+
+    /// <summary>The same for opening: the path of an EXISTING file, or null when the user cancelled.</summary>
+    string Open(OpenFileRequest request);
 }

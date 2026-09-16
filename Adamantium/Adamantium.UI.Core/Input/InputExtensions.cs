@@ -79,6 +79,34 @@ public static class InputExtensions
           || !element.IsHitTestVisible)
          return;
 
+      // A RENDER TRANSFORM moves what you SEE, so it has to move what you can HIT. Undone here, before anything is
+      // compared with anything: the point arrives in the parent's space, and the element's box, its children and its
+      // geometry are all stated in the element's own. Without this a transformed element was hit-tested where it was
+      // LAID OUT rather than where it is drawn - so a canvas that scales what it hosts could be operated at 1:1 and
+      // nowhere else, and the further from the element's origin, the wider the miss.
+      //
+      // Only when there IS one, which is almost never: everything else keeps the plain subtraction it always had.
+      if (element.RenderTransform != null)
+      {
+         var back = Matrix4x4F.Invert(element.LocalTransform);
+         var mapped = Vector3F.TransformCoordinate(new Vector3F((float)p.X, (float)p.Y, 0), back);
+         var own = new Vector2(mapped.X, mapped.Y);
+         var size = element.RenderSize;
+
+         // The element's OWN box, since the point is now in its own space - ClipRectangle states the same box in the
+         // parent's, which the transform has just moved out from under it.
+         var within = own.X >= 0 && own.Y >= 0 && own.X <= size.Width && own.Y <= size.Height;
+
+         if (element.ClipToBounds && !within) return;
+
+         foreach (var child in HitTestChildren(element, own))
+            Collect(child, own, result, boundsOnly);
+
+         if (within && element is IInputComponent hit && (boundsOnly || element.HitTestCore(own))) result.Add(hit);
+
+         return;
+      }
+
       // Broad phase. Whether the point is inside THIS element's own box gates the SELF hit below: the default narrow
       // phase (UIComponent.HitTestCore => true, Panel => Background.IsVisible()) ignores the point and trusts this, so
       // it must stay for self-hit or every filled element would register as hit everywhere.
