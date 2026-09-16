@@ -11,6 +11,19 @@ public static class ShellDialog
     /// <summary>IID_IFileSaveDialog.</summary>
     public static readonly Guid IidFileSaveDialog = new("84BCCD23-5FDE-4CDB-AEA4-AF64B83D78AB");
 
+    /// <summary>CLSID_FileOpenDialog.</summary>
+    public static readonly Guid ClsidFileOpenDialog = new("DC1C5A9C-E88A-4DDE-A5A1-60F82A20AEF7");
+
+    /// <summary>IID_IFileOpenDialog.</summary>
+    public static readonly Guid IidFileOpenDialog = new("D57C7288-D4AD-4768-BE02-9D969532D960");
+
+    /// <summary>FOS_FILEMUSTEXIST - an open dialog must come back with a file that is there, not a name the user typed.
+    /// </summary>
+    public const uint FileMustExist = 0x00001000;
+
+    /// <summary>FOS_PATHMUSTEXIST - and in a folder that is there.</summary>
+    public const uint PathMustExist = 0x00000800;
+
     /// <summary>FOS_OVERWRITEPROMPT - ask before replacing a file that is already there. A save dialog sets this
     /// itself, but only until someone calls SetOptions, which replaces the lot.</summary>
     public const uint OverwritePrompt = 0x00000002;

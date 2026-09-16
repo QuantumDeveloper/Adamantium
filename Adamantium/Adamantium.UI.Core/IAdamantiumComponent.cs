@@ -68,6 +68,14 @@ public interface IAdamantiumComponent : IComponent
     void SetValue(AdamantiumProperty property, object value, ValuePriority priority = ValuePriority.Local);
 
     /// <summary>
+    /// Changes what the property holds without claiming where it comes from: written into the slot it is already
+    /// driven from, never a stronger one. What a user's action writes.
+    /// </summary>
+    /// <param name="property">The property.</param>
+    /// <param name="value">The value.</param>
+    void SetCurrentValue(AdamantiumProperty property, object value);
+
+    /// <summary>
     /// Sets a <see cref="AdamantiumProperty"/> value.
     /// </summary>
     /// <param name="propertyName">Name of the AdamantiumProperty reference</param>

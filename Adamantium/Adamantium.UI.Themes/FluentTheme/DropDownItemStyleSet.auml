@@ -14,6 +14,10 @@
         <Setter Property="BorderThickness" Value="0"/>
         <Setter Property="CornerRadius" Value="{ResourceReference CornerRadiusDefault}"/>
         <Setter Property="Padding" Value="{ResourceReference PaddingRow}"/>
+        <!-- A ROW IS A ROW whatever is in it. Left to its content, an EMPTY one - the entry a list offers for "none" -
+             shrinks to its padding, and a virtualizing list takes one row's height for every row: the blank first line
+             of a list squashed every line under it to its own height and the words ran over each other. -->
+        <Setter Property="MinHeight" Value="{ResourceReference ControlHeightCompact}"/>
         <Setter Property="HorizontalContentAlignment" Value="Left"/>
         <Setter Property="VerticalContentAlignment" Value="Center"/>
     </Style>

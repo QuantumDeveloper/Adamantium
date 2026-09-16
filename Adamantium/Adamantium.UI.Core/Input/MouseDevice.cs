@@ -95,6 +95,22 @@ public class MouseDevice
         // Without this, GetPosition inside a popup is garbage and drag controls (ColorPicker / Slider / ColorWheel) die there.
         var clientRoot = root is IWindow ? root : ((_positionRoot as IUIComponent) ?? root);
         var p = clientRoot.PointToClient(Position);
+
+        // A RENDER TRANSFORM on the way up means the offsets alone no longer say where the element is - the same reason
+        // the hit test has to undo them. Then the composed transform is the only honest answer, and inverting it is
+        // what TranslatePoint already does. Asked only when there IS one: every ordinary control keeps the plain walk.
+        //
+        // Without this a button inside something scaled - a node on a zoomed canvas - was FOUND by the pointer and then
+        // decided the release had landed outside itself, because it measured that with these offsets. It highlighted
+        // under the pointer and did nothing when clicked.
+        if (Transformed(relativeTo))
+        {
+            var local = Vector3F.TransformCoordinate(new Vector3F((float)p.X, (float)p.Y, 0),
+                Matrix4x4F.Invert(relativeTo.WorldTransform));
+
+            return new Vector2(local.X, local.Y);
+        }
+
         IUIComponent v = relativeTo;
         while (v != null)
         {
@@ -103,6 +119,16 @@ public class MouseDevice
         }
 
         return p;
+    }
+
+    private static bool Transformed(IUIComponent of)
+    {
+        for (var at = of; at != null; at = at.VisualParent)
+        {
+            if (at.RenderTransform != null) return true;
+        }
+
+        return false;
     }
 
     /// <summary>
@@ -314,6 +340,11 @@ public class MouseDevice
             var popups = window.PopupRoots;
             for (var i = popups.Count - 1; i >= 0; i--)
             {
+                // A popup that is not a TARGET does not absorb either. A tooltip is the case: it is a label that
+                // follows the pointer, and standing under it, it took the hover - and the press - away from the very
+                // control it is describing. The button's highlight blinked on and off and the click went nowhere.
+                if (!popups[i].IsHitTestVisible) continue;
+
                 if (InputExtensions.HitTest(popups[i], p) is { } popupHit)
                     return popupHit;
                 // Click landed on the popup's own OPAQUE card, not one of its child controls (a SlidePanel/menu root is a

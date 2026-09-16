@@ -38,6 +38,48 @@ internal sealed class WindowsFileDialog : IFileDialogPlatform
         }
     }
 
+    public string Open(OpenFileRequest request)
+    {
+        var clsid = ShellDialog.ClsidFileOpenDialog;
+        var iid = ShellDialog.IidFileOpenDialog;
+
+        if (Win32Interop.CoCreateInstance(ref clsid, IntPtr.Zero, Win32Interop.ClsCtxInprocServer, ref iid,
+                out var instance) != 0 || instance is not IFileOpenDialog dialog)
+            return null;
+
+        try
+        {
+            Prepare(dialog, request);
+
+            if (dialog.Show(Win32Interop.GetActiveWindow()) != 0) return null;
+            if (dialog.GetResult(out var item) != 0) return null;
+
+            return PathOf(item);
+        }
+        finally
+        {
+            Marshal.ReleaseComObject(dialog);
+        }
+    }
+
+    private static void Prepare(IFileOpenDialog dialog, OpenFileRequest request)
+    {
+        // A file being OPENED has to be there - both the file and the folder it is named in. Added to the dialog's own
+        // flags for the same reason the save side adds to them.
+        if (dialog.GetOptions(out var options) == 0)
+        {
+            dialog.SetOptions(options | ShellDialog.ForceFileSystem | ShellDialog.FileMustExist |
+                              ShellDialog.PathMustExist);
+        }
+
+        if (request == null) return;
+
+        if (!string.IsNullOrEmpty(request.Title)) dialog.SetTitle(request.Title);
+
+        var types = Filters(request.FileTypes);
+        if (types.Length > 0) dialog.SetFileTypes((uint)types.Length, types);
+    }
+
     private static void Prepare(IFileSaveDialog dialog, SaveFileRequest request)
     {
         // Read the flags and ADD to them. Setting them outright would drop the ones a save dialog carries by default -
