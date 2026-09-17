@@ -320,7 +320,6 @@ public class ContentPresenter : InputUIComponent
                 var textBlock = new TextBlock
                 {
                     Text = newContent.ToString(),
-                    FontSize = FontSize,
                     TextTrimming = TextTrimming,
                     HorizontalTextAlignment = ToTextAlignment(HorizontalAlignment),
                     VerticalTextAlignment = ToTextAlignment(VerticalAlignment),
@@ -342,6 +341,14 @@ public class ContentPresenter : InputUIComponent
                 // content was built, so a generated label inside a theme scope stayed in the application's colour.
                 textBlock.SetBinding(nameof(TextBlock.Foreground),
                     new Core.Data.Binding(nameof(Foreground)) { Source = this });
+
+                // ...and the SIZE for exactly the same reason, which it was not: it was copied at build time, so a label
+                // born before the theme's size reached the presenter kept the size it was born with and was measured for
+                // it - then drew its glyphs at the size that arrived later, into the box laid out for the old one. In a
+                // drop-down's closed box that is a line measured at 13 pixels holding 16 pixels of letters, which reads
+                // as text sitting low in its field.
+                textBlock.SetBinding(nameof(TextBlock.FontSize),
+                    new Core.Data.Binding(nameof(FontSize)) { Source = this });
                 _currentRoot = textBlock;
             }
         }
@@ -860,6 +867,7 @@ public class ContentPresenter : InputUIComponent
             return finalSize;
 
         _lastArrangeSize = finalSize;
+
         var size = base.ArrangeOverride(finalSize);
 
         if (_transitionPending)

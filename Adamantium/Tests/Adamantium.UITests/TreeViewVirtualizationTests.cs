@@ -354,6 +354,34 @@ public class TreeViewVirtualizationTests
         Assert.That(Selected(tree), Is.EqualTo("a"));
     }
 
+    // THE SELECTION GOES BOTH WAYS. A view-model that acts on a choice has to be able to take it back - a list whose
+    // selection only it can change stays on the node that was picked, and picking that same node again is no change at
+    // all, so the second pick does nothing. (Which is exactly what "add this kind of node" did: one worked, the next
+    // one of the same kind did not.)
+    [Test]
+    public void WritingTheSelectionSelectsAndClearing_LetsTheSameNodeBePickedAgain()
+    {
+        var tree = KeyboardTree(out var roots);
+        var picked = new System.Collections.Generic.List<string>();
+
+        tree.PropertyChanged += (_, e) =>
+        {
+            if (e.Property == TreeView.SelectedItemProperty && e.NewValue is Node node) picked.Add(node.Name);
+        };
+
+        Press(tree, Key.DownArrow);
+        Assert.That(Selected(tree), Is.EqualTo("a"));
+
+        tree.SelectedItem = null;
+        Assert.That(Selected(tree), Is.Null, "the tree kept a selection it was told to let go of");
+
+        // ...and the same node again IS a change now, so whoever acts on it hears about it a second time.
+        tree.SelectedItem = roots[0];
+        Assert.That(tree.SelectedItem, Is.SameAs(roots[0]), "writing a node did not select it");
+
+        Assert.That(picked, Is.EqualTo(new[] { "a", "a" }), "the same node picked twice was heard once");
+    }
+
     [Test]
     public void AKeyTheTreeDoesNotWantIsLeftAlone()
     {

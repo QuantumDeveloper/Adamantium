@@ -400,6 +400,18 @@ public class ChoiceProperty : PropertyDefinition
     public static readonly AdamantiumProperty EnumTypeProperty = AdamantiumProperty.Register(nameof(EnumType),
         typeof(Type), typeof(ChoiceProperty), new PropertyMetadata(null));
 
+    /// <summary>The property of an item that IS the value, when the list is of objects and the line binds one of their
+    /// fields - a catalogue of node kinds against a node's own word for its kind. Empty means the item itself is the
+    /// value, which is the ordinary case.</summary>
+    public static readonly AdamantiumProperty ValuePathProperty = AdamantiumProperty.Register(nameof(ValuePath),
+        typeof(String), typeof(ChoiceProperty), new PropertyMetadata(null));
+
+    public String ValuePath
+    {
+        get => GetValue<String>(ValuePathProperty);
+        set => SetValue(ValuePathProperty, value);
+    }
+
     private DataTemplate _editor;
 
     public IEnumerable ItemsSource
@@ -430,10 +442,31 @@ public class ChoiceProperty : PropertyDefinition
         if (editor is not DropDown drop) return;
 
         drop.ItemsSource = Choices();
-        drop.SelectedItem = value;
+        drop.SelectedItem = String.IsNullOrEmpty(ValuePath) ? value : Matching(value);
     }
 
-    protected internal override object ReadEditor(IUIComponent editor) => (editor as DropDown)?.SelectedItem;
+    protected internal override object ReadEditor(IUIComponent editor)
+    {
+        var picked = (editor as DropDown)?.SelectedItem;
+
+        return String.IsNullOrEmpty(ValuePath) ? picked : Read(picked);
+    }
+
+    // The item whose ValuePath reads as this value - the reverse of what the row writes back.
+    private object Matching(object value)
+    {
+        if (Choices() is not { } choices) return null;
+
+        foreach (var choice in choices)
+        {
+            if (Equals(Read(choice), value)) return choice;
+        }
+
+        return null;
+    }
+
+    private object Read(object item) =>
+        item?.GetType().GetProperty(ValuePath)?.GetValue(item);
 }
 
 /// <summary>A <see cref="Color"/>, edited by the swatch button that opens the full picker. A colour is the one value
@@ -640,6 +673,16 @@ internal static class PropertyEditors
         MinWidth = 0,
         MinHeight = 0,
         BorderThickness = new Thickness(0),
+
+        // ...and its own PADDING, for the same reason the floor above is dropped. A theme's drop-down padding is cut for
+        // a drop-down of the theme's own height; in a row that is a good deal shorter it eats more than the line of text
+        // needs - eleven pixels of a twenty-four-pixel box, leaving thirteen for a line that wants nineteen - and the
+        // letters are then drawn past the bottom of their own box, which is what "the text sits low" was.
+        // ...and its own PADDING, for the same reason the floor above is dropped. A theme's drop-down padding is cut for
+        // a drop-down of the theme's own height; in a row that is a good deal shorter it eats more than the line of text
+        // needs - eleven pixels of a twenty-four-pixel box, leaving thirteen for a line that wants nineteen - and the
+        // letters are then drawn past the bottom of their own box, which is what "the text sits low" was.
+        Padding = new Thickness(8, 0, 8, 0),
         VerticalAlignment = VerticalAlignment.Stretch,
         HorizontalAlignment = HorizontalAlignment.Stretch
     };

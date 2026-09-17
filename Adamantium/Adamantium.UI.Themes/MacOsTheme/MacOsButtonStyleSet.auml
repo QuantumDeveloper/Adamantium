@@ -76,6 +76,9 @@
         <PropertyTrigger Property="IsEnabled" Value="false">
             <Setter TargetName="InnerBorder" Property="Background" Value="{TemplateBinding BackgroundDisabled}"/>
             <Setter TargetName="PART_ContentPresenter" Property="Foreground" Value="{TemplateBinding ForegroundDisabled}"/>
+            <!-- AND THE CONTENT AS A WHOLE GOES QUIET - see Fluent's set: a picture carries its own brush and does not
+                 hear the disabled foreground, so a glyph button sat there looking live with nothing to do. -->
+            <Setter TargetName="PART_ContentPresenter" Property="Opacity" Value="0.4"/>
         </PropertyTrigger>
     </Style>
 

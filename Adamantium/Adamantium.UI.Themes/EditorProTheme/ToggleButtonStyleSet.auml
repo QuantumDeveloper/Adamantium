@@ -24,6 +24,8 @@
         <Setter Property="BackgroundDisabled" Value="Transparent"/>
         <Setter Property="ForegroundPressed" Value="{ObservableResource TextFillColorPrimary}"/>
         <Setter Property="ForegroundDisabled" Value="{ObservableResource TextFillColorDisabled}"/>
+        <!-- The CHECKED fill as a brush rather than a value written into the trigger - see the Fluent set. -->
+        <Setter Property="BackgroundChecked" Value="{ResourceReference SubtleFillColorSecondary}"/>
 
         <Setter Property="MinHeight" Value="{ResourceReference ControlHeight}"/>
         <Setter Property="Padding" Value="{ResourceReference PaddingControl}"/>
@@ -81,7 +83,7 @@
         <!-- Held down: the fill stays and the rule appears. The label keeps its own colour - nothing accent-coloured is
              behind it. -->
         <PropertyTrigger Property="IsChecked" Value="true">
-            <Setter TargetName="InnerBorder" Property="Background" Value="{ResourceReference SubtleFillColorSecondary}"/>
+            <Setter TargetName="InnerBorder" Property="Background" Value="{TemplateBinding BackgroundChecked}"/>
             <Setter TargetName="CheckedRule" Property="Visibility" Value="Visible"/>
         </PropertyTrigger>
         <PropertyTrigger Property="IsEnabled" Value="false">

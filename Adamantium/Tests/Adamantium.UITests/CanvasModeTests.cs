@@ -2,8 +2,11 @@ using System.Collections.Generic;
 using System.Linq;
 using Adamantium.Mathematics;
 using Adamantium.UI.Controls;
+using Adamantium.UI.Controls.DrawingBoard;
 using Adamantium.UI.Controls.Buttons;
+using Adamantium.UI.Controls.Text;
 using Adamantium.UI.Core;
+using Adamantium.UI.Core.Input;
 using Adamantium.UI.Core.Media;
 using NUnit.Framework;
 
@@ -179,5 +182,87 @@ public class CanvasModeTests
             Assert.That(Works(nodes, CanvasMode.Nodes), Is.True);
             Assert.That(Works(nodes, CanvasMode.Drawing), Is.False);
         });
+    }
+
+    // ...and a SHORTCUT obeys the same rule the rail does. A letter that handed over a pen in a graph put the canvas in
+    // a state its own mode exists to prevent, and it took a right-click to find the way out of it.
+    [Test]
+    public void ALetterCannotHandOverAToolThatDoesNotWorkHere()
+    {
+        var canvas = Sized();
+        var select = new SelectTool { Shortcut = Key.V };
+        var text = new TextTool { Shortcut = Key.T };
+
+        canvas.Tools.Add(select);
+        canvas.Tools.Add(text);
+        canvas.Mode = CanvasMode.Nodes;
+        canvas.Tool = select;
+
+        canvas.RaiseEvent(new KeyEventArgs(KeyboardDevice.CurrentDevice, Key.T, InputModifiers.None, 0)
+        {
+            RoutedEvent = Keyboard.KeyDownEvent
+        });
+
+        Assert.That(canvas.Tool, Is.SameAs(select), "a graph was handed a text tool by a letter");
+    }
+
+    // A key TYPED INTO SOMETHING is not the canvas's. Keyboard events bubble, so renaming a node in the inspector sent
+    // every letter of the new name through here: the tool changed halfway through the word and the rest of it was
+    // typed onto the drawing.
+    [Test]
+    public void AKeyTypedIntoSomethingElseIsNotTheCanvasS()
+    {
+        var canvas = Sized();
+        var select = new SelectTool { Shortcut = Key.V };
+        var pen = new PenTool { Shortcut = Key.P };
+
+        canvas.Tools.Add(select);
+        canvas.Tools.Add(pen);
+        canvas.Tool = select;
+
+        var typing = new TextBox();
+        var args = new KeyEventArgs(KeyboardDevice.CurrentDevice, Key.P, InputModifiers.None, 0)
+        {
+            RoutedEvent = Keyboard.KeyDownEvent,
+            OriginalSource = typing
+        };
+
+        canvas.RaiseEvent(args);
+
+        Assert.That(canvas.Tool, Is.SameAs(select), "a letter typed into a field changed the tool in hand");
+    }
+
+    // ...and a letter typed ONTO THE PLANE is not the canvas's either. A caret in a word answers only the few keys that
+    // mean something to it - the letters themselves arrive as text - so everything else went on to the shortcuts and
+    // typing a word picked a tool per letter, throwing the word away.
+    [Test]
+    public void ALetterTypedIntoTextOnThePlaneDoesNotPickATool()
+    {
+        var canvas = Sized();
+        var pen = new PenTool { Shortcut = Key.P };
+        var text = new TextTool { Shortcut = Key.T };
+
+        canvas.Tools.Add(pen);
+        canvas.Tools.Add(text);
+        canvas.Scene = new CanvasScene();
+        canvas.Tool = text;
+
+        // A caret in a fresh piece, which is what a press with the text tool leaves.
+        text.OnPressed(canvas, new CanvasPointerEventArgs
+        {
+            World = new Vector2(10, 10),
+            Pointer = new Vector2(10, 10),
+            Button = MouseButtons.Left,
+            ClickCount = 1
+        });
+
+        Assert.That(text.IsBusy, Is.True, "there is no caret, so this proves nothing");
+
+        canvas.RaiseEvent(new KeyEventArgs(KeyboardDevice.CurrentDevice, Key.P, InputModifiers.None, 0)
+        {
+            RoutedEvent = Keyboard.KeyDownEvent
+        });
+
+        Assert.That(canvas.Tool, Is.SameAs(text), "a letter typed into a caption handed over the pen");
     }
 }

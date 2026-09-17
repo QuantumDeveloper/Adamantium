@@ -35,9 +35,12 @@ public class TreeView : ItemsControl
             new PropertyMetadata(KeyboardNavigationMode.Once));
     }
 
-    // Read-only: the DATA item behind the most-recently selected node (null = nothing selected).
+    // The DATA item behind the most-recently selected node (null = nothing selected), and it goes BOTH ways: clicking a
+    // node writes it, and writing it selects that node - which is how a view-model says what is chosen, and how it
+    // takes a choice back. A tree that only ever wrote it kept a selection nobody else could end: picking the same node
+    // a second time was not a change, so whoever acted on the change never heard about it.
     public static readonly AdamantiumProperty SelectedItemProperty = AdamantiumProperty.Register(nameof(SelectedItem),
-        typeof(object), typeof(TreeView), new PropertyMetadata(null));
+        typeof(object), typeof(TreeView), new PropertyMetadata(null, OnSelectedItemChanged));
 
     /// <summary>Single (one node - the default), Multiple (each click toggles), or Extended (Ctrl/Shift like a list box).</summary>
     public static readonly AdamantiumProperty SelectionModeProperty = AdamantiumProperty.Register(nameof(SelectionMode),
@@ -80,8 +83,9 @@ public class TreeView : ItemsControl
     private bool _hasDesiredOffset;
     private double _desiredOffset;
 
-    /// <summary>The data item of the most-recently selected node. Read-only - set selection by clicking a node.</summary>
-    public object SelectedItem { get => GetValue<object>(SelectedItemProperty); private set => SetValue(SelectedItemProperty, value); }
+    /// <summary>The data item of the most-recently selected node, both ways: clicking a node writes it, and writing it
+    /// selects that node - null selects nothing at all.</summary>
+    public object SelectedItem { get => GetValue<object>(SelectedItemProperty); set => SetValue(SelectedItemProperty, value); }
 
     /// <summary>How many nodes may be selected and how clicks combine (Single, Multiple, Extended).</summary>
     public TreeViewSelectionMode SelectionMode { get => GetValue<TreeViewSelectionMode>(SelectionModeProperty); set => SetValue(SelectionModeProperty, value); }
@@ -159,7 +163,7 @@ public class TreeView : ItemsControl
             }
         }
 
-        SelectedItem = primary;
+        Chosen(primary);
     }
 
     public override void OnApplyTemplate()
@@ -518,12 +522,65 @@ public class TreeView : ItemsControl
         SyncSelectionToContainers();
     }
 
+    // WRITTEN FROM OUTSIDE: a node to select, or null for none. What the tree wrote itself is skipped - the rows are
+    // already what it says.
+    private static void OnSelectedItemChanged(AdamantiumComponent component, AdamantiumPropertyChangedEventArgs e)
+    {
+        if (component is not TreeView tree || tree._choosing) return;
+
+        tree.Choose(e.NewValue);
+    }
+
+    private bool _choosing;
+
+    private void Choose(object node)
+    {
+        if (node == null)
+        {
+            if (_selectedRows.Count == 0) return;
+
+            ClearSelection();
+            SyncSelectionToContainers();
+            return;
+        }
+
+        if (_flattener?.Rows is not { } rows) return;
+
+        foreach (var row in rows)
+        {
+            if (!Equals(row.Node, node)) continue;
+            if (row.IsSelected && _selectedRows.Count == 1) return;
+
+            ClearSelection();
+            Select(row);
+            SyncSelectionToContainers();
+            return;
+        }
+    }
+
+    // What the TREE decided, said without being told it back. A CURRENT value: a plain set lands at Local, which
+    // outranks the binding this is usually read through - and a view-model that answered the pick and let it go could
+    // then never give the tree that answer, because its write would land under one the tree had already made.
+    private void Chosen(object node)
+    {
+        _choosing = true;
+
+        try
+        {
+            SetCurrentValue(SelectedItemProperty, node);
+        }
+        finally
+        {
+            _choosing = false;
+        }
+    }
+
     // Exactly one row selected - clear every other, select this (Single, and Extended's plain click).
     private void SelectOnly(TreeRow row)
     {
         ClearSelection();
         Select(row);
-        SelectedItem = row.Node;
+        Chosen(row.Node);
     }
 
     // Flip one row, leaving the rest untouched (Multiple, and Extended's Ctrl+click).
@@ -536,13 +593,13 @@ public class TreeView : ItemsControl
             _selectedRows.Remove(row);
             if (ReferenceEquals(SelectedItem, row.Node))
             {
-                SelectedItem = null;
+                Chosen(null);
             }
         }
         else
         {
             Select(row);
-            SelectedItem = row.Node;
+            Chosen(row.Node);
         }
     }
 
@@ -570,7 +627,7 @@ public class TreeView : ItemsControl
             Select(rows[i]);
         }
 
-        SelectedItem = row.Node;
+        Chosen(row.Node);
     }
 
     // Mark a row selected - on the row (the container mirror) AND on its node (persisted, reaches off-screen rows).

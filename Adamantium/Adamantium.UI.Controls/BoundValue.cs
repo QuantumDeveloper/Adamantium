@@ -22,6 +22,11 @@ internal sealed class BoundValue : FundamentalUIComponent
     private bool _writing;
     private bool _writable;
 
+    /// <summary>Whether the object this was pointed at HAS what the binding asks for. False is not "the value is
+    /// empty" - it is "this is not one of the objects the line is about", which is what a wire is to a line about
+    /// nodes.</summary>
+    public bool Reads { get; private set; }
+
     /// <summary>Raised when the SOURCE moved the value - not when we wrote it ourselves.</summary>
     public event EventHandler Changed;
 
@@ -43,6 +48,7 @@ internal sealed class BoundValue : FundamentalUIComponent
         ClearValue(ValueProperty);
         ClearValue(ValueProperty, ValuePriority.Binding);
         _writable = false;
+        Reads = false;
 
         if (declared == null || source == null) return;
 
@@ -61,7 +67,7 @@ internal sealed class BoundValue : FundamentalUIComponent
         // is asked for, in the same breath it is pointed at an object, with no frame in between.
         binding.IsImmediate = true;
 
-        BindingEngine.SetBinding(this, ValueProperty, binding);
+        Reads = BindingEngine.SetBinding(this, ValueProperty, binding)?.IsResolved ?? false;
     }
 
     /// <summary>Writes through the binding to the object. False when the binding cannot write, or when what an editor

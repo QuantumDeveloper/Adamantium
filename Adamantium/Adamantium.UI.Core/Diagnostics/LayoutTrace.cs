@@ -17,6 +17,35 @@ public static class LayoutTrace
     public static bool Enabled;
     public static Action<string> Sink;
 
+    /// <summary>ADAM_LAYOUT_TRACE=&lt;path&gt; turns the narration on and sends it to that file. Here rather than in an
+    /// application, so the trace can be had from any stand without building a special one - and to a FILE, because what
+    /// the layout says about itself is far too much to read off a screen.</summary>
+    static LayoutTrace()
+    {
+        if (Environment.GetEnvironmentVariable("ADAM_LAYOUT_TRACE") is not { Length: > 0 } path) return;
+
+        try
+        {
+            System.IO.File.WriteAllText(path, string.Empty);
+        }
+        catch (System.IO.IOException)
+        {
+            return;
+        }
+
+        Enabled = true;
+        Sink = line =>
+        {
+            try
+            {
+                System.IO.File.AppendAllText(path, line + Environment.NewLine);
+            }
+            catch (System.IO.IOException)
+            {
+            }
+        };
+    }
+
     public static void Log(string message)
     {
         if (Enabled) Sink?.Invoke(message);

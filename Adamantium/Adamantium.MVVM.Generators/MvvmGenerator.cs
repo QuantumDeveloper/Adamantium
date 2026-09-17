@@ -434,9 +434,24 @@ public sealed class MvvmGenerator : IIncrementalGenerator
     private static string TypeNameWithGenerics(INamedTypeSymbol type) =>
         type.TypeParameters.Length == 0 ? type.Name : $"{type.Name}<{string.Join(", ", type.TypeParameters.Select(p => p.Name))}>";
 
-    private static bool HasInpcHost(INamedTypeSymbol type) =>
-        DerivesFrom(type, PropertyChangedBaseName) ||
-        type.GetAttributes().Any(a => a.AttributeClass?.ToDisplayString() == ViewModelAttr);
+    // WHERE A CHANGE IS RAISED FROM - the base the property's setter will call into. Either an ancestor that already
+    // supplies it, or the [ViewModel] attribute, which promises it on this class or on one above it.
+    //
+    // The attribute is asked of the ANCESTORS as well, and it has to be: what [ViewModel] gives a class is written by
+    // this same generator, in a part the compilation cannot see while this runs. A base marked [ViewModel] therefore
+    // does not yet DERIVE from anything - so a derived class's [Bindable] field would silently produce no property at
+    // all, which is a partial property with no implementation and a build that stops on it.
+    private static bool HasInpcHost(INamedTypeSymbol type)
+    {
+        if (DerivesFrom(type, PropertyChangedBaseName)) return true;
+
+        for (var at = type; at is not null; at = at.BaseType)
+        {
+            if (at.GetAttributes().Any(a => a.AttributeClass?.ToDisplayString() == ViewModelAttr)) return true;
+        }
+
+        return false;
+    }
 
     private static bool DerivesFrom(INamedTypeSymbol type, string baseFqn)
     {
@@ -470,8 +485,28 @@ public sealed class MvvmGenerator : IIncrementalGenerator
         return sb.ToString();
     }
 
-    private static bool ImplementsInpc(INamedTypeSymbol type) =>
-        type.AllInterfaces.Any(i => i.ToDisplayString() == InpcName);
+    // WHETHER THE IMPLEMENTATION IS ALREADY THERE - not whether the interface is in the list.
+    //
+    // Asking the interface list was wrong, and wrong in exactly the case [ViewModel] exists for: a contract an
+    // application implements - a node on a canvas, a thing on a plane - REQUIRES INotifyPropertyChanged, so every class
+    // implementing one "had" INPC and got nothing injected, then failed to compile for not implementing the event. What
+    // counts is an ancestor that supplies it, or the class writing the event itself.
+    private static bool ImplementsInpc(INamedTypeSymbol type)
+    {
+        if (DeclaresInpcMember(type)) return true;
+
+        for (var b = type.BaseType; b is not null; b = b.BaseType)
+        {
+            if (b.SpecialType == SpecialType.System_Object) break;
+            if (b.AllInterfaces.Any(i => i.ToDisplayString() == InpcName)) return true;
+        }
+
+        return false;
+    }
+
+    // The class says it itself - a hand-written event, which is an implementation and not a promise.
+    private static bool DeclaresInpcMember(INamedTypeSymbol type) =>
+        type.GetMembers("PropertyChanged").Any(m => m.Kind == SymbolKind.Event);
 
     // Task or Task<T> (not ValueTask — async commands need a started Task to await; ValueTask isn't required yet).
     private static bool IsTaskReturning(ITypeSymbol type)

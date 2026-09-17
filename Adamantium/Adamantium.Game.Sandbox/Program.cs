@@ -1,5 +1,6 @@
 ﻿using Adamantium.UI;
 using System;
+using Adamantium.UI.Controls.DrawingBoard;
 
 namespace Adamantium.Game.Sandbox;
 
@@ -20,8 +21,8 @@ public class Program
         // collectors are internal to Adamantium.UI.
         if (Environment.GetEnvironmentVariable("ADAM_OFF") is { Length: > 0 } off)
         {
-            var assembly = typeof(UI.Controls.InfiniteCanvas).Assembly.GetName().Name == "Adamantium.UI"
-                ? typeof(UI.Controls.InfiniteCanvas).Assembly
+            var assembly = typeof(UI.Controls.DrawingBoard.InfiniteCanvas).Assembly.GetName().Name == "Adamantium.UI"
+                ? typeof(UI.Controls.DrawingBoard.InfiniteCanvas).Assembly
                 : System.Reflection.Assembly.Load("Adamantium.UI");
 
             foreach (var name in off.Split(',', StringSplitOptions.RemoveEmptyEntries))

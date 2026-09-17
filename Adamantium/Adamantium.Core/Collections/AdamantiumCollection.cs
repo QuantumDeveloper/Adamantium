@@ -419,6 +419,36 @@ namespace Adamantium.Core.Collections
             }
         }
 
+        /// <summary>
+        /// Moves the item at <paramref name="from"/> to <paramref name="to"/>, keeping everything else in order.
+        /// <para>ONE change and not a removal followed by an insertion: whoever mirrors this collection - a list of
+        /// containers, a set of bindings taken by position - would otherwise see a state in which the item does not
+        /// exist at all, and rebuild itself against it.</para>
+        /// </summary>
+        public void Move(int from, int to)
+        {
+            if (IsFixedSize)
+                throw new InvalidOperationException("Cannot move items in a fixed-size collection.");
+
+            lock (SyncRoot)
+            {
+                if (from < 0 || from >= currentIndex) throw new ArgumentOutOfRangeException(nameof(from));
+                if (to < 0 || to >= currentIndex) throw new ArgumentOutOfRangeException(nameof(to));
+                if (from == to) return;
+
+                var item = items[from];
+
+                if (from < to) Array.Copy(items, from + 1, items, from, to - from);
+                else Array.Copy(items, to, items, to + 1, from - to);
+
+                items[to] = item;
+
+                OnMove(from, to, item);
+            }
+        }
+
+        protected virtual void OnMove(int from, int to, T item) { }
+
         protected virtual void OnInsert(int index, T item) { }
 
         protected virtual void OnSet(int index, T oldItem, T newItem) { }

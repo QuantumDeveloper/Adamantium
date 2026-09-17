@@ -7,6 +7,13 @@ public abstract class BindingExpressionBase
 {
    public virtual bool HasError { get; protected set; }
 
+   /// <summary>Whether this binding FOUND what it was pointed at - a source, and on it the property the path names.
+   /// True by default: a binding that is not built from a path has nothing to miss.
+   /// <para>Not the same question as "is the value null". A property that holds null is an answer; a source that has no
+   /// such property at all is not, and the two arrive as the same null. Whoever asks several objects one question needs
+   /// to tell them apart - an object that cannot answer is not an object that answers differently.</para></summary>
+   public virtual bool IsResolved => true;
+
    public virtual bool HasValidationError { get; protected set; }
 
    public bool IsDirty { get; set; }

@@ -42,6 +42,7 @@
                                 <Grid ColumnDefinitions="*,Auto">
                                     <ContentPresenter
                                             x:Name="PART_ContentPresenter"
+                                            TextTrimming="CharEllipses"
                                             HorizontalAlignment="Left"
                                             VerticalAlignment="Center"
                                             Foreground="{TemplateBinding Foreground}"

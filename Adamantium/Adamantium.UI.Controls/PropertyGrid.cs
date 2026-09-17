@@ -251,6 +251,51 @@ public class PropertyGrid : Control
     /// read. Not cancellable: it exists so a change can be REMEMBERED, not refused.</summary>
     public event EventHandler<PropertyValuesChangedEventArgs> ValueChanging;
 
+    /// <summary>WHERE AN EDIT IS REMEMBERED. Given one, every line written here becomes a step that can be taken back;
+    /// given none, the grid writes and forgets.
+    /// <para>The grid does the remembering ITSELF - what it wrote, to which objects, and what was there before - because
+    /// it is the only thing that knows all three. An application that had to listen for two events and keep that list
+    /// by hand was writing the control's own bookkeeping, and getting one binding wrong meant an edit that could not be
+    /// undone.</para></summary>
+    public static readonly AdamantiumProperty HistoryProperty = AdamantiumProperty.Register(nameof(History),
+        typeof(DrawingBoard.CanvasHistory), typeof(PropertyGrid), new PropertyMetadata(null));
+
+    public DrawingBoard.CanvasHistory History
+    {
+        get => GetValue<DrawingBoard.CanvasHistory>(HistoryProperty);
+        set => SetValue(HistoryProperty, value);
+    }
+
+    // What the objects held before the write that is happening right now. Filled as the write starts and turned into a
+    // step as it finishes - the previous value exists only in between.
+    private readonly List<(object Target, object Was, object Is)> _before = new();
+
+    private void Remember(PropertyValuesChangedEventArgs about)
+    {
+        _before.Clear();
+
+        if (History == null || about?.Property == null) return;
+
+        foreach (var target in about.Targets) _before.Add((target, ValueOf(target, about.Property), null));
+    }
+
+    private void Remembered(PropertyValuesChangedEventArgs about)
+    {
+        if (History == null || about?.Property == null || _before.Count == 0) return;
+
+        for (var i = 0; i < _before.Count; i++)
+        {
+            var (target, was, _) = _before[i];
+            _before[i] = (target, was, ValueOf(target, about.Property));
+        }
+
+        // A COPY: the list is reused by the next write, and a step holding the live one would be rewritten by it.
+        History.Push(new DrawingBoard.CanvasPropertyStep(this, about.Property,
+            new List<(object, object, object)>(_before)));
+
+        _before.Clear();
+    }
+
     /// <summary>Rebuilds every section's rows - after the sections change, the object changes, or a composite folds.</summary>
     public void Rebuild()
     {
@@ -448,7 +493,9 @@ public class PropertyGrid : Control
 
         // BEFORE anything is written, because that is the only moment the previous value still exists. Undo is what
         // wants it: a colour or a width leaves no trace in a comparison of where things are, so the only way to take
-        // one back is to have read it while it was still there.
+        // one back is to have read it while it was still there. The grid reads it for its OWN history first, and says
+        // so after, for anyone else who wants to know.
+        Remember(about);
         ValueChanging?.Invoke(this, about);
 
         // INTO the value first, where the definition says the value is an object with parts rather than a thing to be
@@ -456,6 +503,7 @@ public class PropertyGrid : Control
         // the whole point - everything else holding it follows.
         if (row.Definition.WriteInto(row.Value, edited))
         {
+            Remembered(about);
             ValueChanged?.Invoke(this, about);
             Refresh(null, row.Definition);
             return true;
@@ -465,6 +513,7 @@ public class PropertyGrid : Control
         if (!row.Definition.TryConvert(edited, row.ValueType, out var value)) return false;
         if (!row.WriteValue(value)) return false;
 
+        Remembered(about);
         ValueChanged?.Invoke(this, about);
         Refresh(null, row.Definition);
         return true;

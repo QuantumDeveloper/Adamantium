@@ -16,9 +16,15 @@ public static class BindingEngine
     public static BindingExpressionBase SetBinding(IAdamantiumComponent target, AdamantiumProperty targetProperty,
         BindingBase bindingBase)
     {
-        var expression = BindingExpression.CreateBindingExpression(target, targetProperty, bindingBase);
         var map = _bindings.GetValue(target, static _ => new Dictionary<AdamantiumProperty, BindingExpressionBase>());
+
+        // THE ONE THAT STOOD HERE GOES FIRST. A new binding pushes its value as it is made, and a two-way binding that
+        // is still listening to this target reads that push as the target being edited - and writes it into ITS OWN
+        // source. Re-pointing a row of targets at another row of sources then drags every old source along: a node's
+        // sockets, re-fitted after one of them moved, all ended up called the same thing.
         if (map.TryGetValue(targetProperty, out var existing)) existing.CloseConnection();
+
+        var expression = BindingExpression.CreateBindingExpression(target, targetProperty, bindingBase);
         map[targetProperty] = expression;
         return expression;
     }

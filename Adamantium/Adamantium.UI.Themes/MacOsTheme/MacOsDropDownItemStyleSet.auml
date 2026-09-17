@@ -69,6 +69,7 @@
                                   VerticalAlignment="Center"/>
                             <ContentPresenter Grid.Column="1"
                                 x:Name="PART_ContentPresenter"
+                                TextTrimming="CharEllipses"
                                 HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
                                 VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
                                 Foreground="{TemplateBinding Foreground}"

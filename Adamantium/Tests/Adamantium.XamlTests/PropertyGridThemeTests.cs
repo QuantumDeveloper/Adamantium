@@ -253,4 +253,133 @@ public class PropertyGridThemeTests
             }
         }
     }
+
+    // A LIST'S WORDS SIT IN THE MIDDLE of it. A drop-down whose text rides high reads as a box a line too tall, and a
+    // column of them reads as a form that has slipped.
+    [TestCase("MacOs")]
+    [TestCase("Fluent")]
+    [TestCase("EditorPro")]
+    public void ADropDownPutsItsTextInTheMiddle(string named)
+    {
+        Use(named switch { "MacOs" => MacOs(), "Fluent" => Fluent(), _ => EditorPro() });
+
+        var drop = new DropDown { Width = 140, Height = 26, MinHeight = 0, MinWidth = 0 };
+        drop.Items.Add("Add");
+        drop.SelectedItem = "Add";
+
+        var window = new Window { Width = 300, Height = 120, Content = drop };
+        for (var i = 0; i < 6; i++)
+        {
+            Adamantium.UI.Extensions.WindowExtension.UpdateTree(window);
+            Adamantium.UI.Core.Data.BindingUpdateQueue.Flush();
+        }
+
+        var presenter = (IUIComponent)drop.GetTemplateChild("PART_ContentPresenter");
+
+        Assert.That(presenter, Is.Not.Null, "no presenter at all, so this proves nothing");
+
+        var text = Words(presenter);
+
+        Assert.That(text, Is.Not.Null, "the list shows no words, so there is nothing to place");
+
+        // Where the words sit inside the CONTROL, both measured from the window.
+        var middle = Middle(text, drop);
+
+        Assert.That(middle, Is.EqualTo(0).Within(1.5),
+            $"{named}: the words sit {middle:0.0} pixels off the middle of the list");
+    }
+
+    // ...and the same inside an inspector ROW, which is where it was seen: the editor is stretched to the row's height
+    // there, and a list that centres its words when it is 26 pixels tall need not when it is told to fill.
+    [TestCase("MacOs")]
+    [TestCase("Fluent")]
+    [TestCase("EditorPro")]
+    public void ADropDownInARowPutsItsTextInTheMiddle(string named)
+    {
+        Use(named switch { "MacOs" => MacOs(), "Fluent" => Fluent(), _ => EditorPro() });
+
+        var target = new Target();
+        var choice = new ChoiceProperty
+        {
+            Header = "Kind",
+            Binding = Bind("Name"),
+            ItemsSource = new List<string> { "entity", "Add" }
+        };
+
+        var section = new PropertySection { Header = "Node", Target = target, IsExpanded = true };
+        section.Properties.Add(choice);
+
+        var grid = new PropertyGrid();
+        grid.Sections.Add(section);
+        grid.ApplyCurrentTheme();
+
+        var window = new Window { Width = 360, Height = 200, Content = grid };
+        for (var i = 0; i < 8; i++)
+        {
+            Adamantium.UI.Extensions.WindowExtension.UpdateTree(window);
+            Adamantium.UI.Core.Data.BindingUpdateQueue.Flush();
+        }
+
+        var row = FirstRow(grid);
+
+        Assert.That(row?.Editor, Is.Not.Null, "the row has no editor, so this proves nothing");
+
+        var text = Words(row.Editor);
+
+        Assert.That(text, Is.Not.Null, "the list shows no words, so there is nothing to place");
+
+        // ...and the words have ROOM. A row is shorter than a theme's own drop-down, so a padding cut for the taller one
+        // leaves less than a line needs and the letters are drawn past the bottom of their box - which is what reads as
+        // text sitting low, and what no alignment can correct.
+        var loose = new Adamantium.UI.Controls.Text.TextBlock { Text = "entity", FontSize = text.FontSize };
+        loose.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity), force: true);
+
+        // Within a pixel and a half of the line it wants: a hairline rule and a rounded row can cost one, and one is not
+        // what this is about - the case that started it was thirteen pixels holding nineteen.
+        Assert.That(text.RenderSize.Height, Is.GreaterThanOrEqualTo(loose.DesiredSize.Height - 1.5),
+            $"{named}: the line has {text.RenderSize.Height} pixels and wants {loose.DesiredSize.Height}");
+
+        var inList = Middle(text, row.Editor);
+        var inRow = Middle(row.Editor, row);
+        var words = Middle(text, row);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(inList, Is.EqualTo(0).Within(1.5),
+                $"{named}: the words sit {inList:0.0} pixels off the middle of the list");
+            Assert.That(inRow, Is.EqualTo(0).Within(1.5),
+                $"{named}: the list sits {inRow:0.0} pixels off the middle of the row");
+            Assert.That(words, Is.EqualTo(0).Within(1.5),
+                $"{named}: the words sit {words:0.0} pixels off the middle of the row");
+        });
+    }
+
+    private static Adamantium.UI.Controls.Text.TextBlock Words(IUIComponent from)
+    {
+        if (from is Adamantium.UI.Controls.Text.TextBlock words) return words;
+
+        foreach (var child in from.VisualChildren)
+        {
+            if (child is IUIComponent inside && Words(inside) is { } found) return found;
+        }
+
+        return null;
+    }
+
+    // How far the middle of one is from the middle of the other, in the window's own pixels.
+    private static double Middle(IUIComponent text, IUIComponent control)
+    {
+        var textMiddle = Top(text) + text.RenderSize.Height / 2;
+        var controlMiddle = Top(control) + control.RenderSize.Height / 2;
+
+        return textMiddle - controlMiddle;
+    }
+
+    private static double Top(IUIComponent component)
+    {
+        var top = 0.0;
+        for (var at = component; at != null; at = at.VisualParent) top += at.Bounds.Y;
+
+        return top;
+    }
 }

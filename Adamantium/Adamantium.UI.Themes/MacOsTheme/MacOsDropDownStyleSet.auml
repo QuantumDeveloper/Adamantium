@@ -56,6 +56,7 @@
                             <Grid ColumnDefinitions="*,Auto">
                                 <ContentPresenter
                                         x:Name="PART_ContentPresenter"
+                                        TextTrimming="CharEllipses"
                                         Margin="{TemplateBinding Padding}"
                                         HorizontalAlignment="Left"
                                         VerticalAlignment="Center"

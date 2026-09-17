@@ -4,6 +4,7 @@ using System.ComponentModel;
 using Adamantium.Core.Commands;
 using Adamantium.Mathematics;
 using Adamantium.UI.Controls;
+using Adamantium.UI.Controls.DrawingBoard;
 using Adamantium.UI.Controls.Primitives;
 using Adamantium.UI.Controls.Text;
 using Adamantium.UI.Core;
@@ -334,6 +335,44 @@ public class PropertyGridTests
         });
     }
 
+    // THE SOCKETS OF THE THING SELECTED, read off the application's own node - which is the shape the inspector
+    // actually uses: the line is bound through the item to the node it stands for, not to the control showing it. And
+    // a socket ADDED while the line is open is another group, without anything being reselected.
+    [Test]
+    public void AnItemsLineFollowsTheModelsOwnList()
+    {
+        var node = new Graph.GraphNode { Kind = "Mix", Title = "Mix" };
+        node.Inputs.Add(new Graph.GraphSocket { Name = "A" });
+        node.Inputs.Add(new Graph.GraphSocket { Name = "B" });
+
+        var item = new ElementItem(new CanvasNode(), new Rect(0, 0, 190, 110)) { Model = node };
+        var name = new StringProperty { Header = "Name", Binding = new Binding("Name") };
+        var sockets = new ItemsProperty
+        {
+            Header = "In",
+            IsExpanded = true,
+            Binding = new Binding("Model.Inputs"),
+            ItemHeader = new Binding("Name")
+        };
+
+        sockets.Children.Add(name);
+
+        var grid = Built(Section(item, sockets));
+
+        Assert.That(RowsOf(grid, name).Count, Is.EqualTo(2), "the node's sockets are not shown at all");
+
+        node.Inputs.Add(new Graph.GraphSocket { Name = "Amount" });
+        Adamantium.UI.Core.Data.BindingUpdateQueue.Flush();
+
+        var rows = RowsOf(grid, name);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(rows.Count, Is.EqualTo(3), "a socket added while the list was open never showed up");
+            Assert.That(rows[2].Value, Is.EqualTo("Amount"));
+        });
+    }
+
     // Each group is named by the ITEM - a socket's own name over its own lines. Numbered when the items have nothing to
     // be called.
     [Test]
@@ -438,6 +477,161 @@ public class PropertyGridTests
             Assert.That(header.Definition.ActionIcon, Is.EqualTo("BinIcon"), "it would still be three dots");
             Assert.That(header.Definition.ActionTip, Is.EqualTo("Remove this socket"));
         });
+    }
+
+    // A COLOUR NOBODY HAS SET is still a line you can press. The node's accent is empty until somebody picks one - the
+    // theme's is what it wears meanwhile - and a blank cell there is a colour that can never be chosen.
+    [Test]
+    public void AColourLineWithNoValueStillOffersItsSwatch()
+    {
+        var node = new Graph.GraphNode { Kind = "Add", Title = "Add" };
+        var item = new ElementItem(new CanvasNode(), new Rect(0, 0, 190, 110)) { Model = node };
+
+        var accent = new ColorProperty { Header = "Accent", Binding = new Binding("Model.Accent") };
+        var grid = Built(Section(item, accent));
+        TemplateRows(grid);
+
+        var row = RowOf(grid, accent);
+
+        Assert.That(row.Value, Is.Null, "the node has a colour already, so this proves nothing");
+        Assert.That(row.Editor, Is.Not.Null, "the line is blank, so there is nothing to pick a colour with");
+    }
+
+    // SHOWING a line must not set what it shows. The inspector's "Folded" box appeared the first time nodes were
+    // selected, and the nodes folded - a selection doing something only a person clicking that box should do.
+    [Test]
+    public void ShowingABooleanLineDoesNotSetIt()
+    {
+        var node = new Graph.GraphNode { Kind = "Add", Title = "Add" };
+        var item = new ElementItem(new CanvasNode(), new Rect(0, 0, 190, 110)) { Model = node };
+
+        var folded = new BooleanProperty { Header = "Folded", Binding = new Binding("Model.IsCollapsed") };
+        var grid = Built(Section(item, folded));
+
+        // The EDITOR built, which is what showing the line actually does - a row with no parts has nowhere to build one
+        // and would prove nothing.
+        TemplateRows(grid);
+
+        Assert.That(node.IsCollapsed, Is.False, "the line folded the node by being shown");
+    }
+
+    // ...AND NOT WHEN IT IS SHOWN FOR SEVERAL THINGS AT ONCE. Click one node, then select them all: the line is built
+    // again, now for many targets, and building it must still be a reading. It was not - every node folded the moment
+    // the selection grew, which is the one thing a selection may not do.
+    [Test]
+    public void ShowingABooleanLineForSeveralThingsDoesNotSetThem()
+    {
+        var first = new Graph.GraphNode { Kind = "Add", Title = "Add" };
+        var second = new Graph.GraphNode { Kind = "Mix", Title = "Mix" };
+        var third = new Graph.GraphNode { Kind = "Out", Title = "Out", IsCollapsed = true };
+
+        var folded = new BooleanProperty { Header = "Folded", Binding = new Binding("Model.IsCollapsed") };
+
+        // TWO THAT DISAGREE first: one folded, one not. The line cannot show either, so it goes mixed - which is the
+        // state whose rule is "true for all".
+        var section = new PropertySection { Header = "Node", IsExpanded = true };
+        section.Properties.Add(folded);
+
+        var grid = new PropertyGrid { Template = Chrome() };
+        grid.Sections.Add(section);
+        grid.SelectedObjects = new object[] { Item(first), Item(third) };
+
+        Settle(grid);
+        TemplateRows(grid);
+
+        Assert.That(first.IsCollapsed, Is.False, "showing a line that cannot answer already folded a node");
+        Assert.That(RowOf(grid, folded).IsMixed, Is.True, "the line is not mixed, so this proves nothing");
+
+        // ...and NOW a selection they all agree on. The line takes its targets again and puts their answer in the box -
+        // a change of what the box holds, raised exactly as a click raises it, while the line still counts as mixed.
+        grid.SelectedObjects = new object[] { Item(first), Item(second) };
+
+        Settle(grid);
+        TemplateRows(grid);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(first.IsCollapsed, Is.False, "selecting them all folded a node");
+            Assert.That(second.IsCollapsed, Is.False, "selecting them all folded a node");
+            Assert.That(third.IsCollapsed, Is.True, "the one that was folded came open by being shown");
+        });
+    }
+
+    // A LINE IS ABOUT THE OBJECTS THAT HAVE WHAT IT ASKS FOR. A band takes wires along with the nodes, and a wire has
+    // no "folded" - it is not an object that disagrees, it is one the line is not about. Counted as a disagreement, the
+    // line goes mixed, and the rule for mixed is "make them all agree" - which folded every node in the graph.
+    [Test]
+    public void ALineIgnoresWhatCannotAnswerIt()
+    {
+        var first = new Graph.GraphNode { Kind = "Add", Title = "Add" };
+        var second = new Graph.GraphNode { Kind = "Mix", Title = "Mix" };
+
+        var folded = new BooleanProperty { Header = "Folded", Binding = new Binding("Model.IsCollapsed") };
+        var section = new PropertySection { Header = "Node", IsExpanded = true };
+        section.Properties.Add(folded);
+
+        var grid = new PropertyGrid { Template = Chrome() };
+        grid.Sections.Add(section);
+
+        // A wire is not an ElementItem at all, so "Model.IsCollapsed" finds nothing on it - which is exactly what a
+        // selection of a whole graph hands the line.
+        grid.SelectedObjects = new object[] { Item(first), new StrokeItem(Vector2.Zero, Brushes.White, 2), Item(second) };
+
+        Settle(grid);
+        TemplateRows(grid);
+
+        var row = RowOf(grid, folded);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(row.IsMixed, Is.False, "something that cannot answer was read as an object that disagrees");
+            Assert.That(row.Value, Is.False, "the line does not show what the nodes actually say");
+            Assert.That(first.IsCollapsed, Is.False, "showing the line folded a node");
+            Assert.That(second.IsCollapsed, Is.False, "showing the line folded a node");
+        });
+    }
+
+    private static ElementItem Item(ICanvasNode model) =>
+        new(new CanvasNode(), new Rect(0, 0, 190, 110)) { Model = model };
+
+    private static void Settle(PropertyGrid grid)
+    {
+        grid.Measure(new Size(400, 400), force: true);
+        grid.Arrange(new Rect(0, 0, 400, 400));
+        Adamantium.UI.Core.Data.BindingUpdateQueue.Flush();
+    }
+
+    // Rows are REUSED as the grid rebuilds, and a line that reads nothing - an item's name - has to show nothing. One
+    // that kept what the row held before it showed the count of the list that used to stand in that place.
+    [Test]
+    public void ALineThatReadsNothingShowsNothing()
+    {
+        var node = new CanvasNode { Inputs = 1, Outputs = 1 };
+        var item = new ElementItem(node, new Rect(0, 0, 190, 110));
+
+        var grid = Built(Section(item,
+            Sockets("In", "Element.InputPins"),
+            Sockets("Out", "Element.OutputPins")));
+
+        // One more input, so the line that stood where the OUT list's name stood is now an input's name.
+        node.Inputs = 2;
+
+        Assert.That(RowsWhoseHeaderIs(grid, "In 2")?.Value, Is.Null, "the line is wearing the value of what it was");
+    }
+
+    private static ItemsProperty Sockets(string header, string path)
+    {
+        var sockets = new ItemsProperty
+        {
+            Header = header,
+            IsExpanded = true,
+            Binding = new Binding(path),
+            ItemHeader = new Binding("Name")
+        };
+
+        sockets.Children.Add(new StringProperty { Header = "Name", Binding = new Binding("Name") });
+
+        return sockets;
     }
 
     private class Doing : ICommand
@@ -814,6 +1008,37 @@ public class PropertyGridTests
             MouseButtonState.Pressed, InputModifiers.LeftMouseButton, 0) { RoutedEvent = Mouse.MouseDownEvent });
 
         Assert.That(composite.IsExpanded, Is.True);
+    }
+
+    // ...but NOT through a button on that line. One press cannot both press the button and fold away the thing it was
+    // pressed on.
+    [Test]
+    public void PressingAButtonOnACompositeDoesNotOpenIt()
+    {
+        var target = new Target();
+        var x = new NumericProperty { Header = "X", Binding = new Binding("Scale") };
+        var composite = new CompositeProperty { Header = "Position" };
+        composite.Children.Add(x);
+
+        var grid = Built(Section(target, composite));
+        var row = RowOf(grid, composite);
+        var button = new Adamantium.UI.Controls.Buttons.Button { Content = "+" };
+
+        row.Template = new Adamantium.UI.Core.Templates.ControlTemplate(() =>
+        {
+            var host = new ContentPresenter { Content = button };
+            var result = new Adamantium.UI.Core.Templates.TemplateResult { RootComponent = host };
+            result.RegisterName("PART_Layout", host);
+            return result;
+        });
+
+        row.Measure(new Size(400, 40), force: true);
+        row.Arrange(new Rect(0, 0, 400, 40));
+
+        ((IObservableComponent)button).RaiseEvent(new MouseButtonEventArgs(Mouse.PrimaryDevice, MouseButtons.Left,
+            MouseButtonState.Pressed, InputModifiers.LeftMouseButton, 0) { RoutedEvent = Mouse.MouseDownEvent });
+
+        Assert.That(composite.IsExpanded, Is.False, "the press went through the button and folded the row");
     }
 
     // A composite row is a node: folded it shows one line, opened it adds its children, indented one level.

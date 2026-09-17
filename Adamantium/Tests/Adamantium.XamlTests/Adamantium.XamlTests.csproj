@@ -31,6 +31,9 @@
            keep in step with the drawing interface. -->
       <Compile Include="..\Adamantium.UITests\Rendering\RecordingDrawingSession.cs"
                Link="Rendering\RecordingDrawingSession.cs" />
+      <!-- The node an application would bring: the canvas has none of its own, so both suites ask the same stand-in
+           rather than each writing a graph's objects again. -->
+      <Compile Include="..\Adamantium.UITests\Graph\GraphNode.cs" Link="Graph\GraphNode.cs" />
     </ItemGroup>
 
     <ItemGroup>

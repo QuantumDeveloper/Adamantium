@@ -1254,6 +1254,14 @@ public class InputUIComponent : MeasurableUIComponent, IInputComponent
     protected virtual void OnMouseLeave(MouseEventArgs e)
     {
         IsMouseOver = false;
+
+        // THE POINTER IS NOW OVER WHAT HELD THIS, and that is not an enter: a parent whose child the pointer was in
+        // never left it, so nothing would speak for the cursor and the grip's double arrow stayed on the screen until
+        // something unrelated was entered. The parent's own cursor is the inherited one, which is the right answer for
+        // every case in between. A drag has the pointer captured and dresses it itself, so it is left alone.
+        if (IsMouseCaptured || VisualParent is not UIComponent parent) return;
+
+        Mouse.Cursor = parent.Cursor;
     }
     
     public bool IsMouseCaptured => Mouse.Captured == this;

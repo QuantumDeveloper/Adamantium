@@ -42,6 +42,7 @@
                                 Padding="{TemplateBinding Padding}">
                             <ContentPresenter
                                     x:Name="PART_ContentPresenter"
+                                    TextTrimming="CharEllipses"
                                     HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
                                     VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
                                     Foreground="{TemplateBinding Foreground}"

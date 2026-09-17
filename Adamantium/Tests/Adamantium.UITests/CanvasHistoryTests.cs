@@ -1,5 +1,6 @@
 using Adamantium.Mathematics;
 using Adamantium.UI.Controls;
+using Adamantium.UI.Controls.DrawingBoard;
 using Adamantium.UI.Core;
 using Adamantium.UI.Core.Data;
 using Adamantium.UI.Core.Media;
@@ -222,9 +223,11 @@ public class CanvasHistoryTests
         Assert.That(canvas.History.CanRedo, Is.False);
     }
 
-    // With NO history the canvas takes no snapshots at all - remembering nothing has to cost nothing.
+    // A CANVAS REMEMBERS BY ITSELF. Taking the last thing back is part of what an editor IS, so the control brings its
+    // own memory and undo works with nothing wired up - an application that had to hand one over got a canvas that
+    // could not undo a single stroke until it did.
     [Test]
-    public void WithoutAHistoryNothingIsRecorded()
+    public void ACanvasRemembersByItselfAndCanBeToldNotTo()
     {
         var scene = new CanvasScene();
         var item = Box(0, 0);
@@ -233,6 +236,21 @@ public class CanvasHistoryTests
         var canvas = new InfiniteCanvas { Scene = scene };
         canvas.Measure(new Size(400, 300), force: true);
         canvas.Arrange(new Rect(0, 0, 400, 300));
+
+        Assert.That(canvas.History, Is.Not.Null, "a canvas with no memory of its own remembers nothing at all");
+
+        canvas.BeginEdit("Move");
+        item.Move(new Vector2(10, 0));
+        canvas.EndEdit();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(canvas.Undo(), Is.True, "the canvas did not remember a move it made itself");
+            Assert.That(item.Bounds.X, Is.EqualTo(0).Within(1e-9), "the move was not taken back");
+        });
+
+        // ...and TOLD NOT TO, it does not: remembering nothing has to cost nothing, so no snapshot is taken at all.
+        canvas.History = null;
 
         canvas.BeginEdit("Move");
         item.Move(new Vector2(10, 0));

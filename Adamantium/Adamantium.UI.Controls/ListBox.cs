@@ -43,6 +43,42 @@ public class ListBox : Selector
         // focus wandering off to a neighbouring control instead of down the rows.
     }
 
+    /// <summary>WHAT A DOUBLE CLICK ON A ROW MEANS - open it, go to it, put it in view. The item is handed over as the
+    /// parameter.
+    /// <para>On the list because the gesture is the list's. Double click is read as a press with a click count of two -
+    /// there is no separate event for it - and every application that wanted "open what I picked" was writing that same
+    /// press handler again, in a behaviour of its own.</para></summary>
+    public static readonly AdamantiumProperty ItemActivatedCommandProperty = AdamantiumProperty.Register(
+        nameof(ItemActivatedCommand), typeof(ICommand), typeof(ListBox), new PropertyMetadata(null));
+
+    public ICommand ItemActivatedCommand
+    {
+        get => GetValue<ICommand>(ItemActivatedCommandProperty);
+        set => SetValue(ItemActivatedCommandProperty, value);
+    }
+
+    /// <summary>Raised on the same gesture, for whoever would rather have an event than a command.</summary>
+    public event EventHandler<ItemActivatedEventArgs> ItemActivated;
+
+    public ListBox() => MouseDown += OnPressed;
+
+    // Its OWN subscription rather than an override: MouseDown BUBBLES, and a press on a row is a press on the row, not
+    // on the list. Wired in the constructor, and nothing to let go of - a list outlives none of its own events.
+    private void OnPressed(object sender, MouseButtonEventArgs e)
+    {
+        if (e.Handled || e.ClickCount != 2 || e.ChangedButton != MouseButtons.Left) return;
+
+        // WHAT WAS DOUBLE CLICKED is what is selected: the first of the two presses selected it, which is the same rule
+        // a single click follows.
+        if (SelectedItem is not { } item) return;
+
+        ItemActivated?.Invoke(this, new ItemActivatedEventArgs(item));
+
+        if (ItemActivatedCommand is { } command && command.CanExecute(item)) command.Execute(item);
+
+        e.Handled = true;
+    }
+
     protected override void OnKeyDown(KeyEventArgs e)
     {
         base.OnKeyDown(e);

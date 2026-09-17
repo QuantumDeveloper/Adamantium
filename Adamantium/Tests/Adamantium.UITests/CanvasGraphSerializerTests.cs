@@ -1,6 +1,7 @@
 using System.Linq;
 using Adamantium.Mathematics;
 using Adamantium.UI.Controls;
+using Adamantium.UI.Controls.DrawingBoard;
 using Adamantium.UI.Core;
 using Adamantium.UI.Core.Media;
 using NUnit.Framework;
@@ -34,6 +35,45 @@ public class CanvasGraphSerializerTests
         node.OutputPins[0].Name = "Out 1";
 
         return node;
+    }
+
+    // WHAT A NODE IS survives the round trip on its own, with no callback at all: the kind rides on the node, so a
+    // graph comes back knowing what its nodes were even where the application that opens it builds nothing itself.
+    // Without it only the SHAPE returns and every node comes back a stranger - the look restored and the behaviour not.
+    [Test]
+    public void ANodesKindComesBackWithIt()
+    {
+        var (canvas, scene) = Stage();
+
+        var node = Made("Times two", "In 1");
+        node.Kind = "math.multiply";
+        scene.Add(new ElementItem(node, new Rect(0, 0, 160, 90)));
+
+        var text = CanvasGraphSerializer.Save(canvas);
+
+        var (other, _) = Stage();
+        Assert.That(CanvasGraphSerializer.Load(other, text), Is.True);
+
+        var back = (CanvasNode)other.ItemsHere().OfType<ElementItem>().First().Element;
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(back.Kind, Is.EqualTo("math.multiply"), "the node came back not knowing what it is");
+            Assert.That(back.Title, Is.EqualTo("Times two"),
+                "the title is a label of its own and must not be replaced by the kind");
+        });
+    }
+
+    // ...and a COPY is a node of the same sort. Copied without it, a pasted node looks right and does nothing.
+    [Test]
+    public void ACopiedNodeIsOfTheSameKind()
+    {
+        var node = Made("Times two", "In 1");
+        node.Kind = "math.multiply";
+
+        var copy = new ElementItem(node, new Rect(0, 0, 160, 90)).Copy() as ElementItem;
+
+        Assert.That(((CanvasNode)copy.Element).Kind, Is.EqualTo("math.multiply"));
     }
 
     // Two nodes and the wire between them, out and back: the same graph, with the ends on the same sockets.
