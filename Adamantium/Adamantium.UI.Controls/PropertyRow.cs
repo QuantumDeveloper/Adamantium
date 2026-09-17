@@ -290,6 +290,7 @@ public class PropertyRow : Control
 
         // The editor is built by the presenter during measure, so it can only be found once a pass has run.
         if (_pendingEditor) HookEditor();
+
         return size;
     }
 
@@ -306,13 +307,33 @@ public class PropertyRow : Control
 
         _values.Clear();
 
-        if (Definition?.Binding == null) return;
+        // NOTHING TO READ, so the row holds nothing. Rows are reused as the grid rebuilds, and one that simply returned
+        // here went on showing the value of whatever it stood for last - a list's name wearing the count of the list
+        // before it.
+        if (Definition?.Binding == null)
+        {
+            Read();
+            return;
+        }
 
         foreach (var target in Targets)
         {
             var bound = new BoundValue();
             AddLogicalChild(bound);
             bound.PointAt(target, Definition.Binding);
+
+            // A LINE STANDS FOR THE OBJECTS IT IS ABOUT, and no others. What is selected is whatever the hand drew a
+            // band round - nodes, wires, strokes - and a line asking whether a node is folded cannot be answered by a
+            // wire. An object with no such property is NOT one that disagrees about it: counted as one, selecting a
+            // graph whole made every node's line read "they differ", and the rule for that is "make them all agree" -
+            // which folded every node in it.
+            if (!bound.Reads)
+            {
+                bound.Release();
+                RemoveLogicalChild(bound);
+                continue;
+            }
+
             bound.Changed += OnBoundValueChanged;
             _values.Add(bound);
         }
@@ -463,9 +484,14 @@ public class PropertyRow : Control
         // putting ONE value on all of them is what inspecting several objects is for. Empty content instead, so the
         // editor is built and stands empty - unless the definition says its editor has no empty state, and a blank row
         // is then the honest answer rather than an editor showing a value neither object holds.
+        // ...and "no editor" is for objects that DISAGREE, not for a value nobody has set yet. A colour line whose
+        // property is empty - a node wearing the theme's accent - showed a blank cell, so the first colour could never
+        // be picked: there was nothing there to press.
+        var nothing = template != null && (Definition.EditorCanShowNothing || !IsMixed);
+
         _valueHost.Content = HasChildren
             ? (Definition as CompositeProperty)?.Summary
-            : Value ?? (template != null && Definition.EditorCanShowNothing ? string.Empty : null);
+            : Value ?? (nothing ? string.Empty : null);
 
         if (rebuilt || _editor == null) _pendingEditor = template != null && !IsReadOnly;
         else Fill();
@@ -591,6 +617,13 @@ public class PropertyRow : Control
     {
         if (e.Property != ToggleButton.IsCheckedProperty) return;
 
+        // NOT WHILE THE ROW IS FILLING ITSELF. Showing a line puts what the objects say into the box, and that raises
+        // the same signal a click does - read as a click, it writes the row's own answer back into everything the row
+        // stands for. On a line the objects DISAGREE on that answer is "true for all", so selecting a graph folded
+        // every node in it: the line was shown, not pressed. Commit() has always known this; the mixed branch below
+        // went round it.
+        if (_writing) return;
+
         // A click on an indeterminate box lands on FALSE - that is the three-state cycle - while the row's rule for a
         // boolean the objects disagree on is TRUE, because leaving them disagreeing is the one thing nobody clicked
         // for. One rule whichever way the row is flipped.
@@ -644,8 +677,25 @@ public class PropertyRow : Control
     {
         if (!HasChildren || e.ChangedButton != MouseButtons.Left || Owner == null) return;
 
+        // ...unless the press landed on a BUTTON standing in the line. The whole line opens the row, and the buttons a
+        // line offers sit on that line, so without this one press both does the thing and folds away what it was done
+        // to. A button takes MouseLeftButtonDown, which is Direct, so nothing it marks handled is ever seen here.
+        if (OnAButton(e.OriginalSource as IUIComponent)) return;
+
         Owner.ToggleComposite(this);
         e.Handled = true;
+    }
+
+    private bool OnAButton(IUIComponent from)
+    {
+        while (from != null && !ReferenceEquals(from, this))
+        {
+            if (from is Primitives.ButtonBase) return true;
+
+            from = from.VisualParent;
+        }
+
+        return false;
     }
 
     private void OnGripPressed(object sender, MouseButtonEventArgs e)

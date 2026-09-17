@@ -65,4 +65,29 @@ public class CanvasIconTests
             }
         });
     }
+
+    // The canvas's ACTIONS, which are pictures for the same reason the tools are: ten of them in words took three rows
+    // of the panel. A button whose key is missing draws nothing at all and still takes its place in the row, so it
+    // reads as a button that does nothing rather than as one that is not there.
+    private static readonly string[] Actions =
+    {
+        "SaveIcon", "OpenIcon", "FrameIcon", "AlignLeftIcon", "AlignMiddleIcon", "AlignTopIcon",
+        "FitIcon", "SpreadRowsIcon", "SpreadColumnsIcon", "BinIcon"
+    };
+
+    [TestCase("Fluent")]
+    [TestCase("EditorPro")]
+    [TestCase("MacOs")]
+    public void EveryActionPictureIsThere(string theme)
+    {
+        Use(ThemeNamed(theme));
+
+        Assert.Multiple(() =>
+        {
+            foreach (var key in Actions)
+            {
+                Assert.That(_app.ResourceManager.FindResource(key), Is.Not.Null, key);
+            }
+        });
+    }
 }

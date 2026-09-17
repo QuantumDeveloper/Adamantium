@@ -1,4 +1,5 @@
 using Adamantium.UI.Core;
+using Adamantium.UI.Core.Media;
 using Adamantium.UI.Core.RoutedEvents;
 
 namespace Adamantium.UI.Controls.Primitives;
@@ -18,6 +19,26 @@ public class ToggleButton : ButtonBase
 
     public static readonly AdamantiumProperty IsThreeStateProperty = AdamantiumProperty.Register(nameof(IsThreeState),
         typeof(bool), typeof(ToggleButton), new PropertyMetadata(false));
+
+    // The CHECKED state's brushes, for the same reason ButtonBase carries the hover and pressed ones: one template has
+    // to serve every toggle there is, and what a checked toggle looks like is not the same everywhere. A toggle sitting
+    // on a colour of somebody else's choosing - the fold on a graph node, which sits on the node's own accent strip -
+    // has to be able to say "not painted", and a theme that stated the accent in the trigger itself left it nothing to
+    // say it with. Set by the theme; null means "no change in that state".
+    public static readonly AdamantiumProperty BackgroundCheckedProperty = AdamantiumProperty.Register(
+        nameof(BackgroundChecked), typeof(Brush), typeof(ToggleButton), new PropertyMetadata(default(Brush)));
+
+    public static readonly AdamantiumProperty BorderBrushCheckedProperty = AdamantiumProperty.Register(
+        nameof(BorderBrushChecked), typeof(Brush), typeof(ToggleButton), new PropertyMetadata(default(Brush)));
+
+    public static readonly AdamantiumProperty ForegroundCheckedProperty = AdamantiumProperty.Register(
+        nameof(ForegroundChecked), typeof(Brush), typeof(ToggleButton), new PropertyMetadata(default(Brush)));
+
+    public static readonly AdamantiumProperty BackgroundCheckedPointerOverProperty = AdamantiumProperty.Register(
+        nameof(BackgroundCheckedPointerOver), typeof(Brush), typeof(ToggleButton), new PropertyMetadata(default(Brush)));
+
+    public static readonly AdamantiumProperty BackgroundCheckedPressedProperty = AdamantiumProperty.Register(
+        nameof(BackgroundCheckedPressed), typeof(Brush), typeof(ToggleButton), new PropertyMetadata(default(Brush)));
 
     public static readonly RoutedEvent CheckedEvent = EventManager.RegisterRoutedEvent(nameof(Checked),
         RoutingStrategy.Bubble, typeof(RoutedEventHandler), typeof(ToggleButton));
@@ -40,6 +61,43 @@ public class ToggleButton : ButtonBase
     {
         get => GetValue<bool>(IsThreeStateProperty);
         set => SetValue(IsThreeStateProperty, value);
+    }
+
+    /// <summary>What fills it while checked. Transparent for a toggle that must not paint over what it is standing on.
+    /// </summary>
+    public Brush BackgroundChecked
+    {
+        get => GetValue<Brush>(BackgroundCheckedProperty);
+        set => SetValue(BackgroundCheckedProperty, value);
+    }
+
+    /// <summary>Its edge while checked.</summary>
+    public Brush BorderBrushChecked
+    {
+        get => GetValue<Brush>(BorderBrushCheckedProperty);
+        set => SetValue(BorderBrushCheckedProperty, value);
+    }
+
+    /// <summary>What its content is drawn in while checked.</summary>
+    public Brush ForegroundChecked
+    {
+        get => GetValue<Brush>(ForegroundCheckedProperty);
+        set => SetValue(ForegroundCheckedProperty, value);
+    }
+
+    /// <summary>Checked and under the pointer. Its own brush because a checked toggle must not take the plain hover
+    /// fill - that paints over the checked look and leaves a blank box.</summary>
+    public Brush BackgroundCheckedPointerOver
+    {
+        get => GetValue<Brush>(BackgroundCheckedPointerOverProperty);
+        set => SetValue(BackgroundCheckedPointerOverProperty, value);
+    }
+
+    /// <summary>Checked and held down.</summary>
+    public Brush BackgroundCheckedPressed
+    {
+        get => GetValue<Brush>(BackgroundCheckedPressedProperty);
+        set => SetValue(BackgroundCheckedPressedProperty, value);
     }
 
     /// <summary>Raised when <see cref="IsChecked"/> becomes true.</summary>

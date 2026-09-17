@@ -2,6 +2,7 @@ using System;
 using System.Collections.ObjectModel;
 using System.Linq;
 using Adamantium.Core.DependencyInjection;
+using Adamantium.Game.Sandbox.DrawingBoard.ViewModels;
 using Adamantium.MVVM;
 using Adamantium.UI.Controls;
 

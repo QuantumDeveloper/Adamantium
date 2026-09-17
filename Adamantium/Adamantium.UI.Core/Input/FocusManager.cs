@@ -61,8 +61,29 @@ public static class FocusManager
 
    public static void ResetFocus()
    {
+      Trace(Focused, null);
       Focused = null;
    }
+
+   // WHO TOOK THE FOCUS. ADAM_FOCUS_TRACE=<path> writes every move of it with the stack that made it - a probe for
+   // focus going somewhere nobody asked for, and off unless asked for.
+   private static void Trace(IInputComponent from, IInputComponent to)
+   {
+      if (Environment.GetEnvironmentVariable("ADAM_FOCUS_TRACE") is not { Length: > 0 } path) return;
+
+      try
+      {
+         System.IO.File.AppendAllText(path,
+            $"{DateTime.Now:HH:mm:ss.fff} {Name(from)} -> {Name(to)}{Environment.NewLine}" +
+            Environment.StackTrace + Environment.NewLine + Environment.NewLine);
+      }
+      catch (System.IO.IOException)
+      {
+      }
+   }
+
+   private static string Name(IInputComponent component) =>
+      component == null ? "nothing" : $"{component.GetType().Name}({(component as IUIComponent)?.Name})";
 
    /// <summary>Gives up the focus if it is on <paramref name="element"/>, announcing the move so the ring goes out with
    /// it. What a control calls when it LEAVES the visual tree: the focus cannot stay on something that is no longer on
@@ -125,6 +146,7 @@ public static class FocusManager
 
          var scope = GetFocusScopeAncestors(component).FirstOrDefault();
          var previous = Focused;
+         Trace(previous, component);
          Focused = component;
          Remember(component);   // per WINDOW, so switching away and back comes back HERE - see FocusByRoot
 

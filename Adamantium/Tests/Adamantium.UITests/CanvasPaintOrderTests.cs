@@ -1,5 +1,6 @@
 using Adamantium.Mathematics;
 using Adamantium.UI.Controls;
+using Adamantium.UI.Controls.DrawingBoard;
 using Adamantium.UI.Controls.Panels;
 using Adamantium.UI.Core;
 using Adamantium.UI.Core.Graphics;
@@ -183,6 +184,42 @@ public class CanvasPaintOrderTests
 
         Assert.That(cache.PaintRankOf(node), Is.GreaterThan(cache.PaintRankOf(canvas)),
             "the node is behind it now - which would mean the order decides across a band, and it does not");
+    }
+
+    // A NODE STAYS LIVE. What is in one is a field, a switch, a list, so a node that went deaf to the pointer while the
+    // plane is being arranged would be a picture of a node - it is dragged by its title strip instead. Everything else
+    // on the plane keeps the old rule: editing, a press on it belongs to the plane.
+    [Test]
+    public void ANodeAnswersThePointerWhileOtherControlsDoNot()
+    {
+        var (root, canvas, scene, cache) = Stage();
+        canvas.IsDesignMode = true;
+
+        var node = new CanvasNode { Title = "Multiply" };
+        scene.Add(new ElementItem(node, new Rect(40, 40, 160, 90)));
+
+        Frame(root, canvas, cache);
+
+        Assert.That(node.IsHitTestVisible, Is.True, "the node is deaf, so what is inside it cannot be used");
+    }
+
+    [Test]
+    public void AnOrdinaryControlIsDeafWhileThePlaneIsArranged()
+    {
+        var (root, canvas, scene, cache) = Stage();
+        canvas.Mode = CanvasMode.Drawing;
+        canvas.IsDesignMode = true;
+
+        var button = new Adamantium.UI.Controls.Buttons.Button();
+        scene.Add(new ElementItem(button, new Rect(40, 40, 120, 40)));
+
+        Frame(root, canvas, cache);
+
+        Assert.That(button.IsHitTestVisible, Is.False, "a press on it would work it instead of picking it up");
+
+        canvas.IsDesignMode = false;
+
+        Assert.That(button.IsHitTestVisible, Is.True, "...and using the plane makes it live again");
     }
 
     // ...and THAT is what the bands are for. What a thing is drawn in front of is not a number it carries but which

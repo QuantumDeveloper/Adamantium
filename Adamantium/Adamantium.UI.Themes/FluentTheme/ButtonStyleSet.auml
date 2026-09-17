@@ -76,6 +76,10 @@
         <PropertyTrigger Property="IsEnabled" Value="false">
             <Setter TargetName="InnerBorder" Property="Background" Value="{TemplateBinding BackgroundDisabled}"/>
             <Setter TargetName="PART_ContentPresenter" Property="Foreground" Value="{TemplateBinding ForegroundDisabled}"/>
+            <!-- AND THE CONTENT AS A WHOLE GOES QUIET. A disabled control is greyed through its FOREGROUND, which is
+                 what text reads - and a picture carries its own brush and ignores it, so a button with a glyph in it
+                 sat there looking live with nothing to do. Opacity is what reaches a picture. -->
+            <Setter TargetName="PART_ContentPresenter" Property="Opacity" Value="0.4"/>
         </PropertyTrigger>
     </Style>
 
@@ -97,9 +101,8 @@
          answers the pointer on every button, and an arrow is no exception.
          THE HEIGHT IS FIXED AND THE WIDTH IS A FLOOR, the same pair every entry on that line takes, so the row lines up
          by construction rather than by two numbers that happen to agree.
-         AND IT DIMS ITS GLYPH: the base greys a disabled control through the content presenter's FOREGROUND, which a
-         drawn glyph carries its own brush and ignores - so on the first page the two back arrows sat there looking live.
-         Opacity is what reaches a picture. -->
+         Dimming its glyph when it is off is no longer this style's business: every button does it now - see the base
+         style's disabled trigger, where it belongs. -->
     <Style Selector="Button.PagerArrow">
         <Setter Property="Background" Value="Transparent"/>
         <Setter Property="BorderBrush" Value="Transparent"/>
@@ -114,9 +117,4 @@
         <Setter Property="VerticalAlignment" Value="Center"/>
     </Style>
 
-    <Style Selector="Button.PagerArrow">
-        <PropertyTrigger Property="IsEnabled" Value="false">
-            <Setter TargetName="PART_ContentPresenter" Property="Opacity" Value="0.35"/>
-        </PropertyTrigger>
-    </Style>
 </StyleSet>

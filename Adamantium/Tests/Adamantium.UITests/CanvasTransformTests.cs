@@ -1,6 +1,7 @@
 using System;
 using Adamantium.Mathematics;
 using Adamantium.UI.Controls;
+using Adamantium.UI.Controls.DrawingBoard;
 using Adamantium.UI.Core;
 using Adamantium.UI.Core.Media;
 using NUnit.Framework;
@@ -146,5 +147,53 @@ public class CanvasTransformTests
         var corner = canvas.WorldToScreen(new Vector2(25, -50));
 
         Assert.That(canvas.HandleAt(corner), Is.EqualTo(CanvasHandle.TopLeft));
+    }
+
+    // The frame stands OFF what it is round by half a grip, so the grips sit against the selection instead of half
+    // inside it - over a node's own filled edge that half was simply invisible.
+    [Test]
+    public void TheFrameStandsOffTheSelectionByHalfAGrip()
+    {
+        var canvas = Sized();
+        var scene = new CanvasScene();
+        var shape = Box();
+
+        scene.Add(shape);
+        canvas.Scene = scene;
+        canvas.Select(shape, false);
+
+        var box = canvas.ToScreen(shape.Bounds);
+        var frame = canvas.FrameOf(shape.Bounds);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(frame.X, Is.EqualTo(box.X - canvas.HandleSize / 2).Within(0.01));
+            Assert.That(frame.Y, Is.EqualTo(box.Y - canvas.HandleSize / 2).Within(0.01));
+            Assert.That(frame.Width, Is.EqualTo(box.Width + canvas.HandleSize).Within(0.01));
+            Assert.That(frame.Height, Is.EqualTo(box.Height + canvas.HandleSize).Within(0.01));
+        });
+    }
+
+    // ...and a grip is aimed at where it is DRAWN. The two come from one place, so moving the frame cannot leave the
+    // grips being hunted for at the old box.
+    [Test]
+    public void AGripIsFoundAtTheFrameAndNotAtTheBox()
+    {
+        var canvas = Sized();
+        var scene = new CanvasScene();
+        var shape = Box();
+
+        scene.Add(shape);
+        canvas.Scene = scene;
+        canvas.Select(shape, false);
+
+        var frame = canvas.FrameOf(shape.Bounds);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(canvas.HandleAt(new Vector2(frame.X, frame.Y)), Is.EqualTo(CanvasHandle.TopLeft));
+            Assert.That(canvas.HandleAt(new Vector2(frame.X + frame.Width, frame.Y + frame.Height)),
+                Is.EqualTo(CanvasHandle.BottomRight));
+        });
     }
 }

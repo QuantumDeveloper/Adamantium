@@ -27,6 +27,9 @@ public class BindingExpression : BindingExpressionBase
    public object ResolvedSource { get; private set; }
    public string SourcePropertyName { get; private set; }
 
+   /// <inheritdoc/>
+   public override bool IsResolved => ResolvedSource != null && (_bindToSource || _sourceProperty != null);
+
    private PropertyInfo _sourceProperty;
    private Func<object, object> _sourceGetter;   // compiled reader for _sourceProperty (the hot ComputeValue path)
    private bool _bindToSource;   // empty path ({Binding}, {Binding ElementName=x}) -> the value IS the resolved source object
@@ -259,22 +262,39 @@ public class BindingExpression : BindingExpressionBase
    // expression skips echoing its own write.
    private bool _writingSource;
 
+   // THE SOURCE SPOKE WHILE WE WERE WRITING IT. Not the echo of our own value - that one is thrown away - but the fact
+   // that it said anything at all, which is the difference between a source that ANSWERED the write with another value
+   // and one that simply ignored it. See UpdateSource.
+   private bool _sourceSpoke;
+
    // Called by SharedSourceRegistry (the source's single fan-out handler), not subscribed directly.
    internal void OnSourcePropertyChanged(object sender, PropertyChangedEventArgs e)
    {
-      if (_writingSource) return;   // our own TwoWay write-back - don't echo it back to the target
+      var ours = string.IsNullOrEmpty(e.PropertyName) || e.PropertyName == SourcePropertyName;
+
+      if (_writingSource)   // our own TwoWay write-back - don't echo it back to the target
+      {
+         if (ours) _sourceSpoke = true;
+         return;
+      }
+
       // F2: a runtime source change is batched + coalesced (applied once per frame), not pushed synchronously.
-      if (string.IsNullOrEmpty(e.PropertyName) || e.PropertyName == SourcePropertyName)
-         ScheduleUpdate();
+      if (ours) ScheduleUpdate();
    }
 
    // Element source ({ElementName}) property changed via the AdamantiumProperty system - push to the target if it's the
    // property we bind.
    private void OnSourceComponentChanged(object sender, AdamantiumPropertyChangedEventArgs e)
    {
-      if (_writingSource) return;   // our own TwoWay write-back - don't echo it back to the target
-      if (e.Property?.Name == SourcePropertyName)
-         ScheduleUpdate();
+      var ours = e.Property?.Name == SourcePropertyName;
+
+      if (_writingSource)   // our own TwoWay write-back - don't echo it back to the target
+      {
+         if (ours) _sourceSpoke = true;
+         return;
+      }
+
+      if (ours) ScheduleUpdate();
    }
 
    // F2: the coalesced apply reads the current source value (producer mode publishes ProducedValue, top-level pushes
@@ -393,10 +413,13 @@ public class BindingExpression : BindingExpressionBase
       }
 
       // Guard the ECHO (see _writingSource): our synchronous source write must not schedule a source->target push back.
+      var written = Coerce(value, _sourceProperty.PropertyType);
+
+      _sourceSpoke = false;
       _writingSource = true;
       try
       {
-         _sourceProperty.SetValue(ResolvedSource, Coerce(value, _sourceProperty.PropertyType));
+         _sourceProperty.SetValue(ResolvedSource, written);
       }
       finally
       {
@@ -411,13 +434,31 @@ public class BindingExpression : BindingExpressionBase
       // squeezed by a shrinking Maximum therefore rode the edge all the way back up instead of staying where the
       // view-model said it was. Re-entrancy is bounded by the write below leaving the effective value alone (it IS the
       // effective value), which raises nothing.
-      if (Mode != BindingMode.TwoWay || _syncingSlot) 
+      if (Mode != BindingMode.TwoWay || _syncingSlot)
          return;
-      
+
       _syncingSlot = true;
       try
       {
-         Target.SetValue(TargetProperty, targetValue, ValuePriority.Binding);
+         // WHAT THE SOURCE ANSWERED WITH, when it answered at all. A source is free to take a write and put something
+         // else there - a value it clamped, or a request it has already acted on and taken back: a list of kinds
+         // answers "put one of these on the plane" by making the node and letting the choice go, and a target left
+         // holding the old pick cannot be picked from again, because picking the same row is then no change at all.
+         // The echo guard above hides that second change from us, so it is asked for here.
+         //
+         // ONLY when the source actually SAID something, though. A source that silently ignores a write has not
+         // answered anything, and re-reading it would undo the click that caused the write: one of a pair of radio
+         // buttons clears the other, the view-model behind it ignores "you are not the choice" (it hears only the
+         // positive half), and pushing that back re-checked the button the click had just cleared - both halves of one
+         // choice lit, and the pair stopped switching at all.
+         if (_sourceSpoke && !Equals(_sourceProperty.GetValue(ResolvedSource), written))
+         {
+            UpdateTarget();
+         }
+         else
+         {
+            Target.SetValue(TargetProperty, targetValue, ValuePriority.Binding);
+         }
       }
       finally
       {

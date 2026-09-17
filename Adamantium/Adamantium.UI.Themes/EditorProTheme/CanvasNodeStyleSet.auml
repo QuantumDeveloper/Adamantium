@@ -26,17 +26,74 @@
                                 BorderThickness="{TemplateBinding BorderThickness}"
                                 CornerRadius="{TemplateBinding CornerRadius}">
                             <StackPanel Orientation="Vertical">
-                                <Border x:Name="PART_Header"
-                                        Background="{TemplateBinding Accent}"
-                                        CornerRadius="2,2,0,0"
-                                        Padding="8,3">
-                                    <ContentPresenter Content="{TemplateBinding Title}"
-                                                      FontSize="{TemplateBinding FontSize}"
-                                                      Foreground="{ThemeResource AccentForegroundColor}"
-                                                      VerticalAlignment="Center"/>
-                                </Border>
+                                <!-- The strip, and the two stubs a FOLDED node's wires come to, laid OVER it rather
+                                     than in it: nothing may take width from this row, or the switch that opens the
+                                     node again slides out from under the click that closed it. -->
+                                <Grid>
+                                    <Border x:Name="PART_Header"
+                                            Background="{TemplateBinding Accent}"
+                                            CornerRadius="2,2,0,0"
+                                            Padding="8,3">
+                                        <!-- The FOLD sits in the strip, because the strip is all that is left when the
+                                             node is folded - a switch anywhere else would be one you cannot reach to
+                                             undo. A toggle and not a button: it shows the state as well as changing it. -->
+                                        <DockPanel LastChildFill="True">
+                                            <ToggleButton x:Name="PART_Fold" DockPanel.Dock="Right"
+                                                          Width="16" Height="16" MinWidth="0" MinHeight="0" Padding="0"
+                                                          MarginLeft="6" VerticalAlignment="Center"
+                                                          Background="Transparent" BorderThickness="0"
+                                                          ToolTip="Fold the node down to its title"
+                                                          IsChecked="{TemplateBinding IsCollapsed, Mode=TwoWay}"
+                                                          BackgroundChecked="Transparent"
+                                                          BorderBrushChecked="Transparent"
+                                                          BackgroundCheckedPointerOver="Transparent"
+                                                          BackgroundCheckedPressed="Transparent"
+                                                          ForegroundChecked="{ThemeResource AccentForegroundColor}">
+                                                <!-- Drawn HERE and not taken from the icon set: it sits on the accent
+                                                     strip and so must wear the accent's own foreground, which is a
+                                                     ThemeResource - and a DrawingImage cannot carry one. -->
+                                                <Path Data="M0,0 L3,3 L6,0"
+                                                      Stroke="{ThemeResource AccentForegroundColor}"
+                                                      StrokeThickness="1.3" StrokeLineJoin="Round"
+                                                      HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                            </ToggleButton>
 
-                                <Grid ColumnDefinitions="Auto,*,Auto" Margin="0,6,0,8" MinWidth="112">
+                                            <ContentPresenter Content="{TemplateBinding Title}"
+                                                              FontSize="{TemplateBinding FontSize}"
+                                                              Foreground="{ThemeResource AccentForegroundColor}"
+                                                              VerticalAlignment="Center"/>
+                                        </DockPanel>
+                                    </Border>
+
+                                    <!-- ONE STUB A SIDE, and every wire of that side comes to it. A folded node is a
+                                         summary: a row of discs says no more than one does and stops it being a title
+                                         strip at all. Shown and hidden by the node itself - whether a stub belongs
+                                         depends on there being sockets on that side, which a trigger cannot ask. -->
+                                    <CanvasNodeSocket x:Name="PART_FoldedIn" Width="10" Height="10" CornerRadius="5"
+                                                      HorizontalAlignment="Left" VerticalAlignment="Center"
+                                                      MarginLeft="-5" Visibility="Collapsed"
+                                                      Background="{ObservableResource SolidBackgroundFillColorSecondary}"
+                                                      BorderBrush="{TemplateBinding PinColor}"
+                                                      BorderThickness="2"/>
+
+                                    <CanvasNodeSocket x:Name="PART_FoldedOut" Width="10" Height="10" CornerRadius="5"
+                                                      HorizontalAlignment="Right" VerticalAlignment="Center"
+                                                      MarginRight="-5" Visibility="Collapsed"
+                                                      Background="{ObservableResource SolidBackgroundFillColorSecondary}"
+                                                      BorderBrush="{TemplateBinding PinColor}"
+                                                      BorderThickness="2"/>
+                                </Grid>
+
+                                <Grid x:Name="PART_Rows" ColumnDefinitions="Auto,*,Auto" Margin="0,6,0,8" MinWidth="112">
+                                    <!-- WHAT IS IN THE NODE, between the two columns of sockets - see Fluent's set. -->
+                                    <ContentPresenter Grid.Column="1" x:Name="PART_ContentPresenter"
+                                                      Content="{TemplateBinding Content}"
+                                                      ContentTemplate="{TemplateBinding ContentTemplate}"
+                                                      ContentTemplateSelector="{TemplateBinding ContentTemplateSelector}"
+                                                      Margin="8,0,8,0"
+                                                      HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                                      VerticalAlignment="{TemplateBinding VerticalContentAlignment}"/>
+
                                     <ItemsControl Grid.Column="0" ItemsSource="{TemplateBinding InputPins}">
                                         <!-- Its OWN template: the stock one wraps the items in a ScrollViewer, and a scroller takes every pixel it is
                                              offered - which made a node as tall as whatever it was measured against instead of as tall as its pins. -->
@@ -62,12 +119,28 @@
                                                             Background="{ObservableResource SolidBackgroundFillColorSecondary}"
                                                             BorderBrush="{Binding Color}"
                                                             BorderThickness="2">
-                                                        <Border CornerRadius="3" Background="{Binding Fill}"/>
+                                                        <!-- Tucked half a pixel under the ring - see Fluent's set for
+                                                             the hairline this keeps out. -->
+                                                        <Border CornerRadius="3.5" Margin="-0.5"
+                                                                Background="{Binding Fill}"/>
                                                     </CanvasNodeSocket>
                                                     <TextBlock Text="{Binding Name}" MarginLeft="6"
                                                                VerticalAlignment="Center"
                                                                VerticalTextAlignment="Center"
                                                                Foreground="{ObservableResource TextFillColorSecondary}"/>
+
+                                                    <!-- THE GRIP, and only the grip, moves a socket: the pin itself is
+                                                         where a wire is pulled from, and one target cannot mean two
+                                                         things. The transparent box round the dots is what makes the
+                                                         gaps between them press too. -->
+                                                    <Border CanvasNode.IsSocketGrip="True" Background="Transparent"
+                                                            Width="12" Height="14" MinWidth="0" MinHeight="0"
+                                                            MarginLeft="6" VerticalAlignment="Center" Cursor="SizeAll"
+                                                            ToolTipService.ToolTip="Drag to move this socket">
+                                                        <Path Fill="{ObservableResource TextFillColorTertiary}"
+                                                              HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                              Data="M0,0 L2,0 L2,2 L0,2 Z M4,0 L6,0 L6,2 L4,2 Z M0,4 L2,4 L2,6 L0,6 Z M4,4 L6,4 L6,6 L4,6 Z M0,8 L2,8 L2,10 L0,10 Z M4,8 L6,8 L6,10 L4,10 Z"/>
+                                                    </Border>
                                                 </StackPanel>
                                             </DataTemplate>
                                         </ItemsControl.ItemTemplate>
@@ -90,6 +163,16 @@
                                             <DataTemplate>
                                                 <StackPanel Orientation="Horizontal" MarginBottom="3"
                                                             HorizontalAlignment="Right">
+                                                    <!-- On THIS side the grip stands first, for the same reason the pin
+                                                         stands last: each is nearest the edge it belongs to. -->
+                                                    <Border CanvasNode.IsSocketGrip="True" Background="Transparent"
+                                                            Width="12" Height="14" MinWidth="0" MinHeight="0"
+                                                            MarginRight="6" VerticalAlignment="Center" Cursor="SizeAll"
+                                                            ToolTipService.ToolTip="Drag to move this socket">
+                                                        <Path Fill="{ObservableResource TextFillColorTertiary}"
+                                                              HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                              Data="M0,0 L2,0 L2,2 L0,2 Z M4,0 L6,0 L6,2 L4,2 Z M0,4 L2,4 L2,6 L0,6 Z M4,4 L6,4 L6,6 L4,6 Z M0,8 L2,8 L2,10 L0,10 Z M4,8 L6,8 L6,10 L4,10 Z"/>
+                                                    </Border>
                                                     <TextBlock Text="{Binding Name}" MarginRight="6"
                                                                VerticalAlignment="Center"
                                                                VerticalTextAlignment="Center"
@@ -99,7 +182,10 @@
                                                             Background="{ObservableResource SolidBackgroundFillColorSecondary}"
                                                             BorderBrush="{Binding Color}"
                                                             BorderThickness="2">
-                                                        <Border CornerRadius="3" Background="{Binding Fill}"/>
+                                                        <!-- Tucked half a pixel under the ring - see Fluent's set for
+                                                             the hairline this keeps out. -->
+                                                        <Border CornerRadius="3.5" Margin="-0.5"
+                                                                Background="{Binding Fill}"/>
                                                     </CanvasNodeSocket>
                                                 </StackPanel>
                                             </DataTemplate>
@@ -108,6 +194,14 @@
                                 </Grid>
                             </StackPanel>
                         </Border>
+
+                    <ControlTemplate.Triggers>
+                        <!-- FOLDED: the strip is the whole node - see Fluent's set. -->
+                        <PropertyTrigger Property="IsCollapsed" Value="true">
+                            <Setter TargetName="PART_Rows" Property="Visibility" Value="Collapsed"/>
+                            <Setter TargetName="PART_Header" Property="CornerRadius" Value="2"/>
+                        </PropertyTrigger>
+                    </ControlTemplate.Triggers>
                 </ControlTemplate>
             </Setter.Value>
         </Setter>

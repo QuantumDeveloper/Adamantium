@@ -120,6 +120,14 @@ namespace Adamantium.Core.Collections
             NotifyReplace(oldItem, newItem, index);
         }
 
+        // A MOVE and not a remove plus an add: the item never leaves, so the count does not change and nothing
+        // downstream has to unwind the item's state and build it again.
+        protected override void OnMove(int from, int to, T item)
+        {
+            CollectionChanged?.Invoke(this,
+                new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Move, item, to, from));
+        }
+
         private List<T> _clearing;   // the items a Clear() is about to drop - kept only while it is being reported
 
         // A Clear() IS a bulk removal, so it is reported as a Remove, with the items: a downstream mirror needs to know WHAT

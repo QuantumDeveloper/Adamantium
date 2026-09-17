@@ -5,6 +5,7 @@ using System.IO;
 using Adamantium.Core.DependencyInjection;
 using Adamantium.Mathematics;
 using Adamantium.UI.Controls;
+using Adamantium.UI.Controls.DrawingBoard;
 using Adamantium.UI.Core;
 using Adamantium.UI.Core.Media;
 using Adamantium.UI.Core.Resources;

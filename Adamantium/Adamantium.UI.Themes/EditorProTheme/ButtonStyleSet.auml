@@ -76,6 +76,9 @@
         <PropertyTrigger Property="IsEnabled" Value="false">
             <Setter TargetName="InnerBorder" Property="Background" Value="{TemplateBinding BackgroundDisabled}"/>
             <Setter TargetName="PART_ContentPresenter" Property="Foreground" Value="{TemplateBinding ForegroundDisabled}"/>
+            <!-- AND THE CONTENT AS A WHOLE GOES QUIET - see Fluent's set: a picture carries its own brush and does not
+                 hear the disabled foreground, so a glyph button sat there looking live with nothing to do. -->
+            <Setter TargetName="PART_ContentPresenter" Property="Opacity" Value="0.4"/>
             <!-- The outline dims WITH the label. Left crisp, it would keep promising a press the button cannot take -
                  and on this theme the outline IS the button, so it is the part that has to go quiet.
                  A direct resource, not a {TemplateBinding}: there is no BorderBrushDisabled on Button, and binding a
@@ -137,10 +140,5 @@
         <Setter Property="VerticalAlignment" Value="Center"/>
     </Style>
 
-    <Style Selector="Button.PagerArrow">
-        <PropertyTrigger Property="IsEnabled" Value="false">
-            <Setter TargetName="PART_ContentPresenter" Property="Opacity" Value="0.35"/>
-        </PropertyTrigger>
-    </Style>
 
 </StyleSet>

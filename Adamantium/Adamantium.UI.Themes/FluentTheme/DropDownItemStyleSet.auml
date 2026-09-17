@@ -32,8 +32,11 @@
                             BorderBrush="{TemplateBinding BorderBrush}"
                             BorderThickness="{TemplateBinding BorderThickness}"
                             Padding="{TemplateBinding Padding}">
+                        <!-- TRIMMED, because a row is as wide as the list and a name is as long as it is: untrimmed, a
+                             long entry simply ran out past the popup's own edge and over whatever was beside it. -->
                         <ContentPresenter
                                 x:Name="PART_ContentPresenter"
+                                TextTrimming="CharEllipses"
                                 HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
                                 VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
                                 Foreground="{TemplateBinding Foreground}"

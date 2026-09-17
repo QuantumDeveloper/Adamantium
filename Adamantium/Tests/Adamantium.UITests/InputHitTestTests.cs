@@ -175,6 +175,28 @@ public class InputHitTestTests
         Assert.That(Mouse.Cursor, Is.EqualTo(Cursors.Arrow), "and it goes back without waiting for the next enter");
     }
 
+    // LEAVING a grip puts the pointer back over what held it, and that is not an enter - the parent never left. Without
+    // somebody speaking for it, the double arrow a panel's resize edge put up stayed on the screen while the pointer
+    // was already over the rows.
+    [Test]
+    public void LeavingAGrip_PutsBackTheCursorOfWhatHeldIt()
+    {
+        var panel = new Border { Width = 200, Height = 100, Cursor = Cursors.Arrow };
+        var grip = new Border { Width = 7, Height = 100, Cursor = Cursors.SizeEWE };
+        panel.Child = grip;
+
+        panel.Measure(new Size(200, 100), force: true);
+        panel.Arrange(new Rect(0, 0, 200, 100));
+
+        PointAt(grip);
+        Assert.That(Mouse.Cursor, Is.EqualTo(Cursors.SizeEWE), "the grip never said what it was");
+
+        ((IObservableComponent)grip).RaiseEvent(new MouseEventArgs(Mouse.PrimaryDevice, InputModifiers.None, 0)
+        { RoutedEvent = Mouse.MouseLeaveEvent });
+
+        Assert.That(Mouse.Cursor, Is.EqualTo(Cursors.Arrow), "the pointer is over the panel and still wearing the grip");
+    }
+
     // ...but only the element the pointer is ON may speak. Otherwise any control anywhere - a row realized off screen,
     // a template part being built - would grab the cursor while the pointer is nowhere near it.
     [Test]
