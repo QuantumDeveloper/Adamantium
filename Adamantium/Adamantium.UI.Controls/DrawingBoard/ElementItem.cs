@@ -5,6 +5,7 @@ using Adamantium.UI.Controls.Base;
 using Adamantium.UI.Controls.Text;
 using Adamantium.UI.Core;
 using Adamantium.UI.Core.Graphics;
+using Adamantium.UI.Core.Media;
 
 namespace Adamantium.UI.Controls.DrawingBoard;
 
@@ -15,7 +16,7 @@ namespace Adamantium.UI.Controls.DrawingBoard;
 /// controls.</para>
 /// <para>Zoom costs it nothing: it is laid out once per size change, and panning is a new arrange of a rectangle, not a
 /// re-measure of what is inside it.</para></summary>
-public class ElementItem : ICanvasItem
+public class ElementItem : ICanvasItem, ICanvasTransformed
 {
     private Boolean? _sizeFollowsContent;
     private Rect _world;
@@ -29,6 +30,25 @@ public class ElementItem : ICanvasItem
     /// <summary>The control itself. It lives in the canvas's own visual tree while it is on screen, so it draws, takes
     /// input and animates the way it would anywhere else.</summary>
     public IUIComponent Element { get; }
+
+    /// <summary>THE CONTROL A PERSON SEES - which is not always what is hosted.
+    /// <para>An application's own object is put on the plane as a <see cref="ContentPresenter"/> with the object's
+    /// template inside it, so the button somebody points at and recolours is the presenter's CHILD. Written on the
+    /// presenter, a background is painted under an opaque button and a corner radius belongs to something that has no
+    /// corners: the panel's lines read a value, wrote one, and nothing on screen moved - except the foreground, which
+    /// is inherited and reached the text by itself.</para>
+    /// <para>For a control put down by a tool the two are the same thing.</para></summary>
+    public IUIComponent Painted
+    {
+        get
+        {
+            if (Element is not ContentPresenter { VisualChildren.Count: 1 } presenter) return Element;
+
+            foreach (var child in presenter.VisualChildren) return child;
+
+            return Element;
+        }
+    }
 
     /// <summary>WHAT THIS STANDS FOR, when the canvas made it for a node of the application's own graph - null for a
     /// control somebody put on a drawing.
@@ -179,34 +199,34 @@ public class ElementItem : ICanvasItem
     /// <para>Zero for a control that has no such property at all - a panel has no border to thicken.</para></summary>
     public Double CornerTopLeft
     {
-        get => Element is Control control ? control.CornerRadius.TopLeft : 0;
-        set => SetCorner(value, Element is Control c ? c.CornerRadius : default, 0);
+        get => Painted is Control control ? control.CornerRadius.TopLeft : 0;
+        set => SetCorner(value, Painted is Control c ? c.CornerRadius : default, 0);
     }
 
     public Double CornerTopRight
     {
-        get => Element is Control control ? control.CornerRadius.TopRight : 0;
-        set => SetCorner(value, Element is Control c ? c.CornerRadius : default, 1);
+        get => Painted is Control control ? control.CornerRadius.TopRight : 0;
+        set => SetCorner(value, Painted is Control c ? c.CornerRadius : default, 1);
     }
 
     public Double CornerBottomRight
     {
-        get => Element is Control control ? control.CornerRadius.BottomRight : 0;
-        set => SetCorner(value, Element is Control c ? c.CornerRadius : default, 2);
+        get => Painted is Control control ? control.CornerRadius.BottomRight : 0;
+        set => SetCorner(value, Painted is Control c ? c.CornerRadius : default, 2);
     }
 
     public Double CornerBottomLeft
     {
-        get => Element is Control control ? control.CornerRadius.BottomLeft : 0;
-        set => SetCorner(value, Element is Control c ? c.CornerRadius : default, 3);
+        get => Painted is Control control ? control.CornerRadius.BottomLeft : 0;
+        set => SetCorner(value, Painted is Control c ? c.CornerRadius : default, 3);
     }
 
     public Double BorderWidth
     {
-        get => Element is Control control ? control.BorderThickness.Left : 0;
+        get => Painted is Control control ? control.BorderThickness.Left : 0;
         set
         {
-            if (Element is Control control) control.BorderThickness = new Thickness(Math.Max(0, value));
+            if (Painted is Control control) control.BorderThickness = new Thickness(Math.Max(0, value));
         }
     }
 
@@ -218,7 +238,11 @@ public class ElementItem : ICanvasItem
     /// </summary>
     public String Label
     {
-        get => Element switch
+        // THE CONTROL, not the host it stands in: an application's object is hosted inside a ContentPresenter, and
+        // that presenter's content is the application's OBJECT - so a label read off it was the object's ToString and
+        // a label written onto it replaced the object with a string. What a person means by "what it says" is what the
+        // button says. See Painted.
+        get => Painted switch
         {
             TextBox box => box.Text,
             // Before the content control: a node is not one, so without this it answered nothing and read in the
@@ -229,7 +253,7 @@ public class ElementItem : ICanvasItem
         };
         set
         {
-            switch (Element)
+            switch (Painted)
             {
                 case TextBox box:
                     box.Text = value;
@@ -244,6 +268,42 @@ public class ElementItem : ICanvasItem
                     break;
             }
         }
+    }
+
+    private Vector2 Middle => new(World.X + World.Width / 2, World.Y + World.Height / 2);
+
+    private CanvasTransform _transform = CanvasTransform.None;
+
+    /// <summary>The turn and the lean this control is drawn with - the same statement a shape carries, and about the
+    /// middle of its own box for the same reason.
+    /// <para>Carried out by the LAYER, in the one render transform it already puts on every hosted control for the
+    /// zoom: a second transform written here replaced that one, and the control then stood at its own size inside a
+    /// frame drawn at the camera's - which is a control and its frame walking away from each other.</para>
+    /// <para>A render transform and not a layout one: layout is what the item's box says, and a control that laid
+    /// itself out turned would change size as it turned. Hit-testing follows a render transform, so a turned control is
+    /// still pressed where it is seen.</para></summary>
+    public CanvasTransform Transform
+    {
+        get => _transform;
+        set => _transform = value;
+    }
+
+    public double Angle
+    {
+        get => Transform.Angle;
+        set => Transform = Transform with { Angle = value };
+    }
+
+    public double SkewX
+    {
+        get => Transform.SkewX;
+        set => Transform = Transform with { SkewX = value };
+    }
+
+    public double SkewY
+    {
+        get => Transform.SkewY;
+        set => Transform = Transform with { SkewY = value };
     }
 
     public void Move(Vector2 worldDelta) =>
@@ -266,9 +326,15 @@ public class ElementItem : ICanvasItem
         if (Model != null) Model.Width = width;
     }
 
-    public bool HitTest(Vector2 world, double tolerance) =>
-        world.X >= World.X - tolerance && world.X <= World.X + World.Width + tolerance &&
-        world.Y >= World.Y - tolerance && world.Y <= World.Y + World.Height + tolerance;
+    public bool HitTest(Vector2 world, double tolerance)
+    {
+        // TURNED BACK FIRST, the way a shape does it: the box is stated straight, so a point is asked about in the
+        // control's own frame rather than the frame it is drawn in.
+        if (_transform.IsSomething) world = _transform.Undo(world, Middle);
+
+        return world.X >= World.X - tolerance && world.X <= World.X + World.Width + tolerance &&
+               world.Y >= World.Y - tolerance && world.Y <= World.Y + World.Height + tolerance;
+    }
 
     /// <summary>Nothing: a control draws ITSELF, from its own template, as a child of the canvas. Everything else on the
     /// plane is data and has to be painted here; this one is the case that is not.</summary>
@@ -278,7 +344,7 @@ public class ElementItem : ICanvasItem
 
     private void SetCorner(double value, CornerRadius current, int corner)
     {
-        if (Element is not Control control) return;
+        if (Painted is not Control control) return;
 
         value = Math.Max(0, value);
         control.CornerRadius = corner switch

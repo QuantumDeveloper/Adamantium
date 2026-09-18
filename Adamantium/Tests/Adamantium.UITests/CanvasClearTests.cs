@@ -1,9 +1,10 @@
-using System;
+﻿using System;
 using Adamantium.Core.Collections;
 using Adamantium.Mathematics;
 using Adamantium.UI.Controls;
 using Adamantium.UI.Controls.DrawingBoard;
 using Adamantium.UI.Core;
+using Adamantium.UI.Core.Media;
 using Adamantium.UITests.Graph;
 using NUnit.Framework;
 
@@ -139,6 +140,64 @@ public class CanvasClearTests
             Assert.That(scene.Items.Count, Is.EqualTo(0));
             Assert.That(canvas.Selection.Count, Is.EqualTo(0), "the selection still holds things that are gone");
         });
+    }
+
+    /// <summary>A SELECTION SURVIVES AN EDIT. Letting go of what has left the plane must not let go of what is still on
+    /// it - an inspector writes a colour, the scene is told something changed, and if the selection evaporated there
+    /// the row it was writing through has nothing left to write to.</summary>
+    [Test]
+    [Timeout(15000)]
+    public void AnEditDoesNotDropTheSelection()
+    {
+        var (canvas, scene, nodes) = Stage();
+
+        var objects = new TrackingCollection<ICanvasObject>();
+        canvas.Objects = objects;
+
+        objects.Add(new PlacedObject
+        {
+            Left = 10, Top = 20, Width = 100, Height = 60,
+            Content = new PlacedShape(CanvasShape.Rectangle)
+        });
+
+        var node = Node(nodes, 0);
+
+        canvas.SelectMany(new System.Collections.Generic.List<ICanvasItem>(scene.Items), false);
+
+        var held = canvas.Selection.Count;
+
+        Assert.That(held, Is.GreaterThan(0), "nothing got selected, so this proves nothing");
+
+        // WHAT AN INSPECTOR DOES when a value is written: the drawing changed, so the plane is told.
+        scene.Touch();
+
+        Assert.That(canvas.Selection.Count, Is.EqualTo(held), "the selection was dropped by an ordinary edit");
+    }
+
+    /// <summary>...and a child INSIDE A GROUP is still selected. A group's children leave the scene's own list, so
+    /// anything asking the scene "is this still there" is told no about something that plainly is.</summary>
+    [Test]
+    [Timeout(15000)]
+    public void ASelectedChildOfAGroupIsNotForgotten()
+    {
+        var (canvas, scene, nodes) = Stage();
+
+        var first = new ShapeItem(CanvasShape.Rectangle, new Rect(0, 0, 60, 40), Brushes.White, 2);
+        var second = new ShapeItem(CanvasShape.Rectangle, new Rect(100, 0, 60, 40), Brushes.White, 2);
+
+        scene.Add(first);
+        scene.Add(second);
+
+        canvas.SelectMany(new System.Collections.Generic.List<ICanvasItem> { first, second }, false);
+        canvas.GroupSelection();
+
+        canvas.SelectMany(new System.Collections.Generic.List<ICanvasItem> { first }, false);
+
+        Assert.That(canvas.Selection.Count, Is.EqualTo(1), "a child of a group could not be selected at all");
+
+        scene.Touch();
+
+        Assert.That(canvas.Selection.Count, Is.EqualTo(1), "the child was forgotten because the scene does not hold it");
     }
 
     /// <summary>And what the graph says afterwards: a plane with nothing on it is a graph with no wires. A node whose

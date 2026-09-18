@@ -77,14 +77,18 @@ InkPSInput InkSegmentVS(uint vertexId : SV_VertexID, uint instanceId : SV_Instan
 
     // The stroke's own box, grown by the radius and by one DEVICE pixel in local units so the analytic edge has
     // somewhere to fade - a quad cut to the exact radius clips the fade and leaves a hard, aliased rim.
+    // THIS RECORD'S OWN SEGMENT, from its point to the next one - the box to cover, and nothing wider. Grown by the
+    // radius and by one DEVICE pixel in local units so the analytic edge has somewhere to fade: a quad cut to the exact
+    // radius clips the fade and leaves a hard, aliased rim.
     float grow = it.Params.x + 1.0 / max(iso, 1e-6);
-    float2 low = it.Segment.xy - grow;
-    float2 high = it.Segment.zw + grow;
+    float2 low = min(it.Segment.xy, it.Segment.zw) - grow;
+    float2 high = max(it.Segment.xy, it.Segment.zw) + grow;
 
     float2 corner = float2(vertexId & 1u, (vertexId >> 1u) & 1u);
     float2 localPos = lerp(low, high, corner);
 
     o.Position = mul(mul(float4(localPos, 0.0, 1.0), nodeWorld), Projection);
+
     o.Local   = localPos;
     o.Shape   = float2(it.Params.x, iso);
     o.InstId  = instanceId;
@@ -114,29 +118,51 @@ float4 InkSegmentPS(InkPSInput i) : SV_Target
 
     // Both offsets are counted FROM THIS RECORD, because the draw bases the buffer at the run it is flushing - see the
     // note where the header is written.
+    // SIGNED, because every record but the first of a stroke sits AFTER the point it counts from.
     uint count = (uint)it.Clip.y;
-    uint first = i.InstId + (uint)it.Clip.z;
+    uint first = (uint)((int)i.InstId + (int)it.Clip.z);
 
-    // The NEAREST point of the whole polyline, not of one segment of it. This is the whole difference: one distance,
-    // one coverage, one blend - so overlapping segments cannot composite twice and a translucent stroke stays even.
+    // The NEAREST segment of the WHOLE polyline, not of the one this quad was raised for - and WHICH one it was, which
+    // is the whole test.
     //
-    // ONE flat loop, deliberately. Grouping the points into runs with their own boxes and skipping the runs that cannot
-    // reach this fragment is the obvious saving, and it cost this driver's shader compiler an access violation INSIDE
-    // vkCreateShadersEXT: nested loops in a fragment stage are where it gives up (the same ceiling BrushEffect's
-    // "runtime bound so the driver does not unroll" was written against). What the culling would have saved was measured
-    // at well under what the pass costs anyway, so this is not a trade being made blind.
+    // This quad covers one segment's box and nothing more, so what gets shaded is a chain of little boxes hugging the
+    // line rather than one box the size of the stroke. Where two of those boxes lie over the same pixel - at a joint,
+    // at a crossing - both fragments run, and only the one that owns the nearest segment keeps it. One owner, one
+    // blend: overlapping capsules compositing twice is exactly what made a highlighter impossible, and it is why this
+    // pass was one instance per stroke before.
     float nearest = 1e30;
+    uint owner = 0u;
+
+    // NEARER BY A MARGIN, not merely nearer: each segment's quad interpolates its own position for the pixel it
+    // covers, and those agree only to floating-point - so two fragments comparing all-but-equal distances could name
+    // different owners, and the pixel would be drawn twice or not at all. A thousandth of a device pixel is far above
+    // that error and far below anything the coverage can express.
+    float tie = 1e-3 / max(i.Shape.y, 1e-6);
+    float2 at = i.Local;
     float2 previous = items[first].Segment.xy;
 
     // A stroke of one point is a dot: the loop below does not execute and the distance is to that point alone.
-    if (count == 1u) nearest = length(i.Local - previous);
+    if (count == 1u) nearest = length(at - previous);
 
     for (uint s = 1u; s < count; s++)
     {
         float2 current = items[first + s].Segment.xy;
-        nearest = min(nearest, DistanceToSegment(i.Local, previous, current));
+        float away = DistanceToSegment(at, previous, current);
+
+        // STRICTLY nearer, so a tie goes to the earlier segment. Every segment's fragment measures from the same
+        // rebuilt position and walks the same points in the same order, so they all name the same winner - which is
+        // what makes `exactly one of us draws` true rather than likely.
+        if (away < nearest - tie)
+        {
+            nearest = away;
+            owner = s - 1u;
+        }
+
         previous = current;
     }
+
+    // NOT MINE: some other segment of this stroke is nearer to this pixel, and that one is drawing it.
+    if (owner != (uint)max(it.Params.w - 1.0, 0.0)) discard;
 
     // In DEVICE pixels, so the fade is one pixel wide however far the camera is zoomed - which keeps the edge of the
     // ink the same softness at every scale instead of blurring as it grows.

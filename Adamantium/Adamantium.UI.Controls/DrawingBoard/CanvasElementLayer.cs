@@ -205,6 +205,18 @@ public class CanvasElementLayer : Panel
             visual.RenderTransformOrigin = Vector2.Zero;
             transform.ScaleX = scale;
             transform.ScaleY = scale;
+
+            // ...AND THE ITEM'S OWN TURN, in the SAME transform. One control has one render transform: a second one
+            // written anywhere else simply replaces this, and the control then stands unscaled inside a frame drawn at
+            // the camera's scale. The turn is about the MIDDLE of the control's own box - stated as a centre rather
+            // than as an origin, because the origin here is the top-left the zoom scales about.
+            var turn = _items[i] is ICanvasTransformed turned ? turned.Transform : CanvasTransform.None;
+
+            transform.RotationAngle = turn.Angle;
+            transform.SkewX = turn.SkewX;
+            transform.SkewY = turn.SkewY;
+            transform.RotationCenterX = world.Width / 2;
+            transform.RotationCenterY = world.Height / 2;
         }
 
         // The hosted controls have just been put somewhere, and what the canvas DRAWS depends on where they are - a

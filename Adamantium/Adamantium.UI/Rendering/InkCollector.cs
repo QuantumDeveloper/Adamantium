@@ -68,10 +68,21 @@ internal sealed class InkCollector : SdfBatchCollector<InkSegmentItem>
 
         var points = Math.Max(1, Math.Min(ink.Count, ink.Points.Length));
 
-        // ONE header, then the points. Only the header draws; the points are read by its fragment shader and draw
-        // nothing - see the layout note at the top of InkEffect.fx.
-        EnsureCpuCapacity(Count + 1 + points);
-        if (Count + 1 + points > GpuCapacity) return false;
+        // ONE RECORD PER POINT, and each one DRAWS - its own segment, from itself to the point after it. There is no
+        // separate header: everything a fragment needs is on every record, so a stroke costs one record a point, which
+        // is FEWER than the header-plus-points this used to write.
+        //
+        // What that buys is the whole change. A record's quad is its own segment's box, so what the GPU is asked to
+        // shade is a chain of little boxes hugging the line - the ribbon - instead of one box the size of the stroke.
+        // A stroke across the window fills about a twentieth of its own bounds, and the other nineteen twentieths were
+        // fragments walking the whole polyline only to learn they were nowhere near it.
+        //
+        // What must NOT follow is drawing a pixel twice: overlapping capsules compositing twice is exactly what made a
+        // highlighter impossible and why this pass drew a stroke in one instance before. So a fragment works out the
+        // nearest segment of the WHOLE polyline and keeps the pixel only if that segment is its own - one owner, one
+        // blend. See InkEffect.fx.
+        EnsureCpuCapacity(Count + points);
+        if (Count + points > GpuCapacity) return false;
 
         var sx = world.M11;
         var sy = world.M22;
@@ -81,45 +92,93 @@ internal sealed class InkCollector : SdfBatchCollector<InkSegmentItem>
         var color = Straight(ink.Color, (float)(opacity * ink.Opacity));
         var half = (float)(Math.Max(ink.Thickness, 0.1) * 0.5 * Math.Abs(sx));
 
-        var header = Count++;
         var first = Count;
-
-        // The BOX the stroke covers, in the same node-local units the points are written in: the header's quad, and the
-        // only thing its fragment has to cover.
-        var lowX = float.MaxValue;
-        var lowY = float.MaxValue;
-        var highX = float.MinValue;
-        var highY = float.MinValue;
 
         for (var i = 0; i < points; i++)
         {
-            var x = ink.Points[i].X * sx + tx;
-            var y = ink.Points[i].Y * sy + ty;
+            var at = first + i;
 
-            if (x < lowX) lowX = x;
-            if (y < lowY) lowY = y;
-            if (x > highX) highX = x;
-            if (y > highY) highY = y;
+            var ax = ink.Points[i].X * sx + tx;
+            var ay = ink.Points[i].Y * sy + ty;
 
-            Items[Count++] = new InkSegmentItem { Segment = new Vector4F(x, y, 0, 0) };
+            // THE POINT AFTER IT, so the record is a whole segment and its quad can be built from it alone. The last
+            // point has nobody after it: it carries itself, and draws nothing - the segment before it already reaches
+            // that far, cap and all.
+            var last = i == points - 1;
+            var bx = last ? ax : ink.Points[i + 1].X * sx + tx;
+            var by = last ? ay : ink.Points[i + 1].Y * sy + ty;
+
+            Items[Count++] = new InkSegmentItem
+            {
+                Segment = new Vector4F(ax, ay, bx, by),
+                // .w is WHICH SEGMENT this is, counted from ONE - and a non-zero .w is also what says this record
+                // draws. Zero on the last point of a stroke, which has no segment of its own; and one on a stroke of a
+                // single point, which is a dot and draws its segment from itself to itself.
+                Params = new Vector4F(half, transformSlot, fadeSlot, last && points > 1 ? 0 : i + 1),
+                // RELATIVE to THIS record, never absolute - and negative for every record but the first. The draw
+                // offsets the buffer address by the first instance of the run it is flushing, so inside the shader
+                // index 0 is the run's start and not the array's; an absolute index is only right while a run happens
+                // to begin at zero, and reads somebody else's record as soon as one does not.
+                Clip = new Vector4F(clipSlot, points, first - at, 0),
+                Color = color
+            };
         }
-
-        Items[header] = new InkSegmentItem
-        {
-            Segment = new Vector4F(lowX, lowY, highX, highY),
-            Params = new Vector4F(half, transformSlot, fadeSlot, 1),   // .w 1 = this record draws
-            // RELATIVE to the header, never absolute. The draw offsets the buffer address by the first instance of the
-            // run it is flushing, so inside the shader index 0 is the run's start and not the array's - an absolute
-            // index is only right while a run happens to begin at zero, and reads somebody else's record as soon as one
-            // does not.
-            Clip = new Vector4F(clipSlot, points, first - header, 0),
-            Color = color
-        };
 
         MarkPending(scissor, logicalBounds);
 
         return true;
     }
+
+    /// <summary>HOW FAR THE STROKE STRAYS from every <see cref="Stride"/>-th point of itself - what lets a fragment far
+    /// from the ink say so without asking about every point.
+    /// <para>The fragment's cost is the whole polyline, and it is paid by every pixel of the stroke's BOX. A stroke is a
+    /// thin ribbon in a box it fills a twentieth of, so almost every one of those pixels walks two hundred points to
+    /// find out it is nowhere near any of them. Given this number it can walk a sixteenth of them first: the real
+    /// polyline never leaves this distance from the coarse one, so anything farther than it from the coarse line is
+    /// farther than the ink from the real one, and can stop.</para>
+    /// <para>Measured on the coarse SEGMENTS rather than on their end points - the sagitta of a hand-drawn arc is a
+    /// fraction of the chord it bulges from, and the tighter this number is, the more pixels get to stop early.</para>
+    /// </summary>
+    private float Spread(int first, int points)
+    {
+        if (points < Stride * 2) return -1;   // fewer points than a coarse walk saves: none is taken
+
+        var most = 0f;
+
+        for (var at = 0; at < points - 1; at += Stride)
+        {
+            var next = Math.Min(at + Stride, points - 1);
+
+            var ax = Items[first + at].Segment.X;
+            var ay = Items[first + at].Segment.Y;
+            var bx = Items[first + next].Segment.X;
+            var by = Items[first + next].Segment.Y;
+
+            var dx = bx - ax;
+            var dy = by - ay;
+            var span = dx * dx + dy * dy;
+
+            for (var i = at + 1; i < next; i++)
+            {
+                var px = Items[first + i].Segment.X - ax;
+                var py = Items[first + i].Segment.Y - ay;
+
+                var t = span > 1e-12f ? Math.Clamp((px * dx + py * dy) / span, 0f, 1f) : 0f;
+                var offX = px - dx * t;
+                var offY = py - dy * t;
+
+                var away = MathF.Sqrt(offX * offX + offY * offY);
+                if (away > most) most = away;
+            }
+        }
+
+        return most;
+    }
+
+    /// <summary>How many points a coarse step skips. Sixteen because the saving is what the coarse walk does NOT do and
+    /// the cost is the spread it opens up: too fine saves nothing, too coarse bulges so far from the ink that no pixel
+    /// is ever allowed to stop.</summary>
+    internal const int Stride = 16;
 
     /// <summary>Bake one unit into the patch stage - see BatchArena. Ink does not patch: a stroke is many instances and
     /// the stage repairs one, so a stroke that changed is re-recorded like anything else.</summary>

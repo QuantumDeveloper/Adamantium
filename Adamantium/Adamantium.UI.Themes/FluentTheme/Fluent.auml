@@ -47,9 +47,10 @@
         <StyleInclude Source="{x:Type fluent:ScrollBarStyleSet}"/>
         <StyleInclude Source="{x:Type fluent:ScrollViewerStyleSet}"/>
         <StyleInclude Source="{x:Type fluent:ZoomBoxStyleSet}"/>
+        <!-- The canvas AND everything that only exists inside one - its panes, its bars, its nodes - in a single set:
+             they are not controls anybody uses on their own, so a style of theirs is never something to go looking for
+             anywhere but here. -->
         <StyleInclude Source="{x:Type fluent:InfiniteCanvasStyleSet}"/>
-        <StyleInclude Source="{x:Type fluent:CanvasPaneStyleSet}"/>
-        <StyleInclude Source="{x:Type fluent:CanvasNodeStyleSet}"/>
         <StyleInclude Source="{x:Type fluent:ToggleButtonStyleSet}"/>
         <StyleInclude Source="{x:Type fluent:CheckBoxStyleSet}"/>
         <StyleInclude Source="{x:Type fluent:RadioButtonStyleSet}"/>

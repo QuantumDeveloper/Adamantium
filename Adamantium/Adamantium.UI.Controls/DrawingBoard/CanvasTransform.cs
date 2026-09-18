@@ -44,8 +44,17 @@ public readonly struct CanvasTransform : IEquatable<CanvasTransform>
 
         // SKEW first, then the turn. The other order is a different transform - and this is the order every drawing
         // program states it in, so a number typed into a panel means what the person typing it expects.
-        if (SkewX != 0) x += y * Math.Tan(SkewX * Math.PI / 180);
-        if (SkewY != 0) y += x * Math.Tan(SkewY * Math.PI / 180);
+        //
+        // BOTH LEANS FROM THE SAME x AND y, which is what a shear IS - and what this engine's own Transform and WPF's
+        // SkewTransform both do. Shearing x and then shearing y by the NEW x is a different transform: with one lean
+        // the two agree, with two they walk apart, and a shape leaning both ways was drawn away from the frame round
+        // it and from the point a press was asked about.
+        if (SkewX != 0 || SkewY != 0)
+        {
+            var leaned = x + y * Math.Tan(SkewX * Math.PI / 180);
+            y += x * Math.Tan(SkewY * Math.PI / 180);
+            x = leaned;
+        }
 
         if (Angle != 0)
         {
@@ -78,10 +87,46 @@ public readonly struct CanvasTransform : IEquatable<CanvasTransform>
             (x, y) = (x * cos - y * sin, x * sin + y * cos);
         }
 
-        if (SkewY != 0) y -= x * Math.Tan(SkewY * Math.PI / 180);
-        if (SkewX != 0) x -= y * Math.Tan(SkewX * Math.PI / 180);
+        // The shear UNDONE as a pair, because it was done as a pair: taking one lean out and then the other from the
+        // half-undone number is not the inverse of shearing both at once.
+        if (SkewX != 0 || SkewY != 0)
+        {
+            var leanX = Math.Tan(SkewX * Math.PI / 180);
+            var leanY = Math.Tan(SkewY * Math.PI / 180);
+            var room = 1 - leanX * leanY;
+
+            // Flat: the two leans together have squashed the plane onto a line, and nothing can be taken back out of
+            // it. The point is left where it is rather than divided by nothing.
+            if (Math.Abs(room) > 1e-9)
+            {
+                var straight = (x - y * leanX) / room;
+                y = (y - x * leanY) / room;
+                x = straight;
+            }
+        }
 
         return new Vector2(about.X + x, about.Y + y);
+    }
+
+    /// <summary>The same statement as a MATRIX, about a point - what a renderer needs, and worked out here so that
+    /// pixels and everything that reasons about the shape cannot drift apart.
+    /// <para>Row-vector convention (v * M), the same one <c>TransformValues</c> composes a control's transform in - so
+    /// a shape drawn with this matrix, a control turned by the engine's own Transform, the frame round either and the
+    /// point a press is asked about are all one arithmetic.</para></summary>
+    public Matrix4x4F Matrix(Vector2 about)
+    {
+        var lean = Matrix4x4F.Identity;
+
+        if (SkewX != 0 || SkewY != 0)
+        {
+            lean.M21 = (float)Math.Tan(SkewX * Math.PI / 180);
+            lean.M12 = (float)Math.Tan(SkewY * Math.PI / 180);
+        }
+
+        return Matrix4x4F.Translation((float)-about.X, (float)-about.Y, 0)
+               * lean
+               * Matrix4x4F.RotationZ((float)(Angle * Math.PI / 180))
+               * Matrix4x4F.Translation((float)about.X, (float)about.Y, 0);
     }
 
     public bool Equals(CanvasTransform other) =>

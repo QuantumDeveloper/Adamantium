@@ -1886,4 +1886,26 @@ public class PropertyGridTests
 
         TestContext.Out.WriteLine(System.IO.File.ReadAllText(report));
     }
+
+    // A WRITE IS ANNOUNCED TWICE - before and after - and that is ALL an inspector owes anybody. What becomes of it is
+    // not its business: it knows nothing of planes, scenes or histories, and must not, or every inspector in the
+    // application would carry a canvas's vocabulary. Whoever cares listens - see InfiniteCanvas.Inspector.
+    [Test]
+    public void AWriteIsAnnouncedBeforeAndAfter()
+    {
+        var target = new Target { Scale = 3 };
+        var scale = new NumericProperty { Header = "Scale", Binding = new Binding("Scale") };
+
+        var grid = Built(Section(target, scale));
+
+        var said = new List<string>();
+
+        grid.ValueChanging += (_, about) => said.Add($"before {grid.ValueOf(target, about.Property)}");
+        grid.ValueChanged += (_, about) => said.Add($"after {grid.ValueOf(target, about.Property)}");
+
+        grid.Write(RowOf(grid, scale), 10.0);
+
+        Assert.That(said, Is.EqualTo(new[] { "before 3", "after 10" }),
+            "the value before the write exists only between the two, and that is what undo is made of");
+    }
 }

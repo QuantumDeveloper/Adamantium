@@ -55,6 +55,10 @@ public partial class CanvasNodeViewModel : ICanvasNode
 
     public TrackingCollection<ICanvasSocket> Outputs { get; } = new();
 
+    /// <summary>A socket of THIS graph's own kind, for the inspector's plus - the canvas holds no socket type to fall
+    /// back on, so the node that would own it is the one asked to make it.</summary>
+    public ICanvasSocket NewSocket(string name) => new CanvasSocketViewModel { Name = name };
+
     /// <summary>HOW MANY sockets down each side, the number a person sets when they want one more rather than a
     /// particular one. Not a second store - it grows and trims the list itself, keeping the sockets that survive, so
     /// asking for a fourth does not take the names off the first three.</summary>

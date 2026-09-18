@@ -47,7 +47,9 @@ public class ShapeItem : ICanvasItem, ICanvasTransformed, ICanvasPoints
     /// <summary>A second shape just like this one. Everything that makes it what it is, including the two bits that say
     /// which way a run leans and which end it starts at - a copied arrow that pointed the other way would be a copy of
     /// something else.</summary>
-    public ICanvasItem Copy() => new ShapeItem(Shape, World, Stroke, Thickness, Fill)
+    // ...WITH PAINT OF ITS OWN. A copy handed the original's brushes is the same object as far as a colour written
+    // into one goes: recolouring the copy recoloured what it was copied from. See Brush.Copy.
+    public ICanvasItem Copy() => new ShapeItem(Shape, World, Stroke?.Copy(), Thickness, Fill?.Copy())
     {
         Flipped = Flipped,
         Reversed = Reversed,
@@ -99,6 +101,12 @@ public class ShapeItem : ICanvasItem, ICanvasTransformed, ICanvasPoints
     public Brush Stroke { get; set; }
 
     public Brush Fill { get; set; }
+
+    /// <summary>The OUTLINE's colour and not the fill's: a shape is drawn by its edge - an unfilled one has nothing
+    /// else - so the outline is the colour it reads as.</summary>
+    public Color? Paint => (Stroke as SolidColorBrush)?.Color;
+
+    public void PaintWith(Color color) => Stroke = new SolidColorBrush(color);
 
     /// <summary>How wide the outline is, in WORLD units - it belongs to the drawing, so it grows with the zoom. The
     /// tool states it in screen pixels and converts, the same division the pen makes.</summary>
@@ -471,7 +479,7 @@ public class ShapeItem : ICanvasItem, ICanvasTransformed, ICanvasPoints
                 // THROUGH THE ARROW PASS when the colour is a plain one, which is what a line on a plane always is: the
                 // whole shape - shaft and both heads - is then decided per pixel from these two points, with no
                 // geometry built, kept or handed over. A line is the same thing with nothing on its ends.
-                if (Paint(session, from, to, width)) return;
+                if (PaintRun(session, from, to, width)) return;
 
                 // A line and an arrow are drawn from their END POINTS, so a turn is applied to those rather than to a
                 // geometry - which is also what keeps the head pointing along the line it is on.
@@ -535,11 +543,9 @@ public class ShapeItem : ICanvasItem, ICanvasTransformed, ICanvasPoints
     // those are turned where they are worked out instead.
     private bool Turned(IDrawingSession session, Rect path, Pen pen, double width, InfiniteCanvas canvas)
     {
-        var middle = canvas.WorldToScreen(Middle);
-        var turn = Matrix4x4F.Translation((float)-middle.X, (float)-middle.Y, 0)
-                   * Lean()
-                   * Matrix4x4F.RotationZ((float)(Transform.Angle * Math.PI / 180))
-                   * Matrix4x4F.Translation((float)middle.X, (float)middle.Y, 0);
+        // ASKED OF THE TRANSFORM ITSELF, so what is drawn, what is picked and the frame drawn round it are one
+        // statement rather than three that have to agree.
+        var turn = Transform.Matrix(canvas.WorldToScreen(Middle));
 
         switch (Shape)
         {
@@ -563,18 +569,6 @@ public class ShapeItem : ICanvasItem, ICanvasTransformed, ICanvasPoints
             default:
                 return false;
         }
-    }
-
-    // The skew half of the matrix, written out because a shear is not one of the ready-made rotations.
-    private Matrix4x4F Lean()
-    {
-        if (Transform.SkewX == 0 && Transform.SkewY == 0) return Matrix4x4F.Identity;
-
-        var lean = Matrix4x4F.Identity;
-        lean.M21 = (float)Math.Tan(Transform.SkewX * Math.PI / 180);
-        lean.M12 = (float)Math.Tan(Transform.SkewY * Math.PI / 180);
-
-        return lean;
     }
 
     // Which corners of the box the line actually runs between, in WORLD units.
@@ -625,7 +619,7 @@ public class ShapeItem : ICanvasItem, ICanvasTransformed, ICanvasPoints
     /// </summary>
     public static bool PaintsRuns = true;
 
-    private bool Paint(IDrawingSession session, Vector2 from, Vector2 to, double width)
+    private bool PaintRun(IDrawingSession session, Vector2 from, Vector2 to, double width)
     {
         if (!PaintsRuns) return false;
         if (Transform.IsSomething || Stroke is not SolidColorBrush solid || width <= 0) return false;

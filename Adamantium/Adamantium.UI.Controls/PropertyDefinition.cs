@@ -105,6 +105,10 @@ public abstract class PropertyDefinition : FundamentalUIComponent
     /// <summary>Raised when something a row has to redraw itself for changed - visibility, or the children collection.</summary>
     internal event EventHandler LayoutChanged;
 
+    // Says the line has to be built again. Here rather than in each definition because an event can only be raised by
+    // the type that declares it, and what a kind of line changes shape for is the kind's own business.
+    private protected void Relayout() => LayoutChanged?.Invoke(this, EventArgs.Empty);
+
     public object Header
     {
         get => GetValue(HeaderProperty);
@@ -395,16 +399,22 @@ public class BooleanProperty : PropertyDefinition
 public class ChoiceProperty : PropertyDefinition
 {
     public static readonly AdamantiumProperty ItemsSourceProperty = AdamantiumProperty.Register(nameof(ItemsSource),
-        typeof(IEnumerable), typeof(ChoiceProperty), new PropertyMetadata(null));
+        typeof(IEnumerable), typeof(ChoiceProperty), new PropertyMetadata(null, OnChoicesChanged));
 
     public static readonly AdamantiumProperty EnumTypeProperty = AdamantiumProperty.Register(nameof(EnumType),
-        typeof(Type), typeof(ChoiceProperty), new PropertyMetadata(null));
+        typeof(Type), typeof(ChoiceProperty), new PropertyMetadata(null, OnChoicesChanged));
 
     /// <summary>The property of an item that IS the value, when the list is of objects and the line binds one of their
     /// fields - a catalogue of node kinds against a node's own word for its kind. Empty means the item itself is the
     /// value, which is the ordinary case.</summary>
     public static readonly AdamantiumProperty ValuePathProperty = AdamantiumProperty.Register(nameof(ValuePath),
-        typeof(String), typeof(ChoiceProperty), new PropertyMetadata(null));
+        typeof(String), typeof(ChoiceProperty), new PropertyMetadata(null, OnChoicesChanged));
+
+    // The list a line offers ARRIVES - a page states its catalogue with a binding, and a binding is pushed after the
+    // panel holding the line has been built. A row made over an empty list keeps offering nothing and shows nothing for
+    // the value it holds, which is a drop-down standing blank beside an object that plainly has one.
+    private static void OnChoicesChanged(AdamantiumComponent component, AdamantiumPropertyChangedEventArgs e) =>
+        (component as ChoiceProperty)?.Relayout();
 
     public String ValuePath
     {

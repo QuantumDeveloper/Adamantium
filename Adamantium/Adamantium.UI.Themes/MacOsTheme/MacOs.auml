@@ -61,9 +61,8 @@
         <StyleInclude Source="{x:Type mac:MacOsToolTipStyleSet}"/>
         <StyleInclude Source="{x:Type mac:MacOsKeyTipAdornerStyleSet}"/>
         <StyleInclude Source="{x:Type mac:MacOsZoomBoxStyleSet}"/>
+        <!-- The canvas AND everything that only exists inside one - see Fluent's list. -->
         <StyleInclude Source="{x:Type mac:MacOsInfiniteCanvasStyleSet}"/>
-        <StyleInclude Source="{x:Type mac:MacOsCanvasPaneStyleSet}"/>
-        <StyleInclude Source="{x:Type mac:MacOsCanvasNodeStyleSet}"/>
         <StyleInclude Source="{x:Type mac:MacOsTilesHostStyleSet}"/>
         <StyleInclude Source="{x:Type mac:MacOsFlipTileStyleSet}"/>
         <StyleInclude Source="{x:Type mac:MacOsGridSplitterStyleSet}"/>

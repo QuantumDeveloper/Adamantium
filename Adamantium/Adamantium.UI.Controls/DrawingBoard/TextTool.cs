@@ -59,7 +59,7 @@ public class TextTool : ICanvasTool
         }
         else
         {
-            _editing = new TextItem(e.World, string.Empty, canvas.Ink,
+            _editing = new TextItem(e.World, string.Empty, canvas.Ink?.Copy(),
                 canvas.ScreenToWorldLength(canvas.TextSize));
             _fresh = true;
         }

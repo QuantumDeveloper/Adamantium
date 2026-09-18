@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using Adamantium.Mathematics;
 using Adamantium.UI.Controls.Panels;
@@ -14,6 +14,13 @@ namespace Adamantium.UI.Controls.DrawingBoard;
 /// has to know where its usable middle actually is.</para></summary>
 public class CanvasChromeLayer : Panel
 {
+    // THE PANES THIS LAYER PLACES - the canvas's own, declared in its template beside the layers. A canvas dresses
+    // itself - the rail, the inspector, the view bar are what an editor IS - so those panes are parts of the template
+    // like any other, and not something every application has to write out again.
+    //
+    // ORDER IS THE TEMPLATE'S and is left alone: children later in the collection draw over earlier ones, so a theme
+    // saying which panel is in front is a matter of which line it is written on. Hence the SELECTION bar comes first
+    // there - it is a passing label and must not cover the furniture it lands on.
     private readonly List<CanvasPane> _panes = new();
 
     /// <summary>NOT ITSELF A TARGET. A panel in this engine catches the mouse across its whole box whether or not it has
@@ -47,15 +54,75 @@ public class CanvasChromeLayer : Panel
         set => SetValue(PaneGapProperty, value);
     }
 
-    /// <summary>The canvas whose viewport and selection this layer places against.</summary>
-    public InfiniteCanvas Owner { get; set; }
+    private InfiniteCanvas _owner;
 
-    /// <summary>Puts the layer's children in step with the panes it should be showing. Cheap to call - it returns
-    /// having done nothing when the set is unchanged.</summary>
-    public void Sync(CanvasPanes panes)
+    /// <summary>The canvas whose viewport and selection this layer places against. Setting it tells the panes, which
+    /// may well have arrived before it did.</summary>
+    public InfiniteCanvas Owner
     {
-        if (Same(panes)) return;
+        get => _owner;
+        set
+        {
+            if (ReferenceEquals(_owner, value)) return;
 
+            _owner = value;
+            Gather();
+        }
+    }
+
+    /// <summary>Puts the layer in step with the panes it should be showing: the canvas's own, and the one it may be
+    /// holding up right now. Cheap to call - it returns having done nothing when nothing has changed.</summary>
+    public void Sync()
+    {
+        Gather();
+        InvalidateMeasure();
+    }
+
+    // WHOSE THEY ARE, told to each pane that has not been told yet.
+    private void Gather()
+    {
+        var changed = false;
+
+        foreach (var child in Children)
+        {
+            if (child is not CanvasPane pane) continue;
+
+            if (!ReferenceEquals(pane.Layer, this))
+            {
+                pane.Layer = this;
+                changed = true;
+            }
+
+            if (!ReferenceEquals(pane.Canvas, Owner))
+            {
+                pane.Canvas = Owner;
+                changed = true;
+            }
+
+            if (!_panes.Contains(pane))
+            {
+                _panes.Add(pane);
+                changed = true;
+            }
+        }
+
+        // ...and let go of any that left, so a template swap does not leave the layer placing panes that are gone.
+        for (var i = _panes.Count - 1; i >= 0; i--)
+        {
+            if (Children.Contains(_panes[i])) continue;
+
+            _panes[i].Layer = null;
+            _panes[i].Canvas = null;
+            _panes.RemoveAt(i);
+            changed = true;
+        }
+
+        if (changed) SyncSelection();
+    }
+
+    /// <summary>Lets go of every pane - what a canvas does when its template is taken away.</summary>
+    public void Release()
+    {
         foreach (var pane in _panes)
         {
             pane.Layer = null;
@@ -63,36 +130,6 @@ public class CanvasChromeLayer : Panel
         }
 
         _panes.Clear();
-        Children.Clear();
-
-        // FOLLOWERS FIRST, and that is a z-order rule rather than a list one: children later in the collection draw
-        // over earlier ones, and a pane anchored to an edge is furniture while one that rides the selection is a
-        // passing label. The label must not cover the furniture - a bar landing on the inspector hides the very rows
-        // it was opened to change. Order among equals is kept, so the markup still decides everything else.
-        if (panes != null)
-        {
-            foreach (var pane in panes)
-            {
-                if (pane.Placement == CanvasPanePlacement.Selection) Take(pane);
-            }
-
-            foreach (var pane in panes)
-            {
-                if (pane.Placement != CanvasPanePlacement.Selection) Take(pane);
-            }
-        }
-
-        SyncSelection();
-        InvalidateMeasure();
-    }
-
-    private void Take(CanvasPane pane)
-    {
-        pane.Layer = this;
-        pane.Canvas = Owner;
-
-        _panes.Add(pane);
-        Children.Add(pane);
     }
 
     /// <summary>Show or hide the panes that FOLLOW the selection. Called when the selection changes, and deliberately
@@ -106,8 +143,9 @@ public class CanvasChromeLayer : Panel
         {
             if (pane.Placement != CanvasPanePlacement.Selection) continue;
 
-            var wanted = anything ? Visibility.Visible : Visibility.Collapsed;
-            if (pane.Visibility != wanted) pane.Visibility = wanted;
+            // A CURRENT value: a pane may have its own reason bound here - the node list follows whether it was asked
+            // for - and the Local slot the plain setter writes would mask that binding for good.
+            pane.SetCurrentValue(CanvasPane.IsNeededProperty, anything);
         }
     }
 
@@ -132,6 +170,18 @@ public class CanvasChromeLayer : Panel
         return new Thickness(left, top, right, bottom);
     }
 
+    public CanvasChromeLayer()
+    {
+        // A PART AND ITS OWN CHILDREN DO NOT ARRIVE TOGETHER: the layer is found by name the moment the canvas's
+        // template is applied, and its panes are built after that. Taking them up right then took up an EMPTY set - the
+        // panes stood in the tree, nothing ever placed them, and a canvas came up wearing its tool rail and nothing
+        // else. So the layer listens instead of asking once.
+        //
+        // HERE and not in the measure pass: taking a pane up settles whether it is on screen, and Visibility is a
+        // layout INPUT - written while laying out, it invalidates the very pass that wrote it.
+        Children.CollectionChanged += (_, _) => Gather();
+    }
+
     protected override Size MeasureOverride(Size availableSize)
     {
         var width = Double.IsInfinity(availableSize.Width) ? 0 : availableSize.Width;
@@ -146,6 +196,7 @@ public class CanvasChromeLayer : Panel
 
     protected override Size ArrangeOverride(Size finalSize)
     {
+
         var inset = PaneInset;
         var gap = PaneGap;
 
@@ -282,16 +333,4 @@ public class CanvasChromeLayer : Panel
     private double Centered(CanvasPanePlacement placement, double room, double gap) =>
         Math.Max(0, (room - Total(placement, gap, false)) / 2);
 
-    private bool Same(CanvasPanes panes)
-    {
-        var count = panes?.Count ?? 0;
-        if (count != _panes.Count) return false;
-
-        for (var i = 0; i < count; i++)
-        {
-            if (!ReferenceEquals(panes[i], _panes[i])) return false;
-        }
-
-        return true;
-    }
 }

@@ -57,7 +57,7 @@ public class PenTool : ICanvasTool
         {
             if (_drawing == null)
             {
-                _drawing = new StrokeItem(e.World, canvas.Ink, canvas.ScreenToWorldLength(canvas.InkThickness));
+                _drawing = new StrokeItem(e.World, canvas.Ink.Copy(), canvas.ScreenToWorldLength(canvas.InkThickness));
                 _drawing.Add(e.World);
                 _chaining = true;
             }
@@ -71,7 +71,7 @@ public class PenTool : ICanvasTool
             return;
         }
 
-        _drawing = new StrokeItem(e.World, canvas.Ink, canvas.ScreenToWorldLength(canvas.InkThickness));
+        _drawing = new StrokeItem(e.World, canvas.Ink.Copy(), canvas.ScreenToWorldLength(canvas.InkThickness));
         _drawing.Add(e.World);
 
         canvas.CaptureMouse();

@@ -5,6 +5,7 @@ using System.ComponentModel;
 using System.Threading;
 using System.Threading.Tasks;
 using Adamantium.Core.Collections;
+using Adamantium.UI.Core;
 
 namespace Adamantium.UI.Controls.DrawingBoard;
 
@@ -364,6 +365,16 @@ public sealed class CanvasGraphRunner : IDisposable
         if (_scheduled) return;
 
         _scheduled = true;
+
+        // ONTO THE LOOP THREAD, where the graph itself lives. A SynchronizationContext here is the DISPATCHER's, and
+        // that one marshals onto the message-pump thread - so the pass walked the very sockets and nodes the loop
+        // thread was editing. Two threads in one graph is corruption waiting to be noticed; it showed up first as a
+        // freeze, with the pump inside a pass and the loop inside a wire being cut.
+        if (UIAppContext.Current?.Dispatcher is { } dispatcher)
+        {
+            dispatcher.Post(() => Pump(null));
+            return;
+        }
 
         // Captured late as well as early: an object built before its thread has a context of its own would otherwise
         // never find one.

@@ -14,9 +14,16 @@ namespace Adamantium.UITests;
 /// button switches itself off when there is nothing to do, because the command says so.</para></summary>
 public class CanvasCommandTests
 {
+    // IN A WINDOW, because the canvas asks its questions in the engine's own overlay dialog - and an overlay is shown
+    // on a window. A canvas measured on its own has nowhere to put a question, which is a different state and not the
+    // one a person is ever in.
     private static (InfiniteCanvas Canvas, CanvasScene Scene) Stage()
     {
         var canvas = new InfiniteCanvas();
+        var window = new Window { Width = 800, Height = 600, Content = canvas };
+
+        Adamantium.UI.Extensions.WindowExtension.UpdateTree(window);
+
         canvas.Measure(new Size(800, 600), force: true);
         canvas.Arrange(new Rect(0, 0, 800, 600));
 
@@ -167,15 +174,13 @@ public class CanvasCommandTests
 
         canvas.ConfirmsDelete = true;
 
-        var panes = canvas.Chrome.Count;
-
         Assert.That(canvas.DeleteCommand.CanExecute(), Is.True);
         canvas.DeleteCommand.Execute();
 
         Assert.Multiple(() =>
         {
             Assert.That(scene.Items, Has.Count.EqualTo(1), "it was taken out before the question was answered");
-            Assert.That(canvas.Chrome, Has.Count.EqualTo(panes + 1), "nothing was asked");
+            Assert.That(canvas.IsAsking, Is.True, "nothing was asked");
         });
     }
 
@@ -187,14 +192,213 @@ public class CanvasCommandTests
         scene.Add(item);
         canvas.SelectMany(new ICanvasItem[] { item }, false);
 
-        var panes = canvas.Chrome.Count;
-
         canvas.DeleteCommand.Execute();
 
         Assert.Multiple(() =>
         {
             Assert.That(scene.Items, Is.Empty, "the plain delete asked instead of deleting");
-            Assert.That(canvas.Chrome, Has.Count.EqualTo(panes), "a question was put up that nobody asked for");
+            Assert.That(canvas.IsAsking, Is.False, "a question was put up that nobody asked for");
         });
+    }
+
+    // THE QUESTION IS THE ENGINE'S OWN DIALOG - the modal overlay window everything else in an application asks with,
+    // put up on the window the canvas stands in. Not a plate of the canvas's own invention: a second kind of dialog is
+    // a second thing for a person to learn, and it read as one.
+    [Test]
+    public void TheQuestionIsAskedInTheOverlayDialog()
+    {
+        var canvas = new InfiniteCanvas { Scene = new CanvasScene() };
+        var window = new Window { Width = 800, Height = 600, Content = canvas };
+
+        Adamantium.UI.Extensions.WindowExtension.UpdateTree(window);
+        canvas.Measure(new Size(800, 600), force: true);
+        canvas.Arrange(new Rect(0, 0, 800, 600));
+
+        canvas.Scene.Add(Box(0, 0));
+        canvas.ConfirmsDelete = true;
+
+        canvas.ClearCommand.Execute();
+
+        var asked = Overlays(window);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(canvas.IsAsking, Is.True, "nothing was asked");
+            Assert.That(asked, Has.Count.EqualTo(1), "the question was not put in an overlay dialog");
+            Assert.That(asked.Count > 0 ? asked[0].Title : null, Is.EqualTo("Clear the canvas"),
+                "the dialog does not say what it is about");
+        });
+    }
+
+    private static System.Collections.Generic.List<OverlayWindow> Overlays(Window window)
+    {
+        var found = new System.Collections.Generic.List<OverlayWindow>();
+
+        foreach (var root in window.PopupRoots) Gather(root, found);
+
+        return found;
+    }
+
+    private static void Gather(IUIComponent within, System.Collections.Generic.List<OverlayWindow> into)
+    {
+        if (within is OverlayWindow overlay) into.Add(overlay);
+
+        foreach (var child in within.VisualChildren)
+        {
+            if (child is IUIComponent visual) Gather(visual, into);
+        }
+    }
+
+    // A BUTTON IS ASKED AGAIN when what it answers from moves. A command left out of that list is asked exactly once -
+    // while nothing is selected and the plane is empty - and its button is then grey for the rest of the session,
+    // whatever is picked afterwards. Which is what "the buttons are disabled for no reason" was.
+    [Test]
+    public void EveryCommandSaysItCanBePressedAgainWhenTheSelectionChanges()
+    {
+        var (canvas, scene) = Stage();
+
+        var told = new System.Collections.Generic.List<string>();
+
+        void Watch(string name, CanvasCommand command) =>
+            command.CanExecuteChanged += (_, _) => told.Add(name);
+
+        Watch("align", canvas.AlignCommand);
+        Watch("spread", canvas.SpreadCommand);
+        Watch("frame", canvas.FrameCommand);
+        Watch("clear", canvas.ClearCommand);
+        Watch("delete", canvas.DeleteCommand);
+
+        var one = Box(0, 0);
+        var two = Box(200, 0);
+        var three = Box(400, 0);
+
+        scene.Add(one);
+        scene.Add(two);
+        scene.Add(three);
+        canvas.SelectMany(new ICanvasItem[] { one, two, three }, false);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(told, Does.Contain("align"), "the lining-up button was never asked again");
+            Assert.That(told, Does.Contain("spread"), "the spreading button was never asked again");
+            Assert.That(told, Does.Contain("frame"), "the framing button was never asked again");
+            Assert.That(told, Does.Contain("clear"), "the bin was never asked again");
+            Assert.That(told, Does.Contain("delete"), "the delete button was never asked again");
+
+            // ...and what they answer NOW is what the state says.
+            Assert.That(canvas.AlignCommand.CanExecute("Left"), Is.True);
+            Assert.That(canvas.SpreadCommand.CanExecute("Vertical"), Is.True);
+            Assert.That(canvas.FrameCommand.CanExecute(), Is.True);
+            Assert.That(canvas.ClearCommand.CanExecute(), Is.True);
+        });
+    }
+
+    // LINING UP, as a button says it: one command and the edge as its word, so a theme's four buttons are four lines of
+    // markup and not four properties to keep in step.
+    [Test]
+    public void AligningTakesTheEdgeAsAWord()
+    {
+        var (canvas, scene) = Stage();
+        var left = Box(10, 0);
+        var right = Box(200, 300);
+
+        scene.Add(left);
+        scene.Add(right);
+        canvas.SelectMany(new ICanvasItem[] { left, right }, false);
+
+        Assert.That(canvas.AlignCommand.CanExecute("Left"), Is.True);
+        canvas.AlignCommand.Execute("Left");
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(right.Bounds.X, Is.EqualTo(left.Bounds.X).Within(1e-9), "the edges were not lined up");
+            Assert.That(canvas.AlignCommand.CanExecute("sideways"), Is.False, "a word that is no edge went through");
+        });
+    }
+
+    [Test]
+    public void LiningUpNeedsTwoThingsAndSpreadingThree()
+    {
+        var (canvas, scene) = Stage();
+        var one = Box(10, 0);
+
+        scene.Add(one);
+        canvas.SelectMany(new ICanvasItem[] { one }, false);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(canvas.AlignCommand.CanExecute("Left"), Is.False, "one thing was offered lining up");
+            Assert.That(canvas.SpreadCommand.CanExecute("Vertical"), Is.False, "one thing was offered spreading out");
+        });
+    }
+
+    // A COMMENT FRAME round what is selected, and the frame is then what is selected - the same as drawing one by hand.
+    [Test]
+    public void FramingDrawsOneRoundTheSelection()
+    {
+        var (canvas, scene) = Stage();
+        var item = Box(0, 0);
+
+        scene.Add(item);
+        canvas.SelectMany(new ICanvasItem[] { item }, false);
+
+        Assert.That(canvas.FrameCommand.CanExecute(), Is.True);
+        canvas.FrameCommand.Execute("Notes");
+
+        var frame = scene.Items.OfType<CanvasFrameItem>().SingleOrDefault();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(frame, Is.Not.Null, "no frame was drawn");
+            Assert.That(frame?.Title, Is.EqualTo("Notes"), "the frame was not given the title the button asked for");
+        });
+    }
+
+    // EMPTYING THE PLANE goes through the same question as deleting a selection - and through the history, because it
+    // is the action most worth being able to take back.
+    [Test]
+    public void ClearingEmptiesThePlaneAndAsksWhenToldTo()
+    {
+        var (canvas, scene) = Stage();
+
+        scene.Add(Box(0, 0));
+        scene.Add(Box(100, 100));
+
+        canvas.ConfirmsDelete = true;
+
+        Assert.That(canvas.ClearCommand.CanExecute(), Is.True);
+        canvas.ClearCommand.Execute();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(scene.Items, Has.Count.EqualTo(2), "the plane was emptied before the question was answered");
+            Assert.That(canvas.IsAsking, Is.True, "nothing was asked");
+        });
+
+        canvas.ConfirmsDelete = false;
+        canvas.Clear();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(scene.Items, Is.Empty, "the plane was not emptied");
+            Assert.That(canvas.ClearCommand.CanExecute(), Is.False, "the bin stayed on over an empty plane");
+        });
+    }
+
+    // ...AND IN A DRAWING TOO. The bin is about the canvas rather than about the mode it is being used in, so what it
+    // can do is answered from the SCENE and not from what the mode is showing.
+    [Test]
+    public void TheBinIsOfferedInEitherMode()
+    {
+        var (canvas, scene) = Stage();
+
+        canvas.Mode = CanvasMode.Nodes;
+        scene.Add(Box(0, 0));
+
+        Assert.That(canvas.ClearCommand.CanExecute(), Is.True, "a plane with a drawing on it read as empty");
+
+        canvas.ClearCommand.Execute();
+
+        Assert.That(scene.Items, Is.Empty, "the drawing was left behind by a graph's bin");
     }
 }
