@@ -44,6 +44,7 @@ public partial class InfiniteCanvasViewModel : TabPageViewModel
         Tools.Add(ButtonTool);
         Tools.Add(CheckTool);
         Tools.Add(BoxTool);
+        Tools.Add(TextureTool);
         Tools.Add(NodeTool);
 
         // A GRAPH THAT WORKS, there from the start: two colors and an amount go into a mix, the mix is dimmed, and the
@@ -261,6 +262,11 @@ public partial class InfiniteCanvasViewModel : TabPageViewModel
     public ICanvasTool BoxTool { get; } =
         new ElementTool(() => new TextBox { Text = "Editable" }, new Size(160, 30))
         { Name = "Text box", Icon = "ToolTextBoxIcon", Description = "drag out a text box" };
+
+    /// <summary>A TEXTURE - a surface to paint a picture on. The engine's own tool, not one of this page's: what it
+    /// puts down is a plain fill and the file is chosen afterwards in the panel, so there is nothing here to
+    /// decide.</summary>
+    public ICanvasTool TextureTool { get; } = new TextureTool();
 
     /// <summary>A NODE of a graph. The same tool as the three above and not a mechanism of its own: a node IS a
     /// control, which was the point of building it as one - so putting it on the plane needs nothing the canvas did not

@@ -253,6 +253,14 @@
                          StrokeThickness="1.1"/>
     </DrawingImage>
 
+    <!-- A PICTURE: the frame, the little sun and the hill every photo icon has been since icons began - read at a
+         glance and never mistaken for the comment frame beside it, which has a strip and no contents. -->
+    <DrawingImage x:Key="ToolTextureIcon">
+        <GeometryDrawing Geometry="M1,2 L9,2 L9,8 L1,8 Z M1,6.6 L3.4,4.4 L5.6,6.2 L7,5 L9,6.8 M6.6,3.6 A0.7,0.7 0 1,1 6.6,3.59"
+                         Stroke="{ResourceReference TextFillColorSecondary}"
+                         StrokeThickness="1.1"/>
+    </DrawingImage>
+
     <!-- A COMMENT FRAME: a box with a strip along its top, which is what one looks like on the plane. Not the group
          mark - a group is corner brackets round things that have become one, and a frame is a place things stand in. -->
     <DrawingImage x:Key="FrameIcon">

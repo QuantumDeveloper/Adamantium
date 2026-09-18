@@ -284,13 +284,16 @@ public sealed class BitmapImage : BitmapSource
       return Task.CompletedTask;
    }
 
-   public uint MipLevelsCount => _rawBitmap.MipLevelsCount;
+   // Empty until there IS a bitmap, exactly as FrameCount above - and for a bitmap that never arrived at all: a file
+   // that has been moved or is not a picture leaves this null, and the read then threw on a THREAD-POOL thread out of
+   // an async void, which is not an exception anybody can catch. It took the whole application down.
+   public uint MipLevelsCount => _rawBitmap?.MipLevelsCount ?? 0;
 
    public bool HasMipLevels => MipLevelsCount > 0;
 
    public BitmapFrame GetMipLevel(uint level)
    {
-      var mipData = _rawBitmap.GetMipLevelData(level);
+      var mipData = _rawBitmap?.GetMipLevelData(level);
       if (mipData == null) return null;
       
       return new BitmapFrame(
@@ -306,10 +309,30 @@ public sealed class BitmapImage : BitmapSource
    private void Load(Uri uri)
    {
       var path = uri.OriginalString.Replace("file://", "");
-      var rawImg = BitmapLoader.Load(path);
-      FillData(rawImg);
-      IsLoaded = true;
+
+      // A FILE THAT CANNOT BE READ IS NOT A FAULT IN THE PROGRAM. It is a path somebody typed, a file that has moved,
+      // a drive that is not there - ordinary facts about the world - and this runs on a thread pool thread out of an
+      // async void, where anything thrown takes the whole PROCESS down. An application must not be killed by a
+      // mistyped path.
+      //
+      // The picture simply stays unloaded, which is a state every reader already handles: it has no frames, it draws
+      // nothing, and an element showing it falls back to its ground exactly as it does before any file is chosen.
+      try
+      {
+         var rawImg = BitmapLoader.Load(path);
+         FillData(rawImg);
+         IsLoaded = true;
+      }
+      catch (Exception e)
+      {
+         LoadError = e;
+      }
    }
+
+   /// <summary>Why the file did not load, where it did not. Null while it has not been tried, and null once it has
+   /// loaded - a picture that failed is not a picture that is still coming, and something has to be able to tell the
+   /// difference without watching the clock.</summary>
+   public Exception LoadError { get; private set; }
 
    private void FillData(IRawBitmap rawBitmap)
    {

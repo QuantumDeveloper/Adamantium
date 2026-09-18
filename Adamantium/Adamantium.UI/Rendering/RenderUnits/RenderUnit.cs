@@ -975,7 +975,10 @@ public class ImageRenderUnit : RenderUnit<ImagePayload>
 {
     public ImageRenderUnit(IDrawCommand command, RenderUnitContext context) : base(command, context)
     {
-        var rectangleGeometry = new RectangleGeometry(Payload.DestinationRect);
+        // ITS CORNERS TOO. They were left off here and applied only by UpdateWithDrawCommand, so a picture with
+        // rounded corners was built square and stayed square until something else made it rebuild - which for a
+        // picture that is placed once and never touched is never.
+        var rectangleGeometry = new RectangleGeometry(Payload.DestinationRect, Payload.CornerRadius);
         // Generate the quad's vertices (every other render unit does this in its ctor too). Without it the mesh is
         // empty -> the component's VertexBuffer is null -> UIRenderComponent.Render early-returns and the image is
         // never drawn (this is why images never appeared while text/solid shapes did).

@@ -30,6 +30,39 @@ public class BindingExpression : BindingExpressionBase
    /// <inheritdoc/>
    public override bool IsResolved => ResolvedSource != null && (_bindToSource || _sourceProperty != null);
 
+   /// <inheritdoc/>
+   public override Type SourceType => _sourceProperty?.PropertyType;
+
+   /// <inheritdoc/>
+   public override bool IsSourceEdited
+   {
+      get
+      {
+         var (component, property) = SourceSlot();
+
+         return property != null && component.IsSet(property, ValuePriority.Local);
+      }
+   }
+
+   /// <inheritdoc/>
+   public override bool ResetSource()
+   {
+      var (component, property) = SourceSlot();
+      if (property == null) return false;
+
+      component.ClearValue(property);
+      return true;
+   }
+
+   // The property system's own slot behind the path, where there is one. A plain object's property has none - there is
+   // nothing there that knows what "untouched" means - and the answer is then nothing.
+   private (AdamantiumComponent Component, AdamantiumProperty Property) SourceSlot()
+   {
+      if (ResolvedSource is not AdamantiumComponent component || SourcePropertyName == null) return (null, null);
+
+      return (component, component.GetProperty(SourcePropertyName));
+   }
+
    private PropertyInfo _sourceProperty;
    private Func<object, object> _sourceGetter;   // compiled reader for _sourceProperty (the hot ComputeValue path)
    private bool _bindToSource;   // empty path ({Binding}, {Binding ElementName=x}) -> the value IS the resolved source object

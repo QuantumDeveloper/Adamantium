@@ -1,11 +1,8 @@
-﻿using System;
-using Adamantium.Mathematics;
-using Adamantium.ProceduralGeometry;
+﻿using Adamantium.ProceduralGeometry;
 using Adamantium.UI.Controls.Base;
 using Adamantium.UI.Controls.Text;
 using Adamantium.UI.Core;
 using Adamantium.UI.Core.Graphics;
-using Adamantium.UI.Core.Media;
 
 namespace Adamantium.UI.Controls.DrawingBoard;
 
@@ -197,29 +194,54 @@ public class ElementItem : ICanvasItem, ICanvasTransformed
     /// <para>Here for the same reason <see cref="X"/> is: a corner radius and a thickness are STRUCTS, and a struct
     /// cannot be written half at a time, so an inspector line editing one corner has nothing to bind to.</para>
     /// <para>Zero for a control that has no such property at all - a panel has no border to thicken.</para></summary>
+    /// <summary>The corners of whatever is being shown - ASKED BY NAME, the way a binding asks.
+    /// <para>A button, a border, a rectangle and a picture all round their corners, and none of them inherits the
+    /// property from the others. Listing the types here would be a list to extend for the next one, and an interface
+    /// over them would be a second answer to a question the property system already answers: a component knows its own
+    /// properties by name, which is exactly what {Binding CornerRadius} uses.</para>
+    /// <para>The four corners are separate lines because a CornerRadius is a STRUCT - it cannot be written a quarter at
+    /// a time - which is the one thing a binding cannot do for us.</para></summary>
+    private CornerRadius Corners
+    {
+        get => Rounded(out var component, out var property) ? (CornerRadius)component.GetValue(property) : default;
+        set
+        {
+            if (Rounded(out var component, out var property)) component.SetValue(property, value);
+        }
+    }
+
+    private bool Rounded(out IAdamantiumComponent component, out AdamantiumProperty property)
+    {
+        component = Painted as IAdamantiumComponent;
+        property = component?.GetProperty(nameof(Control.CornerRadius));
+
+        return property != null && property.PropertyType == typeof(CornerRadius);
+    }
+
     public Double CornerTopLeft
     {
-        get => Painted is Control control ? control.CornerRadius.TopLeft : 0;
-        set => SetCorner(value, Painted is Control c ? c.CornerRadius : default, 0);
+        get => Corners.TopLeft;
+        set => SetCorner(value, Corners, 0);
     }
 
     public Double CornerTopRight
     {
-        get => Painted is Control control ? control.CornerRadius.TopRight : 0;
-        set => SetCorner(value, Painted is Control c ? c.CornerRadius : default, 1);
+        get => Corners.TopRight;
+        set => SetCorner(value, Corners, 1);
     }
 
     public Double CornerBottomRight
     {
-        get => Painted is Control control ? control.CornerRadius.BottomRight : 0;
-        set => SetCorner(value, Painted is Control c ? c.CornerRadius : default, 2);
+        get => Corners.BottomRight;
+        set => SetCorner(value, Corners, 2);
     }
 
     public Double CornerBottomLeft
     {
-        get => Painted is Control control ? control.CornerRadius.BottomLeft : 0;
-        set => SetCorner(value, Painted is Control c ? c.CornerRadius : default, 3);
+        get => Corners.BottomLeft;
+        set => SetCorner(value, Corners, 3);
     }
+
 
     public Double BorderWidth
     {
@@ -342,12 +364,63 @@ public class ElementItem : ICanvasItem, ICanvasTransformed
     {
     }
 
+    /// <summary>ONE TILE's rectangle, as a fraction of the thing it paints - the four numbers that decide how big a
+    /// repeat is and where the first copy starts. A quarter across and a quarter down is sixteen copies.
+    /// <para>Here for the same reason the corners are: a Rect is a STRUCT, so a line editing one side of it has
+    /// nothing to bind to. Everything else about a texture - how it fits, whether it repeats, which way up, its turn,
+    /// its tint - is a property of its own and is bound straight through, with nothing added here.</para>
+    /// <para>Zero-sized where the thing is not painted with a picture at all: there is no tile to speak of, and a
+    /// panel showing four numbers about nothing is a panel telling a story.</para></summary>
+    public Double TileX
+    {
+        get => Tiled?.Viewport.X ?? 0;
+        set => SetTile(value, 0);
+    }
+
+    public Double TileY
+    {
+        get => Tiled?.Viewport.Y ?? 0;
+        set => SetTile(value, 1);
+    }
+
+    public Double TileWidth
+    {
+        get => Tiled?.Viewport.Width ?? 0;
+        set => SetTile(value, 2);
+    }
+
+    public Double TileHeight
+    {
+        get => Tiled?.Viewport.Height ?? 0;
+        set => SetTile(value, 3);
+    }
+
+    /// <summary>The thing being shown, WHERE IT SHOWS A PICTURE - which is what the lines about a texture are about.
+    /// Not "is this a texture": a texture is an ordinary picture control put on the plane, and a picture put there any
+    /// other way has the same questions to answer.</summary>
+    public Image Tiled => Painted as Image;
+
+    private void SetTile(double value, int side)
+    {
+        if (Tiled is not { } brush) return;
+
+        var box = brush.Viewport;
+
+        // A tile of no width is a picture that never lands, and the brush would go on being asked for copies of
+        // nothing. The smallest tile is one pixel's worth of the shape, which is as small as anybody means.
+        brush.Viewport = side switch
+        {
+            0 => new Rect(value, box.Y, box.Width, box.Height),
+            1 => new Rect(box.X, value, box.Width, box.Height),
+            2 => new Rect(box.X, box.Y, Math.Max(0.001, value), box.Height),
+            _ => new Rect(box.X, box.Y, box.Width, Math.Max(0.001, value))
+        };
+    }
+
     private void SetCorner(double value, CornerRadius current, int corner)
     {
-        if (Painted is not Control control) return;
-
         value = Math.Max(0, value);
-        control.CornerRadius = corner switch
+        Corners = corner switch
         {
             0 => new CornerRadius(value, current.TopRight, current.BottomRight, current.BottomLeft),
             1 => new CornerRadius(current.TopLeft, value, current.BottomRight, current.BottomLeft),

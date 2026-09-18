@@ -21,11 +21,16 @@ internal sealed class BoundValue : FundamentalUIComponent
 
     private bool _writing;
     private bool _writable;
+    private BindingExpressionBase _expression;
 
     /// <summary>Whether the object this was pointed at HAS what the binding asks for. False is not "the value is
     /// empty" - it is "this is not one of the objects the line is about", which is what a wire is to a line about
     /// nodes.</summary>
     public bool Reads { get; private set; }
+
+    /// <summary>Whether what the object holds was WRITTEN there, as against inherited from a style or a theme. What
+    /// tells an edit from the way the object always looked.</summary>
+    public bool IsEdited => _expression?.IsSourceEdited ?? false;
 
     /// <summary>Raised when the SOURCE moved the value - not when we wrote it ourselves.</summary>
     public event EventHandler Changed;
@@ -48,6 +53,7 @@ internal sealed class BoundValue : FundamentalUIComponent
         ClearValue(ValueProperty);
         ClearValue(ValueProperty, ValuePriority.Binding);
         _writable = false;
+        _expression = null;
         Reads = false;
 
         if (declared == null || source == null) return;
@@ -67,7 +73,8 @@ internal sealed class BoundValue : FundamentalUIComponent
         // is asked for, in the same breath it is pointed at an object, with no frame in between.
         binding.IsImmediate = true;
 
-        Reads = BindingEngine.SetBinding(this, ValueProperty, binding)?.IsResolved ?? false;
+        _expression = BindingEngine.SetBinding(this, ValueProperty, binding);
+        Reads = _expression?.IsResolved ?? false;
     }
 
     /// <summary>Writes through the binding to the object. False when the binding cannot write, or when what an editor
@@ -75,7 +82,11 @@ internal sealed class BoundValue : FundamentalUIComponent
     public bool Write(object value)
     {
         if (!_writable) return false;
-        if (!TryConvert(value, Value?.GetType(), out value)) return false;
+
+        // WHAT THE PROPERTY TAKES, and only failing that what is in it now. A property typed Brush holding a solid
+        // colour takes a picture just as well, and asking the value being replaced what fits refused every kind but
+        // the one already there - a row could put a colour over a colour for ever and never put a picture there once.
+        if (!TryConvert(value, _expression?.SourceType ?? Value?.GetType(), out value)) return false;
 
         _writing = true;
         try
@@ -89,6 +100,10 @@ internal sealed class BoundValue : FundamentalUIComponent
 
         return true;
     }
+
+    /// <summary>Takes the written value away, so whatever the object would hold without it comes back. False when
+    /// there is nothing written to take away - a plain object's property knows no such thing.</summary>
+    public bool Reset() => _expression?.ResetSource() ?? false;
 
     public void Release() => BindingEngine.ClearBindings(this);
 

@@ -77,6 +77,15 @@ public class PropertyGrid : Control
     public static readonly AdamantiumProperty MixedTextProperty = AdamantiumProperty.Register(nameof(MixedText),
         typeof(String), typeof(PropertyGrid), new PropertyMetadata("multiple values"));
 
+    /// <summary>When the lines offer their reset button. ALWAYS by default, dim until there is something to put back:
+    /// a button that comes and goes takes its room with it, and a line that changes shape the moment a value stops
+    /// being the default moves out from under the hand using it.
+    /// <para>On the GRID and not on each line: it is one panel's manner, and a panel where some lines keep the room
+    /// and others do not is the ragged column this exists to prevent.</para></summary>
+    public static readonly AdamantiumProperty ResetButtonProperty = AdamantiumProperty.Register(nameof(ResetButton),
+        typeof(ResetButtonState), typeof(PropertyGrid),
+        new PropertyMetadata(ResetButtonState.Always, OnResetButtonChanged));
+
     /// <summary>Sections from somewhere ELSE - what <see cref="PropertyDefinitionBuilder"/> made from a type, what an
     /// editor assembled per component. Set, it replaces <see cref="Sections"/> entirely: an inspector is either written
     /// out or generated, and mixing the two silently would be a puzzle for whoever reads the markup.</summary>
@@ -210,6 +219,12 @@ public class PropertyGrid : Control
     {
         get => GetValue<String>(MixedTextProperty);
         set => SetValue(MixedTextProperty, value);
+    }
+
+    public ResetButtonState ResetButton
+    {
+        get => GetValue<ResetButtonState>(ResetButtonProperty);
+        set => SetValue(ResetButtonProperty, value);
     }
 
     public String SearchText
@@ -471,6 +486,25 @@ public class PropertyGrid : Control
         return true;
     }
 
+    /// <summary>Takes back what was written into one line, where the objects themselves know what was written - the
+    /// value is dropped rather than replaced, so a style's or a theme's answer comes back. Reported like any other
+    /// edit: whoever keeps the undo of a write keeps the undo of taking it back.</summary>
+    public bool Reset(PropertyRow row)
+    {
+        if (row?.Definition == null || row.IsReadOnly) return false;
+
+        var about = new PropertyValuesChangedEventArgs(row.Targets.Count > 0 ? row.Targets[0] : null,
+            row.Definition, row.Targets);
+
+        ValueChanging?.Invoke(this, about);
+
+        if (!row.ResetValues()) return false;
+
+        ValueChanged?.Invoke(this, about);
+        Refresh(null, row.Definition);
+        return true;
+    }
+
     /// <summary>Flips a boolean row. What the box in the row does, offered for a keyboard shortcut or a test.</summary>
     public bool ToggleRow(PropertyRow row)
     {
@@ -704,7 +738,11 @@ public class PropertyGrid : Control
 
     private void Watch()
     {
-        foreach (var definition in _watched) definition.LayoutChanged -= OnDefinitionLayoutChanged;
+        foreach (var definition in _watched)
+        {
+            definition.LayoutChanged -= OnDefinitionLayoutChanged;
+            if (definition is ImageSourceProperty picture) picture.Picked -= OnPicturePicked;
+        }
 
         _watched.Clear();
 
@@ -717,6 +755,7 @@ public class PropertyGrid : Control
     private void Watch(PropertyDefinition definition)
     {
         definition.LayoutChanged += OnDefinitionLayoutChanged;
+        if (definition is ImageSourceProperty picture) picture.Picked += OnPicturePicked;
         _watched.Add(definition);
 
         foreach (var child in definition.Children) Watch(child);
@@ -724,10 +763,29 @@ public class PropertyGrid : Control
 
     private void OnDefinitionLayoutChanged(object sender, EventArgs e) => Rebuild();
 
+    // A file chosen through the line's own button is written exactly as a typed path is: the same before/after report,
+    // so an edit made by pointing at a file can be taken back like any other.
+    private void OnPicturePicked(ImageSourceProperty definition, String path)
+    {
+        foreach (var row in _rows)
+        {
+            if (ReferenceEquals(row.Definition, definition)) Write(row, path);
+        }
+    }
+
     private void OnSectionsChanged(object sender, NotifyCollectionChangedEventArgs e) => Rebuild();
 
     private static void OnSelectedObjectChanged(AdamantiumComponent d, AdamantiumPropertyChangedEventArgs e) =>
         (d as PropertyGrid)?.Rebuild();
+
+    // Told to the rows that are already standing, rather than rebuilding them: a panel's manner can be changed while
+    // somebody is looking at it, and every line answers the same way.
+    private static void OnResetButtonChanged(AdamantiumComponent d, AdamantiumPropertyChangedEventArgs e)
+    {
+        if (d is not PropertyGrid grid) return;
+
+        foreach (var row in grid._rows) row.ResetButton = grid.ResetButton;
+    }
 
     private static void OnNameColumnWidthChanged(AdamantiumComponent d, AdamantiumPropertyChangedEventArgs e)
     {

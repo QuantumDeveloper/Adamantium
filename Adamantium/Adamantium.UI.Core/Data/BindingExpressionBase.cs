@@ -42,6 +42,21 @@ public abstract class BindingExpressionBase
 
    public AdamantiumProperty TargetProperty { get; set; }
 
+   /// <summary>Whether the source property carries a value WRITTEN INTO IT, as against one arriving from a style, a
+   /// trigger or the type's own default. False where the expression cannot tell, which is the safe answer: a panel
+   /// then offers no undo rather than an undo that takes away something nobody wrote.</summary>
+   public virtual bool IsSourceEdited => false;
+
+   /// <summary>Drops that written value, so whatever the object would hold without it comes back - the theme's brush,
+   /// the style's size, the property's own default. False where there is nothing to drop.</summary>
+   public virtual bool ResetSource() => false;
+
+   /// <summary>What the SOURCE will take, where the expression has resolved a property to write back to. The DECLARED
+   /// type and not the type of what is in it: a property typed <c>Brush</c> holding a solid colour takes a picture
+   /// just as well, and anything deciding what fits by asking the value it is replacing would refuse every kind but
+   /// the one already there. Null where the expression has nothing to write back to.</summary>
+   public virtual Type SourceType => null;
+
    // The value this expression currently produces (after its own converter, before any target-type coercion). It
    // matters only when the expression is a CHILD of a MultiBinding: its value feeds the parent's converter instead
    // of driving a target property. A top-level expression (TargetProperty != null) pushes straight to the target.

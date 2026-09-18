@@ -48,6 +48,12 @@ public class PropertyRow : Control
         nameof(ShowActionButton), typeof(bool), typeof(PropertyRow),
         new PropertyMetadata(false, PropertyMetadataOptions.AffectsRender));
 
+    /// <summary>When this row offers its reset button. The PANEL's manner, mirrored here for the same reason the line
+    /// above is: a template triggers on the ROW, and the grid is not in its way.</summary>
+    public static readonly AdamantiumProperty ResetButtonProperty = AdamantiumProperty.Register(nameof(ResetButton),
+        typeof(ResetButtonState), typeof(PropertyRow),
+        new PropertyMetadata(ResetButtonState.Always, PropertyMetadataOptions.AffectsRender));
+
     private readonly List<BoundValue> _values = new();
     private Grid _layout;
     private IInputComponent _grip;
@@ -152,6 +158,12 @@ public class PropertyRow : Control
         set => SetValue(ShowActionButtonProperty, value);
     }
 
+    public ResetButtonState ResetButton
+    {
+        get => GetValue<ResetButtonState>(ResetButtonProperty);
+        set => SetValue(ResetButtonProperty, value);
+    }
+
     /// <summary>Whether what the objects hold is anything other than the property's default. The theme reads it to show
     /// the button that puts the default back - and the mark itself is worth having: an inspector of forty rows says at
     /// a glance which four were touched.</summary>
@@ -182,6 +194,7 @@ public class PropertyRow : Control
         IsExpanded = definition is CompositeProperty { IsExpanded: true };
         IsReadOnly = definition.IsReadOnly;
         ShowActionButton = definition.ShowActionButton;
+        if (owner != null) ResetButton = owner.ResetButton;
 
         if (rebind) Bind();
         else Read();
@@ -364,7 +377,7 @@ public class PropertyRow : Control
 
             // Objects that disagree cannot ALL be at the default - at most one of them is. So the row is modified, and
             // resetting it is the one edit that makes them agree again.
-            IsModified = !IsReadOnly && Definition?.HasDefault == true;
+            IsModified = !IsReadOnly && (Definition?.HasDefault == true || Edited());
             return;
         }
 
@@ -373,7 +386,24 @@ public class PropertyRow : Control
 
         // Not on a read-only row: the reset it would offer is a write, and a write there is refused. A mark promising
         // a button that does nothing is worse than no mark.
-        IsModified = !IsReadOnly && Definition is { HasDefault: true } && !Definition.SameValue(first, Default());
+        //
+        // TWO WAYS a line can know it was touched. The markup may SAY what untouched means - `DefaultValue="0"` - which
+        // is the only way for a plain object whose properties nothing stands behind. Failing that the property system
+        // knows by itself: a value written into a component sits in its own slot, above the style's and the theme's, so
+        // "was this edited" is a question the object can answer and no theme has to repeat forty times.
+        IsModified = !IsReadOnly &&
+            (Definition is { HasDefault: true } ? !Definition.SameValue(first, Default()) : Edited());
+    }
+
+    // Any of them: a selection where one object was edited and two were not is a selection with something to put back.
+    private bool Edited()
+    {
+        foreach (var bound in _values)
+        {
+            if (bound.IsEdited) return true;
+        }
+
+        return false;
     }
 
     // The default AS THE PROPERTY WOULD HOLD IT. Written in markup it arrives as text - `DefaultValue="80"` is the
@@ -397,6 +427,13 @@ public class PropertyRow : Control
     // What the action button LOOKS like, which is the only thing a person has to go on before pressing it. A line that
     // names a picture gets that picture and its own words; one that names neither keeps the three dots and "More" the
     // theme put there, which is the honest look for "there is more here".
+    private void ApplyTip()
+    {
+        var tip = Definition.ValueAsTip ? Definition.TextOf(Value) : null;
+
+        ToolTip = string.IsNullOrEmpty(tip) ? Definition.Description : tip;
+    }
+
     private void ApplyAction()
     {
         if (_action == null) return;
@@ -458,7 +495,11 @@ public class PropertyRow : Control
         // The DESCRIPTION becomes the row's tip. The property has been on the definition from the start and nothing
         // read it, which made it a line of markup that quietly did nothing; and the name column is narrow enough that a
         // header often has to be short, so somewhere to say the rest of it is exactly what an inspector needs.
-        ToolTip = Definition.Description;
+        //
+        // ...unless the line says its VALUE is the tip: a path or an address is longer than the cell it sits in, and
+        // what it actually says is the one thing being asked. Empty, the description comes back - a tip that is nothing
+        // reads as a broken one.
+        ApplyTip();
 
         // The whole line of a COMPOSITE opens it, so the whole line says so. On the ROW, because that is the target:
         // the chevron carried the hand all along and everything beside it did not, which is exactly the part of it
@@ -647,9 +688,44 @@ public class PropertyRow : Control
     /// refuses exactly as it would refuse anything else.</summary>
     public bool ResetToDefault()
     {
-        if (Definition is not { HasDefault: true } || Owner == null) return false;
+        if (Owner == null) return false;
 
-        return Owner.Write(this, Definition.DefaultValue);
+        // What the markup SAYS is untouched, where it says anything - a plain number written back like any other edit.
+        // Otherwise the written value is simply dropped, and what the object would hold without it comes back: the
+        // theme's brush, the style's size. Writing a type's default over those would not be a reset - it would be one
+        // more edit, and the one nobody asked for.
+        return Definition is { HasDefault: true }
+            ? Owner.Write(this, Definition.DefaultValue)
+            : Owner.Reset(this);
+    }
+
+    // Drops what was written into every object the row stands for. Held off in the middle, exactly as a push is: each
+    // object's clearing raises the signal the row listens to, and answering each one re-reads them all.
+    internal bool ResetValues()
+    {
+        if (_values.Count == 0) return false;
+
+        var dropped = false;
+        _pushing = true;
+        try
+        {
+            foreach (var bound in _values)
+            {
+                dropped |= bound.Reset();
+            }
+        }
+        finally
+        {
+            _pushing = false;
+        }
+
+        if (dropped)
+        {
+            Read();
+            ApplyContent();
+        }
+
+        return dropped;
     }
 
     public bool RunAction()

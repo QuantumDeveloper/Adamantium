@@ -342,6 +342,116 @@ public class CanvasChromeThemeTests
         });
     }
 
+    // WHICH SIDE those buttons are on is the canvas's too. LEFT to begin with: the right end of a line is where the
+    // LINE's own buttons are - the reset, which comes and goes with the value - and a stepper sharing that end moves
+    // out from under the hand between one press and the next.
+    [Test]
+    [TestCase("Fluent")]
+    [TestCase("EditorPro")]
+    [TestCase("MacOs")]
+    public void TheNumberRowsFollowTheCanvassSideForTheirButtons(string theme)
+    {
+        var canvas = Built(theme);
+        var scene = new CanvasScene();
+        canvas.Scene = scene;
+
+        var window = new Window { Width = 1000, Height = 700, Content = canvas };
+        var shape = new ShapeItem(CanvasShape.Rectangle, new Rect(0, 0, 60, 40),
+            Adamantium.UI.Core.Media.Brushes.White, 2);
+
+        scene.Add(shape);
+        canvas.Select(shape, false);
+
+        for (var i = 0; i < 4; i++)
+        {
+            Adamantium.UI.Extensions.WindowExtension.UpdateTree(window);
+            Adamantium.UI.Core.Data.BindingUpdateQueue.Flush();
+        }
+
+        var numbers = new List<NumericProperty>();
+        Numbers(Piece<CanvasInspector>(canvas), numbers);
+
+        Assert.That(numbers, Is.Not.Empty, "the panel has no number rows at all");
+
+        Assert.Multiple(() =>
+        {
+            foreach (var row in numbers)
+            {
+                Assert.That(row.ButtonsPlacement, Is.EqualTo(NumericButtonsPlacement.Left),
+                    $"the {row.Header} row put its buttons where the line's own buttons are");
+            }
+        });
+
+        // ...and it is a matter of TASTE, so it is the application's to change.
+        canvas.NumberButtonsPlacement = NumericButtonsPlacement.Split;
+        Adamantium.UI.Core.Data.BindingUpdateQueue.Flush();
+
+        Assert.Multiple(() =>
+        {
+            foreach (var row in numbers)
+            {
+                Assert.That(row.ButtonsPlacement, Is.EqualTo(NumericButtonsPlacement.Split),
+                    $"the {row.Header} row did not follow the canvas");
+            }
+        });
+    }
+
+    // ...AND SO IS THE RESET BUTTON'S MANNER. The panel is the canvas's own, so what it does with its buttons is asked
+    // of the canvas rather than settled in a theme.
+    [Test]
+    [TestCase("Fluent")]
+    [TestCase("EditorPro")]
+    [TestCase("MacOs")]
+    public void TheInspectorsGridsFollowTheCanvassResetButton(string theme)
+    {
+        var canvas = Built(theme);
+
+        canvas.Scene = new CanvasScene();
+
+        var window = new Window { Width = 1000, Height = 700, Content = canvas };
+
+        for (var i = 0; i < 4; i++)
+        {
+            Adamantium.UI.Extensions.WindowExtension.UpdateTree(window);
+            Adamantium.UI.Core.Data.BindingUpdateQueue.Flush();
+        }
+
+        var grids = new List<PropertyGrid>();
+        Grids(Piece<CanvasInspector>(canvas), grids);
+
+        Assert.That(grids, Is.Not.Empty, "the panel has no grids at all");
+
+        Assert.Multiple(() =>
+        {
+            foreach (var grid in grids)
+            {
+                Assert.That(grid.ResetButton, Is.EqualTo(ResetButtonState.Always), "the steady manner is not default");
+            }
+        });
+
+        canvas.ResetButton = ResetButtonState.WhenModified;
+        Adamantium.UI.Core.Data.BindingUpdateQueue.Flush();
+
+        Assert.Multiple(() =>
+        {
+            foreach (var grid in grids)
+            {
+                Assert.That(grid.ResetButton, Is.EqualTo(ResetButtonState.WhenModified),
+                    "a grid of the panel did not follow the canvas");
+            }
+        });
+    }
+
+    private static void Grids(IUIComponent within, List<PropertyGrid> into)
+    {
+        if (within is PropertyGrid grid) into.Add(grid);
+
+        foreach (var child in within.VisualChildren)
+        {
+            if (child is IUIComponent visual) Grids(visual, into);
+        }
+    }
+
     private static void Numbers(IUIComponent within, List<NumericProperty> into)
     {
         if (within is PropertyGrid grid)

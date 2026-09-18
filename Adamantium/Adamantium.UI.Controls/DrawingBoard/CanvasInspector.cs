@@ -1,6 +1,7 @@
 using System.Collections;
 using Adamantium.UI.Controls.Base;
 using Adamantium.UI.Core;
+using Adamantium.UI.Core.Media;
 using Adamantium.UI.Core.RoutedEvents;
 
 namespace Adamantium.UI.Controls.DrawingBoard;
@@ -79,6 +80,11 @@ public class CanvasInspector : Control, ICanvasPart
     public static readonly AdamantiumProperty FrameSectionProperty = Face(nameof(FrameSection));
     public static readonly AdamantiumProperty ElementSectionProperty = Face(nameof(ElementSection));
     public static readonly AdamantiumProperty NodeSectionProperty = Face(nameof(NodeSection));
+
+    /// <summary>Shown where what is selected is painted with a PICTURE: how it fits, whether it repeats, which way up,
+    /// its turn and its tint. Not "is this a texture" - a texture is only a surface with a picture on it, and a button
+    /// with one has exactly the same questions to answer.</summary>
+    public static readonly AdamantiumProperty TextureSectionProperty = Face(nameof(TextureSection));
 
     /// <summary>Whether the actions that only mean something to a GRAPH are offered - lining nodes up, spreading them
     /// out, framing them, bringing them into view and the file the graph is kept in. Emptying the plane is NOT among
@@ -174,6 +180,7 @@ public class CanvasInspector : Control, ICanvasPart
     public Visibility FrameSection => GetValue<Visibility>(FrameSectionProperty);
     public Visibility ElementSection => GetValue<Visibility>(ElementSectionProperty);
     public Visibility NodeSection => GetValue<Visibility>(NodeSectionProperty);
+    public Visibility TextureSection => GetValue<Visibility>(TextureSectionProperty);
     public Visibility GraphActions => GetValue<Visibility>(GraphActionsProperty);
 
     public Boolean HasCorners => GetValue<Boolean>(HasCornersProperty);
@@ -196,6 +203,18 @@ public class CanvasInspector : Control, ICanvasPart
     private static readonly IReadOnlyList<CanvasCurve> Kinds =
         [CanvasCurve.Bezier, CanvasCurve.BSpline, CanvasCurve.Nurbs];
 
+    // A TEXTURE's own catalogues. Every one of them is a brush's property and not the canvas's: what is offered here is
+    // the whole of what the engine can paint a picture with, so a plane is not a poorer place to use a texture than a
+    // control in a window is.
+    private static readonly IReadOnlyList<Stretch> Filling =
+        [Stretch.Fill, Stretch.Uniform, Stretch.UniformToFill, Stretch.None];
+
+    private static readonly IReadOnlyList<TileMode> Tiling =
+        [TileMode.None, TileMode.Tile, TileMode.FlipX, TileMode.FlipY, TileMode.FlipXY];
+
+    private static readonly IReadOnlyList<ImageBackgroundState> Grounding =
+        [ImageBackgroundState.WhenEmpty, ImageBackgroundState.Always, ImageBackgroundState.Never];
+
     /// <summary>The grids a plane can wear, for the row that chooses one.</summary>
     public static readonly AdamantiumProperty GridStylesProperty = AdamantiumProperty.Register(nameof(GridStyles),
         typeof(IEnumerable), typeof(CanvasInspector), new PropertyMetadata(Grids));
@@ -205,6 +224,18 @@ public class CanvasInspector : Control, ICanvasPart
 
     public static readonly AdamantiumProperty CurvesProperty = AdamantiumProperty.Register(nameof(Curves),
         typeof(IEnumerable), typeof(CanvasInspector), new PropertyMetadata(Kinds));
+
+    /// <summary>The ways a picture can fill its tile, for the row that chooses one.</summary>
+    public static readonly AdamantiumProperty FillsProperty = AdamantiumProperty.Register(nameof(Fills),
+        typeof(IEnumerable), typeof(CanvasInspector), new PropertyMetadata(Filling));
+
+    /// <summary>...and the ways that tile can repeat, mirrored or not.</summary>
+    public static readonly AdamantiumProperty TilingsProperty = AdamantiumProperty.Register(nameof(Tilings),
+        typeof(IEnumerable), typeof(CanvasInspector), new PropertyMetadata(Tiling));
+
+    /// <summary>When the ground behind a picture is painted, for the row that chooses one.</summary>
+    public static readonly AdamantiumProperty GroundsProperty = AdamantiumProperty.Register(nameof(Grounds),
+        typeof(IEnumerable), typeof(CanvasInspector), new PropertyMetadata(Grounding));
 
     /// <summary>The catalogues, straight off the canvas - so the row that names a node's kind offers exactly what the
     /// palette offers and the two cannot drift apart.</summary>
@@ -223,11 +254,23 @@ public class CanvasInspector : Control, ICanvasPart
     public static readonly AdamantiumProperty RemoveSocketCommandProperty = AdamantiumProperty.Register(
         nameof(RemoveSocketCommand), typeof(ICommand), typeof(CanvasInspector), new PropertyMetadata(null));
 
+    /// <summary>Sizes what is selected to the PICTURE painted on it - its own pixels, so its proportions are the
+    /// photographer's and not whatever rectangle the hand happened to drag out. The one thing about a texture a person
+    /// cannot do by typing: nobody knows a file is 1024 by 768 until the picture is in front of them.</summary>
+    public static readonly AdamantiumProperty ActualSizeCommandProperty = AdamantiumProperty.Register(
+        nameof(ActualSizeCommand), typeof(ICommand), typeof(CanvasInspector), new PropertyMetadata(null));
+
     public IEnumerable GridStyles => GetValue<IEnumerable>(GridStylesProperty);
 
     public IEnumerable ArrowHeads => GetValue<IEnumerable>(ArrowHeadsProperty);
 
     public IEnumerable Curves => GetValue<IEnumerable>(CurvesProperty);
+
+    public IEnumerable Fills => GetValue<IEnumerable>(FillsProperty);
+
+    public IEnumerable Tilings => GetValue<IEnumerable>(TilingsProperty);
+
+    public IEnumerable Grounds => GetValue<IEnumerable>(GroundsProperty);
 
     public IEnumerable NodeKinds => GetValue<IEnumerable>(NodeKindsProperty);
 
@@ -237,6 +280,8 @@ public class CanvasInspector : Control, ICanvasPart
 
     public ICommand RemoveSocketCommand => GetValue<ICommand>(RemoveSocketCommandProperty);
 
+    public ICommand ActualSizeCommand => GetValue<ICommand>(ActualSizeCommandProperty);
+
     public CanvasInspector()
     {
         // At DEFAULT priority, which is the whole point: written the ordinary way these would sit in the Local slot,
@@ -245,6 +290,33 @@ public class CanvasInspector : Control, ICanvasPart
         SetValue(AddSocketCommandProperty, new CanvasCommand(side => Socketed(side, true)), ValuePriority.Default);
         SetValue(RemoveSocketCommandProperty, new CanvasCommand(socket => Socketed(socket, false)),
             ValuePriority.Default);
+        SetValue(ActualSizeCommandProperty, new CanvasCommand(_ => Actual()), ValuePriority.Default);
+    }
+
+    // EVERY selected picture at once, and each at its OWN size: "the picture's own size" is a different number for
+    // each of them, which is the one thing a selection cannot be given as one value.
+    private void Actual()
+    {
+        if (Canvas is not { } canvas || canvas.Selection.Count == 0) return;
+
+        canvas.BeginEdit("Actual size");
+        try
+        {
+            foreach (var item in canvas.Selection)
+            {
+                if (item is not ElementItem { Tiled.Source: { } picture } element) continue;
+                if (picture.Width <= 0 || picture.Height <= 0) continue;
+
+                element.Width = picture.Width;
+                element.Height = picture.Height;
+            }
+
+            canvas.Scene?.Touch();
+        }
+        finally
+        {
+            canvas.EndEdit();
+        }
     }
 
     // ONE node, not all of them: the panel shows the sockets of what is selected, and adding "one more input" to
@@ -284,9 +356,28 @@ public class CanvasInspector : Control, ICanvasPart
     {
         base.OnApplyTemplate();
 
+        if (_grid != null) _grid.ValueChanged -= OnRowWritten;
+
         _grid = GetTemplateChild("PART_Selected") as PropertyGrid;
+
+        // An EDIT can change which sections apply - a picture painted onto a surface brings a texture's lines with it -
+        // and nothing else would ever say so: the selection has not changed, and the scene's own signal is about what
+        // is on the plane rather than about what a panel should be showing.
+        if (_grid != null) _grid.ValueChanged += OnRowWritten;
+
         Wire();
     }
+
+    public override void OnRemoveTemplate()
+    {
+        base.OnRemoveTemplate();
+
+        if (_grid != null) _grid.ValueChanged -= OnRowWritten;
+
+        _grid = null;
+    }
+
+    private void OnRowWritten(object sender, PropertyValuesChangedEventArgs e) => ReadSections();
 
     private void Wire()
     {
@@ -462,6 +553,20 @@ public class CanvasInspector : Control, ICanvasPart
         Selection = chosen == null ? null : new List<ICanvasItem>(chosen);
         Header = ShowsProperties && many > 1 ? $"{many} objects selected" : null;
 
+        ReadSections();
+    }
+
+    // WHICH SECTIONS APPLY, and nothing else. Split out because an EDIT can change the answer without changing what is
+    // selected: painting a picture onto a surface is what makes a texture's lines mean something, and a panel that
+    // worked this out once when the thing was picked up would go on offering nothing about the picture just put on it.
+    //
+    // The selection itself is deliberately NOT republished here. It is handed over as a fresh list - that is what makes
+    // the rows re-read - and doing that on every keystroke would rebuild the rows under the hand typing into them.
+    private void ReadSections()
+    {
+        var chosen = Canvas?.Selection;
+        var many = chosen?.Count ?? 0;
+
         SetCurrentValue(StrokeSectionProperty, Shown<StrokeItem>(chosen));
         SetCurrentValue(ShapeSectionProperty, Shown<ShapeItem>(chosen));
         SetCurrentValue(TextSectionProperty, Shown<TextItem>(chosen));
@@ -470,7 +575,7 @@ public class CanvasInspector : Control, ICanvasPart
         SetCurrentValue(FrameSectionProperty, Shown<CanvasFrameItem>(chosen));
         SetCurrentValue(ElementSectionProperty, Shown<ElementItem>(chosen));
         SetCurrentValue(NodeSectionProperty, Shown(Any(chosen, item => item is ElementItem { Model: ICanvasNode })));
-
+        SetCurrentValue(TextureSectionProperty, Shown(Any(chosen, item => item is ElementItem { Tiled: not null })));
         SetCurrentValue(HasCornersProperty, Any(chosen, item => item is ShapeItem { Shape: CanvasShape.Rectangle }));
         SetCurrentValue(HasSidesProperty, Any(chosen, item => item is ShapeItem { Shape: CanvasShape.Polygon }));
         SetCurrentValue(HasHeadsProperty, Any(chosen, item => item is ShapeItem { Shape: CanvasShape.Arrow }));
