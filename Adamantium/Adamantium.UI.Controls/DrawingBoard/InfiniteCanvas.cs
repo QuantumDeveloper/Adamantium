@@ -57,7 +57,6 @@ public class InfiniteCanvas : Control
     private readonly List<ElementItem> _visibleElements = new();
 
     private CanvasChromeLayer _chromeLayer;
-    private CanvasPanes _chrome;
     private CanvasTools _tools;
     private readonly CanvasFrameGesture _frame = new();
     private bool _publishing;
@@ -152,15 +151,46 @@ public class InfiniteCanvas : Control
     public static readonly AdamantiumProperty AreToolShortcutsEnabledProperty = AdamantiumProperty.Register(
         nameof(AreToolShortcutsEnabled), typeof(Boolean), typeof(InfiniteCanvas), new PropertyMetadata(true));
 
-    /// <summary>The panels shown over the plane - a tool rail, an inspector, a context bar. The canvas owns WHERE each
-    /// one goes (<see cref="CanvasPane.Placement"/>) and the application owns what is in it.
-    /// <para>A collection and not one slot, because a canvas's chrome has three jobs with three different laws of
-    /// placement, and putting all three in one panel is how a tool panel turns into a column that does not fit. See
-    /// <see cref="CanvasPane"/>.</para>
-    /// <para><see cref="Overlay"/> still works and is the same thing said for one panel: keep it for a single floating
-    /// panel, use this when there is more than one.</para></summary>
-    public static readonly AdamantiumProperty ChromeProperty = AdamantiumProperty.Register(nameof(Chrome),
-        typeof(CanvasPanes), typeof(InfiniteCanvas), new PropertyMetadata(null, OnChromeChanged));
+    /// <summary>Whether the canvas shows its OWN view bar - undo and redo, the zoom, and the way back to the origin.
+    /// <para>On by default, and a switch rather than something to assemble: steering the camera and taking back the
+    /// last thing done are what a canvas IS, so it arrives wearing them. Turning one of these off takes that panel
+    /// away and leaves the rest standing.</para></summary>
+    public static readonly AdamantiumProperty ShowsViewBarProperty = AdamantiumProperty.Register(nameof(ShowsViewBar),
+        typeof(Boolean), typeof(InfiniteCanvas), new PropertyMetadata(true));
+
+    /// <summary>Whether the canvas shows its own tool rail - one button per entry of <see cref="Tools"/>.</summary>
+    public static readonly AdamantiumProperty ShowsToolRailProperty = AdamantiumProperty.Register(nameof(ShowsToolRail),
+        typeof(Boolean), typeof(InfiniteCanvas), new PropertyMetadata(true));
+
+    /// <summary>Whether the canvas shows its own map - the whole of what is on the plane, drawn small, with a box round
+    /// the part being looked at.</summary>
+    public static readonly AdamantiumProperty ShowsMiniMapProperty = AdamantiumProperty.Register(nameof(ShowsMiniMap),
+        typeof(Boolean), typeof(InfiniteCanvas), new PropertyMetadata(true));
+
+    /// <summary>Whether the canvas shows its own selection bar - what can be done to what is selected, over the
+    /// selection itself.</summary>
+    public static readonly AdamantiumProperty ShowsSelectionBarProperty = AdamantiumProperty.Register(
+        nameof(ShowsSelectionBar), typeof(Boolean), typeof(InfiniteCanvas), new PropertyMetadata(true));
+
+    /// <summary>Whether the canvas shows its own inspector - the tool in hand and its settings with nothing selected,
+    /// the properties of what is selected otherwise, and a list of everything on the plane.</summary>
+    public static readonly AdamantiumProperty ShowsInspectorProperty = AdamantiumProperty.Register(
+        nameof(ShowsInspector), typeof(Boolean), typeof(InfiniteCanvas), new PropertyMetadata(true));
+
+    /// <summary>Whether the canvas shows its own list of node kinds where a wire is let go over nothing. Off, a wire
+    /// dropped on the plane simply comes to nothing - see <see cref="WireDropped"/> for answering it another
+    /// way.</summary>
+    public static readonly AdamantiumProperty ShowsNodePaletteProperty = AdamantiumProperty.Register(
+        nameof(ShowsNodePalette), typeof(Boolean), typeof(InfiniteCanvas), new PropertyMetadata(true));
+
+    /// <summary>Whether the number rows of the inspector carry their up and down buttons. ON, because a number a hand
+    /// nudges is what a panel like this is mostly used for - and because a panel that offers them on one row and not
+    /// on the next is two panels in one place.
+    /// <para>A switch rather than a decision taken in a theme: the buttons cost width, and how much width a panel has
+    /// to spare is the application's to say - not something to be argued about again each time a row is added.</para>
+    /// </summary>
+    public static readonly AdamantiumProperty ShowsNumberButtonsProperty = AdamantiumProperty.Register(
+        nameof(ShowsNumberButtons), typeof(Boolean), typeof(InfiniteCanvas), new PropertyMetadata(true));
 
     /// <summary>Where the overlay sits in the viewport. Its own property rather than the content's alignment, because a
     /// floating panel is placed against the CANVAS and not against whatever it happens to contain.</summary>
@@ -259,9 +289,15 @@ public class InfiniteCanvas : Control
         set => SetValue(NodeKindsProperty, value);
     }
 
+    /// <summary>The catalogue of node kinds changed - what the palette rebuilds its sections on.</summary>
+    public event EventHandler NodeKindsChanged;
+
     private static void OnNodeKindsChanged(AdamantiumComponent component, AdamantiumPropertyChangedEventArgs e)
     {
-        if (component is InfiniteCanvas canvas) canvas._graph.SetKinds(e.NewValue as IEnumerable);
+        if (component is not InfiniteCanvas canvas) return;
+
+        canvas._graph.SetKinds(e.NewValue as IEnumerable);
+        canvas.NodeKindsChanged?.Invoke(canvas, EventArgs.Empty);
     }
 
     /// <summary>The kinds a SOCKET may carry, said the same way. Two sockets join when their kinds agree, so a name
@@ -275,9 +311,15 @@ public class InfiniteCanvas : Control
         set => SetValue(SocketKindsProperty, value);
     }
 
+    /// <summary>The catalogue of socket kinds changed - what the line that names what a socket carries offers.</summary>
+    public event EventHandler SocketKindsChanged;
+
     private static void OnSocketKindsChanged(AdamantiumComponent component, AdamantiumPropertyChangedEventArgs e)
     {
-        if (component is InfiniteCanvas canvas) canvas._graph.SetSocketKinds(e.NewValue as IEnumerable);
+        if (component is not InfiniteCanvas canvas) return;
+
+        canvas._graph.SetSocketKinds(e.NewValue as IEnumerable);
+        canvas.SocketKindsChanged?.Invoke(canvas, EventArgs.Empty);
     }
 
 
@@ -304,6 +346,79 @@ public class InfiniteCanvas : Control
 
     /// <summary>Raised after <see cref="Mode"/> changes, so a rail can offer the tools that mode admits.</summary>
     public event EventHandler ModeChanged;
+
+    /// <summary>AN INSPECTOR OVER THIS PLANE. Given one, a line written in it repaints the drawing and becomes a step
+    /// that can be taken back; given none, nothing here changes.
+    /// <para>What a canvas draws is DATA - no property store, no notification - which is exactly what lets a drawing
+    /// hold tens of thousands of items. So a value written straight into one is heard by nobody: the model changes and
+    /// the picture does not, until something else happens to redraw the plane. And a colour leaves no trace in a
+    /// comparison of where things are, so it cannot be undone by the ordinary gesture step either.</para>
+    /// <para>THIS WAY ROUND on purpose. The inspector is a general-purpose control and must not learn what a canvas,
+    /// a scene or a history are - putting those on it would put them on EVERY inspector in the application. It already
+    /// says everything needed, as any control should: it announces a write before and after
+    /// (<see cref="PropertyGrid.ValueChanging"/>, <see cref="PropertyGrid.ValueChanged"/>) and will read a value back
+    /// when asked. The canvas is the specialised one, so the canvas does the listening.</para></summary>
+    public static readonly AdamantiumProperty InspectorProperty = AdamantiumProperty.Register(nameof(Inspector),
+        typeof(PropertyGrid), typeof(InfiniteCanvas), new PropertyMetadata(null, OnInspectorChanged));
+
+    public PropertyGrid Inspector
+    {
+        get => GetValue<PropertyGrid>(InspectorProperty);
+        set => SetValue(InspectorProperty, value);
+    }
+
+    private static void OnInspectorChanged(AdamantiumComponent component, AdamantiumPropertyChangedEventArgs e)
+    {
+        if (component is not InfiniteCanvas canvas) return;
+
+        if (e.OldValue is PropertyGrid was)
+        {
+            was.ValueChanging -= canvas.OnInspectorWriting;
+            was.ValueChanged -= canvas.OnInspectorWritten;
+        }
+
+        if (e.NewValue is PropertyGrid now)
+        {
+            now.ValueChanging += canvas.OnInspectorWriting;
+            now.ValueChanged += canvas.OnInspectorWritten;
+        }
+    }
+
+    // What the objects held before the write happening right now. Filled as it starts and turned into a step as it
+    // finishes - the previous value exists only in between.
+    private readonly List<(object Target, object Was, object Is)> _edited = new();
+
+    private void OnInspectorWriting(object sender, PropertyValuesChangedEventArgs about)
+    {
+        _edited.Clear();
+
+        if (sender is not PropertyGrid grid || about?.Property == null) return;
+
+        foreach (var target in about.Targets) _edited.Add((target, grid.ValueOf(target, about.Property), null));
+    }
+
+    private void OnInspectorWritten(object sender, PropertyValuesChangedEventArgs about)
+    {
+        // TOLD WHATEVER WAS EDITED, without asking whether it was an item of this plane. The inspector reaches THROUGH
+        // an item to the control inside it, and through a node to one of its sockets - and a socket is not an item, so
+        // asking left a recoloured socket's wire the old colour. Nothing is saved by asking: this inspector is pointed
+        // at this canvas, and being told twice costs one repaint of what is visible.
+        Scene?.Touch();
+        Repaint();
+
+        if (History == null || sender is not PropertyGrid grid || about?.Property == null || _edited.Count == 0) return;
+
+        for (var i = 0; i < _edited.Count; i++)
+        {
+            var (target, was, _) = _edited[i];
+            _edited[i] = (target, was, grid.ValueOf(target, about.Property));
+        }
+
+        // A COPY: the list is reused by the next write, and a step holding the live one would be rewritten by it.
+        History.Push(new CanvasPropertyStep(grid, about.Property, new List<(object, object, object)>(_edited)));
+
+        _edited.Clear();
+    }
 
     /// <summary>Where what was done is remembered. The canvas makes its OWN and undo works out of the box; bind another
     /// to share one memory across a whole editor, or set null for a canvas that is to remember nothing at all.
@@ -503,7 +618,6 @@ public class InfiniteCanvas : Control
         // good. Measured exactly that: the view model held eleven tools and the canvas a different, empty list, and no
         // binding could ever reach it again.
         SetValue(ToolsProperty, new CanvasTools(), ValuePriority.Default);
-        SetValue(ChromeProperty, new CanvasPanes(), ValuePriority.Default);
 
         // ITS OWN MEMORY, and not something an application has to bring. A canvas is an editor: taking the last thing
         // back is part of what it IS, and a control that could only do it once somebody handed it a history was a
@@ -571,10 +685,46 @@ public class InfiniteCanvas : Control
         set => SetValue(OverlayProperty, value);
     }
 
-    public CanvasPanes Chrome
+    public Boolean ShowsViewBar
     {
-        get => _chrome;
-        set => SetValue(ChromeProperty, value);
+        get => GetValue<Boolean>(ShowsViewBarProperty);
+        set => SetValue(ShowsViewBarProperty, value);
+    }
+
+    public Boolean ShowsToolRail
+    {
+        get => GetValue<Boolean>(ShowsToolRailProperty);
+        set => SetValue(ShowsToolRailProperty, value);
+    }
+
+    public Boolean ShowsMiniMap
+    {
+        get => GetValue<Boolean>(ShowsMiniMapProperty);
+        set => SetValue(ShowsMiniMapProperty, value);
+    }
+
+    public Boolean ShowsSelectionBar
+    {
+        get => GetValue<Boolean>(ShowsSelectionBarProperty);
+        set => SetValue(ShowsSelectionBarProperty, value);
+    }
+
+    public Boolean ShowsNodePalette
+    {
+        get => GetValue<Boolean>(ShowsNodePaletteProperty);
+        set => SetValue(ShowsNodePaletteProperty, value);
+    }
+
+    public Boolean ShowsNumberButtons
+    {
+        get => GetValue<Boolean>(ShowsNumberButtonsProperty);
+        set => SetValue(ShowsNumberButtonsProperty, value);
+    }
+
+    public Boolean ShowsInspector
+    {
+        get => GetValue<Boolean>(ShowsInspectorProperty);
+        set => SetValue(ShowsInspectorProperty, value);
     }
 
     public CanvasTools Tools
@@ -1058,8 +1208,19 @@ public class InfiniteCanvas : Control
         set => SetValue(DeleteQuestionProperty, value);
     }
 
+    /// <summary>...and what the question about emptying the whole plane says. <c>{0}</c> is how many things are on
+    /// it.</summary>
+    public static readonly AdamantiumProperty ClearQuestionProperty = AdamantiumProperty.Register(
+        nameof(ClearQuestion), typeof(String), typeof(InfiniteCanvas), new PropertyMetadata(null));
+
+    public String ClearQuestion
+    {
+        get => GetValue<String>(ClearQuestionProperty);
+        set => SetValue(ClearQuestionProperty, value);
+    }
+
     // The question while it stands. One at a time: a second Delete while it is up is the same question.
-    private CanvasPane _asking;
+    private OverlayWindow _asking;
 
     /// <summary>Asks to take everything selected out - what `Delete` and a delete button both go through. A handler of
     /// <see cref="DeleteRequested"/> may take the job over; otherwise the canvas asks when
@@ -1074,7 +1235,12 @@ public class InfiniteCanvas : Control
 
         if (ConfirmsDelete)
         {
-            Ask(asked.Items.Count);
+            Ask("Delete",
+                String.Format(System.Globalization.CultureInfo.CurrentCulture,
+                    DeleteQuestion ?? (asked.Items.Count > 1 ? "Remove {0} objects?" : "Remove it?"),
+                    asked.Items.Count),
+                "Delete", DeleteSelection);
+
             return false;
         }
 
@@ -1082,50 +1248,137 @@ public class InfiniteCanvas : Control
         return true;
     }
 
-    // THE QUESTION, IN THE CANVAS'S OWN CHROME. Built here rather than left to an application: a control that has a
-    // feature must carry it, and "ask before deleting" is not something every application should write again - nor can
-    // it be a dialog of the engine's, because what a dialog IS belongs to the application above this one.
-    private void Ask(int many)
+    /// <summary>Asks to empty the plane - everything on it, of both modes, in one step of the history. Asks first when
+    /// <see cref="ConfirmsDelete"/> says to, exactly as deleting a selection does: emptying a plane is the same action
+    /// about everything, and a canvas that asked about three objects and not about three hundred would be lying about
+    /// which is the dangerous one.</summary>
+    public bool RequestClear()
     {
-        if (_asking != null) return;
+        if (Scene is not { } scene) return false;
+
+        var many = 0;
+        foreach (var _ in scene.ItemsIn(Everything)) many++;
+
+        if (many == 0) return false;
+
+        if (ConfirmsDelete)
+        {
+            Ask("Clear the canvas",
+                String.Format(System.Globalization.CultureInfo.CurrentCulture,
+                    ClearQuestion ?? "Remove all {0} objects?", many),
+                "Clear", Clear);
+
+            return false;
+        }
+
+        Clear();
+        return true;
+    }
+
+    /// <summary>Empties the plane, asking nobody - one step of the history, so it can be taken back.</summary>
+    public void Clear()
+    {
+        if (Scene is not { } scene) return;
+
+        BeginEdit("Clear");
+        try
+        {
+            scene.Reset([]);
+            _selection.Clear();
+            Selected();
+            scene.Touch();
+        }
+        finally
+        {
+            EndEdit();
+        }
+    }
+
+    // THE QUESTION, IN THE ENGINE'S OWN OVERLAY WINDOW - modal, over the very thing it is about, and the same dialog
+    // everything else in the application asks with. A plate of the canvas's own invention would be a second kind of
+    // dialog for a person to learn, and it looked like one.
+    private void Ask(String title, String question, String does, Action done)
+    {
+        if (_asking != null || WindowAround() is not { } host) return;
+
+        _answer = done;
 
         var words = new TextBlock
         {
-            Text = string.Format(System.Globalization.CultureInfo.CurrentCulture,
-                DeleteQuestion ?? (many > 1 ? "Remove {0} objects?" : "Remove it?"), many),
-            VerticalAlignment = VerticalAlignment.Center
+            Text = question,
+            TextWrapping = TextWrapping.WrapByWords,
+            MarginBottom = 20
         };
 
-        var yes = new Button { Content = "Delete", MinWidth = 76, MarginLeft = 12 };
-        var no = new Button { Content = "Cancel", MinWidth = 76, MarginLeft = 6 };
+        var yes = new Button { Content = does, MinWidth = 96, MarginRight = 8 };
+        var no = new Button { Content = "Cancel", MinWidth = 96 };
 
         yes.Click += (_, _) => Answered(true);
         no.Click += (_, _) => Answered(false);
 
-        var row = new StackPanel { Orientation = Orientation.Horizontal };
-        row.Children.Add(words);
+        var row = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            HorizontalAlignment = HorizontalAlignment.Right
+        };
+
         row.Children.Add(yes);
         row.Children.Add(no);
 
-        _asking = new CanvasPane
+        var body = new StackPanel { Orientation = Orientation.Vertical, Width = 360, Margin = new Thickness(16) };
+        body.Children.Add(words);
+        body.Children.Add(row);
+
+        _asking = new OverlayWindow
         {
-            Kind = CanvasPaneKind.Bar,
-            Placement = CanvasPanePlacement.TopCenter,
-            IsDocked = true,
-            Content = row
+            Title = title,
+            IsModal = true,
+            AllowMove = true,
+            // A question is answered by ANSWERING it: a click on the dim behind would be a third answer nobody gave.
+            CloseOnOverlay = false,
+            Content = body
         };
 
-        Chrome?.Add(_asking);
+        // Closed by the cross or by Escape is a NO: the destructive thing is what needs saying out loud, so anything
+        // that is not "yes" leaves the drawing as it was.
+        _asking.Closed += (_, _) => Answered(false);
+
+        host.ShowOverlayWindow(_asking);
     }
+
+    // The window this canvas stands in, which is what an overlay is shown on. Walked up the tree rather than taken from
+    // the application: a canvas in a second window must not put its question on the first one.
+    private IPopupHost WindowAround()
+    {
+        for (IUIComponent node = this; node != null; node = node.VisualParent)
+        {
+            if (node is IPopupHost host) return host;
+        }
+
+        return Popup.HostOf(this);
+    }
+
+    /// <summary>Whether the canvas is waiting for an answer about something - whether to delete what is selected, or to
+    /// empty the plane. Nothing goes until it is answered.</summary>
+    public bool IsAsking => _asking != null;
+
+    // What the question is about, so one dialog serves every question the canvas asks.
+    private Action _answer;
 
     private void Answered(bool yes)
     {
-        if (_asking == null) return;
+        if (_asking is not { } window) return;
 
-        Chrome?.Remove(_asking);
+        var done = _answer;
+
+        // CLEARED FIRST, because closing the window raises Closed - which comes back here - and the answer must not be
+        // given twice, nor a "yes" turned into the "no" that a close means.
         _asking = null;
+        _answer = null;
 
-        if (yes) DeleteSelection();
+        window.Close();
+
+        if (yes) done?.Invoke();
     }
 
     /// <summary>Takes everything selected out of the scene, asking nobody. What a handler of
@@ -1303,10 +1556,12 @@ public class InfiniteCanvas : Control
         var room = Math.Max(0, FrameMargin);
         var strip = room * 1.4;
 
+        // A COPY of the accent, not the accent itself: the frame's colour is a thing a person changes in the panel,
+        // and written into the theme's own brush that change would repaint every accent in the application.
         var frame = new CanvasFrameItem(
             new Rect(bounds.X - room, bounds.Y - room - strip, bounds.Width + room * 2, bounds.Height + room * 2 + strip),
             title ?? "Comment",
-            SelectionBrush) { TitleHeight = strip };
+            SelectionBrush?.Copy()) { TitleHeight = strip };
 
         BeginEdit("Frame");
         try
@@ -1539,7 +1794,9 @@ public class InfiniteCanvas : Control
 
     private void Remove()
     {
-        foreach (var item in _selection)
+        // A COPY, because taking a thing off the plane is heard: the canvas lets go of what has left the scene (see
+        // Forget), and that writes to the very list this is walking.
+        foreach (var item in new List<ICanvasItem>(_selection))
         {
             // A NODE TAKES ITS WIRES WITH IT. A wire is held by two sockets, and a socket whose node is gone is not
             // somewhere a wire can end - left behind, it would be drawn from a node that is not there to a node that
@@ -1752,6 +2009,13 @@ public class InfiniteCanvas : Control
     private CanvasCommand _delete;
     private CanvasCommand _group;
     private CanvasCommand _ungroup;
+    private CanvasCommand _toFront;
+    private CanvasCommand _toBack;
+    private CanvasCommand _align;
+    private CanvasCommand _spread;
+    private CanvasCommand _comment;
+    private CanvasCommand _fitView;
+    private CanvasCommand _clear;
 
     /// <summary>Takes the last step back. Off when there is nothing behind it.</summary>
     public CanvasCommand UndoCommand => _undo ??= new CanvasCommand(_ => Undo(), _ => History is { CanUndo: true });
@@ -1794,6 +2058,85 @@ public class InfiniteCanvas : Control
     public CanvasCommand UngroupCommand =>
         _ungroup ??= new CanvasCommand(_ => UngroupSelection(), _ => _selection.Count > 0);
 
+    /// <summary>Raises what is selected to the front of paint order, and lowers it to the back. Off with nothing
+    /// selected.</summary>
+    public CanvasCommand BringToFrontCommand =>
+        _toFront ??= new CanvasCommand(_ => Reorder(true), _ => _selection.Count > 0 && Scene != null);
+
+    public CanvasCommand SendToBackCommand =>
+        _toBack ??= new CanvasCommand(_ => Reorder(false), _ => _selection.Count > 0 && Scene != null);
+
+    /// <summary>Lines the selection up on one edge - the parameter is which, a <see cref="CanvasAlignment"/> or its
+    /// word. ONE command taking a word rather than four: a button says which edge it means, and four properties saying
+    /// the same thing four times is a surface nobody can keep in step.</summary>
+    public CanvasCommand AlignCommand => _align ??= new CanvasCommand(
+        edge => { if (Edge(edge) is { } wanted) Align(wanted); },
+        edge => Edge(edge) != null && _selection.Count > 1);
+
+    /// <summary>...and this opens equal gaps between them, down a column or across a row - the parameter is a
+    /// <see cref="CanvasSpread"/> or its word.</summary>
+    public CanvasCommand SpreadCommand => _spread ??= new CanvasCommand(
+        way => { if (Way(way) is { } wanted) Spread(wanted); },
+        way => Way(way) != null && _selection.Count > 2);
+
+    /// <summary>Draws a titled frame round what is selected - the parameter is the title, "Comment" when there is
+    /// none.</summary>
+    public CanvasCommand FrameCommand => _comment ??= new CanvasCommand(
+        title => FrameSelection(title as String),
+        _ => _selection.Count > 0 && Scene != null);
+
+    /// <summary>Brings the WORK into view: what is selected, and the whole plane when nothing is. One button rather
+    /// than two, because that is the one question a person asks of a plane with no edges.</summary>
+    public CanvasCommand FitViewCommand => _fitView ??= new CanvasCommand(_ =>
+    {
+        if (!FitSelection()) FitAll();
+    });
+
+    /// <summary>Empties the plane - asking first when the canvas was told to ask, exactly as deleting a selection
+    /// does. Off when there is nothing on it.</summary>
+    public CanvasCommand ClearCommand =>
+        _clear ??= new CanvasCommand(_ => RequestClear(), _ => Anything());
+
+    private static CanvasAlignment? Edge(object said) => said switch
+    {
+        CanvasAlignment edge => edge,
+        String word when Enum.TryParse<CanvasAlignment>(word, true, out var edge) => edge,
+        _ => null
+    };
+
+    private static CanvasSpread? Way(object said) => said switch
+    {
+        CanvasSpread way => way,
+        String word when Enum.TryParse<CanvasSpread>(word, true, out var way) => way,
+        _ => null
+    };
+
+    // Anything AT ALL on the plane, of either mode: emptying it is not about the mode in hand, and a bin that switched
+    // itself off over a plane full of the other mode's work would be saying the plane is empty when it is not.
+    private bool Anything()
+    {
+        if (Scene is not { } scene) return false;
+
+        foreach (var _ in scene.ItemsIn(Everything)) return true;
+
+        return false;
+    }
+
+    // BACK TO FRONT when raising and front to back when lowering, so a selection of several keeps its own order instead
+    // of being reversed by each item leapfrogging the last.
+    private void Reorder(bool front)
+    {
+        if (Scene is not { } scene || _selection.Count == 0) return;
+
+        for (var i = 0; i < _selection.Count; i++)
+        {
+            var item = front ? _selection[i] : _selection[_selection.Count - 1 - i];
+
+            if (front) scene.BringToFront(item);
+            else scene.SendToBack(item);
+        }
+    }
+
     private static Double Factor(object given, Double fallback) =>
         given switch
         {
@@ -1803,8 +2146,9 @@ public class InfiniteCanvas : Control
             _ => fallback
         };
 
-    // What a command's answer depends on has just moved, so every bound button asks again. Cheap and exact: these are
-    // the only two things any of them look at.
+    // What a command's answer depends on has just moved, so every bound button asks again. EVERY command that answers
+    // from the selection or from the plane belongs in this list: one left out is a button that was asked once, while
+    // nothing was selected, and stays grey for the rest of the session however much is picked afterwards.
     private void Refresh()
     {
         _undo?.RaiseCanExecuteChanged();
@@ -1813,6 +2157,12 @@ public class InfiniteCanvas : Control
         _delete?.RaiseCanExecuteChanged();
         _group?.RaiseCanExecuteChanged();
         _ungroup?.RaiseCanExecuteChanged();
+        _toFront?.RaiseCanExecuteChanged();
+        _toBack?.RaiseCanExecuteChanged();
+        _align?.RaiseCanExecuteChanged();
+        _spread?.RaiseCanExecuteChanged();
+        _comment?.RaiseCanExecuteChanged();
+        _clear?.RaiseCanExecuteChanged();
     }
 
     private void Selected()
@@ -3102,6 +3452,7 @@ public class InfiniteCanvas : Control
 
         _chromeLayer = GetTemplateChild("PART_Chrome") as CanvasChromeLayer;
         if (_chromeLayer != null) _chromeLayer.Owner = this;
+
         SyncChrome();
 
         ApplyDesignMode();
@@ -3147,9 +3498,7 @@ public class InfiniteCanvas : Control
 
         if (_chromeLayer != null)
         {
-            // The panes are the APPLICATION's - they are handed back rather than dropped, or a template swap would take
-            // the user's own panels with it.
-            _chromeLayer.Sync(null);
+            _chromeLayer.Release();
             _chromeLayer.Owner = null;
         }
 
@@ -3344,21 +3693,6 @@ public class InfiniteCanvas : Control
     private static void OnOverlayChanged(AdamantiumComponent component, AdamantiumPropertyChangedEventArgs e) =>
         (component as InfiniteCanvas)?.PlaceOverlay();
 
-    private static void OnChromeChanged(AdamantiumComponent component, AdamantiumPropertyChangedEventArgs e)
-    {
-        if (component is not InfiniteCanvas canvas) return;
-
-        if (canvas._chrome != null) canvas._chrome.CollectionChanged -= canvas.OnChromeEdited;
-
-        canvas._chrome = e.NewValue as CanvasPanes;
-
-        if (canvas._chrome != null) canvas._chrome.CollectionChanged += canvas.OnChromeEdited;
-
-        canvas.SyncChrome();
-    }
-
-    private void OnChromeEdited(object sender, NotifyCollectionChangedEventArgs e) => SyncChrome();
-
     private static void OnToolsChanged(AdamantiumComponent component, AdamantiumPropertyChangedEventArgs e)
     {
         if (component is not InfiniteCanvas canvas) return;
@@ -3378,11 +3712,13 @@ public class InfiniteCanvas : Control
     /// <summary>The set of tools changed - a rail rebuilds its buttons on it.</summary>
     public event EventHandler ToolsChanged;
 
+    // THE CANVAS'S OWN PANELS, which the template brought - plus any the canvas puts up while it is running, like the
+    // question it asks before it deletes anything.
     private void SyncChrome()
     {
         if (_chromeLayer == null) return;
 
-        _chromeLayer.Sync(_chrome);
+        _chromeLayer.Sync();
         _chromeLayer.InvalidateMeasure();
         _chromeLayer.InvalidateArrange();
     }
@@ -3467,6 +3803,11 @@ public class InfiniteCanvas : Control
 
         PlaneChanged?.Invoke(this, EventArgs.Empty);
 
+        // ...and the buttons that answer from the PLANE rather than from the selection - the bin is the one - ask
+        // again. Emptying a plane that has just been filled must not be refused because it was empty when the button
+        // was first bound.
+        Refresh();
+
         Repaint();
     }
 
@@ -3480,7 +3821,10 @@ public class InfiniteCanvas : Control
     {
         if (_selection.Count == 0 || Scene is not { } scene) return;
 
-        var there = new HashSet<ICanvasItem>(scene.ItemsIn(Everything));
+        var there = new HashSet<ICanvasItem>();
+
+        foreach (var item in scene.ItemsIn(Everything)) Gather(item, there);
+
         var gone = false;
 
         for (var i = _selection.Count - 1; i >= 0; i--)
@@ -3492,6 +3836,18 @@ public class InfiniteCanvas : Control
         }
 
         if (gone) Selected();
+    }
+
+    // A GROUP'S CHILDREN ARE STILL ON THE PLANE even though the scene does not list them - making a group takes them
+    // out of the scene and puts the group in their place. Asking the scene alone whether a selected thing is still
+    // there therefore says no about something plainly visible, and the selection would evaporate the moment anything
+    // touched the drawing: a colour written in the inspector would stop taking effect until the thing was clicked
+    // again, which is exactly what it did.
+    private static void Gather(ICanvasItem item, HashSet<ICanvasItem> into)
+    {
+        if (!into.Add(item) || item is not GroupItem group) return;
+
+        foreach (var child in group.Children) Gather(child, into);
     }
 
     /// <summary>WHAT IS UNDER A POINT, topmost first - or null where the plane is empty.

@@ -487,6 +487,13 @@ public abstract class Brush: AdamantiumComponent, IRenderAttachable
 
    private Brush CreateFrozenCore() => AsFrozen(CreateClone());
 
+   /// <summary>A brush of ONE'S OWN: a live, editable copy of this one's current values.
+   /// <para>What a tool takes when it turns a SETTING into a thing on a plane. A colour written into a brush repaints
+   /// everything painting with it - which is what a shared brush is for, and exactly wrong for two drawings made one
+   /// after the other with the same colour in hand: recolouring one of them recoloured the other, and the setting
+   /// too.</para></summary>
+   public Brush Copy() => CreateClone();
+
    /// <summary>A fresh, UNFROZEN clone of this brush's current values (same runtime type). Subclasses copy their own
    /// properties; the base freezes it. Split out from freezing so the compositor can override an animated value on the
    /// clone BEFORE it is frozen (see <see cref="BuildAnimatedSnapshot"/>).</summary>

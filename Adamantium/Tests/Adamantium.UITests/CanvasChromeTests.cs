@@ -25,14 +25,15 @@ public class CanvasChromeTests
         };
     }
 
+    // The panes are the layer's CHILDREN, exactly as a canvas's template leaves them - the layer takes them up on the
+    // first sync and places them from there.
     private static CanvasChromeLayer Laid(params CanvasPane[] panes)
     {
         var layer = new CanvasChromeLayer { PaneInset = new Thickness(10), PaneGap = 8 };
-        var collection = new CanvasPanes();
 
-        foreach (var pane in panes) collection.Add(pane);
+        foreach (var pane in panes) layer.Children.Add(pane);
 
-        layer.Sync(collection);
+        layer.Sync();
         layer.Measure(new Size(Room, Room), force: true);
         layer.Arrange(new Rect(0, 0, Room, Room));
 

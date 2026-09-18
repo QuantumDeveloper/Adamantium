@@ -48,6 +48,17 @@ public interface ICanvasItem
     /// and leaves behind what says no, rather than producing a broken half.</para></summary>
     ICanvasItem Copy() => null;
 
+    /// <summary>The ONE colour that this item reads as, or nothing when it has none.
+    /// <para>Asked here rather than worked out by whoever is showing it: every kind of item keeps its colour under a
+    /// name of its own - a stroke has a brush, a shape has a stroke and a fill, a wire has neither - so anyone outside
+    /// answering this question would be taking the engine's own types apart, and would have to be extended again for
+    /// every item somebody else adds.</para></summary>
+    Color? Paint => null;
+
+    /// <summary>...and paints it that colour. Does nothing for an item that has no colour to set, which is the honest
+    /// answer rather than a refusal: whoever paints a selection paints what can be painted and leaves the rest.</summary>
+    void PaintWith(Color color) { }
+
     /// <summary>Whether a world point is ON this item. The tolerance is a WORLD length the canvas works out from a
     /// screen one - what counts as a hit has to be the same distance under the cursor at any zoom.</summary>
     bool HitTest(Vector2 world, double tolerance);

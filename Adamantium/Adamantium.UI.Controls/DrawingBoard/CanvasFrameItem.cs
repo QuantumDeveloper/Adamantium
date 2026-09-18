@@ -80,7 +80,7 @@ public class CanvasFrameItem : ICanvasItem
         return World.Contains(world) && !inner.Contains(world);
     }
 
-    public ICanvasItem Copy() => new CanvasFrameItem(World, Title, Stroke, Fill)
+    public ICanvasItem Copy() => new CanvasFrameItem(World, Title, Stroke?.Copy(), Fill?.Copy())
     {
         Thickness = Thickness,
         TitleHeight = TitleHeight

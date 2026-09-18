@@ -204,7 +204,10 @@ public class MergedFluentThemeTests
         // control with a template of its own. Same spirit once more: a new control, a new set.
         // 57 with the CanvasNode - the block a graph editor is made of, which is a control like any other and wears the
         // theme's own palette rather than an editor's.
-        Assert.That(merged.StyleIncludes.Count, Is.EqualTo(57));
+        // Back to 55: the pane and the node went back INTO the canvas's set, along with everything else that only
+        // exists inside a canvas. They are not controls anybody uses on their own, and three files for one family
+        // meant hunting through a theme to find where a bar was styled. Nothing was lost - three entries became one.
+        Assert.That(merged.StyleIncludes.Count, Is.EqualTo(55));
     }
 
     [Test]

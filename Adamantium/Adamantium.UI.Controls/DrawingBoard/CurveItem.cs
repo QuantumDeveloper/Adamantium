@@ -42,7 +42,7 @@ public class CurveItem : ICanvasItem, ICanvasPoints
     }
 
     /// <summary>A second curve just like this one.</summary>
-    public ICanvasItem Copy() => new CurveItem(Kind, _points, Stroke, Thickness)
+    public ICanvasItem Copy() => new CurveItem(Kind, _points, Stroke?.Copy(), Thickness)
     {
         Degree = _degree,
         IsUniform = IsUniform

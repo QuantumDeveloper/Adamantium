@@ -42,6 +42,12 @@ public interface ICanvasNode : ICanvasPlaced
 
     TrackingCollection<ICanvasSocket> Outputs { get; }
 
+    /// <summary>A NEW socket for this node, named but not yet placed - what the inspector's plus asks for.
+    /// <para>Asked of the NODE because a socket is the application's object exactly as a node is: the canvas holds no
+    /// socket type of its own to fall back on. NULL means "sockets are not added by hand here", and then the plus is
+    /// simply not offered - which is a real answer for a node whose sockets follow from what it does.</para></summary>
+    ICanvasSocket NewSocket(string name) => null;
+
     /// <summary>WHAT THIS NODE IS - the part that differs between kinds, and the only part a change of kind replaces.
     /// It shapes the sockets when it is installed and stands as the node's content, drawn by the template chosen for
     /// its type. The canvas never looks inside it.</summary>

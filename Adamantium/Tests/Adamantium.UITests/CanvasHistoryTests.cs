@@ -292,6 +292,96 @@ public class CanvasHistoryTests
         Assert.That(item.Thickness, Is.EqualTo(12).Within(1e-9));
     }
 
+    // AN INSPECTOR HANDED TO THE CANVAS does both halves by itself: the plane repaints as the line is written, and the
+    // line becomes a step. The connection is made THIS way round because an inspector is a general-purpose control -
+    // it must not learn what a scene or a history is, or every inspector in the application would carry them.
+    [Test]
+    public void AnInspectorGivenToTheCanvasRepaintsAndRecords()
+    {
+        var scene = new CanvasScene();
+        var item = Box(0, 0);
+        scene.Add(item);
+
+        var canvas = Sized(scene);
+        var grid = Built(item, out var thickness);
+
+        canvas.Inspector = grid;
+
+        var told = 0;
+        scene.Changed += (_, _) => told++;
+
+        grid.Write(Row(grid, thickness), 12.0);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(item.Thickness, Is.EqualTo(12).Within(1e-9), "the write itself lands");
+            Assert.That(told, Is.GreaterThan(0), "the plane was never told what it draws had changed");
+            Assert.That(canvas.History.CanUndo, Is.True, "and it did not become a step");
+        });
+
+        canvas.UndoCommand.Execute(null);
+
+        Assert.That(item.Thickness, Is.EqualTo(1).Within(1e-9), "back to what it was");
+    }
+
+    // ...and a canvas given NO inspector is untouched by one: nothing here is wired by default, and an inspector over
+    // something that is not a plane must not need a canvas to work.
+    [Test]
+    public void ACanvasWithoutAnInspectorRecordsNothingFromOne()
+    {
+        var scene = new CanvasScene();
+        var item = Box(0, 0);
+        scene.Add(item);
+
+        var canvas = Sized(scene);
+        var grid = Built(item, out var thickness);
+
+        grid.Write(Row(grid, thickness), 12.0);
+
+        Assert.That(item.Thickness, Is.EqualTo(12).Within(1e-9));
+        Assert.That(canvas.History.CanUndo, Is.False);
+    }
+
+    private static PropertyGrid Built(object target, out NumericProperty thickness)
+    {
+        thickness = new NumericProperty { Header = "Thickness", Binding = new Binding("Thickness") };
+
+        var grid = new PropertyGrid { Template = Chrome() };
+        var section = new PropertySection { Header = "Shape", Target = target, IsExpanded = true };
+
+        section.Properties.Add(thickness);
+        grid.Sections.Add(section);
+
+        grid.Measure(new Size(400, 400), force: true);
+        grid.Arrange(new Rect(0, 0, 400, 400));
+
+        return grid;
+    }
+
+    private static Adamantium.UI.Core.Templates.ControlTemplate Chrome() =>
+        new(() =>
+        {
+            var host = new Adamantium.UI.Controls.Panels.StackPanel();
+            var result = new Adamantium.UI.Core.Templates.TemplateResult { RootComponent = host };
+            result.RegisterName("PART_Sections", host);
+            return result;
+        });
+
+    private static PropertyRow Row(PropertyGrid grid, PropertyDefinition definition)
+    {
+        foreach (var section in grid.Sections)
+        {
+            if (section.Content is not IUIComponent host) continue;
+
+            foreach (var child in host.VisualChildren)
+            {
+                if (child is PropertyRow row && ReferenceEquals(row.Definition, definition)) return row;
+            }
+        }
+
+        return null;
+    }
+
     // ...and a line re-typed with the same number in it is not a step: undoing to what it already was is worse than
     // there being nothing to undo.
     [Test]

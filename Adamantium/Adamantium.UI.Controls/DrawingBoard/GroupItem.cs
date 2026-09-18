@@ -26,6 +26,33 @@ public class GroupItem : ICanvasItem
     /// </summary>
     public IReadOnlyList<ICanvasItem> Children => _children;
 
+    /// <summary>The colour of what is IN it, when everything in it agrees - and nothing when they do not, because a
+    /// group of a red stroke and a blue one is not any one colour.</summary>
+    public Color? Paint
+    {
+        get
+        {
+            Color? one = null;
+
+            foreach (var child in _children)
+            {
+                if (child.Paint is not { } paint) continue;
+                if (one is { } had && had != paint) return null;
+
+                one = paint;
+            }
+
+            return one;
+        }
+    }
+
+    /// <summary>Paints everything in it. A group is a handle on several things at once, and this is one of the
+    /// things.</summary>
+    public void PaintWith(Color color)
+    {
+        foreach (var child in _children) child.PaintWith(color);
+    }
+
     /// <summary>A second group holding copies of what is in this one. Null when NOTHING in it could be copied: a group
     /// of things that cannot be copied is not a group, it is an empty box. What can be copied comes; what cannot is
     /// left behind, which is the same rule the copier follows one level up.</summary>

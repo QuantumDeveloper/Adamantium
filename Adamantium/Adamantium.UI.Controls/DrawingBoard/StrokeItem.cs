@@ -36,7 +36,7 @@ public class StrokeItem : ICanvasItem
     /// copy is put together exactly the way the original was.</summary>
     public ICanvasItem Copy()
     {
-        var copy = new StrokeItem(Origin, Brush, Thickness);
+        var copy = new StrokeItem(Origin, Brush?.Copy(), Thickness);
         foreach (var point in _points) copy.Add(new Vector2(Origin.X + point.At.X, Origin.Y + point.At.Y), point.Pressure);
 
         return copy;
@@ -46,6 +46,11 @@ public class StrokeItem : ICanvasItem
     public Vector2 Origin { get; set; }
 
     public Brush Brush { get; set; }
+
+    /// <summary>The colour of the ink - the stroke's brush, when it is a plain one.</summary>
+    public Color? Paint => (Brush as SolidColorBrush)?.Color;
+
+    public void PaintWith(Color color) => Brush = new SolidColorBrush(color);
 
     /// <summary>How wide the ink is, in WORLD units - so it grows with the zoom, the way ink on paper does. What must
     /// NOT scale is the grid and the handles; those are stated in screen pixels.</summary>

@@ -40,7 +40,7 @@ public class TextItem : ICanvasItem
     }
 
     /// <summary>A second piece of text just like this one.</summary>
-    public ICanvasItem Copy() => new TextItem(Origin, Text, Brush, FontSize, FontFamily);
+    public ICanvasItem Copy() => new TextItem(Origin, Text, Brush?.Copy(), FontSize, FontFamily);
 
     /// <summary>Where the text starts, in the world - its top-left corner.</summary>
     public Vector2 Origin { get; set; }
@@ -48,6 +48,11 @@ public class TextItem : ICanvasItem
     public string Text { get; set; }
 
     public Brush Brush { get; set; }
+
+    /// <summary>The colour the letters are drawn in.</summary>
+    public Color? Paint => (Brush as SolidColorBrush)?.Color;
+
+    public void PaintWith(Color color) => Brush = new SolidColorBrush(color);
 
     /// <summary>The height of the letters in WORLD units.</summary>
     public double FontSize { get; set; }

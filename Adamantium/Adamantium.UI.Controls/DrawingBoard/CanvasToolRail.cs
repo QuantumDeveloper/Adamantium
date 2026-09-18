@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using Adamantium.UI.Controls.Panels;
 using Adamantium.UI.Controls.Primitives;
@@ -21,7 +21,7 @@ namespace Adamantium.UI.Controls.DrawingBoard;
 /// than the viewport is one whose last tools cannot be reached. Too many for one column become a second, which is what
 /// the hand-written panel did by splitting the buttons into rows - except that this one does it at whatever size the
 /// canvas happens to be.</para>
-public class CanvasToolRail : WrapPanel
+public class CanvasToolRail : WrapPanel, ICanvasPart
 {
     private readonly List<ToggleButton> _buttons = new();
     private readonly Dictionary<ButtonBase, ICanvasTool> _of = new();

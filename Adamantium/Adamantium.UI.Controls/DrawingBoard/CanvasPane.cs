@@ -59,6 +59,23 @@ public class CanvasPane : ContentControl
     public static readonly AdamantiumProperty CanDragProperty = AdamantiumProperty.Register(nameof(CanDrag),
         typeof(Boolean), typeof(CanvasPane), new PropertyMetadata(true));
 
+    /// <summary>Whether this pane is wanted at all - what a canvas's own switch writes to take one of its default
+    /// panels away.
+    /// <para>Its OWN property rather than plain <c>Visibility</c>, because two things decide whether a pane is on
+    /// screen and they are not the same thing: whether anybody wants it, and - for a pane that follows the selection -
+    /// whether there is a selection to follow. Written to the one property, the later answer simply erased the earlier
+    /// one, and a bar switched off came back the moment something was picked.</para></summary>
+    public static readonly AdamantiumProperty IsWantedProperty = AdamantiumProperty.Register(nameof(IsWanted),
+        typeof(Boolean), typeof(CanvasPane), new PropertyMetadata(true, OnWantedChanged));
+
+    /// <summary>Whether the OCCASION for this pane holds - there is a selection for a bar that follows one, the list of
+    /// node kinds was asked for. True for a pane that is simply always there.
+    /// <para>The other half of <see cref="IsWanted"/>: one says whether anybody wants the panel at all, this says
+    /// whether right now is when it belongs on screen. They are different questions and the answer to one must not be
+    /// able to erase the other.</para></summary>
+    public static readonly AdamantiumProperty IsNeededProperty = AdamantiumProperty.Register(nameof(IsNeeded),
+        typeof(Boolean), typeof(CanvasPane), new PropertyMetadata(true, OnWantedChanged));
+
     public static readonly AdamantiumProperty SnapDistanceProperty = AdamantiumProperty.Register(nameof(SnapDistance),
         typeof(Double), typeof(CanvasPane), new PropertyMetadata(28.0));
 
@@ -111,13 +128,28 @@ public class CanvasPane : ContentControl
     /// past the pane to the canvas - a rail needs its tools, an inspector its selection - without the markup having to
     /// name the canvas and without the pane having to know what the template does with it.</summary>
     public static readonly AdamantiumProperty CanvasProperty = AdamantiumProperty.Register(nameof(Canvas),
-        typeof(InfiniteCanvas), typeof(CanvasPane), new PropertyMetadata(null));
+        typeof(InfiniteCanvas), typeof(CanvasPane), new PropertyMetadata(null, OnCanvasChanged));
 
     public InfiniteCanvas Canvas
     {
         get => GetValue<InfiniteCanvas>(CanvasProperty);
         internal set => SetValue(CanvasProperty, value);
     }
+
+    // ...and HANDED ON to whatever is in the pane, when what is in it is a piece of the canvas's own chrome. A binding
+    // would not do: a pane waiting for its moment - a bar that waits for a selection, a list that waits to be asked -
+    // has no template applied and so no tree for one to resolve through, and the piece inside it needs to know which
+    // canvas it is for BEFORE it is first shown, because knowing is how it decides whether to show at all.
+    private static void OnCanvasChanged(AdamantiumComponent component, AdamantiumPropertyChangedEventArgs e)
+    {
+        (component as CanvasPane)?.Hand();
+    }
+
+    private void Hand()
+    {
+        if (Content is ICanvasPart part) part.Canvas = Canvas;
+    }
+
 
     /// <summary>Where this pane sits. Dragging it sets <see cref="CanvasPanePlacement.Free"/>, and letting it go near
     /// an edge sets that edge - so the property is the record of where the user left it, not only what the markup
@@ -168,6 +200,35 @@ public class CanvasPane : ContentControl
     {
         get => GetValue<Boolean>(CanDragProperty);
         set => SetValue(CanDragProperty, value);
+    }
+
+    public Boolean IsWanted
+    {
+        get => GetValue<Boolean>(IsWantedProperty);
+        set => SetValue(IsWantedProperty, value);
+    }
+
+    public Boolean IsNeeded
+    {
+        get => GetValue<Boolean>(IsNeededProperty);
+        set => SetValue(IsNeededProperty, value);
+    }
+
+    // THE ONE PLACE Visibility is written, so the two answers cannot erase one another.
+    //
+    // A CURRENT value and not a Local one: the pane writes its own answer here, and Local outranks both Binding and
+    // Trigger - written the ordinary way, a theme could never put a trigger on a pane's visibility again and an
+    // application could never bind one.
+    internal void Settle()
+    {
+        var wanted = IsWanted && IsNeeded ? Visibility.Visible : Visibility.Collapsed;
+
+        if (Visibility != wanted) SetCurrentValue(VisibilityProperty, wanted);
+    }
+
+    private static void OnWantedChanged(AdamantiumComponent component, AdamantiumPropertyChangedEventArgs e)
+    {
+        (component as CanvasPane)?.Settle();
     }
 
     /// <summary>How near an edge a dropped pane has to be to stick to it, in screen pixels.</summary>
@@ -298,7 +359,9 @@ public class CanvasPane : ContentControl
     /// <summary>What this pane takes out of the canvas's usable area - all zero unless it is docked.</summary>
     internal Thickness Reserved()
     {
-        if (!IsDocked) return new Thickness(0);
+        // A pane that is not there takes nothing. Collapsed it is never arranged, so its RenderSize is whatever it was
+        // when it was last shown - a switched-off bar would go on walling off the bottom of the plane.
+        if (!IsDocked || Visibility != Visibility.Visible) return new Thickness(0);
 
         var size = RenderSize;
 

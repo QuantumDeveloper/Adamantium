@@ -22,6 +22,8 @@ public class AncestorBindingExpression : BindingExpressionBase
     private AdamantiumProperty _sourceProperty;   // the ancestor's AdamantiumProperty for the FIRST path segment
     private string[] _segments = [];
     private INotifyPropertyChanged _leafOwner;    // for a dotted path: the object owning the leaf, observed for changes
+    private IAdamantiumComponent _leafComponent;  // ...and the same when that object is a component of this engine
+    private AdamantiumProperty _leafProperty;     // the leaf hop itself, whose own Changed says when it moved
     private bool _hooked;
     private bool _targetHooked;
 
@@ -49,6 +51,7 @@ public class AncestorBindingExpression : BindingExpressionBase
     // has no attach/detach of its own and rides its owner's - and the SAME instance must be used to unsubscribe, so it
     // is kept rather than re-walked (the owner can change between hook and unhook).
     private IFundamentalUIComponent _anchor;
+
 
     // Subscribe to the target's own attach/detach so the ancestor is (re)resolved every time the target enters the tree.
     private void HookTree()
@@ -195,19 +198,55 @@ public class AncestorBindingExpression : BindingExpressionBase
     private void HookLeafOwner()
     {
         if (_segments.Length <= 1) return;
-        _leafOwner = RelativeBindingPipeline.LeafOwner(_source, _sourceProperty, _segments) as INotifyPropertyChanged;
+
+        var owner = RelativeBindingPipeline.LeafOwner(_source, _sourceProperty, _segments);
+
+        _leafOwner = owner as INotifyPropertyChanged;
         if (_leafOwner != null) _leafOwner.PropertyChanged += OnLeafOwnerChanged;
+
+        // ...AND A COMPONENT OF THIS ENGINE, which says so on the PROPERTY rather than on the object. Left out, a
+        // dotted path onto a control - {Ancestor Panel, Canvas.SomeSwitch} - read the value once and never again.
+        // Hooked on the property and not on the component: a component announces every property it has, and a canvas
+        // announces its camera on every frame of a pan.
+        if (owner is not IAdamantiumComponent component) return;
+        if (component.GetProperty(_segments[^1]) is not { } leaf) return;
+
+        _leafComponent = component;
+        _leafProperty = leaf;
+        _leafProperty.Changed += OnLeafPropertyChanged;
+    }
+
+    // The property is one object shared by every instance of its type, so the sender says WHOSE value moved.
+    private void OnLeafPropertyChanged(object sender, AdamantiumPropertyChangedEventArgs e)
+    {
+        if (ReferenceEquals(sender, _leafComponent)) ScheduleUpdate();
     }
 
     private void UnhookLeafOwner()
     {
         if (_leafOwner != null) _leafOwner.PropertyChanged -= OnLeafOwnerChanged;
         _leafOwner = null;
+
+        if (_leafProperty != null) _leafProperty.Changed -= OnLeafPropertyChanged;
+        _leafProperty = null;
+        _leafComponent = null;
     }
 
     private void OnLeafOwnerChanged(object sender, PropertyChangedEventArgs e)
     {
         if (string.IsNullOrEmpty(e.PropertyName) || e.PropertyName == _segments[^1]) ScheduleUpdate();
+    }
+
+    // The first thing UP THE LOGICAL CHAIN that is actually in the visual tree - where a non-visual target's visual
+    // walk can start. Several steps, because non-visual nodes nest: a row inside a composite inside a section.
+    private static IUIComponent NearestElement(IFundamentalUIComponent from)
+    {
+        for (var cur = from.LogicalParent; cur != null; cur = cur.LogicalParent)
+        {
+            if (cur is IUIComponent element) return element;
+        }
+
+        return null;
     }
 
     private IFundamentalUIComponent FindAncestor()
@@ -234,7 +273,11 @@ public class AncestorBindingExpression : BindingExpressionBase
             // start at its host - the element it's attached to (its logical parent) - and walk that host's VISUAL tree.
             // The visual tree crosses template boundaries, so this reaches an ItemsControl / Window ancestor that a
             // logical walk (which stops at each container's template parts) never could.
-            var start = anchor is IUIComponent visual ? visual.VisualParent : anchor.LogicalParent as IUIComponent;
+            //
+            // The host may be SEVERAL logical steps away: an inspector's row is a PropertyDefinition whose logical
+            // parent is its section, which is not an element either - so taking one step and casting gave null, the
+            // walk never started, and every {Ancestor} written on a row silently did nothing.
+            var start = anchor is IUIComponent visual ? visual.VisualParent : NearestElement(anchor);
             for (var cur = start; cur != null; cur = cur.VisualParent)
             {
                 if (_def.Stop != null && _def.Stop.IsInstanceOfType(cur)) return null;

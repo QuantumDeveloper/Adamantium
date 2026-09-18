@@ -58,7 +58,7 @@ public class CurveTool : ICanvasTool
 
         if (_making == null)
         {
-            _making = new CurveItem(Kind, null, canvas.Ink,
+            _making = new CurveItem(Kind, null, canvas.Ink?.Copy(),
                 canvas.ScreenToWorldLength(canvas.InkThickness));
         }
 

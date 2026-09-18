@@ -196,4 +196,65 @@ public class CanvasTransformTests
                 Is.EqualTo(CanvasHandle.BottomRight));
         });
     }
+
+    private static Vector2 Through(Matrix4x4F matrix, Vector2 point)
+    {
+        var moved = Vector3F.TransformCoordinate(new Vector3F((float)point.X, (float)point.Y, 0), matrix);
+
+        return new Vector2(moved.X, moved.Y);
+    }
+
+    // THE MATRIX THE PIXELS GO THROUGH IS THIS SAME TRANSFORM. A shape is drawn by a matrix and reasoned about point by
+    // point - the frame round it, the grips, the hit test - so the two have to be one arithmetic. They were not: the
+    // matrix sheared x and y from the ORIGINAL numbers and the point-by-point walk sheared y by the NEW x, which agrees
+    // while only one lean is set and walks apart the moment both are.
+    [TestCase(-117d, 19.1665d, 40.8334d)]
+    [TestCase(0d, 25d, 0d)]
+    [TestCase(0d, 0d, 25d)]
+    [TestCase(30d, 0d, 0d)]
+    [TestCase(-45d, 10d, 7d)]
+    public void TheMatrixAgreesWithThePointByPoint(double angle, double skewX, double skewY)
+    {
+        var about = new Vector2(100, 60);
+        var turn = new CanvasTransform(angle, skewX, skewY);
+        var matrix = turn.Matrix(about);
+
+        foreach (var corner in new[]
+                 {
+                     new Vector2(40, 20), new Vector2(160, 20), new Vector2(160, 100), new Vector2(40, 100)
+                 })
+        {
+            var expected = turn.Apply(corner, about);
+            var actual = Through(matrix, corner);
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(actual.X, Is.EqualTo(expected.X).Within(0.001),
+                    $"the drawn corner {corner} is not where the frame puts it");
+                Assert.That(actual.Y, Is.EqualTo(expected.Y).Within(0.001),
+                    $"the drawn corner {corner} is not where the frame puts it");
+            });
+        }
+    }
+
+    // ...AND THE ENGINE'S OWN TRANSFORM LEANS THE SAME WAY. A hosted control is turned by that one and the frame round
+    // it by this one, so two conventions for a lean would be a control and its frame walking apart.
+    [Test]
+    public void TheEngineSTransformLeansTheSameWay()
+    {
+        var turn = new CanvasTransform(0, 19.1665, 40.8334);
+        var ours = turn.Matrix(Vector2.Zero);
+
+        var theirs = new Transform { SkewX = turn.SkewX, SkewY = turn.SkewY };
+
+        var point = new Vector2(150, 30);
+        var expected = Through((Matrix4x4F)theirs.Matrix, point);
+        var actual = Through(ours, point);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(actual.X, Is.EqualTo(expected.X).Within(0.001), "the two leans do not agree");
+            Assert.That(actual.Y, Is.EqualTo(expected.Y).Within(0.001), "the two leans do not agree");
+        });
+    }
 }

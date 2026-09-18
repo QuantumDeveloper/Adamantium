@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using Adamantium.Mathematics;
 using Adamantium.UI.Controls.Base;
 using Adamantium.UI.Core;
@@ -16,7 +16,7 @@ namespace Adamantium.UI.Controls.DrawingBoard;
 /// <para>Every item as a plain BOX and nothing else. A small picture of the drawing would be a second renderer to keep
 /// in step with the first; boxes say where things are, which is all a map is for, and they cost one rectangle each.
 /// </para></summary>
-public class CanvasMiniMap : InputUIComponent
+public class CanvasMiniMap : InputUIComponent, ICanvasPart
 {
     private Rect _world;
     private double _scale;
