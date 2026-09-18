@@ -623,6 +623,17 @@ public abstract class AdamantiumComponent : IAdamantiumComponent
         return Slots(property) != null;
     }
 
+    /// <summary>Whether a value stands in ONE slot of this property - <see cref="ValuePriority.Local"/> for "somebody
+    /// wrote this here", as against a value arriving from a style, a trigger, a binding or the type's own default.
+    /// <para>What a panel offering to undo an edit has to know: a button whose background comes from the theme has not
+    /// been edited, and a reset offered there would take the theme's answer away rather than an edit.</para></summary>
+    public bool IsSet(AdamantiumProperty property, ValuePriority priority)
+    {
+        ArgumentNullException.ThrowIfNull(property);
+
+        return Slots(property) is { } container && container.GetValue(priority) != AdamantiumProperty.UnsetValue;
+    }
+
     public AdamantiumProperty GetProperty(string propertyName)
     {
         return AdamantiumPropertyMap.ResolveProperty(GetType(), propertyName);

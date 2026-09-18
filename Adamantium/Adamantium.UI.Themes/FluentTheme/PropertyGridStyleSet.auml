@@ -147,8 +147,15 @@
                                      untouched row offers to undo nothing, and a column of them would say the whole
                                      object had been edited. Square and the editors' height, like the button beside
                                      it. -->
+                                <!-- ALWAYS THERE, and DISABLED until there is something to put back. Collapsed, the
+                                     button's column grew the moment a value stopped being the default, the editor
+                                     beside it narrowed by that much, and everything in the editor slid - so the second
+                                     press of a stepper landed on the reset that had just appeared under the hand. A
+                                     line must not change shape because somebody typed in it.
+                                     Greyed rather than invisible: a button that is there and dim says what it would do
+                                     and why it cannot yet, where a blank gap says nothing at all. -->
                                 <Button x:Name="PART_Reset"
-                                        Visibility="Collapsed"
+                                        IsEnabled="False"
                                         Width="24" Height="24" MinWidth="0" MinHeight="0"
                                         Padding="0" Margin="0 0 2 0"
                                         ToolTipService.ToolTip="Reset to the default">
@@ -169,8 +176,24 @@
                         <PropertyTrigger Property="ShowActionButton" Value="true">
                             <Setter TargetName="PART_Action" Property="Visibility" Value="Visible"/>
                         </PropertyTrigger>
+                        <!-- The button STANDS THERE and wakes up for an edited line. That is the panel's default
+                             manner; the two triggers under it are the other two it can be asked for. -->
                         <PropertyTrigger Property="IsModified" Value="true">
-                            <Setter TargetName="PART_Reset" Property="Visibility" Value="Visible"/>
+                            <Setter TargetName="PART_Reset" Property="IsEnabled" Value="True"/>
+                        </PropertyTrigger>
+
+                        <!-- OFFERED ONLY WHERE IT DOES SOMETHING: tidier, at the cost of the line moving as it is
+                             used, which is the whole reason the default is the other way round. -->
+                        <MultiTrigger>
+                            <MultiTrigger.Conditions>
+                                <Condition Property="ResetButton" Value="WhenModified"/>
+                                <Condition Property="IsModified" Value="false"/>
+                            </MultiTrigger.Conditions>
+                            <Setter TargetName="PART_Reset" Property="Visibility" Value="Collapsed"/>
+                        </MultiTrigger>
+
+                        <PropertyTrigger Property="ResetButton" Value="Never">
+                            <Setter TargetName="PART_Reset" Property="Visibility" Value="Collapsed"/>
                         </PropertyTrigger>
                         <PropertyTrigger Property="HasChildren" Value="true">
                             <Setter TargetName="Glyph" Property="Visibility" Value="Visible"/>

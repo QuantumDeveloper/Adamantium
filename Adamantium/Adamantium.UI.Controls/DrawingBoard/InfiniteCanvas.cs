@@ -192,6 +192,24 @@ public class InfiniteCanvas : Control
     public static readonly AdamantiumProperty ShowsNumberButtonsProperty = AdamantiumProperty.Register(
         nameof(ShowsNumberButtons), typeof(Boolean), typeof(InfiniteCanvas), new PropertyMetadata(true));
 
+    /// <summary>Which side of the number those buttons sit on. LEFT by default, against the control's own "one at each
+    /// end": the RIGHT end of an inspector line is where the LINE's buttons are - the reset, and the "..." - and the
+    /// reset comes and goes, since it is offered only while a value is not the default. A stepper sharing that end
+    /// moves out from under the hand between one press and the next, which is felt most by the one thing in a panel
+    /// people do several times without looking.
+    /// <para>Outward, like the switch above, because it is a matter of taste and of how much room a panel has: both of
+    /// those are the application's to say.</para></summary>
+    public static readonly AdamantiumProperty NumberButtonsPlacementProperty = AdamantiumProperty.Register(
+        nameof(NumberButtonsPlacement), typeof(NumericButtonsPlacement), typeof(InfiniteCanvas),
+        new PropertyMetadata(NumericButtonsPlacement.Left));
+
+    /// <summary>When the panel's lines offer the button that puts a value back. ALWAYS by default, dim until there is
+    /// something to put back: a button that comes and goes takes its room with it, and a line that changes shape as it
+    /// is used moves out from under the hand. An application short of width can have them only where they do something
+    /// - or not at all.</summary>
+    public static readonly AdamantiumProperty ResetButtonProperty = AdamantiumProperty.Register(nameof(ResetButton),
+        typeof(ResetButtonState), typeof(InfiniteCanvas), new PropertyMetadata(ResetButtonState.Always));
+
     /// <summary>Where the overlay sits in the viewport. Its own property rather than the content's alignment, because a
     /// floating panel is placed against the CANVAS and not against whatever it happens to contain.</summary>
     public static readonly AdamantiumProperty OverlayPlacementProperty = AdamantiumProperty.Register(
@@ -719,6 +737,18 @@ public class InfiniteCanvas : Control
     {
         get => GetValue<Boolean>(ShowsNumberButtonsProperty);
         set => SetValue(ShowsNumberButtonsProperty, value);
+    }
+
+    public NumericButtonsPlacement NumberButtonsPlacement
+    {
+        get => GetValue<NumericButtonsPlacement>(NumberButtonsPlacementProperty);
+        set => SetValue(NumberButtonsPlacementProperty, value);
+    }
+
+    public ResetButtonState ResetButton
+    {
+        get => GetValue<ResetButtonState>(ResetButtonProperty);
+        set => SetValue(ResetButtonProperty, value);
     }
 
     public Boolean ShowsInspector

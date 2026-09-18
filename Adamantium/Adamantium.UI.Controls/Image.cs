@@ -16,6 +16,7 @@ public class Image : InputUIComponent, IDesignTimeAnimatedMedia
    private uint _frameCursor;     // THIS control's playback position - the source may be shared with other images
    private BitmapImage _bitmap;
    private BitmapFrame _frame;
+   private ImageBrush _tiling;
    private BitmapFrame _oldFrame;
    private UInt64 _currentReplayIteration;
    
@@ -34,6 +35,55 @@ public class Image : InputUIComponent, IDesignTimeAnimatedMedia
 
    public static readonly AdamantiumProperty FilterBrushProperty = AdamantiumProperty.Register(nameof(FilterBrush),
       typeof(Brush), typeof(Image), new PropertyMetadata(Brushes.White, PropertyMetadataOptions.AffectsRender));
+
+   /// <summary>The GROUND the picture is drawn on, rounded by the same <see cref="CornerRadius"/> and filling the
+   /// whole element.
+   /// <para>What it is for: an Image with no source at all draws NOTHING - it is a hole the size of its slot, which is
+   /// indistinguishable from a broken layout while a picture is being chosen, or loading, or failed to load. A ground
+   /// gives it something to be seen and taken hold of.</para>
+   /// <para>WHEN it is drawn is <see cref="BackgroundState"/>'s to say, not this one's.</para></summary>
+   public static readonly AdamantiumProperty BackgroundProperty = AdamantiumProperty.Register(nameof(Background),
+      typeof(Brush), typeof(Image), new PropertyMetadata(null, PropertyMetadataOptions.AffectsRender));
+
+   /// <summary>When that ground is painted: while there is no picture (the default), under the picture as well, or
+   /// never. A switch rather than a rule decided here, because both answers are wanted - a placeholder gets out of the
+   /// way when the picture arrives, a letterbox colour must not.</summary>
+   public static readonly AdamantiumProperty BackgroundStateProperty = AdamantiumProperty.Register(
+      nameof(BackgroundState), typeof(ImageBackgroundState), typeof(Image),
+      new PropertyMetadata(ImageBackgroundState.WhenEmpty, PropertyMetadataOptions.AffectsRender));
+
+   /// <summary>Whether the PICTURE is drawn at all - the foreground, as against the ground behind it. ON, obviously;
+   /// off leaves the element standing at its own size showing only its <see cref="Background"/>.
+   /// <para>Not the same as clearing <see cref="Source"/>: the picture is kept, its file is still named, everything
+   /// about how it would be laid out is still set - it is simply not painted, and putting it back is one switch rather
+   /// than choosing the file again.</para>
+   /// <para>A picture switched off counts as NO PICTURE for <see cref="BackgroundState"/>: turning the foreground off
+   /// to see the ground and getting a blank element instead would be a switch that undoes itself.</para></summary>
+   public static readonly AdamantiumProperty ShowsForegroundProperty = AdamantiumProperty.Register(
+      nameof(ShowsForeground), typeof(bool), typeof(Image),
+      new PropertyMetadata(true, PropertyMetadataOptions.AffectsRender));
+
+   /// <summary>Whether the picture is laid down ONCE or REPEATED across the element, and whether every other copy is
+   /// mirrored. NONE by default, which is a picture in a frame; anything else is a texture, and is what lets a small
+   /// file dress a large surface without being stretched into mush.
+   /// <para>Declared here, DONE by <see cref="ImageBrush"/>: repeating a picture is a brush's trade, and this control
+   /// hands it the work rather than growing a second implementation of it.</para></summary>
+   public static readonly AdamantiumProperty TileModeProperty = AdamantiumProperty.Register(nameof(TileMode),
+      typeof(TileMode), typeof(Image),
+      new PropertyMetadata(TileMode.None, PropertyMetadataOptions.AffectsRender));
+
+   /// <summary>ONE TILE's rectangle in the element, as a fraction of it by default: a quarter across and a quarter
+   /// down is sixteen copies. The whole element (0,0,1,1) is one copy, which is why a picture told to repeat and left
+   /// at this shows exactly one.</summary>
+   public static readonly AdamantiumProperty ViewportProperty = AdamantiumProperty.Register(nameof(Viewport),
+      typeof(Rect), typeof(Image),
+      new PropertyMetadata(new Rect(0, 0, 1, 1), PropertyMetadataOptions.AffectsRender));
+
+   /// <summary>Whether <see cref="Viewport"/> is a fraction of the element or logical pixels. Pixels are what a
+   /// texture of a known size wants - "lay this 64-pixel tile" - and a fraction is what a pattern wants.</summary>
+   public static readonly AdamantiumProperty ViewportUnitsProperty = AdamantiumProperty.Register(
+      nameof(ViewportUnits), typeof(BrushMappingMode), typeof(Image),
+      new PropertyMetadata(BrushMappingMode.RelativeToBoundingBox, PropertyMetadataOptions.AffectsRender));
 
    public static readonly AdamantiumProperty CornerRadiusProperty = AdamantiumProperty.Register(nameof(CornerRadius),
       typeof(CornerRadius), typeof(Image),
@@ -232,6 +282,42 @@ public class Image : InputUIComponent, IDesignTimeAnimatedMedia
       set => SetValue(CornerRadiusProperty, value);
    }
 
+   public Brush Background
+   {
+      get => GetValue<Brush>(BackgroundProperty);
+      set => SetValue(BackgroundProperty, value);
+   }
+
+   public ImageBackgroundState BackgroundState
+   {
+      get => GetValue<ImageBackgroundState>(BackgroundStateProperty);
+      set => SetValue(BackgroundStateProperty, value);
+   }
+
+   public bool ShowsForeground
+   {
+      get => GetValue<bool>(ShowsForegroundProperty);
+      set => SetValue(ShowsForegroundProperty, value);
+   }
+
+   public TileMode TileMode
+   {
+      get => GetValue<TileMode>(TileModeProperty);
+      set => SetValue(TileModeProperty, value);
+   }
+
+   public Rect Viewport
+   {
+      get => GetValue<Rect>(ViewportProperty);
+      set => SetValue(ViewportProperty, value);
+   }
+
+   public BrushMappingMode ViewportUnits
+   {
+      get => GetValue<BrushMappingMode>(ViewportUnitsProperty);
+      set => SetValue(ViewportUnitsProperty, value);
+   }
+
    public Brush FilterBrush
    {
       get => GetValue<Brush>(FilterBrushProperty);
@@ -262,7 +348,25 @@ public class Image : InputUIComponent, IDesignTimeAnimatedMedia
    {
    }
 
+   // ASYNC VOID, so anything thrown in here reaches nobody and takes the process down instead. Everything it does is
+   // on behalf of a picture that may have come from a person typing a path, so the failures are ordinary: the file is
+   // gone, the bytes are not a picture, the frame cannot be decoded. None of them is worth an application.
    private async void ProcessImageSource()
+   {
+      try
+      {
+         await Process();
+      }
+      catch
+      {
+         // Nothing to do about it here, and nothing to be gained by taking the process with it: the picture stays
+         // unloaded, draws nothing, and the element falls back to its ground - the same state it is in before a file
+         // is chosen at all. BitmapImage.LoadError keeps what went wrong for anything that wants to say so.
+         InvalidateRender(false);
+      }
+   }
+
+   private async Task Process()
    {
       if (Source is BitmapImage bitmap)
       {
@@ -498,14 +602,18 @@ public class Image : InputUIComponent, IDesignTimeAnimatedMedia
 
    protected override Size ArrangeOverride(Size finalSize)
    {
-      if (Source == null) return Size.Zero;
-
       // A Stretch alignment means "take the slot" - so take it, and CENTRE the fitted picture inside it (OnRender).
       // Returning only the fitted size made the element smaller than the slot it was given, and the base arrange anchors
       // Stretch at the start, so the whole leftover piled up on ONE side: a picture whose aspect differs from its slot
       // sat against the left/top edge with an empty strip on the right/bottom. Any other alignment still shrinks to the
       // picture - that is the size THAT alignment then positions.
-      var fitted = CalculateScaling(Stretch, finalSize, new Size(Source.Width, Source.Height));
+      // NO SOURCE IS NOT NO SIZE. This used to return zero outright, so an Image with nothing named took up nothing
+      // whatever slot it was handed - and since it also drew nothing, a picture being chosen was an element that was
+      // not there at all: on a canvas, a selection frame around empty plane. What the source decides is the FITTED
+      // size of the picture; whether the element takes its slot is the alignment's business, as below.
+      var fitted = Source != null
+         ? CalculateScaling(Stretch, finalSize, new Size(Source.Width, Source.Height))
+         : Size.Zero;
 
       return new Size(
          HorizontalAlignment == HorizontalAlignment.Stretch ? finalSize.Width : fitted.Width,
@@ -515,7 +623,18 @@ public class Image : InputUIComponent, IDesignTimeAnimatedMedia
    protected override void OnRender(IDrawingContext context)
    {
       base.OnRender(context);
-      if (Source == null) return;
+
+      // THE GROUND FIRST, where it is asked for: an Image with no source draws nothing at all, and nothing is
+      // indistinguishable from a broken layout while a picture is being chosen or is still loading.
+      if (Background is { } ground && Shows())
+      {
+         context.ForControl(this)
+            .DrawRectangle(ground, new Rect(0, 0, Bounds.Width, Bounds.Height), CornerRadius);
+      }
+
+      // THE GROUND ALONE, where the picture is switched off. Everything about the picture is kept - the file, the fit,
+      // the tiling - and none of it is painted.
+      if (Source == null || !ShowsForeground) return;
 
       // Draw the current animation frame, not the static source: each frame is its own BitmapSource (texture cached
       // per frame index), so advancing _frame makes animated images play. _frame is null for non-bitmap sources
@@ -526,6 +645,23 @@ public class Image : InputUIComponent, IDesignTimeAnimatedMedia
       // rendering it would build a texture from null and crash. Skip until it is ready - ProcessImageSource sets _frame
       // and re-invalidates once loaded. A decoded _frame (BitmapFrame) or a non-BitmapImage source is always ready.
       if (image is BitmapImage { IsLoaded: false }) return;
+
+      // AS A RECTANGLE PAINTED WITH THE PICTURE, which is what an ordinary picture IS. The engine already draws those
+      // analytically: a rounded rect whose colour is sampled from an image goes through the textured SDF batch, where
+      // the corner is cut per fragment and comes out smooth at any size and any zoom.
+      //
+      // The path below builds a MESH instead, and a mesh's rounded corner is an arc broken into segments - visibly
+      // stepped, which no amount of tessellation fixes because the edge stays hard. So the mesh is for what a brush
+      // cannot carry, and nothing else:
+      //  - a DRAWING replays its own shapes;
+      //  - an ANIMATION draws one layer of a frame-array texture, chosen per frame;
+      //  - a LIVE SURFACE (a game rendering into a panel) is imported and owned per component.
+      if (Brushed(image))
+      {
+         context.ForControl(this).DrawRectangle(Tiling(image), new Rect(0, 0, Bounds.Width, Bounds.Height),
+            CornerRadius);
+         return;
+      }
 
       // Scale the picture per Stretch, then CENTRE it in what the element occupies. Two directions to the leftover:
       // a fit SMALLER than the element leaves an equal margin on both sides (Uniform in a box of another aspect);
@@ -574,6 +710,44 @@ public class Image : InputUIComponent, IDesignTimeAnimatedMedia
       session.DrawImage(image, FilterBrush, destination, CornerRadius,
          new Rect((1 - visibleU) / 2, (1 - visibleV) / 2, visibleU, visibleV));
    }
+
+   // Whether this picture can be painted AS A BRUSH - which is how it gets an analytic edge. A plain bitmap can; the
+   // three that cannot are the ones whose drawing is not "sample this texture over this rectangle".
+   private bool Brushed(ImageSource image)
+   {
+      if (image is DrawingImage or SharedSurfaceImage or RenderTargetImage) return false;
+
+      // An animation picks a LAYER of a frame-array texture per frame, and a brush has no layer to pick.
+      return !(BitmapImage.UseFrameArrayTextures && _bitmap is { FrameCount: > 1, IsLoaded: true });
+   }
+
+   // The brush that paints the picture, kept and re-pointed rather than made per frame: a new brush every render is a
+   // new object on a property every render, which is a change, which is another render.
+   private ImageBrush Tiling(ImageSource image)
+   {
+      _tiling ??= new ImageBrush();
+
+      _tiling.Source = image;
+      _tiling.Stretch = Stretch;
+      _tiling.TileMode = TileMode;
+      _tiling.Viewport = Viewport;
+      _tiling.ViewportUnits = ViewportUnits;
+
+      // The FILTER is what this control has always called its tint - a colour multiplied into every sampled pixel -
+      // and the brush says the same thing in its own words. White is "leave it alone", which is both defaults.
+      _tiling.Tint = FilterBrush is SolidColorBrush colour ? colour.Color : Colors.White;
+
+      return _tiling;
+   }
+
+   // "Empty" is NOT ONLY "no source named": a picture that has been named but has not finished loading shows nothing
+   // either, and the ground is wanted most exactly then - that is the moment a hole would be mistaken for a fault.
+   private bool Shows() => BackgroundState switch
+   {
+      ImageBackgroundState.Always => true,
+      ImageBackgroundState.Never => false,
+      _ => !ShowsForeground || Source == null || (_frame ?? Source) is BitmapImage { IsLoaded: false }
+   };
 
    private Size CalculateScaling(Stretch stretch, Size destinationSize, Size sourceSize)
    {

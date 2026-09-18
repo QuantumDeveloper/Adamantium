@@ -1,13 +1,16 @@
 using System;
 using System.Collections;
+using System.Collections.Generic;
 using System.Collections.Specialized;
 using System.Linq;
+using Adamantium.Core.Commands;
 using Adamantium.Mathematics;
 using Adamantium.UI.Controls.Primitives;
 using Adamantium.UI.Controls.Text;
 using Adamantium.UI.Core;
 using Adamantium.UI.Core.Data;
 using Adamantium.UI.Core.Media;
+using Adamantium.UI.Core.Media.Imaging;
 using Adamantium.UI.Core.RoutedEvents;
 using Adamantium.UI.Core.Templates;
 
@@ -32,6 +35,12 @@ public abstract class PropertyDefinition : FundamentalUIComponent
 
     public static readonly AdamantiumProperty DescriptionProperty = AdamantiumProperty.Register(nameof(Description),
         typeof(String), typeof(PropertyDefinition), new PropertyMetadata(null));
+
+    /// <summary>Whether the row's tip is its own VALUE rather than the description. For a line holding something longer
+    /// than its cell - a path, an address - the one question asked of it is what it actually says, and the description
+    /// is a sentence the reader has already read. Falls back to the description while the value is empty.</summary>
+    public static readonly AdamantiumProperty ValueAsTipProperty = AdamantiumProperty.Register(nameof(ValueAsTip),
+        typeof(bool), typeof(PropertyDefinition), new PropertyMetadata(false));
 
     public static readonly AdamantiumProperty IsReadOnlyProperty = AdamantiumProperty.Register(nameof(IsReadOnly),
         typeof(bool), typeof(PropertyDefinition), new PropertyMetadata(false));
@@ -126,6 +135,12 @@ public abstract class PropertyDefinition : FundamentalUIComponent
     {
         get => GetValue<String>(DescriptionProperty);
         set => SetValue(DescriptionProperty, value);
+    }
+
+    public bool ValueAsTip
+    {
+        get => GetValue<bool>(ValueAsTipProperty);
+        set => SetValue(ValueAsTipProperty, value);
     }
 
     public bool IsReadOnly
@@ -234,6 +249,11 @@ public abstract class PropertyDefinition : FundamentalUIComponent
     /// render cache's change detection depends on staying by reference.</para></summary>
     protected internal virtual bool SameValue(object left, object right) => Equals(left, right);
 
+    /// <summary>The value as a person would read it, which is what <see cref="ValueAsTip"/> shows. A number or a string
+    /// says itself; a value that is an OBJECT does not - a brush painted from a file has a file to name, and its type's
+    /// own wording is not it.</summary>
+    protected internal virtual String TextOf(object value) => value?.ToString();
+
     /// <summary>Whether this property's editor can stand EMPTY - showing no value while staying usable, which is what a
     /// row of disagreeing objects needs: setting one value on all of them is the point of selecting several.
     /// <para>A field, a number and a list all have an empty state. A colour swatch does not - it is a colour or it is
@@ -318,6 +338,17 @@ public class NumericProperty : PropertyDefinition
     public static readonly AdamantiumProperty ShowButtonsProperty = AdamantiumProperty.Register(nameof(ShowButtons),
         typeof(Boolean), typeof(NumericProperty), new PropertyMetadata(true));
 
+    /// <summary>Which side of the number they sit on. LEFT here, against the control's own default of one at each end:
+    /// the RIGHT end of an inspector line is where the line's own buttons live - reset, and the "...". A stepper put
+    /// there is a stepper that shares an edge with them, and nudging a number is the one thing in a panel a person does
+    /// several times without looking.
+    /// <para>The row's buttons are also the ones that COME AND GO - the reset appears the moment a value stops being
+    /// the default - so a stepper at that end moves out from under the hand between one press and the next. Against the
+    /// left edge, nothing that appears on the right can shift it.</para></summary>
+    public static readonly AdamantiumProperty ButtonsPlacementProperty = AdamantiumProperty.Register(
+        nameof(ButtonsPlacement), typeof(NumericButtonsPlacement), typeof(NumericProperty),
+        new PropertyMetadata(NumericButtonsPlacement.Left));
+
     private DataTemplate _editor;
 
     public Double Minimum
@@ -351,6 +382,12 @@ public class NumericProperty : PropertyDefinition
         set => SetValue(ShowButtonsProperty, value);
     }
 
+    public NumericButtonsPlacement ButtonsPlacement
+    {
+        get => GetValue<NumericButtonsPlacement>(ButtonsPlacementProperty);
+        set => SetValue(ButtonsPlacementProperty, value);
+    }
+
     protected internal override DataTemplate DefaultEditorTemplate =>
         _editor ??= new DataTemplate(() => new TemplateResult { RootComponent = PropertyEditors.Number() });
 
@@ -362,6 +399,15 @@ public class NumericProperty : PropertyDefinition
         numeric.Maximum = Maximum;
         numeric.SmallChange = Step;
         numeric.AreButtonsVisible = ShowButtons;
+        numeric.ButtonsPlacement = ButtonsPlacement;
+
+        // HOW MANY DECIMALS - which this line has carried and nobody read, so every number came out at whatever
+        // precision a double prints at: a width dragged by hand read "182.99999999999997". A line of an inspector is
+        // read at a glance, and thirteen digits of noise are not an answer to "how wide is it".
+        //
+        // "0.###" rather than "N3": a round number stays round. Trailing zeros ("182.000") say a precision was
+        // measured that was not, and turn every whole number into four characters of nothing.
+        numeric.StringFormat = Decimals > 0 ? "0." + new String('#', Decimals) : "0";
         // NULL, not zero, when there is nothing to show - the objects disagree. A zero here would be a number neither
         // of them holds, which is worse than an empty field: it reads as an answer.
         numeric.Value = value is IConvertible convertible
@@ -559,6 +605,124 @@ public class SolidColorBrushProperty : PropertyDefinition
 
         return base.TryConvert(edited, target, out value);
     }
+}
+
+/// <summary>A PICTURE: the line shows the file it comes from and takes a typed or pasted path, and its own "..." asks
+/// for one through whatever the operating system puts in front of the user.
+/// <para>The picture ITSELF - an <see cref="ImageSource"/> - and not a brush painted from it. A control that shows a
+/// picture has a property for the picture, and writing a brush over that property instead would put the picture
+/// wherever the colour goes, where the next colour written wipes it out.</para></summary>
+public class ImageSourceProperty : PropertyDefinition
+{
+    private DataTemplate _editor;
+
+    public ImageSourceProperty()
+    {
+        // The row's own button, at DEFAULT priority so an application that wants to ask for a file its own way can
+        // still bind one over it. A path is something a person points at rather than types.
+        SetValue(ShowActionButtonProperty, true, ValuePriority.Default);
+        SetValue(ActionTipProperty, "Pick a picture", ValuePriority.Default);
+        SetValue(ActionCommandProperty, new PickCommand(this), ValuePriority.Default);
+
+        // THE PATH IS ITS OWN TIP: a file two folders deep does not fit the cell, and which file this is is the one
+        // question asked of this row.
+        SetValue(ValueAsTipProperty, true, ValuePriority.Default);
+    }
+
+    protected internal override DataTemplate DefaultEditorTemplate =>
+        _editor ??= new DataTemplate(() => new TemplateResult { RootComponent = PropertyEditors.Field() });
+
+    protected internal override void PrepareEditor(IUIComponent editor, object value)
+    {
+        if (editor is TextBox box) box.Text = PathOf(value) ?? String.Empty;
+    }
+
+    protected internal override object ReadEditor(IUIComponent editor) => (editor as TextBox)?.Text;
+
+    protected internal override String TextOf(object value) => PathOf(value);
+
+    /// <summary>What the line SHOWS is the FILE, so that is what "the same" means here - two objects showing one file
+    /// agree as far as this line is concerned, whatever two objects the pictures themselves are.</summary>
+    protected internal override bool SameValue(object left, object right) =>
+        left is ImageSource || right is ImageSource
+            ? PathOf(left) == PathOf(right)
+            : base.SameValue(left, right);
+
+    // Nothing is written INTO a picture: a picture is the file it was loaded from, and pointing it at another file is
+    // another picture. So the line goes the ordinary way - convert, then write through the binding.
+    protected internal override bool TryConvert(object edited, Type target, out object value)
+    {
+        // EMPTIED ON PURPOSE is an answer: a cleared path means "no picture here", and refusing it would leave a line
+        // that can be given a file and never take one away.
+        if (edited is String { Length: 0 } or null)
+        {
+            value = null;
+            return true;
+        }
+
+        if (Picture(edited as String) is { } source)
+        {
+            value = source;
+            return true;
+        }
+
+        return base.TryConvert(edited, target, out value);
+    }
+
+    private static ImageSource Picture(String path)
+    {
+        if (String.IsNullOrWhiteSpace(path)) return null;
+
+        return Uri.TryCreate(path, UriKind.RelativeOrAbsolute, out var uri) ? new BitmapImage(uri) : null;
+    }
+
+    private static String PathOf(object picture) =>
+        picture is BitmapImage { UriSource: { } uri } ? uri.OriginalString : null;
+
+    // The "..." this row is born with: ask, and write the answer the same way a typed path is written - through the
+    // row, so the grid's own before/after report (which is what undo is made of) happens once and in one place.
+    private sealed class PickCommand : ICommand
+    {
+        private readonly ImageSourceProperty _line;
+
+        public PickCommand(ImageSourceProperty line) => _line = line;
+
+        public event EventHandler CanExecuteChanged;
+
+        public bool CanExecute(object parameter = null) => FileDialog.IsAvailable;
+
+        public void Execute(object parameter = null)
+        {
+            if (!FileDialog.IsAvailable) return;
+
+            var path = FileDialog.Open(new OpenFileRequest
+            {
+                Title = "Pick a picture",
+                FileTypes = Pictures
+            });
+
+            if (path == null) return;   // cancelled is an answer, and nothing is written
+
+            _line.Pick(path);
+        }
+
+        public void RaiseCanExecuteChanged() => CanExecuteChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    /// <summary>A file was chosen for this line. The GRID listens, so the write goes through the same path a typed one
+    /// does - one place that reports the change and one place that is undone.</summary>
+    internal event Action<ImageSourceProperty, String> Picked;
+
+    /// <summary>Says a file was chosen for this line - what its own "..." calls, and what an application asking for a
+    /// picture its own way calls to answer. The WRITING is the grid's, so an edit made by pointing at a file is the
+    /// same edit a typed path is: reported once, and taken back the same way.</summary>
+    public void Pick(String path) => Picked?.Invoke(this, path);
+
+    private static readonly IReadOnlyList<FileType> Pictures =
+    [
+        new("Pictures", "png", "jpg", "jpeg", "bmp", "gif", "tga", "tiff", "ico", "dds"),
+        new("All files", "*")
+    ];
 }
 
 /// <summary>A property that holds other properties: a vector, a colour, a nested object. It has no value of its own -

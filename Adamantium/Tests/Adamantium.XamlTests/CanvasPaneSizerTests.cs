@@ -165,4 +165,64 @@ public class CanvasPaneSizerTests
         Assert.That((Sizer(pane) as Border)?.Cursor?.Type, Is.EqualTo(CursorType.SizeEWE),
             "a strip of nothing has to declare itself, or it is a strip of nothing");
     }
+
+    // THE PANEL A PERSON ACTUALLY DRAGS - the inspector inside a canvas, not a pane built by hand. Every part of the
+    // edge was tested on its own; what a part-by-part test cannot see is whether the width the drag writes survives
+    // the chrome's own arranging of its panes.
+    //
+    // The DRAG itself cannot be staged here: a move reads the pointer off the device, so faking one would mean taking
+    // the mouse. What is staged is what the drag does - it writes a width - and what has to follow from it.
+    [Test]
+    [TestCase("Fluent")]
+    [TestCase("EditorPro")]
+    [TestCase("MacOs")]
+    public void TheInspectorInACanvasKeepsAWidthItWasGiven(string theme)
+    {
+        Use(ThemeNamed(theme));
+
+        var canvas = new InfiniteCanvas { Scene = new CanvasScene() };
+
+        canvas.ApplyCurrentTheme();
+
+        var window = new Window { Width = 1000, Height = 700, Content = canvas };
+
+        Settle(window);
+
+        var pane = canvas.GetTemplateChild("PART_Inspector") as CanvasPane;
+
+        Assert.That(pane, Is.Not.Null, "the chrome carries no inspector pane");
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(pane.CanResize, Is.True, "the panel a person reads rows in cannot be widened");
+            Assert.That(Sizer(pane)?.Visibility, Is.EqualTo(Visibility.Visible), "it has no edge to catch");
+        });
+
+        // ...and the layer has to have TAKEN it: a pane with no layer to measure the drag against reads every press on
+        // its edge and does nothing with it, which is exactly what "the resize disappeared" looks like.
+        Assert.That(pane.Layer, Is.Not.Null, "the chrome never took the pane, so its edge has nothing to measure by");
+
+        // What a drag of 80 pixels inwards writes.
+        var wider = pane.ActualWidth + 80;
+
+        pane.Width = wider;
+
+        Settle(window);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(pane.Width, Is.EqualTo(wider).Within(0.5), "the width was written over");
+            Assert.That(pane.RenderSize.Width, Is.EqualTo(wider).Within(0.5), "the pane was arranged at another width");
+        });
+    }
+
+
+    private static void Settle(Window window)
+    {
+        for (var i = 0; i < 4; i++)
+        {
+            Adamantium.UI.Extensions.WindowExtension.UpdateTree(window);
+            Adamantium.UI.Core.Data.BindingUpdateQueue.Flush();
+        }
+    }
 }

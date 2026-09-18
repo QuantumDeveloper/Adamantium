@@ -54,7 +54,13 @@ internal sealed class RecordingDrawingSession : IDrawingSession
         return this;
     }
 
-    public IDrawingSession DrawRectangle(Brush brush, Rect destinationRect, CornerRadius corners, Pen pen = null) => this;
+    // RECORDED like the square-cornered one. It used to answer nothing, so a test could not tell a control that draws a
+    // rounded ground from one that draws nothing at all - which is the whole question about a picture with no file.
+    public IDrawingSession DrawRectangle(Brush brush, Rect destinationRect, CornerRadius corners, Pen pen = null)
+    {
+        Rectangles.Add((brush, destinationRect, pen));
+        return this;
+    }
 
     public IDrawingSession DrawBorder(Brush background, Rect destinationRect, CornerRadius corners, Brush borderBrush,
         Thickness borderThickness) => this;

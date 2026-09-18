@@ -132,8 +132,10 @@
                             <StackPanel Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Center">
                                 <!-- Put the default back, only where there is something to put back - see Fluent's
                                      set. -->
+                                <!-- ALWAYS THERE and disabled until there is something to put back - see Fluent's set:
+                                     its room is kept, so a line does not change shape because somebody typed in it. -->
                                 <Button x:Name="PART_Reset"
-                                        Visibility="Collapsed"
+                                        IsEnabled="False"
                                         Width="22" Height="22" MinWidth="0" MinHeight="0"
                                         Padding="0" Margin="0 0 2 0"
                                         ToolTipService.ToolTip="Reset to the default">
@@ -155,7 +157,20 @@
                             <Setter TargetName="PART_Action" Property="Visibility" Value="Visible"/>
                         </PropertyTrigger>
                         <PropertyTrigger Property="IsModified" Value="true">
-                            <Setter TargetName="PART_Reset" Property="Visibility" Value="Visible"/>
+                            <Setter TargetName="PART_Reset" Property="IsEnabled" Value="True"/>
+                        </PropertyTrigger>
+
+                        <!-- The other two manners a panel can be asked for - see Fluent's set. -->
+                        <MultiTrigger>
+                            <MultiTrigger.Conditions>
+                                <Condition Property="ResetButton" Value="WhenModified"/>
+                                <Condition Property="IsModified" Value="false"/>
+                            </MultiTrigger.Conditions>
+                            <Setter TargetName="PART_Reset" Property="Visibility" Value="Collapsed"/>
+                        </MultiTrigger>
+
+                        <PropertyTrigger Property="ResetButton" Value="Never">
+                            <Setter TargetName="PART_Reset" Property="Visibility" Value="Collapsed"/>
                         </PropertyTrigger>
                         <PropertyTrigger Property="HasChildren" Value="true">
                             <Setter TargetName="Glyph" Property="Visibility" Value="Visible"/>
