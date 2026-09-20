@@ -80,15 +80,18 @@ namespace Adamantium.UI.Sandbox
 
         private async void LoadModels()
         {
-            var entity = await ImportModel(SandboxAssets.Models.F15C.F_15C_Eagle_dae);
-            EntityWorld.EntityManager.AddEntity(entity);
+            await LoadAndAddModel(SandboxAssets.Models.F15C.F_15C_Eagle_dae);
         }
 
-        /// <summary>Loads a model file and adds it to the scene - the runtime "load model" path the game menu uses.</summary>
+        /// <summary>Loads a model file and adds it to the scene - the runtime "load model" path the game menu uses. The
+        /// model becomes the subject the camera can follow: in a scene with one thing in it, that thing is the one the
+        /// third-person modes are about.</summary>
         public async Task<Entity> LoadAndAddModel(string pathToFile)
         {
             var entity = await ImportModel(pathToFile);
             EntityWorld.EntityManager.AddEntity(entity);
+
+            GamePlayManager.SetUserControlled(entity);
             return entity;
         }
     }

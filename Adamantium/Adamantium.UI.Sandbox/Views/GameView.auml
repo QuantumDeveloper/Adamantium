@@ -9,11 +9,43 @@
             </RenderTargetPanel.Behaviors>
         </RenderTargetPanel>
 
-        <!-- Always-visible toggle in the corner. -->
-        <Button Content="{Binding MenuButtonText}"
-                Command="{Binding ToggleMenuCommand}"
-                HorizontalAlignment="Left" VerticalAlignment="Top"
-                Width="120" Height="34" Margin="16"/>
+        <!-- Always-visible toggle in the corner, with the camera's travel speed under it. -->
+        <StackPanel Orientation="Vertical" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="16">
+            <Button Content="{Binding MenuButtonText}"
+                    Command="{Binding ToggleMenuCommand}"
+                    Width="120" Height="34"/>
+            <TextBlock Text="Camera speed" MarginTop="10" MarginBottom="4"
+                       Foreground="{ResourceReference TextFillColorSecondary}"/>
+            <NumericUpDown Value="{Binding CameraSpeed, Mode=TwoWay}"
+                           Width="120" Minimum="0.01" Maximum="10000"
+                           SmallChange="1" LargeChange="10" StringFormat="N2"/>
+            <Button Content="Reset camera" Command="{Binding ResetCameraCommand}"
+                    Width="120" Height="30" MarginTop="10"/>
+        </StackPanel>
+
+        <!-- What the GAME'S OWN rendering costs, opposite corner - not the rate the panel ticks it at, which would
+             only ever report the interface back. -->
+        <StackPanel Orientation="Vertical" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="16">
+            <TextBlock Text="{Binding Fps, StringFormat='FPS: {0:F0}'}"
+                       HorizontalAlignment="Right"
+                       FontSize="18" Foreground="{ResourceReference TextFillColorPrimary}"/>
+            <TextBlock Text="{Binding FrameCostMs, StringFormat='{0:F2} ms/frame'}"
+                       HorizontalAlignment="Right" MarginTop="2"
+                       Foreground="{ResourceReference TextFillColorSecondary}"/>
+        </StackPanel>
+
+        <!-- How to fly it, bottom-left. A world with no landmarks tells a person nothing about what the keyboard does,
+             and the keys are the engine's (InputService), not this tab's - so they are stated, not guessed at. -->
+        <StackPanel Orientation="Vertical" HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="16">
+            <TextBlock Text="WASD — move, mouse — look around"
+                       Foreground="{ResourceReference TextFillColorSecondary}"/>
+            <TextBlock Text="Q / E — up / down" MarginTop="2"
+                       Foreground="{ResourceReference TextFillColorSecondary}"/>
+            <TextBlock Text="Numpad + / − — double or halve the speed" MarginTop="2"
+                       Foreground="{ResourceReference TextFillColorSecondary}"/>
+            <TextBlock Text="F1 — free camera, F3 / F4 / F5 — follow the model" MarginTop="2"
+                       Foreground="{ResourceReference TextFillColorSecondary}"/>
+        </StackPanel>
 
         <!-- The overlay menu: collapsed when IsMenuVisible is false (declarative DataTrigger). Themed - a card surface with
              an accent outline, so it follows a theme/accent swap instead of hardcoded colours. -->
@@ -33,8 +65,9 @@
                            Foreground="{ResourceReference TextFillColorPrimary}"/>
                 <Button Content="Continue" Command="{Binding ToggleMenuCommand}" Height="36" Margin="0,0,0,8"/>
                 <Button Content="Load F-15" Command="{Binding LoadF15Command}" Height="36" Margin="0,0,0,8"/>
-                <Button Content="Load Monkey" Command="{Binding LoadMonkeyCommand}" Height="36" Margin="0,0,0,8"/>
-                <Button Content="Load Swordman" Command="{Binding LoadSwordmanCommand}" Height="36"/>
+                <!-- No Swordman: it is a rigged model and character animation is not connected yet, so loading it
+                     takes the application down. Bring the button back with the animation. -->
+                <Button Content="Load Monkey" Command="{Binding LoadMonkeyCommand}" Height="36"/>
                 <TextBlock Text="{Binding Status}" HorizontalAlignment="Center" Margin="0,16,0,0"
                            Foreground="{ResourceReference TextFillColorSecondary}"/>
             </StackPanel>

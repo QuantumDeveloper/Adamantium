@@ -1,4 +1,4 @@
-﻿using Adamantium.UI;
+using Adamantium.UI;
 using System;
 using Adamantium.UI.Controls.DrawingBoard;
 
