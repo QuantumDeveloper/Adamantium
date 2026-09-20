@@ -219,6 +219,19 @@ namespace Adamantium.ECS.Components
             Type = CameraType.Special;
         }
 
+        /// <summary>Drops a turn or a flight still in progress, leaving the camera exactly where it got to. What a drag
+        /// needs before it takes over: otherwise the animation keeps writing the rotation the drag is changing.</summary>
+        public void CancelTravel()
+        {
+            if (rotationDone && moveToObjectDone) return;
+
+            rotationDone = true;
+            moveToObjectDone = true;
+            rotationDuration = 0;
+            moveToDuration = 0;
+            SetFreeCamera();
+        }
+
         private void ContiniousRotation(AppTime gameTime)
         {
             if (!rotationDone)
@@ -234,6 +247,17 @@ namespace Adamantium.ECS.Components
                     SetFreeCamera();
                 }
             }
+        }
+
+        /// <inheritdoc />
+        /// <inheritdoc />
+        public override void MoveTo(Vector3 position, int time)
+        {
+            moveTime = time;
+            moveToObjectDone = false;
+            moveToDuration = 0;
+            startingOffset = Owner.Transform.Position;
+            endingPosition = position;
         }
 
         /// <inheritdoc />
@@ -268,8 +292,18 @@ namespace Adamantium.ECS.Components
 
         public override void Update(AppTime gameTime)
         {
-            Rotation.Normalize();
+            // Rotation is a STRUCT behind a property: Rotation.Normalize() normalised a copy and dropped it, so the
+            // quaternion drifted from unit length as mouse-look multiplied into it - and a non-unit quaternion scales
+            // the rotation matrix, shrinking the third-person offset until the camera sat inside its subject.
+            var rotation = Rotation;
+            rotation.Normalize();
+            Rotation = rotation;
+
             MoveToPoint(gameTime);
+
+            // Whatever the camera type is. It used to tick only inside the Special branch, so the orientation gizmo
+            // armed a turn the free camera never performed - the click registered and nothing moved.
+            ContiniousRotation(gameTime);
             if (Type == CameraType.Free)
             {
                 ViewMatrix = Matrix4x4F.RotationQuaternion(Rotation);
@@ -282,7 +316,6 @@ namespace Adamantium.ECS.Components
             }
             else if (Type == CameraType.Special)
             {
-                ContiniousRotation(gameTime);
                 if (LookAtObject == null)
                 {
                     ViewMatrix = Matrix4x4F.RotationQuaternion(Rotation);
@@ -297,6 +330,14 @@ namespace Adamantium.ECS.Components
             }
             else
             {
+                // A subject that has gone away leaves an orbit around nowhere.
+                if (Subject == null)
+                {
+                    SetFreeCamera();
+                    ViewMatrix = Matrix4x4F.RotationQuaternion(Rotation);
+                    return;
+                }
+
                 QuaternionF tmpRotation;
 
                 if (Type == CameraType.ThirdPersonLocked)
@@ -310,23 +351,18 @@ namespace Adamantium.ECS.Components
                 }
 
                 Matrix4x4F rotMatrix = Matrix4x4F.RotationQuaternion(tmpRotation);
-                var center1 = Owner.Owner.GetCenterAbsolute();
-                Owner.Transform.Position = center1 - Vector3.Multiply(new Vector3(rotMatrix.M13, rotMatrix.M23, rotMatrix.M33), Radius);
 
-                if (LookAt != null)
-                {
-                    ViewMatrix = Matrix4x4F.LookAtRH(
-                        Vector3F.Zero,
-                        (Vector3) LookAt - Owner.Transform.Position,
-                        new Vector3F(rotMatrix.M12, rotMatrix.M22, rotMatrix.M32));
-                }
-                else
-                {
-                    ViewMatrix = Matrix4x4F.LookAtRH(
-                        Vector3F.Zero,
-                        center1 - Owner.Transform.Position,
-                        new Vector3F(rotMatrix.M12, rotMatrix.M22, rotMatrix.M32));
-                }
+                var back = Vector3.Multiply(new Vector3(rotMatrix.M13, rotMatrix.M23, rotMatrix.M33), Radius);
+
+                // In the subject's space, from its CENTRE: an offset from the origin orbits whatever point the model
+                // was authored around, not the thing on screen.
+                var center = (Vector3)Subject.GetLocalCenter();
+                Owner.Transform.Position = center - back;
+
+                ViewMatrix = Matrix4x4F.LookAtLH(
+                    Vector3F.Zero,
+                    LookAt != null ? (Vector3)LookAt - Owner.Transform.Position : back,
+                    new Vector3F(rotMatrix.M12, rotMatrix.M22, rotMatrix.M32));
 
             }
 
@@ -548,6 +584,7 @@ namespace Adamantium.ECS.Components
             }
             if (hostObject != null)
             {
+                // Transforms are relative to the parent, so this link is what turns the offset below into "behind it".
                 Owner.Owner = hostObject;
 
                 HostUpVector = EntityRotationMatrix.Up;
@@ -561,7 +598,21 @@ namespace Adamantium.ECS.Components
                     }
                     else
                     {
-                        Radius = hostObject.GetDiameter() * (Fov/2);
+                        // From the CENTRE: get out of the body, then stand back far enough for the diameter to
+                        // subtend the field of view. Fov is in DEGREES.
+                        var diameter = hostObject.GetDiameter();
+
+                        if (diameter > 0)
+                        {
+                            var framed = diameter / 2 + diameter / (2 * Math.Tan(MathHelper.DegreesToRadians(Fov / 2)));
+                            Radius = framed * FramingMargin;
+                        }
+                        else if (Radius <= 0)
+                        {
+                            // Nothing measurable to frame - a subject whose bounds have not been built yet. Keep the
+                            // distance we already stand at rather than collapsing the orbit onto its centre.
+                            Radius = (WorldPosition - hostObject.GetCenterAbsolute()).Length();
+                        }
                     }
                 }
 
@@ -642,7 +693,10 @@ namespace Adamantium.ECS.Components
         public override void DeleteThirdPersonConfig()
         {
             Type = CameraType.Free;
-            Owner.Owner = null;
+
+            // Fold the offset back into world: it only meant something relative to the subject.
+            if (Owner?.Owner is { } was) Owner.Transform.Position = was.GetCenterAbsolute() + Owner.Transform.Position;
+            if (Owner != null) Owner.Owner = null;
         }
     }
 }

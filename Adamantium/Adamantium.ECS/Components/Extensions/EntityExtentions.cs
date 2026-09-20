@@ -28,13 +28,13 @@ namespace Adamantium.ECS.Components.Extensions
 
         public static Vector3 GetCenterAbsolute(this Entity owner)
         {
-            var collision = owner.GetComponent<Collider>();
-            if (collision == null)
-            {
-                return owner.Transform.Position;
-            }
+            // WORLD, through the parents - it used to read the entity's own Position, which is relative to its parent.
             var transform = owner.Transform;
-            return (collision.LocalCenter * transform.Scale) + transform.Pivot;
+            var collision = owner.GetComponent<Collider>();
+
+            return collision == null
+                ? transform.WorldPosition
+                : transform.WorldPosition + (collision.LocalCenter * transform.Scale);
         }
 
         public static Vector3F GetLocalCenter(this Entity owner)
@@ -73,12 +73,11 @@ namespace Adamantium.ECS.Components.Extensions
         {
             if (owner == null) return 0;
             
+            // No bounds, no size. It used to answer with the largest component of the entity's POSITION, which was
+            // never a diameter and is now a position relative to a parent besides.
             var collision = owner.GetComponent<Collider>();
-            if (collision == null)
-            {
-                return Vector3F.Max(owner.Transform.Position);
-            }
-            return Vector3F.Max(collision.Bounds.Size);
+
+            return collision == null ? 0 : Vector3F.Max(collision.Bounds.Size);
         }
 
         public static Matrix4x4F GetActualMatrixF(this Entity owner, CameraBase camera)
@@ -103,7 +102,7 @@ namespace Adamantium.ECS.Components.Extensions
 
         public static Vector3 GetOwnerPosition(this IEntityOwner component)
         {
-            return component.Owner.Transform.Position;
+            return component.Owner.Transform.WorldPosition;
         }
 
         public static QuaternionF GetOwnerRotation(this IEntityOwner component)

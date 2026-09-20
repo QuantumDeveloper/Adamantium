@@ -74,8 +74,9 @@ public class TransformService : EntityService
                 // (dirty - also set below when its PARENT moved), the CAMERA position (the world is camera-relative; note a
                 // rotating camera does NOT move, so mouse-look costs nothing), the shared pivot, or a first-ever compute.
                 // A static scene therefore skips the whole matrix + collider pass instead of rebuilding it every frame.
+                // WORLD position: a parented camera's local offset barely changes while its subject flies.
                 if (!dirty && metadata.Computed
-                    && metadata.LastCameraPosition == camera.Owner.Transform.Position
+                    && metadata.LastCameraPosition == camera.WorldPosition
                     && metadata.LastPivotCorrection == generalCenter)
                 {
                     continue;

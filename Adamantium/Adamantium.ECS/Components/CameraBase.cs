@@ -88,6 +88,18 @@ namespace Adamantium.ECS.Components
             set => SetProperty(ref lookAtObject, value);
         }
 
+        /// <summary>The object a third-person camera FOLLOWS. It IS the parent of the camera's entity: transforms are
+        /// relative to the parent, so the follow link and the transform link are one thing.</summary>
+        public Entity Subject => Owner?.Owner;
+
+        /// <summary>Air a third-person camera keeps around its subject, as a multiple of the edge-to-edge framing
+        /// distance. Ignored when an explicit distance is passed to <c>SetThirdPersonCamera</c>.</summary>
+        public Double FramingMargin { get; set; } = 2;
+
+        /// <summary>Where the camera is IN THE WORLD. Its own <c>Transform.Position</c> is relative to its parent, and
+        /// a third-person camera hangs off the object it follows - the scene is shifted by THIS one.</summary>
+        public Vector3 WorldPosition => Owner?.Transform.WorldPosition ?? Vector3.Zero;
+
         /// <summary>
         /// Gets or Sets value indicating does ZNear and ZFar planes should be reversed for inverted depth buffer
         /// </summary>
@@ -194,12 +206,14 @@ namespace Adamantium.ECS.Components
         {
             get
             {
-                if (Owner?.Owner == null)
+                if (Subject == null)
                 {
                     return Matrix4x4F.Identity;
                 }
 
-                return Matrix4x4F.RotationQuaternion(Owner.Transform.Rotation);
+                // The SUBJECT's rotation. The guard used to ask about the host and the answer described the camera
+                // (Owner.Transform is the camera's own), so every caller got the camera's rotation handed back.
+                return Matrix4x4F.RotationQuaternion(Subject.Transform.Rotation);
             }
         }
 
@@ -348,12 +362,17 @@ namespace Adamantium.ECS.Components
         /// <param name="time"></param>
         public abstract void JumpToObject(Entity lookAtObject, int time);
 
+        /// <summary>Travels to a point over <paramref name="time"/> milliseconds. The same machinery
+        /// <see cref="JumpToObject"/> rides - offered because a place can be worth flying to without an object there
+        /// to aim at.</summary>
+        public abstract void MoveTo(Vector3 position, int time);
+
         ///<summary>
         ///Returns quaternion, which has the same angle as the forward vector of the hosted object in left handed coordinate system
         ///</summary>
         public QuaternionF SyncRotationWithEntityForwardLH()
         {
-            return QuaternionF.RotationLookAtLH(RotationMatrix.Forward, RotationMatrix.Up);
+            return QuaternionF.RotationLookAtLH(SubjectForward, EntityRotationMatrix.Up);
         }
 
         ///<summary>
@@ -361,7 +380,11 @@ namespace Adamantium.ECS.Components
         ///</summary>
         public QuaternionF SyncRotationWithEntityBackwardLH()
         {
-            return QuaternionF.RotationLookAtLH(RotationMatrix.Backward, RotationMatrix.Up);
+            return QuaternionF.RotationLookAtLH(-SubjectForward, EntityRotationMatrix.Up);
         }
+
+        /// <summary>Which way the <see cref="Subject"/> FACES: -Z, as <c>Matrix4x4F.Forward</c> states and the models
+        /// are authored. Not <see cref="Vector3.ForwardLH"/> (+Z), which is about VIEW space depth.</summary>
+        public Vector3F SubjectForward => EntityRotationMatrix.Forward;
     }
 }

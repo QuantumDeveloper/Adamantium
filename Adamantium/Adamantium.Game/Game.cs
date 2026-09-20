@@ -42,6 +42,11 @@ public class Game : PropertyChangedBase, IGame
 
     private TimeSpan totalTime;
 
+    // The game's OWN rendering cost, kept apart from the cadence it is ticked at. See DrawTimeMs / RenderFps.
+    private readonly System.Diagnostics.Stopwatch renderTimer = new();
+    private double renderSeconds, renderWindow;
+    private int renderedFrames;
+
     private readonly PreciseTimer gameTimer;
 
     private Double fpsTime;
@@ -170,7 +175,17 @@ public class Game : PropertyChangedBase, IGame
     public double TimeStep => 1.0d / DesiredFPS;
         
     public UInt32 DesiredFPS { get; set; }
-        
+
+    /// <summary>What ONE of the game's own frames costs on the CPU - recording the scene and submitting it - averaged
+    /// over the last second. The GPU's own time is not in it: <c>Draw</c> records commands, it does not wait for them.
+    /// </summary>
+    public Double DrawTimeMs { get; private set; }
+
+    /// <summary>Frames per second the game's RENDERING could sustain, from <see cref="DrawTimeMs"/>. Deliberately not
+    /// the rate it is ticked at: a hosted game is driven once per frame of whoever hosts it, so counting ticks reports
+    /// the HOST and says nothing about what the scene costs.</summary>
+    public Single RenderFps { get; private set; }
+
     /// <summary>
     /// Condition on which game loop will be exited
     /// </summary>
@@ -502,11 +517,26 @@ public class Game : PropertyChangedBase, IGame
     private void ExecuteDrawSequence2(AppTime gameTime)
     {
         if (!gamePlatform.HasOutputs) return;
-                
+
         if (BeginScene())
         {
+            renderTimer.Restart();
             Draw(gameTime);
+            renderSeconds += renderTimer.Elapsed.TotalSeconds;
+            renderedFrames++;
         }
+
+        // Over a second, like the loop's own counter: a single frame is noise, and a rate recomputed every frame is
+        // unreadable on screen.
+        renderWindow += gameTime.FrameTime;
+        if (renderWindow < 1.0) return;
+
+        DrawTimeMs = renderedFrames > 0 ? renderSeconds * 1000.0 / renderedFrames : 0;
+        RenderFps = renderSeconds > 0 ? (Single)(renderedFrames / renderSeconds) : 0;
+
+        renderWindow = 0;
+        renderSeconds = 0;
+        renderedFrames = 0;
     }
 
     private void InitializeBeforeRun()

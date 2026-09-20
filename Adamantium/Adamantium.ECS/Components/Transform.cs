@@ -29,7 +29,28 @@ namespace Adamantium.ECS.Components
 
         public Vector3F GetRelativePosition(Vector3 offset)
         {
-            return (Vector3F)(Position - offset);
+            return WorldPosition - offset;
+        }
+
+        /// <summary>Where this entity is IN THE WORLD: its own position composed through its parents. <see cref="Position"/>
+        /// is relative to the parent, so for anything below a root the two differ. Camera-independent, unlike
+        /// <see cref="TransformMetaData.AbsoluteWorld"/>, which the render pass records per camera.</summary>
+        public Vector3 WorldPosition
+        {
+            get
+            {
+                var world = Matrix4x4F.Translation((Vector3F)Position);
+
+                for (var at = Owner?.Owner; at != null; at = at.Owner)
+                {
+                    var t = at.Transform;
+                    world *= Matrix4x4F.Scaling(t.Scale)
+                             * Matrix4x4F.RotationQuaternion(t.Rotation)
+                             * Matrix4x4F.Translation((Vector3F)t.Position);
+                }
+
+                return (Vector3)world.TranslationVector;
+            }
         }
 
         public void RemoveMetadata(CameraBase camera)
@@ -498,22 +519,22 @@ namespace Adamantium.ECS.Components
             // transform now flows into its children. For a root, parentWorld is identity and this leaves the matrix as-is.
             var absoluteWorld = localMatrix * parentWorld;
 
-            // Camera-relative render matrix: the view matrix is rotation-only (the camera sits at the origin), so shift
-            // the composed world by the camera's own position. The game's Free camera is always at zero -> a no-op there;
-            // this only matters for the moving tool/third-person cameras.
-            var cameraPosition = (Vector3F)camera.Owner.Transform.Position;
+            // Camera-relative render matrix: the view is rotation-only, so shift the world by the camera's WORLD
+            // position - Transform.Position is relative to a parent, which a third-person camera has.
+            var cameraWorld = camera.WorldPosition;
+            var cameraPosition = (Vector3F)cameraWorld;
             var renderWorld = absoluteWorld * Matrix4x4F.Translation(-cameraPosition);
 
             var metadata = GetMetadata(camera);
             metadata.AbsoluteWorld = absoluteWorld;
-            metadata.RelativePosition = GetRelativePosition(camera.Owner.Transform.Position);
+            metadata.RelativePosition = GetRelativePosition(cameraWorld);
             metadata.Pivot = finalPivot;
             metadata.WorldMatrixF = renderWorld;
             metadata.WorldMatrix = (Matrix4x4)renderWorld;
             metadata.Rotation = Rotation;
             metadata.Scale = Scale;
             // Record the inputs so TransformService can skip this (camera, node) next frame if none of them changed.
-            metadata.LastCameraPosition = camera.Owner.Transform.Position;
+            metadata.LastCameraPosition = cameraWorld;
             metadata.LastPivotCorrection = pivotCorrection;
             metadata.Computed = true;
             return renderWorld;

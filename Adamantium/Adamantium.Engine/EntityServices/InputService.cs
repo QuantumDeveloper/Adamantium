@@ -4,6 +4,7 @@ using Adamantium.Core;
 using Adamantium.Engine.Managers;
 using Adamantium.Engine.Services;
 using Adamantium.ECS;
+using Adamantium.ECS.Components;
 using Adamantium.ECS.Components.Extensions;
 using Adamantium.Game.Core;
 using Adamantium.Game.Core.Input;
@@ -45,10 +46,17 @@ public class InputService : EntityService
     public override bool IsRenderingService => false;
     public override EntityServiceType ServiceType => EntityServiceType.Update;
 
+    /// <summary>Whether the third-person keys follow the WHOLE object or the exact entity that was picked. Picking
+    /// hands back a mesh, which for a single model is rarely what "follow it" means - but one carriage of a train is,
+    /// so an editor turns this off and decides for itself.</summary>
+    public bool FollowsWholeObject { get; set; } = true;
+
     public override void Update(AppTime gameTime)
     {
-        //userControlledEntity = gamePlayManager.SelectedEntity;
-        userControlledEntity = toolsManager.SelectedEntity;
+        // The editor's SELECTION first, then whatever the application put the player in charge of. Only the first half
+        // was read, so an application that never opens a tool panel had no subject at all - and every key that follows
+        // one (the third-person modes) quietly did nothing.
+        userControlledEntity = toolsManager.SelectedEntity ?? gamePlayManager.UserControlledEntity;
         var cameraController = DependencyResolver.Resolve<CameraManager>();
 
         var currentCamera = cameraController?.UserControlledCamera;
@@ -256,7 +264,9 @@ public class InputService : EntityService
                   SetFirstPersonCamera(UserControlledCamera, UserControlledCamera.Offset, UserControlledCamera.Rotation, radius);*/
         }
 
-        if (inputManager.IsKeyDown(Keys.F3))
+        // PRESSED, not held: F3 re-entered third person on every frame the key was down, rebuilding the orbit from
+        // scratch each time - which is what a held key looked like it was doing wrong.
+        if (inputManager.IsKeyPressed(Keys.F3))
         {
             if (cameraController.SetUserControlled(toolsManager.SelectedEntity))
             {
@@ -264,31 +274,18 @@ public class InputService : EntityService
             }
             else
             {
-                if (currentCamera.Type != CameraType.ThirdPersonFree ||
-                    currentCamera.Owner != userControlledEntity)
-                {
-                    currentCamera.SetThirdPersonCamera(userControlledEntity, Vector3F.Zero, CameraType.ThirdPersonFree);
-                }
+                Follow(currentCamera, userControlledEntity, Vector3F.Zero, CameraType.ThirdPersonFree);
             }
         }
 
         if (inputManager.IsKeyPressed(Keys.F4))
         {
-            if (currentCamera.Type != CameraType.ThirdPersonFreeAlt ||
-                currentCamera.Owner != userControlledEntity)
-            {
-                currentCamera.SetThirdPersonCamera(userControlledEntity, new Vector3F(-10, 0, 0), CameraType.ThirdPersonFreeAlt);
-            }
+            Follow(currentCamera, userControlledEntity, new Vector3F(-10, 0, 0), CameraType.ThirdPersonFreeAlt);
         }
 
         if (inputManager.IsKeyPressed(Keys.F5))
         {
-            if (currentCamera.Type != CameraType.ThirdPersonLocked ||
-                currentCamera.Owner != userControlledEntity)
-            {
-                currentCamera.SetThirdPersonCamera(userControlledEntity,
-                    new Vector3F(-10, 0, 0), CameraType.ThirdPersonLocked);
-            }
+            Follow(currentCamera, userControlledEntity, new Vector3F(-10, 0, 0), CameraType.ThirdPersonLocked);
         }
 
         // for camera look backwards
@@ -336,6 +333,27 @@ public class InputService : EntityService
         {
             //audioManager.Stop();
         }
+    }
+
+    // Only when it changes something: the old guards compared the camera's OWN entity against the subject, never
+    // equal, so every press rebuilt the orbit.
+    private void Follow(Camera camera, Entity subject, Vector3F relativeRotation, CameraType type)
+    {
+        if (subject == null) return;
+
+        if (FollowsWholeObject) subject = RootOf(subject);
+
+        if (camera.Type == type && camera.Subject == subject) return;
+
+        camera.SetThirdPersonCamera(subject, relativeRotation, type);
+    }
+
+    private static Entity RootOf(Entity entity)
+    {
+        var root = entity;
+        while (root.Owner != null) root = root.Owner;
+
+        return root;
     }
 
     private void EntityManagerEntityRemoved(object sender, EntityEventArgs e)

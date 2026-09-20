@@ -12,7 +12,7 @@ namespace Adamantium.ECS.Components
     // use-after-dispose, ownership ambiguity - into the data layer for no benefit. NamedObject still supplies the INPC
     // SetProperty (via PropertyChangedBase) and the Name.
     [ViewModel]
-    public abstract partial class Component : AdamantiumViewModel, IComponent, IControllableComponent, IInitializable, IEntityOwner, ICloneableComponent
+    public abstract partial class Component: IComponent, IControllableComponent, IInitializable, IEntityOwner, ICloneableComponent
     {
         protected Component()
         {
