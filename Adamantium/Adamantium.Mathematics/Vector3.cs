@@ -1028,7 +1028,8 @@ namespace Adamantium.Mathematics
             Matrix4x4.Invert(ref worldViewProjection, out matrix);
 
             v.X = (((vector.X - x) / width) * 2.0f) - 1.0f;
-            v.Y = -((((vector.Y - y) / height) * 2.0f) - 1.0f);
+            // Y DOWN, like the single-precision twin - see the note there.
+            v.Y = (((vector.Y - y) / height) * 2.0f) - 1.0f;
             v.Z = (vector.Z - minZ) / (maxZ - minZ);
 
             TransformCoordinate(ref v, ref matrix, out result);

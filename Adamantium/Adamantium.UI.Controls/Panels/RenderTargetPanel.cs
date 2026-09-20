@@ -206,30 +206,35 @@ public class RenderTargetPanel : Grid
    {
       base.OnMouseLeftButtonDown(sender, e);
       _leftDown = true;
-      if (MouseLookMode == MouseLookMode.Drag) Engage();
-      else if (MouseLookMode == MouseLookMode.Continuous) Focus();
+
+      // NO grab on the left button: looking around is the RIGHT one (that is the button the engine rotates the camera
+      // with). Grabbing here hid and re-centred the cursor on a plain click, so every left-click pick measured from
+      // the middle of the surface instead of where it landed.
+      if (MouseLookMode == MouseLookMode.Continuous) 
+         Focus();
    }
 
    protected override void OnMouseLeftButtonUp(object sender, MouseButtonEventArgs e)
    {
       base.OnMouseLeftButtonUp(sender, e);
       _leftDown = false;
-      if (MouseLookMode == MouseLookMode.Drag && !_rightDown) Disengage();
    }
 
    protected override void OnMouseRightButtonDown(object sender, MouseButtonEventArgs e)
    {
       base.OnMouseRightButtonDown(sender, e);
       _rightDown = true;
-      if (MouseLookMode == MouseLookMode.Drag) Engage();
-      else if (MouseLookMode == MouseLookMode.Continuous) Focus();
+      if (MouseLookMode == MouseLookMode.Drag) 
+         Engage();
+      else if (MouseLookMode == MouseLookMode.Continuous) 
+         Focus();
    }
 
    protected override void OnMouseRightButtonUp(object sender, MouseButtonEventArgs e)
    {
       base.OnMouseRightButtonUp(sender, e);
       _rightDown = false;
-      if (MouseLookMode == MouseLookMode.Drag && !_leftDown) Disengage();
+      if (MouseLookMode == MouseLookMode.Drag) Disengage();
    }
 
    protected override void OnGotFocus(RoutedEventArgs e)

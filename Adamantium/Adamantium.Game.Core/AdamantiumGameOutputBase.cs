@@ -1,10 +1,7 @@
-﻿using System.Collections.Generic;
-using Adamantium.Core.Events;
+﻿using Adamantium.Core.Events;
 using Adamantium.Game.Core.Input;
-using Adamantium.Graphics;
 using Adamantium.Graphics.Core;
 using Adamantium.Imaging;
-using Adamantium.UI;
 using Adamantium.UI.Core;
 using Adamantium.UI.Core.Input;
 using GameMouseButtons = Adamantium.Game.Core.Input.MouseButton;
@@ -18,7 +15,9 @@ namespace Adamantium.Game.Core
         
         public override GameWindowDescription Description { get; protected set; }
 
-        protected IInputComponent InputComponent { get; set; }
+        /// <summary>The component the game's surface IS - a window, or the panel it is hosted in. Public because a
+        /// cursor position only means something relative to it.</summary>
+        public IInputComponent InputComponent { get; protected set; }
 
         protected static readonly Dictionary<Key, Keys> TranslationKeys;
         protected static readonly Dictionary<MouseButtons, GameMouseButtons> MouseTranslationKeys;

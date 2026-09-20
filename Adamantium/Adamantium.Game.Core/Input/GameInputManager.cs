@@ -225,9 +225,23 @@ namespace Adamantium.Game.Core.Input
         {
             get
             {
-                NativePoint point = new NativePoint((int)absolutePosition.X, (int)absolutePosition.Y);
-                Win32Interop.ScreenToClient(Handle, ref point);
-                return new Vector2F(point.X, point.Y);
+                // Relative to the SURFACE the game draws on. A game hosted in a panel does not start at the window's
+                // client origin, so ScreenToClient(window) answered in the wrong space and every pick missed by the
+                // height of the chrome above it.
+                if ((window as AdamantiumGameOutputBase)?.InputComponent is Adamantium.UI.Core.IUIComponent surface)
+                {
+                    // Through the UI's own conversion: it divides by the DPI scale at the root and then walks the
+                    // offsets down in the SAME logical space. Subtracting the surface's screen origin by hand was
+                    // right only at 100% - on a 150% monitor every pick missed by half as much again.
+                    var point = Adamantium.UI.Core.UIExtensions.PointToClient(surface,
+                        new Adamantium.UI.Core.PixelPoint((int)absolutePosition.X, (int)absolutePosition.Y));
+
+                    return new Vector2F((float)point.X, (float)point.Y);
+                }
+
+                NativePoint point2 = new NativePoint((int)absolutePosition.X, (int)absolutePosition.Y);
+                Win32Interop.ScreenToClient(Handle, ref point2);
+                return new Vector2F(point2.X, point2.Y);
             }
         }
 
@@ -252,6 +266,33 @@ namespace Adamantium.Game.Core.Input
         public bool IsMousePositionLocked { get; private set; }
 
         public bool IsLockedToWindowBounds { get; private set; }
+
+        /// <summary>Holds the pointer for a drag the GAME is running - turning a gizmo, say. The cursor is hidden and
+        /// pinned where it was, so the drag carries on past the point where the pointer would have run into the edge of
+        /// the screen, and the motion arrives as <see cref="RawMouseDelta"/> instead of as a position. Released with
+        /// false, which puts the cursor back where the drag began.
+        ///
+        /// <para>The same relative mode the surface's own mouse-look engages - it enters and leaves on the window's own
+        /// thread (the worker posts itself a message), which is what makes it safe to ask for from the game loop.</para></summary>
+        public void HoldPointer(bool hold)
+        {
+            if (hold == isPointerHeld) return;
+            isPointerHeld = hold;
+
+            if ((window as AdamantiumGameOutputBase)?.InputComponent?.RootVisual is not
+                Adamantium.UI.Controls.WindowBase root) return;
+
+            if (hold)
+            {
+                Win32Interop.GetCursorPos(out var point);
+                heldFrom = new Adamantium.UI.Core.PixelPoint(point.X, point.Y);
+            }
+
+            root.SetRelativeMouseMode(hold, hold ? default : heldFrom);
+        }
+
+        private bool isPointerHeld;
+        private Adamantium.UI.Core.PixelPoint heldFrom;
 
         protected virtual void SetMousePosition(Vector2F position)
         {
