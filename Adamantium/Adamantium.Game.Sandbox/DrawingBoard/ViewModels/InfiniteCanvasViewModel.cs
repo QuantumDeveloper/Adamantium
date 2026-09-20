@@ -5,7 +5,6 @@ using Adamantium.Core.Collections;
 using Adamantium.Mathematics;
 using Adamantium.Navigation;
 using Adamantium.MVVM;
-using Adamantium.ProceduralGeometry;
 using Adamantium.UI.Controls;
 using Adamantium.UI.Controls.DrawingBoard;
 using Adamantium.UI.Controls.Buttons;
