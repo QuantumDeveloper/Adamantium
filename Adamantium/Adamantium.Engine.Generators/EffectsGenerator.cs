@@ -12,8 +12,6 @@ public class EffectsGenerator : IIncrementalGenerator
 {
     public void Initialize(IncrementalGeneratorInitializationContext context)
     {
-        NativeLibraryLoader.LoadNativeLibraries();
-        
         var effectFiles = context.AdditionalTextsProvider.Where(file => file.Path.EndsWith(".fx"));
         var includeFiles = context.AdditionalTextsProvider.Where(file => file.Path.EndsWith(".fxh"));
 
@@ -32,17 +30,15 @@ public class EffectsGenerator : IIncrementalGenerator
 
         var includesProvider = includesAndContents.Collect();
 
-        // The assembly NAME, not the whole Compilation. Combining with CompilationProvider re-ran every shader compile
-        // on every keystroke - the compilation changes whenever any C# file does - and a .fx compile is seconds, not
-        // milliseconds. The name is a string that changes when the project is renamed and never otherwise, so an edit
-        // elsewhere in the project no longer costs a shader rebuild. The project directory comes along to place each
-        // effect by its folder, and is a string in the same way.
+        // STRINGS, not the whole Compilation: combining with CompilationProvider recompiled every shader on every
+        // keystroke, because the compilation changes whenever any C# file does.
         var placement = context.CompilationProvider
             .Combine(context.AnalyzerConfigOptionsProvider)
             .Select((pair, _) =>
             {
                 pair.Right.GlobalOptions.TryGetValue("build_property.projectdir", out var projectDir);
-                return (AssemblyName: pair.Left.AssemblyName, ProjectDir: projectDir);
+                pair.Right.GlobalOptions.TryGetValue("build_property.adamantiumslangpath", out var slangPath);
+                return (AssemblyName: pair.Left.AssemblyName, ProjectDir: projectDir, SlangPath: slangPath);
             });
 
         var sourceProvider = fxNamesAndContents
@@ -52,6 +48,20 @@ public class EffectsGenerator : IIncrementalGenerator
         context.RegisterSourceOutput(sourceProvider, (spc, provider) =>
         {
             var ((file, place), includes) = provider;
+
+            // Here, not in Initialize: a project with no .fx never loads a shader compiler. Reported rather than
+            // thrown - a generator that fails to initialize is only a warning, and the assembly comes out empty.
+            var nativeFailure = NativeLibraryLoader.LoadNativeLibraries(place.SlangPath);
+
+            if (nativeFailure != null)
+            {
+                CreateDiagnostic(ref spc, file.name,
+                    $"The shader compiler could not be loaded, so no effect was generated: {nativeFailure} " +
+                    "Slang comes from the Vulkan SDK - check that VULKAN_SDK points at an installed one, and that this " +
+                    "process was started after the last SDK change (an IDE keeps the environment it started with).",
+                    DiagnosticSeverity.Error);
+                return;
+            }
 
             try
             {
@@ -75,10 +85,8 @@ public class EffectsGenerator : IIncrementalGenerator
         });
     }
 
-    /// <summary>Where an effect's class lives: the assembly, then the folders the .fx sits in - the same rule a .cs
-    /// file follows, and the same one the AUML generator uses. The class name is the file name, so two effects named
-    /// alike would collide on a flat namespace; the file system already forbids that within one folder, so following
-    /// the folders is all the uniqueness needed. Effects at the project root give the assembly name unchanged.</summary>
+    /// <summary>The assembly, then the folders the .fx sits in - the rule a .cs file already follows. The class name
+    /// is the file name, so a flat namespace could not hold two effects named alike.</summary>
     private static string ComposeNamespace(string assemblyName, string projectDir, string effectPath)
     {
         if (string.IsNullOrEmpty(projectDir)) return assemblyName;
@@ -112,10 +120,6 @@ public class EffectsGenerator : IIncrementalGenerator
 
         textGenerator.NewLine();
 
-        // The ASSEMBLY's own namespace: an effect compiled into Adamantium.UI.FX is Adamantium.UI.FX.BatchEffect. It
-        // used to be "{RootNamespace}.Effects.Generated", and the root namespace was then held back by hand so moving
-        // the effects into their own assembly would not rename every type - which left the namespace and the assembly
-        // disagreeing for good.
         textGenerator.WriteLine($"namespace {@namespace}");
         textGenerator.WriteOpenBraceAndIndent();
         textGenerator.WriteLine($"public partial class {fxName} : Effect");

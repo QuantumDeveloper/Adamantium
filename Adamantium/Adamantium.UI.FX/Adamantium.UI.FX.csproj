@@ -11,6 +11,16 @@
         <OutputType>Library</OutputType>
     </PropertyGroup>
 
+    <!-- The Slang runtime rides in this package, so the shader compiler does not need the Vulkan SDK installed. Named
+         here only to learn where NuGet put it; the generator is handed the path. -->
+    <ItemGroup>
+        <PackageReference Include="Adamantium.Vulkan.Slang" Version="1.0.7" GeneratePathProperty="true" PrivateAssets="all" />
+    </ItemGroup>
+
+    <PropertyGroup>
+        <AdamantiumSlangPath>$(PKGAdamantium_Vulkan_Slang)</AdamantiumSlangPath>
+    </PropertyGroup>
+
     <ItemGroup>
         <ProjectReference Include="..\Adamantium.Core\Adamantium.Core.csproj" />
         <ProjectReference Include="..\Adamantium.Graphics.Core\Adamantium.Graphics.Core.csproj" />
@@ -28,10 +38,10 @@
         <AdditionalFiles Include="$(ProjectDir)**\*.fx" />
         <AdditionalFiles Include="$(ProjectDir)**\*.fxh" />
         <CompilerVisibleProperty Include="RootNamespace" />
-        <!-- The effects generator places each effect's class by the folder its .fx sits in, and needs the project root
-             to work that folder out. Without it every effect would land in one flat namespace and two files named
-             alike could not coexist. -->
+        <!-- The generator places each effect's class by the folder its .fx sits in, and needs the project root. -->
         <CompilerVisibleProperty Include="ProjectDir" />
+        <!-- Where the Slang runtime is, so shaders build without the Vulkan SDK installed. -->
+        <CompilerVisibleProperty Include="AdamantiumSlangPath" />
         <AdditionalFiles Remove="obj\**" />
         <!-- IDE up-to-date check: rebuild when generator inputs (AdditionalFiles) change. -->
         <UpToDateCheckInput Include="@(AdditionalFiles)" Visible="false" />
