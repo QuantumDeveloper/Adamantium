@@ -6,7 +6,7 @@ using Adamantium.ECS;
 using Adamantium.ECS.Components;
 using Adamantium.Engine.Rendering;
 using Adamantium.Fonts;
-using Adamantium.FX.Effects.Generated;
+using Adamantium.FX;
 using Adamantium.Graphics.Core.EffectsFramework;
 using Adamantium.Graphics.Core.Vertices;
 using Adamantium.Mathematics;

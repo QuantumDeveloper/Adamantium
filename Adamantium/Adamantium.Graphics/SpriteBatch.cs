@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using Adamantium.Core;
-using Adamantium.FX.Effects.Generated;
+using Adamantium.FX;
 using Adamantium.Graphics.Core;
 using Adamantium.Graphics.Core.EffectsFramework;
 using Adamantium.Mathematics;

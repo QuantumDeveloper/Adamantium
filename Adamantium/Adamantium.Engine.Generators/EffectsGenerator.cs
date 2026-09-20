@@ -32,24 +32,20 @@ public class EffectsGenerator : IIncrementalGenerator
 
         var includesProvider = includesAndContents.Collect();
 
+        // The assembly NAME, not the whole Compilation. Combining with CompilationProvider re-ran every shader compile
+        // on every keystroke - the compilation changes whenever any C# file does - and a .fx compile is seconds, not
+        // milliseconds. The name is a string that changes when the project is renamed and never otherwise, so an edit
+        // elsewhere in the project no longer costs a shader rebuild.
+        var assemblyName = context.CompilationProvider.Select((compilation, _) => compilation.AssemblyName);
+
         var sourceProvider = fxNamesAndContents
-            .Combine(context.CompilationProvider)
-            .Combine(context.AnalyzerConfigOptionsProvider)
+            .Combine(assemblyName)
             .Combine(includesProvider);
 
         context.RegisterSourceOutput(sourceProvider, (spc, provider) =>
         {
-            var (((file, compilation), configOptions), includes) = provider;
+            var ((file, @namespace), includes) = provider;
 
-            configOptions.GlobalOptions.TryGetValue("build_property.RootNamespace", out var @namespace);
-            if (string.IsNullOrEmpty(@namespace))
-            {
-                CreateDiagnostic(ref spc,
-                    file.name,
-                    "No RootNamespace Compiler option provided in project file. Please, add <CompilerVisibleProperty Include=\"RootNamespace\" /> to your csproj file",
-                    DiagnosticSeverity.Error);
-            }
-            
             try
             {
                 var text = file.content;
@@ -60,7 +56,7 @@ public class EffectsGenerator : IIncrementalGenerator
                 }
                 else
                 {
-                    var result = GenerateEffect(compilerResult, compilation, file.fxName, @namespace);
+                    var result = GenerateEffect(compilerResult, file.fxName, @namespace);
                     spc.AddSource($"{file.fxName}.g.cs", result);
                 }
             }
@@ -71,7 +67,7 @@ public class EffectsGenerator : IIncrementalGenerator
         });
     }
 
-    private string GenerateEffect(EffectCompilerResult result, Compilation compilation, string fxName, string @namespace)
+    private string GenerateEffect(EffectCompilerResult result, string fxName, string @namespace)
     {
         var textGenerator = new TextGenerator();
         textGenerator.WriteLine("using Adamantium.EffectsCompiler;");
@@ -80,7 +76,11 @@ public class EffectsGenerator : IIncrementalGenerator
 
         textGenerator.NewLine();
 
-        textGenerator.WriteLine($"namespace {@namespace}.Effects.Generated");
+        // The ASSEMBLY's own namespace: an effect compiled into Adamantium.UI.FX is Adamantium.UI.FX.BatchEffect. It
+        // used to be "{RootNamespace}.Effects.Generated", and the root namespace was then held back by hand so moving
+        // the effects into their own assembly would not rename every type - which left the namespace and the assembly
+        // disagreeing for good.
+        textGenerator.WriteLine($"namespace {@namespace}");
         textGenerator.WriteOpenBraceAndIndent();
         textGenerator.WriteLine($"public partial class {fxName} : Effect");
         textGenerator.WriteOpenBraceAndIndent();

@@ -12,7 +12,7 @@ using Adamantium.Mathematics;
 using Adamantium.UI.Core;
 using Adamantium.UI.Core.Graphics;
 using Adamantium.UI.Core.Media;
-using Adamantium.UI.Effects.Generated;
+using Adamantium.UI.FX;
 using Adamantium.UI.Rendering;
 using Adamantium.UI.Rendering.RenderUnits;
 using Adamantium.Vulkan.Core;
@@ -229,13 +229,13 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
 
     // The material passes live in their OWN effect, not the brushes' - putting them in BrushEffect made this driver's
     // shader compiler die on an unrelated pass. See the note at the top of MaterialEffect.fx.
-    private Adamantium.UI.Effects.Generated.MaterialEffect _material;
+    private Adamantium.UI.FX.MaterialEffect _material;
 
-    private Adamantium.UI.Effects.Generated.MaterialEffect Material(Matrix4x4F projection)
+    private Adamantium.UI.FX.MaterialEffect Material(Matrix4x4F projection)
     {
         if (_material != null) return _material;
 
-        _material = new Adamantium.UI.Effects.Generated.MaterialEffect(_device);
+        _material = new Adamantium.UI.FX.MaterialEffect(_device);
         _material.Projection.SetValue(projection);
         _material.TransformsAddress.SetValue(TransformsAddress);
         var vp = _device.CurrentViewports;

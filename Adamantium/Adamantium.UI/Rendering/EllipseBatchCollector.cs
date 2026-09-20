@@ -7,7 +7,7 @@ using Adamantium.Mathematics;
 using Adamantium.ProceduralGeometry.Shapes;
 using Adamantium.UI.Core;
 using Adamantium.UI.Core.Media;
-using Adamantium.UI.Effects.Generated;
+using Adamantium.UI.FX;
 using Adamantium.UI.Rendering.Payloads;
 using Adamantium.Vulkan.Core;
 

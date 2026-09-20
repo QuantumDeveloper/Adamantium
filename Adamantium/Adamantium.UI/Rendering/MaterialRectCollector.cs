@@ -29,7 +29,7 @@ internal sealed class MaterialRectCollector : SdfBatchCollector<MaterialRectItem
     // Its OWN effect, not the brushes'. Putting these shaders in BrushEffect made vkCreateShadersEXT die with an access
     // violation - on the gradient pass, which had worked for months: this driver's compiler has a ceiling per effect,
     // and the brushes were already at it. See the note at the top of MaterialEffect.fx.
-    private Adamantium.UI.Effects.Generated.MaterialEffect Effect;
+    private Adamantium.UI.FX.MaterialEffect Effect;
 
     // How a frame pixel maps into the bound image. A parameter rather than an instance field because it belongs to the
     // SEGMENT, and because it must be recomputed at draw time - see the note on SourceUv in MaterialEffect.fx.
@@ -50,7 +50,7 @@ internal sealed class MaterialRectCollector : SdfBatchCollector<MaterialRectItem
     {
         if (Effect != null) return;
 
-        Effect = new Adamantium.UI.Effects.Generated.MaterialEffect(device);
+        Effect = new Adamantium.UI.FX.MaterialEffect(device);
         SourceUvParam = Effect.SourceUv;
         ProjectionParam = Effect.Projection;
         ViewportSizeParam = Effect.ViewportSize;

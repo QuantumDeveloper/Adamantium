@@ -5,7 +5,7 @@ using Adamantium.Graphics.Core.Presentation;
 using Adamantium.Mathematics;
 using Adamantium.UI.Core;
 using Adamantium.UI.Core.Graphics;
-using Adamantium.UI.Effects.Generated;
+using Adamantium.UI.FX;
 using Adamantium.Vulkan.Core;
 
 namespace Adamantium.UI.Rendering;

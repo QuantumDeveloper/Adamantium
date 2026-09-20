@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using Adamantium.Graphics.Core;
 using Adamantium.UI.Core.Graphics;
-using Adamantium.UI.Effects.Generated;
+using Adamantium.UI.FX;
 using Adamantium.UI.Rendering.Payloads;
 using Adamantium.UI.Rendering.RenderUnits;
 

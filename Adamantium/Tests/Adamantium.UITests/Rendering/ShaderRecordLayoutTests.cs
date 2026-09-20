@@ -23,25 +23,25 @@ public class ShaderRecordLayoutTests
 
     private static readonly Record[] Records =
     {
-        new(typeof(RectItem), "Adamantium.UI.Effects.Generated.BatchEffect", "RectData"),
-        new(typeof(EllipseItem), "Adamantium.UI.Effects.Generated.BatchEffect", "EllipseData"),
-        new(typeof(PolygonItem), "Adamantium.UI.Effects.Generated.BatchEffect", "PolygonData"),
-        new(typeof(HaloRectItem), "Adamantium.UI.Effects.Generated.BatchEffect", "HaloRectData"),
-        new(typeof(HaloLivingItem), "Adamantium.UI.Effects.Generated.BatchEffect", "HaloLivingData"),
-        new(typeof(GradientRectItem), "Adamantium.UI.Effects.Generated.BrushEffect", "GradientRectData"),
-        new(typeof(PatternRectItem), "Adamantium.UI.Effects.Generated.BrushEffect", "PatternRectData"),
-        new(typeof(TextureItem), "Adamantium.UI.Effects.Generated.BrushEffect", "TexRectData"),
-        new(typeof(FractalRectItem), "Adamantium.UI.Effects.Generated.BrushEffect", "FractalRectData"),
-        new(typeof(MaterialRectItem), "Adamantium.UI.Effects.Generated.MaterialEffect", "MaterialRectData"),
-        new(typeof(CanvasArrowItem), "Adamantium.UI.Effects.Generated.ArrowEffect", "ArrowRecord"),
-        new(typeof(GlyphItem), "Adamantium.FX.Effects.Generated.FontEffect", "GlyphData"),
+        new(typeof(RectItem), "Adamantium.UI.FX.BatchEffect", "RectData"),
+        new(typeof(EllipseItem), "Adamantium.UI.FX.BatchEffect", "EllipseData"),
+        new(typeof(PolygonItem), "Adamantium.UI.FX.BatchEffect", "PolygonData"),
+        new(typeof(HaloRectItem), "Adamantium.UI.FX.BatchEffect", "HaloRectData"),
+        new(typeof(HaloLivingItem), "Adamantium.UI.FX.BatchEffect", "HaloLivingData"),
+        new(typeof(GradientRectItem), "Adamantium.UI.FX.BrushEffect", "GradientRectData"),
+        new(typeof(PatternRectItem), "Adamantium.UI.FX.BrushEffect", "PatternRectData"),
+        new(typeof(TextureItem), "Adamantium.UI.FX.BrushEffect", "TexRectData"),
+        new(typeof(FractalRectItem), "Adamantium.UI.FX.BrushEffect", "FractalRectData"),
+        new(typeof(MaterialRectItem), "Adamantium.UI.FX.MaterialEffect", "MaterialRectData"),
+        new(typeof(CanvasArrowItem), "Adamantium.UI.FX.ArrowEffect", "ArrowRecord"),
+        new(typeof(GlyphItem), "Adamantium.FX.FontEffect", "GlyphData"),
         // The RETAINED families read their instances by BDA exactly as the SDF batches do, and were missed by the first
         // pass of this list because they live under Rendering/Retained and are named "...Instance" rather than "...Item".
         // A record left out of here is a record whose two sides can drift in silence, which is the whole point.
-        new(typeof(Adamantium.UI.Rendering.Retained.GeometryInstance), "Adamantium.UI.Effects.Generated.BatchEffect", "GeometryInstance"),
-        new(typeof(Adamantium.UI.Rendering.Retained.GradientGeometryInstance), "Adamantium.UI.Effects.Generated.BrushEffect", "GradGeomData"),
-        new(typeof(Adamantium.UI.Rendering.Retained.TextureGeometryInstance), "Adamantium.UI.Effects.Generated.BrushEffect", "TextureGeomData"),
-        new(typeof(Adamantium.UI.Rendering.Retained.PatternGeometryInstance), "Adamantium.UI.Effects.Generated.BrushEffect", "PatternGeomData"),
+        new(typeof(Adamantium.UI.Rendering.Retained.GeometryInstance), "Adamantium.UI.FX.BatchEffect", "GeometryInstance"),
+        new(typeof(Adamantium.UI.Rendering.Retained.GradientGeometryInstance), "Adamantium.UI.FX.BrushEffect", "GradGeomData"),
+        new(typeof(Adamantium.UI.Rendering.Retained.TextureGeometryInstance), "Adamantium.UI.FX.BrushEffect", "TextureGeomData"),
+        new(typeof(Adamantium.UI.Rendering.Retained.PatternGeometryInstance), "Adamantium.UI.FX.BrushEffect", "PatternGeomData"),
     };
 
     private static IEnumerable<TestCaseData> Cases() =>

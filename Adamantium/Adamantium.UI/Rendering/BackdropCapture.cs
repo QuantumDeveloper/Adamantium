@@ -207,7 +207,7 @@ internal sealed class BackdropCapture : IDisposable
         var levels = CountLevels((uint)width, (uint)height);
         if (levels < 2) return;
 
-        _blur ??= new Adamantium.UI.Effects.Generated.CaptureBlurEffect(gd);
+        _blur ??= new Adamantium.UI.FX.CaptureBlurEffect(gd);
 
         // THE VIEWPORT AND SCISSOR ARE THE FRAME'S, and they are CACHED - the device sends them only when they change.
         // Each level here needs its own, tiny, and leaving the last one behind clipped everything the frame drew after
@@ -283,7 +283,7 @@ internal sealed class BackdropCapture : IDisposable
         gd.SetScissors(scissor);
     }
 
-    private Adamantium.UI.Effects.Generated.CaptureBlurEffect _blur;
+    private Adamantium.UI.FX.CaptureBlurEffect _blur;
 
 
     // Kept between captures and re-made only when the size changes - the same rule the off-screen renderer's target

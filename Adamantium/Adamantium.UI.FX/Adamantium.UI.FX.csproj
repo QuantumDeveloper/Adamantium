@@ -9,10 +9,6 @@
         <CompilerGeneratedFilesOutputPath>$(BaseIntermediateOutputPath)Generated</CompilerGeneratedFilesOutputPath>
         <LangVersion>latest</LangVersion>
         <OutputType>Library</OutputType>
-        <!-- Adamantium.UI, NOT Adamantium.UI.FX: the effects generator emits into "{RootNamespace}.Effects.Generated",
-             and these effects have always been Adamantium.UI.Effects.Generated.*. Keeping the root namespace is what
-             makes this a MOVE of files rather than a rename of every type that draws through them. -->
-        <RootNamespace>Adamantium.UI</RootNamespace>
     </PropertyGroup>
 
     <ItemGroup>

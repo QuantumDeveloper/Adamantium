@@ -23,7 +23,7 @@ namespace Adamantium.UITests.Rendering
             var outDir = Environment.GetEnvironmentVariable("ADAM_DUMP_DIR") ?? Path.GetTempPath();
             Directory.CreateDirectory(outDir);
 
-            var typeName = $"Adamantium.UI.Effects.Generated.{name}";
+            var typeName = $"Adamantium.UI.FX.{name}";
             var effect = Type.GetType($"{typeName}, Adamantium.UI.FX")
                          ?? AppDomain.CurrentDomain.GetAssemblies()
                              .Select(a => a.GetType(typeName)).FirstOrDefault(t => t != null);

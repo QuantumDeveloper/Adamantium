@@ -4,7 +4,7 @@ using Adamantium.Graphics;
 using Adamantium.Graphics.Core;
 using Adamantium.Mathematics;
 using Adamantium.UI.Core.Media;
-using Adamantium.UI.Effects.Generated;
+using Adamantium.UI.FX;
 using Adamantium.Vulkan.Core;
 using Buffer = Adamantium.Graphics.Buffer;
 

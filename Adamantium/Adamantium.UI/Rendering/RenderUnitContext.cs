@@ -1,6 +1,6 @@
 using Adamantium.Graphics.Core;
 using Adamantium.UI.Core.Graphics;
-using Adamantium.UI.Effects.Generated;
+using Adamantium.UI.FX;
 
 namespace Adamantium.UI.Rendering;
 
