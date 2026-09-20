@@ -1,5 +1,4 @@
 ﻿using Adamantium.Core;
-using Adamantium.Graphics;
 using Adamantium.Graphics.Core;
 using Adamantium.Graphics.Core.Models;
 using Adamantium.Mathematics;
@@ -25,6 +24,7 @@ namespace Adamantium.ProceduralGeometry.Shapes
             // Creates a triangle fan to close the end of a cylinder.
             private static void CreateConeCap(
                 List<Vector3> positions,
+                List<Vector3F> normals,
                 List<Vector2F> uvs,
                 List<int> indices,
                 int tessellation,
@@ -70,6 +70,9 @@ namespace Adamantium.ProceduralGeometry.Shapes
                         0.5f - (float)(position.Z / diameter.Y));
 
                     positions.Add(position);
+                    // A cap is FLAT: its whole face looks one way, which is also what keeps the rim a hard edge rather
+                    // than blending into the side.
+                    normals.Add((Vector3F)normal);
                     uvs.Add(uv);
                 }
             }
@@ -111,6 +114,7 @@ namespace Adamantium.ProceduralGeometry.Shapes
                 PrimitiveType primitiveType = PrimitiveType.TriangleList;
 
                 var positions = new List<Vector3>();
+                var normals = new List<Vector3F>();
                 var uvs = new List<Vector2F>();
                 var indices = new List<int>();
 
@@ -126,16 +130,25 @@ namespace Adamantium.ProceduralGeometry.Shapes
                 // Create a ring of triangles around the outside of the cylinder.
                 for (int i = 0; i <= tessellation; i++)
                 {
-                    var normal = GetCircleVector(i, tessellation);
+                    var circle = GetCircleVector(i, tessellation);
 
-                    var sideOffsetTop = normal * topRadius;
-                    var sideOffsetBottom = normal * bottomRadius;
+                    var sideOffsetTop = circle * topRadius;
+                    var sideOffsetBottom = circle * bottomRadius;
+
+                    // The side's normal is the circle direction LEANED toward the narrow end by as much as the radius
+                    // falls away over the height - straight out only when the two radii match and it is a cylinder.
+                    // Written rather than averaged back out of the triangles, which a cone's apex cannot survive: every
+                    // vertex there is the same point, so the faces meeting it have no area to weigh.
+                    var sideNormal = (Vector3F)Vector3.Normalize(
+                        circle * (height * 2) + Vector3.UnitY * (bottomRadius - topRadius));
 
                     var uv = new Vector2F(i / (float)tessellation, 0);
 
                     positions.Add(sideOffsetTop + topOffset);
+                    normals.Add(sideNormal);
                     uvs.Add(uv);
                     positions.Add(sideOffsetBottom - topOffset);
+                    normals.Add(sideNormal);
                     uvs.Add(uv + Vector2F.UnitY);
 
                     indices.Add(i * 2);
@@ -147,17 +160,18 @@ namespace Adamantium.ProceduralGeometry.Shapes
                     indices.Add((i * 2 + 3) % (stride * 2));
                 }
 
-                // Create flat triangle fan caps to seal the top and bottom.
-                CreateConeCap(positions, uvs, indices, tessellation, height, topRadius, true);
-                CreateConeCap(positions, uvs, indices, tessellation, height, bottomRadius, false);
+                // Flat triangle fans to seal the ends - but only an end that HAS a radius. A cone's point is already
+                // closed, and capping it produced a fan of zero-area triangles with NaN texture coordinates (the cap's
+                // uv divides by the diameter, which is zero there).
+                if (topRadius > 0) CreateConeCap(positions, normals, uvs, indices, tessellation, height, topRadius, true);
+                if (bottomRadius > 0) CreateConeCap(positions, normals, uvs, indices, tessellation, height, bottomRadius, false);
 
                 var mesh = new Mesh();
                 mesh.SetTopology(primitiveType).
                     SetPoints(positions).
+                    SetNormals(normals).
                     SetIndices(indices).
-                    SetUVs(0, uvs).
-                    Optimize().
-                    CalculateNormals();
+                    SetUVs(0, uvs);
 
                 return mesh;
             }

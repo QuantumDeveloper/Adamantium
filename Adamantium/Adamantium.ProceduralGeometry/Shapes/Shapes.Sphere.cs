@@ -20,8 +20,9 @@ namespace Adamantium.ProceduralGeometry.Shapes
                     int horizontalSegments = tessellation * 2;
 
                     var vertices = new Vector3[(verticalSegments + 1) * (horizontalSegments + 1)];
-                    var uvs = new Vector2F[(verticalSegments + 1) * (horizontalSegments + 1)];
-                    var indices = new int[verticalSegments * (horizontalSegments + 1) * 6];
+                    var normals = new Vector3F[vertices.Length];
+                    var uvs = new Vector2F[vertices.Length];
+                    var indices = new int[verticalSegments * horizontalSegments * 6];
 
                     var radius = diameter / 2;
 
@@ -48,10 +49,10 @@ namespace Adamantium.ProceduralGeometry.Shapes
                             dz *= dxz;
 
                             var normal = new Vector3(dx, dy, dz);
-                            var textureCoordinate = new Vector2F(1.0f - u, 1.0f - v);
 
                             vertices[vertexCount] = normal * radius;
-                            uvs[vertexCount++] = textureCoordinate;
+                            normals[vertexCount] = (Vector3F)normal;
+                            uvs[vertexCount++] = new Vector2F(1.0f - u, 1.0f - v);
                         }
                     }
 
@@ -61,10 +62,13 @@ namespace Adamantium.ProceduralGeometry.Shapes
                     int indexCount = 0;
                     for (int i = 0; i < verticalSegments; i++)
                     {
-                        for (int j = 0; j <= horizontalSegments; j++)
+                        // STOPS ONE SHORT: the last column is the seam, a duplicate of the first. Wrapping it round
+                        // with a modulo stitched that column to itself - a whole ring of zero-area triangles whose
+                        // normals averaged into the seam and left a dark stripe down the sphere.
+                        for (int j = 0; j < horizontalSegments; j++)
                         {
                             int nextI = i + 1;
-                            int nextJ = (j + 1) % stride;
+                            int nextJ = j + 1;
 
                             indices[indexCount++] = (i * stride + j);
                             indices[indexCount++] = (nextI * stride + j);
@@ -77,11 +81,13 @@ namespace Adamantium.ProceduralGeometry.Shapes
                     }
 
                     var mesh = new Mesh();
+                    // A sphere's normal IS its direction from the centre, so it is written rather than averaged back
+                    // out of the triangles: exact at the poles and the seam, where averaging has the least to work with.
                     mesh.SetTopology(PrimitiveType.TriangleList).
                         SetPoints(vertices).
+                        SetNormals(normals).
                         SetUVs(0, uvs).
-                        SetIndices(indices).
-                        CalculateNormals();
+                        SetIndices(indices);
 
                     return mesh;
                 }

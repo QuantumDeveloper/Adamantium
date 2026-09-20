@@ -527,13 +527,30 @@ public class Mesh
             meshContour.SetPoints(transformed, false);
         }
             
-        CalculateNormals();
+        // Normals the mesh already CARRIES are moved, not re-derived: a generator's exact normals survive being placed,
+        // and a plain translation leaves them alone. Re-averaging them off the triangles here threw that away.
+        if (Normals.Length == Points.Length) TransformNormals(ref transformMatrix);
+        else CalculateNormals();
+
         CalculateTangentsAndBinormals();
         CalculateBoundingVolumes();
 
         IsModified = true;
 
         return this;
+    }
+
+    // Normals follow the inverse transpose, which is what keeps them perpendicular through a non-uniform scale.
+    private void TransformNormals(ref Matrix4x4 transform)
+    {
+        var normalMatrix = Matrix4x4.Transpose(Matrix4x4.Invert(transform));
+
+        for (int i = 0; i < Normals.Length; i++)
+        {
+            var normal = (Vector3)Normals[i];
+            Vector3.TransformNormal(ref normal, ref normalMatrix, out normal);
+            Normals[i] = (Vector3F)Vector3.Normalize(normal);
+        }
     }
 
     public void Clear()
@@ -572,19 +589,16 @@ public class Mesh
         clonedMesh.Colors = new Color[Colors.Length];
         Colors.CopyTo(clonedMesh.Colors, 0);
 
-        if (transform.IsIdentity)
-        {
-            clonedMesh.Normals = new Vector3F[Normals.Length];
-            Normals.CopyTo(clonedMesh.Normals, 0);
+        // Copied whatever the transform is - ApplyTransform moves them. Skipping the copy for a placed clone left it
+        // with no normals to move, so every placed copy fell back to averaging them out of its own triangles.
+        clonedMesh.Normals = new Vector3F[Normals.Length];
+        Normals.CopyTo(clonedMesh.Normals, 0);
 
-            clonedMesh.Tangents = new Vector4F[Tangents.Length];
-            Tangents.CopyTo(clonedMesh.Tangents, 0);
+        clonedMesh.Tangents = new Vector4F[Tangents.Length];
+        Tangents.CopyTo(clonedMesh.Tangents, 0);
 
-            clonedMesh.BiTangents = new Vector3F[BiTangents.Length];
-            BiTangents.CopyTo(clonedMesh.BiTangents, 0);
-
-            CalculateBoundingVolumes();
-        }
+        clonedMesh.BiTangents = new Vector3F[BiTangents.Length];
+        BiTangents.CopyTo(clonedMesh.BiTangents, 0);
 
         clonedMesh.JointIndices = new Vector4F[JointIndices.Length];
         JointIndices.CopyTo(clonedMesh.JointIndices, 0);
