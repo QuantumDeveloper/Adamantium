@@ -35,16 +35,23 @@ public class EffectsGenerator : IIncrementalGenerator
         // The assembly NAME, not the whole Compilation. Combining with CompilationProvider re-ran every shader compile
         // on every keystroke - the compilation changes whenever any C# file does - and a .fx compile is seconds, not
         // milliseconds. The name is a string that changes when the project is renamed and never otherwise, so an edit
-        // elsewhere in the project no longer costs a shader rebuild.
-        var assemblyName = context.CompilationProvider.Select((compilation, _) => compilation.AssemblyName);
+        // elsewhere in the project no longer costs a shader rebuild. The project directory comes along to place each
+        // effect by its folder, and is a string in the same way.
+        var placement = context.CompilationProvider
+            .Combine(context.AnalyzerConfigOptionsProvider)
+            .Select((pair, _) =>
+            {
+                pair.Right.GlobalOptions.TryGetValue("build_property.projectdir", out var projectDir);
+                return (AssemblyName: pair.Left.AssemblyName, ProjectDir: projectDir);
+            });
 
         var sourceProvider = fxNamesAndContents
-            .Combine(assemblyName)
+            .Combine(placement)
             .Combine(includesProvider);
 
         context.RegisterSourceOutput(sourceProvider, (spc, provider) =>
         {
-            var ((file, @namespace), includes) = provider;
+            var ((file, place), includes) = provider;
 
             try
             {
@@ -56,6 +63,7 @@ public class EffectsGenerator : IIncrementalGenerator
                 }
                 else
                 {
+                    var @namespace = ComposeNamespace(place.AssemblyName, place.ProjectDir, file.path);
                     var result = GenerateEffect(compilerResult, file.fxName, @namespace);
                     spc.AddSource($"{file.fxName}.g.cs", result);
                 }
@@ -65,6 +73,34 @@ public class EffectsGenerator : IIncrementalGenerator
                 CreateDiagnostic(ref spc, file.name, ex.Message, DiagnosticSeverity.Error);
             }
         });
+    }
+
+    /// <summary>Where an effect's class lives: the assembly, then the folders the .fx sits in - the same rule a .cs
+    /// file follows, and the same one the AUML generator uses. The class name is the file name, so two effects named
+    /// alike would collide on a flat namespace; the file system already forbids that within one folder, so following
+    /// the folders is all the uniqueness needed. Effects at the project root give the assembly name unchanged.</summary>
+    private static string ComposeNamespace(string assemblyName, string projectDir, string effectPath)
+    {
+        if (string.IsNullOrEmpty(projectDir)) return assemblyName;
+
+        var directory = Path.GetDirectoryName(effectPath) ?? string.Empty;
+        var relative = directory.StartsWith(projectDir, System.StringComparison.OrdinalIgnoreCase)
+            ? directory.Substring(projectDir.Length)
+            : string.Empty;
+
+        var folders = relative
+            .Split(new[] { '\\', '/' }, System.StringSplitOptions.RemoveEmptyEntries)
+            .Select(Sanitize)
+            .Where(part => part.Length > 0);
+
+        return string.Join(".", new[] { assemblyName }.Concat(folders));
+    }
+
+    // A folder may be named anything the file system allows; an identifier may not.
+    private static string Sanitize(string folder)
+    {
+        var cleaned = new string(folder.Select(c => char.IsLetterOrDigit(c) || c == '_' ? c : '_').ToArray());
+        return cleaned.Length > 0 && char.IsDigit(cleaned[0]) ? "_" + cleaned : cleaned;
     }
 
     private string GenerateEffect(EffectCompilerResult result, string fxName, string @namespace)

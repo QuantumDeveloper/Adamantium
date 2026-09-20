@@ -33,6 +33,10 @@
              so the link has to keep the Includes\ folder. -->
         <AdditionalFiles Include="..\Adamantium.UI.FX\Includes\ClipMath.fxh" Link="Includes\ClipMath.fxh" />
         <CompilerVisibleProperty Include="RootNamespace" />
+        <!-- The effects generator places each effect's class by the folder its .fx sits in, and needs the project root
+             to work that folder out. Without it every effect would land in one flat namespace and two files named
+             alike could not coexist. -->
+        <CompilerVisibleProperty Include="ProjectDir" />
         <AdditionalFiles Remove="obj\**" />
         <!-- IDE up-to-date check: rebuild when generator inputs (AdditionalFiles) change. -->
         <UpToDateCheckInput Include="@(AdditionalFiles)" Visible="false" />
