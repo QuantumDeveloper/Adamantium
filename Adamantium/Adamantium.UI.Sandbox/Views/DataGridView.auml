@@ -1,0 +1,414 @@
+<View xmlns="http://adamantium/ui"
+      xmlns:x="http://adamantium/ui/xaml/extensions"
+      xmlns:conv="clr-namespace:Adamantium.UI.Sandbox.Converters"
+      xmlns:val="clr-namespace:Adamantium.UI.Sandbox.Validation">
+    <!-- A column stands in the grid's LOGICAL tree, so everything on it binds like anything else: its value against the
+         row's item, its list of choices against this page's view-model. -->
+    <!-- The table on the left, its settings in a panel of their own on the right - they never overlap, and the switches
+         stop being a heap along the bottom. -->
+    <Grid ColumnDefinitions="*,Auto" Margin="16">
+    <Grid Grid.Column="0" RowDefinitions="Auto,Auto,*" Margin="0,0,16,0">
+
+        <TextBlock Grid.Row="0" Text="TreeDataGrid" FontSize="18"/>
+        <TextBlock Grid.Row="1" Margin="0,4,0,10" TextWrapping="WrapByWords"
+                   Foreground="{ObservableResource TextFillColorSecondary}"
+                   Text="10 000 rows, every fifth with a branch, and one of every column type. Double-click a cell to edit it; the panel on the right drives the rest."/>
+
+        <!-- The tint comes from the picker below by ELEMENT, not through the view-model: the swatch's brush is the one
+             live object and both the button and the table paint from it. -->
+        <TreeDataGrid Grid.Row="2" x:Name="Table"
+                      ItemsSource="{Binding TreeSource}"
+                      ChildrenPath="{Binding TreeChildrenPath}"
+                      KeyPath="{Binding TreeKeyPath}"
+                      ParentKeyPath="{Binding TreeParentKeyPath}"
+                      GridLinesVisibility="{Binding GridLines}"
+                      ShowRowNumbers="{Binding ShowRowNumbers}"
+                      SelectionUnit="{Binding SelectionUnit}"
+                      AlternationCount="{Binding AlternationCount}"
+                      AlternationBrush="{Binding SelectedBrush, ElementName=TintPicker}"
+                      ShowGroupPanel="{Binding ShowGroupPanel}"
+                      ShowSortPanel="{Binding ShowSortPanel}"
+                      ShowSearchPanel="{Binding ShowSearchPanel}"
+                      CanUserChooseColumns="{Binding CanChooseColumns}"
+                      CanUserFilterColumns="{Binding CanFilterColumns}"
+                      ShowNewItemRow="{Binding ShowNewItemRow}"
+                      NewRowHint="New assembly"
+                      SearchMatchBrush="{Binding SearchMatchBrush}"
+                      SearchCurrentMatchBrush="{Binding SearchCurrentMatchBrush}"
+                      ValidationErrorBrush="{Binding ValidationErrorBrush}"
+                      ValidationMode="{Binding ValidationMode}"
+                      RowDetailsHeight="120"
+                      Indent="16"
+                      ExpanderColumnIndex="2">
+            <!-- The record's LONG FORM, opened by the handle in the column ahead of everything. It is a row of the same
+                 flat list, so ten thousand records with three panels open build three panels - and the template is the
+                 page's own, bound against the record like any other. -->
+            <TreeDataGrid.RowDetailsTemplate>
+                <DataTemplate>
+                    <Border Padding="12" Margin="8"
+                            CornerRadius="{ResourceReference CornerRadiusSmall}"
+                            Background="{ObservableResource CardBackgroundFillColorDefault}"
+                            BorderBrush="{ObservableResource ControlStrokeColorDefault}"
+                            BorderThickness="1">
+                        <!-- THREE TABS OF THREE HEIGHTS, on purpose: the panel is as tall as what is in it, so switching
+                             a tab re-measures it and the rows below move. That is the case a fixed height cannot show. -->
+                        <TabControl>
+                            <TabItem Header="Details">
+                                <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto" Margin="4">
+                                    <TextBlock Grid.Row="0" Grid.Column="0" Text="Name" Margin="0,0,16,4"
+                                               Foreground="{ObservableResource TextFillColorSecondary}"/>
+                                    <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding Name}" Margin="0,0,0,4"/>
+                                    <TextBlock Grid.Row="1" Grid.Column="0" Text="Owner" Margin="0,0,16,4"
+                                               Foreground="{ObservableResource TextFillColorSecondary}"/>
+                                    <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding Owner}" Margin="0,0,0,4"/>
+                                    <TextBlock Grid.Row="2" Grid.Column="0" Text="Region" Margin="0,0,16,4"
+                                               Foreground="{ObservableResource TextFillColorSecondary}"/>
+                                    <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding Region}" Margin="0,0,0,4"/>
+                                    <TextBlock Grid.Row="3" Grid.Column="0" Text="Checksum" Margin="0,0,16,0"
+                                               Foreground="{ObservableResource TextFillColorSecondary}"/>
+                                    <TextBlock Grid.Row="3" Grid.Column="1" Text="{Binding Checksum}"/>
+                                </Grid>
+                            </TabItem>
+                            <TabItem Header="Note">
+                                <TextBlock Margin="4" TextWrapping="WrapByWords"
+                                           Text="{Binding Name}"/>
+                            </TabItem>
+                            <TabItem Header="Chart">
+                                <StackPanel Orientation="Horizontal" Margin="4" Spacing="6" VerticalAlignment="Bottom">
+                                    <Border Width="26" Height="150" Background="{ThemeResource AccentFillColorDefault}"/>
+                                    <Border Width="26" Height="90" Background="{ThemeResource AccentFillColorDefault}"/>
+                                    <Border Width="26" Height="210" Background="{ThemeResource AccentFillColorDefault}"/>
+                                    <Border Width="26" Height="120" Background="{ThemeResource AccentFillColorDefault}"/>
+                                    <Border Width="26" Height="60" Background="{ThemeResource AccentFillColorDefault}"/>
+                                </StackPanel>
+                            </TabItem>
+                        </TabControl>
+                    </Border>
+                </DataTemplate>
+            </TreeDataGrid.RowDetailsTemplate>
+
+            <!-- A rule over the whole RECORD: neither "done" nor "error" is a wrong value on its own, only the pair is,
+                 so the mark goes on the row and on none of its cells. -->
+            <TreeDataGrid.RowValidationRule>
+                <val:FinishedIsNotAnErrorRule/>
+            </TreeDataGrid.RowValidationRule>
+
+            <!-- EVERY column type, so each one's editor can be seen: text, drop-down, check box and a fully templated
+                 one. Double-click any cell (or press F2) to open its editor. -->
+            <TreeDataGrid.Columns>
+                <!-- ONE CELL refuses an edit its column allows: a finished record keeps the code it was filed under.
+                     The refusal is an ordinary binding, read off the row. -->
+                <!-- FrozenSide is an ordinary bindable property of the column, and the column stands in the grid's
+                     logical tree - so a check box on this page pins it with no code behind anything. -->
+                <!-- Aggregate is a property OF THE COLUMN, so the strip of totals and a group's header both read the
+                     same statement of what this column adds up to. -->
+                <DataGridTextColumn Header="Code" Binding="{Binding Code}" Width="110" SortMemberPath="Code"
+                                    CanUserHide="False"
+                                    IsReadOnlyBinding="{Binding IsLocked}"
+                                    FrozenSide="{Binding CodeSide}"
+                                    Aggregate="{Binding CodeAggregate}"
+                                    AggregateFormat="{Binding CodeAggregateFormat}"/>
+
+                <!-- The choices come straight from the view-model - the column binds to it like any element would. -->
+                <DataGridDropDownColumn Header="Owner" Binding="{Binding Owner}" Width="100" SortMemberPath="Owner"
+                                        ItemsSource="{Binding OwnerChoices}"/>
+
+                <!-- The carrier is named by the grid's ExpanderColumnIndex above, not by a flag here: "exactly one of
+                     these" cannot be said with a boolean per column without admitting two of them claiming it. -->
+                <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="320" SortMemberPath="Name" MinWidth="160"/>
+
+                <DataGridCheckBoxColumn Header="Done" Binding="{Binding Done}" Width="60" SortMemberPath="Done"/>
+
+                <!-- ...and the format is the column's too. It is bound rather than written out here BECAUSE it is the
+                     column's and not the function's: a fixed "Σ {0:N0}" went on saying Σ over an average. -->
+                <!-- VALIDATION by a rule on the column: the generated sizes run 251..9139, so some of them are outside
+                     what this page accepts and are washed the moment the table is shown - no edit required. The limits
+                     are BOUND, so moving them repaints the table live. -->
+                <DataGridTextColumn Header="Size" Binding="{Binding Size}" Width="80" SortMemberPath="Size"
+                                    Aggregate="{Binding SizeAggregate}"
+                                    AggregateFormat="{Binding SizeAggregateFormat}">
+                    <DataGridTextColumn.ValidationRule>
+                        <val:RangeRule Min="{Binding SizeFloor}" Max="{Binding SizeCeiling}"/>
+                    </DataGridTextColumn.ValidationRule>
+                    <!-- CONDITIONAL FORMATTING on the same column, and the two are different questions: the rule above
+                         says the value is not ACCEPTABLE, this one says what an acceptable value MEANS. It answers
+                         "Warning" and the theme decides that is amber. -->
+                    <DataGridTextColumn.StateRule>
+                        <val:AboveThresholdRule Threshold="{Binding SizeWarnAbove}"/>
+                    </DataGridTextColumn.StateRule>
+                </DataGridTextColumn>
+
+                <!-- Read-only BY THE COLUMN, which is the other way to refuse an edit: Code refuses one cell at a time
+                     instead. Both are honoured by the same BeginEdit. -->
+                <DataGridTextColumn Header="Checksum" Binding="{Binding Checksum}" Width="120" IsReadOnly="True"/>
+
+                <!-- From here on the columns exist to overflow the viewport: scroll sideways and only the columns in
+                     view carry cells (the header strip follows the same offset). -->
+                <!-- A column pinned from the MIDDLE of the table: the pinned zone is a place in the layout, not a
+                     prefix of the declaration, so this one leaves its neighbours and joins the left zone. -->
+                <DataGridTextColumn Header="Region" Binding="{Binding Region}" Width="110" SortMemberPath="Region"
+                                    FrozenSide="{Binding RegionSide}"/>
+                <DataGridTextColumn Header="Batch" Binding="{Binding Batch}" Width="90" SortMemberPath="Batch"/>
+                <DataGridTextColumn Header="Revision" Binding="{Binding Revision}" Width="90" SortMemberPath="Revision"/>
+                <DataGridTextColumn Header="Line" Binding="{Binding Line}" Width="90" SortMemberPath="Line"/>
+                <DataGridTextColumn Header="Shift" Binding="{Binding Shift}" Width="80" SortMemberPath="Shift"/>
+                <DataGridTextColumn Header="Updated" Binding="{Binding Updated}" Width="110" SortMemberPath="Updated"/>
+
+                <!-- A template column owns both looks. Its cell holds the ROW, so the templates bind to its members and
+                     the editor writes straight through. Its cells still carry a MEANING - the model says "Error", the
+                     theme decides what that looks like. -->
+                <DataGridTemplateColumn Header="Status" Width="110" SortMemberPath="Status"
+                                        FrozenSide="{Binding StatusSide}"
+                                        StateBinding="{Binding StatusState}">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <Border CornerRadius="8" Padding="8 0" HorizontalAlignment="Left"
+                                    VerticalAlignment="Center"
+                                    Background="{ObservableResource ControlFillColorSecondary}">
+                                <TextBlock Text="{Binding Status}" VerticalAlignment="Center"/>
+                            </Border>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                    <DataGridTemplateColumn.CellEditingTemplate>
+                        <DataTemplate>
+                            <TextBox Text="{Binding Status, Mode=TwoWay}" BorderThickness="0" Padding="0"
+                                     MinWidth="0" MinHeight="0"/>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellEditingTemplate>
+                </DataGridTemplateColumn>
+            </TreeDataGrid.Columns>
+        </TreeDataGrid>
+
+    </Grid>
+
+    <Border Grid.Column="1" Width="250"
+            Background="{ObservableResource CardBackgroundFillColorDefault}"
+            BorderBrush="{ObservableResource ControlStrokeColorDefault}"
+            BorderThickness="1" CornerRadius="4" Padding="12">
+        <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+            <StackPanel Orientation="Vertical">
+                <TextBlock Text="Grid settings" FontSize="15" Margin="0,0,0,10"/>
+
+                <TextBlock Text="COLUMNS" FontSize="11" Margin="0,4,0,6"
+                           Foreground="{ObservableResource TextFillColorSecondary}"/>
+                <!-- Offers the handle at the right end of the header band; the flyout behind it is where the choosing
+                     happens. Code is not in it: a table of records nobody can identify is not a table, so that column
+                     says CanUserHide="False". -->
+                <CheckBox Content="Let the user choose columns" Margin="0,0,0,6"
+                          IsChecked="{Binding CanChooseColumns, Mode=TwoWay}"/>
+                <!-- Every funnel at once, instead of saying CanUserFilter="False" on each column in turn. Switching it
+                     off also CLEARS what the funnels set: a table left narrowed with no way to see why is worse than
+                     one that cannot be narrowed at all. -->
+                <CheckBox Content="Let the user filter columns" Margin="0,0,0,6"
+                          IsChecked="{Binding CanFilterColumns, Mode=TwoWay}"/>
+                <!-- The blank row at the very bottom. Scroll to the end, type into it, press Enter - the record is made
+                     THEN, not a keystroke earlier, so Escape leaves nothing behind. -->
+                <CheckBox Content="Row for a new record" Margin="0,0,0,6"
+                          IsChecked="{Binding ShowNewItemRow, Mode=TwoWay}"/>
+                <!-- The arrangement written to a FILE and read back - what makes choosing columns worth anything.
+                     Hide a column, drag a header, widen one, pin one, sort by one; save; put it all back wrong;
+                     restore. -->
+                <Grid ColumnDefinitions="*,*" Margin="0,0,0,4">
+                    <Button Grid.Column="0" Content="Save layout" Margin="0,0,4,0"
+                            Command="{Binding SaveLayoutCommand}"
+                            CommandParameter="{Binding ElementName=Table}"/>
+                    <Button Grid.Column="1" Content="Restore"
+                            Command="{Binding RestoreLayoutCommand}"
+                            CommandParameter="{Binding ElementName=Table}"/>
+                </Grid>
+                <TextBlock Text="{Binding LayoutStatus}" FontSize="11" Margin="0,0,0,8"
+                           Foreground="{ObservableResource TextFillColorSecondary}"/>
+
+                <!-- The same acts Ctrl+Z and Ctrl+Y reach; the buttons exist because a demo has to be able to SHOW
+                     them. Edit a cell, paste a block, delete a row, add one through the placeholder - each is one act
+                     and comes back whole. -->
+                <TextBlock Text="HISTORY" FontSize="11" Margin="0,4,0,6"
+                           Foreground="{ObservableResource TextFillColorSecondary}"/>
+                <Grid ColumnDefinitions="*,*" Margin="0,0,0,4">
+                    <Button Grid.Column="0" Content="Undo" Margin="0,0,4,0"
+                            Command="{Binding UndoEditCommand}"
+                            CommandParameter="{Binding ElementName=Table}"/>
+                    <Button Grid.Column="1" Content="Redo"
+                            Command="{Binding RedoEditCommand}"
+                            CommandParameter="{Binding ElementName=Table}"/>
+                </Grid>
+                <TextBlock Text="{Binding HistoryStatus}" FontSize="11" Margin="0,0,0,8" TextWrapping="WrapByWords"
+                           Foreground="{ObservableResource TextFillColorSecondary}"/>
+
+                <TextBlock Text="EXPORT" FontSize="11" Margin="0,4,0,6"
+                           Foreground="{ObservableResource TextFillColorSecondary}"/>
+                <!-- What goes out is what is on screen - the visible columns in their order, the rows filtered and
+                     sorted, and the whole depth of the tree whatever is folded. Group first and both files still carry
+                     the grouped column: on screen its value is in the captions, and a file has no captions. -->
+                <Grid ColumnDefinitions="*,*" Margin="0,0,0,4">
+                    <Button Grid.Column="0" Content="Export CSV" Margin="0,0,4,0"
+                            Command="{Binding ExportCsvCommand}"
+                            CommandParameter="{Binding ElementName=Table}"/>
+                    <Button Grid.Column="1" Content="Export XLSX"
+                            Command="{Binding ExportXlsxCommand}"
+                            CommandParameter="{Binding ElementName=Table}"/>
+                </Grid>
+                <TextBlock Text="{Binding ExportStatus}" FontSize="11" Margin="0,0,0,8" TextWrapping="WrapByWords"
+                           Foreground="{ObservableResource TextFillColorSecondary}"/>
+                <!-- Three pins, one on each kind of column: the first, one from the MIDDLE, and one pinned to the
+                     other EDGE. A pinned column leaves its neighbours and joins the zone at its side. -->
+                <CheckBox Content="Pin Code left" Margin="0,0,0,6"
+                          IsChecked="{Binding PinCode, Mode=TwoWay}"/>
+                <CheckBox Content="Pin Region left" Margin="0,0,0,6"
+                          IsChecked="{Binding PinRegion, Mode=TwoWay}"/>
+                <CheckBox Content="Pin Status right" Margin="0,0,0,6"
+                          IsChecked="{Binding PinStatus, Mode=TwoWay}"/>
+
+                <TextBlock Text="SEARCH" FontSize="11" Margin="0,10,0,6"
+                           Foreground="{ObservableResource TextFillColorSecondary}"/>
+                <!-- The strip runs the search on Enter and on its button, not per keystroke: one pass reads every
+                     shown column of every row. The arrows step through what it found, opening whatever holds it. -->
+                <CheckBox Content="Search panel" Margin="0,0,0,4"
+                          IsChecked="{Binding ShowSearchPanel, Mode=TwoWay}"/>
+                <TextBlock Text="Type and press Enter; the arrows walk the matches. Escape or × closes the strip."
+                           FontSize="11" Margin="0,0,0,8" TextWrapping="WrapByWords"
+                           Foreground="{ObservableResource TextFillColorSecondary}"/>
+
+                <!-- The washes are the TABLE'S to name, exactly as the rules are: unticked this page says nothing and the
+                     theme's colour stands, ticked it names its own. BOTH directions are the point - handing the colour
+                     back has to reach the cells that are already built, and the null that says so has to survive the
+                     binding, which is exactly what used to go missing.
+                     The swatches stay live either way: ColorPickerButton has no disabled LOOK in any theme, so IsEnabled
+                     here would leave a control that is dead and cannot be told from a working one. -->
+                <CheckBox Content="Own match colours" Margin="0,0,0,6"
+                          IsChecked="{Binding OwnSearchColours, Mode=TwoWay}"/>
+                <!-- SAID SEPARATELY, each with its own name. Side by side and unlabelled they read as one setting, and
+                     the first search shows exactly ONE washed cell - the current one - so touching the other swatch
+                     changed nothing anybody could see and the whole thing read as broken. -->
+                <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto" Margin="0,0,0,4">
+                    <ColorPickerButton Grid.Row="0" Grid.Column="0" Width="72" Height="24" Margin="0,0,8,4"
+                                       SelectedColor="{Binding SearchMatchColour, Mode=TwoWay}"/>
+                    <TextBlock Grid.Row="0" Grid.Column="1" Text="Every match" VerticalAlignment="Center" Margin="0,0,0,4"/>
+                    <ColorPickerButton Grid.Row="1" Grid.Column="0" Width="72" Height="24" Margin="0,0,8,0"
+                                       SelectedColor="{Binding SearchCurrentColour, Mode=TwoWay}"/>
+                    <TextBlock Grid.Row="1" Grid.Column="1" Text="The one you are on" VerticalAlignment="Center"/>
+                </Grid>
+                <TextBlock Text="Keep the alpha down - it is a wash over the cell, not a plate."
+                           FontSize="11" Margin="0,0,0,8" TextWrapping="WrapByWords"
+                           Foreground="{ObservableResource TextFillColorSecondary}"/>
+
+                <TextBlock Text="VALIDATION" FontSize="11" Margin="0,10,0,6"
+                           Foreground="{ObservableResource TextFillColorSecondary}"/>
+                <!-- TWO SOURCES on this page at once: the Size column carries a rule with the limits below, and the
+                     record itself reports an error on its Status - the grid asks both and paints the cell either way. -->
+                <TextBlock Text="Size is accepted between these; the Status cell of a record filed as an error is marked by the record itself."
+                           FontSize="11" Margin="0,0,0,6" TextWrapping="WrapByWords"
+                           Foreground="{ObservableResource TextFillColorSecondary}"/>
+                <!-- The third source, and the only one no cell can answer: a record marked done AND filed as an error
+                     contradicts itself, so the whole ROW is washed. Tick a Done box on an error row to see it. -->
+                <!-- And what the table does with a value it refuses. Off: take it and mark it. On: keep the editor and
+                     say why - try typing 99999 into Size. -->
+                <CheckBox Content="Refuse to leave an invalid cell" Margin="0,0,0,6"
+                          IsChecked="{Binding BlockOnInvalid, Mode=TwoWay}"/>
+                <!-- One above the other: side by side, two spinners and their labels do not fit this panel and the
+                     second one loses its buttons off the edge. -->
+                <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto" Margin="0,0,0,6">
+                    <TextBlock Grid.Row="0" Grid.Column="0" Text="from" VerticalAlignment="Center" Margin="0,0,8,4"/>
+                    <NumericUpDown Grid.Row="0" Grid.Column="1" Margin="0,0,0,4"
+                                   Value="{Binding SizeFloor, Mode=TwoWay}" Minimum="0" Maximum="10000"
+                                   SmallChange="250" SnapsToSmallChange="true" StringFormat="N0"/>
+                    <TextBlock Grid.Row="1" Grid.Column="0" Text="to" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                    <NumericUpDown Grid.Row="1" Grid.Column="1"
+                                   Value="{Binding SizeCeiling, Mode=TwoWay}" Minimum="0" Maximum="10000"
+                                   SmallChange="250" SnapsToSmallChange="true" StringFormat="N0"/>
+                </Grid>
+                <!-- A DIFFERENT question from the two above: those say what is allowed, this says what an allowed value
+                     MEANS. The rule answers "Warning" and the theme paints it amber - drag this and watch the column
+                     repaint live. -->
+                <Grid ColumnDefinitions="Auto,*" Margin="0,0,0,6">
+                    <TextBlock Grid.Column="0" Text="warn above" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                    <NumericUpDown Grid.Column="1"
+                                   Value="{Binding SizeWarnAbove, Mode=TwoWay}" Minimum="0" Maximum="10000"
+                                   SmallChange="250" SnapsToSmallChange="true" StringFormat="N0"/>
+                </Grid>
+                <CheckBox Content="Own error colour" Margin="0,0,0,6"
+                          IsChecked="{Binding OwnValidationColour, Mode=TwoWay}"/>
+                <Grid ColumnDefinitions="Auto,*" Margin="0,0,0,8">
+                    <ColorPickerButton Grid.Column="0" Width="72" Height="24" Margin="0,0,8,0"
+                                       SelectedColor="{Binding ValidationErrorColour, Mode=TwoWay}"/>
+                    <TextBlock Grid.Column="1" Text="Rejected value" VerticalAlignment="Center"/>
+                </Grid>
+
+                <TextBlock Text="GROUPING" FontSize="11" Margin="0,10,0,6"
+                           Foreground="{ObservableResource TextFillColorSecondary}"/>
+                <!-- With the strip on, drag any column header UP into it to group by that column; click a chip there to
+                     take the column back out. Groups nest in the order the chips stand in. -->
+                <CheckBox Content="Grouping panel" Margin="0,0,0,6"
+                          IsChecked="{Binding ShowGroupPanel, Mode=TwoWay}"/>
+
+                <TextBlock Text="TREE" FontSize="11" Margin="0,10,0,6"
+                           Foreground="{ObservableResource TextFillColorSecondary}"/>
+                <!-- The SAME records and the same parentage, described the two ways the control accepts: records
+                     holding their children, or a flat list joined on keys - the shape a database hands over. The rows
+                     on screen must come out identical; that is what makes this a test and not an illustration. -->
+                <CheckBox Content="Tree from keys, not nesting" Margin="0,0,0,4"
+                          IsChecked="{Binding TreeFromKeys, Mode=TwoWay}"/>
+                <!-- The only thing that CHANGES on screen, and the thing that proves it: hand the table twelve
+                     thousand flat records and it still shows ten thousand rows with branches. -->
+                <TextBlock Text="{Binding TreeSourceStatus}" FontSize="11" Margin="0,0,0,6" TextWrapping="WrapByWords"
+                           Foreground="{ObservableResource TextFillColorSecondary}"/>
+
+                <TextBlock Text="SORTING" FontSize="11" Margin="0,10,0,6"
+                           Foreground="{ObservableResource TextFillColorSecondary}"/>
+                <!-- A click on a header still sorts by that ONE column. The strip is how a table is sorted by several:
+                     drag a header into it to add a key, press a chip to turn it around, drag one to change which key
+                     decides. From the second key on, each header also says which key it is. -->
+                <CheckBox Content="Sorting panel" Margin="0,0,0,6"
+                          IsChecked="{Binding ShowSortPanel, Mode=TwoWay}"/>
+
+                <TextBlock Text="TOTALS" FontSize="11" Margin="0,10,0,6"
+                           Foreground="{ObservableResource TextFillColorSecondary}"/>
+                <TextBlock Text="Size column" Margin="0,0,0,4"/>
+                <DropDown Margin="0,0,0,6"
+                          ItemsSource="{Binding AggregateChoices}"
+                          SelectedItem="{Binding SizeAggregate, Mode=TwoWay}"/>
+                <CheckBox Content="Count rows in Code" Margin="0,0,0,4"
+                          IsChecked="{Binding CountRows, Mode=TwoWay}"/>
+                <TextBlock Text="Totals stand under the table and in every group's header." FontSize="11"
+                           Margin="0,0,0,8" TextWrapping="WrapByWords"
+                           Foreground="{ObservableResource TextFillColorSecondary}"/>
+
+                <TextBlock Text="ROWS" FontSize="11" Margin="0,10,0,6"
+                           Foreground="{ObservableResource TextFillColorSecondary}"/>
+                <CheckBox Content="Row numbers" Margin="0,0,0,8"
+                          IsChecked="{Binding ShowRowNumbers, Mode=TwoWay}"/>
+
+                <TextBlock Text="Tint every Nth row" Margin="0,0,0,4"/>
+                <NumericUpDown InputMode="Integers" Minimum="0" Maximum="4" SmallChange="1" Margin="0,0,0,4"
+                               Value="{Binding AlternationCount, Mode=TwoWay}"/>
+                <TextBlock Text="2 = every other row; 0 = none" FontSize="11" Margin="0,0,0,8"
+                           Foreground="{ObservableResource TextFillColorSecondary}"/>
+
+                <TextBlock Text="Tint colour" Margin="0,0,0,4"/>
+                <ColorPickerButton x:Name="TintPicker" Width="72" Height="24" HorizontalAlignment="Left"
+                                   Margin="0,0,0,8" SelectedColor="#332F6FED"/>
+
+                <TextBlock Text="LOOK" FontSize="11" Margin="0,10,0,6"
+                           Foreground="{ObservableResource TextFillColorSecondary}"/>
+                <TextBlock Text="Grid lines" Margin="0,0,0,4"/>
+                <DropDown Margin="0,0,0,8"
+                          ItemsSource="{Binding GridLineChoices}"
+                          SelectedItem="{Binding GridLines, Mode=TwoWay}"/>
+
+                <!-- What a click takes. In FullRow the press, the drag and the arrows all take rows - one funnel
+                     answers for the mode, so they cannot disagree. -->
+                <TextBlock Text="Selection unit" Margin="0,0,0,4"/>
+                <DropDown Margin="0,0,0,8"
+                          ItemsSource="{Binding SelectionUnitChoices}"
+                          SelectedItem="{Binding SelectionUnit, Mode=TwoWay}"/>
+
+                <!-- Whether the table is in edit is an ordinary bindable property, so a view-model (or, as here,
+                     another element) can hold a toolbar or postpone a refresh while a cell is open. -->
+                <TextBlock Text="editing a cell" Margin="0,10,0,0"
+                           Foreground="{ObservableResource TextFillColorSecondary}"
+                           Visibility="{Binding IsEditing, ElementName=Table, Converter={conv:BoolToVisibilityConverter}}"/>
+            </StackPanel>
+        </ScrollViewer>
+    </Border>
+    </Grid>
+</View>

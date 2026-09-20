@@ -36,7 +36,7 @@ public class NineSliceDumpTests
     public void Dump()
     {
         var device = GpuTestDevice.Device;
-        var png = @"C:\AdamantiumEngine\Adamantium\Adamantium\Adamantium.Game.Sandbox\Textures\nine-slice-frame.png";
+        var png = @"C:\AdamantiumEngine\Adamantium\Adamantium\Adamantium.UI.Sandbox\Textures\nine-slice-frame.png";
         var bitmap = new BitmapImage(new Uri(png));
         bitmap.EnsureLoadedAsync().GetAwaiter().GetResult();
 

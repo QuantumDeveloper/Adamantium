@@ -1,0 +1,86 @@
+<Window x:Namespace="Adamantium.UI.Sandbox"
+        xmlns="http://adamantium/ui"
+		xmlns:x="http://adamantium/ui/xaml/extensions"
+		xmlns:local="clr-namespace:Adamantium.UI.Sandbox"
+		xmlns:conv="clr-namespace:Adamantium.UI.Sandbox.Converters"
+		xmlns:vm="clr-namespace:Adamantium.UI.Sandbox.ViewModels"
+		xmlns:views="clr-namespace:Adamantium.UI.Sandbox.Views"
+		xmlns:behaviors="clr-namespace:Adamantium.UI.Sandbox.Behaviors"
+        x:ViewModel="{x:Type vm:MainViewModel}"
+        x:CreateInDesignTime="False"
+        Title="Adamantium Window"
+        Width="1280"
+        Height="720"
+        AnalyticAntialiasing="{Binding AnalyticAa, Mode=TwoWay}"
+        PresentPolicy="{Binding PresentPolicy, Mode=TwoWay}"
+        ResizeMode="{Binding WindowResizeMode, Mode=TwoWay}"
+        LeftWindowCommands="{Binding LeftWindowCommands}"
+        RightWindowCommands="{Binding RightWindowCommands}"
+        Background="{ObservableResource SolidBackgroundFillColorBase}">
+    <Window.Icon>
+        <Border Width="16" Height="16" CornerRadius="4" Background="{ThemeResource AccentFillColorDefault}"/>
+    </Window.Icon>
+    <!-- The custom TitleBar (draggable caption, min/max/close) comes from the default Window ControlTemplate now, so this
+         is just the window CONTENT - hosted below the caption by the template's ContentPresenter. -->
+    <Grid>
+        <!-- The control gallery: data-driven tabs, one View + view-model per tab (see GalleryView / GalleryViewModel).
+             The old inline demos (shapes, images, the game panel) now live in their respective tabs. -->
+        <views:GalleryView/>
+
+        <!-- Shows which title-bar command last ran, so the caption commands visibly do distinct things. -->
+        <TextBlock Text="{Binding LastCommand}" FontSize="12"
+                   Foreground="{ResourceReference TextFillColorSecondary}"
+                   HorizontalAlignment="Left" VerticalAlignment="Top" Margin="16,10,0,0"/>
+
+        <!-- Diagnostics toggle - always visible, top-right. Opens the diagnostics SlidePanel on demand so the live stats
+             don't cover the window content. Two-way, so the panel's x button flips it back off. -->
+        <ToggleSwitch Content="Diagnostics"
+                      HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,10,16,0"
+                      IsChecked="{Binding DiagnosticsOpen, Mode=TwoWay}"/>
+
+        <!-- PERMANENT diagnostics plate: the live RuntimeStats overlay (DiagnosticsOverlayBehavior) pinned top-right,
+             shown/hidden by the Diagnostics toggle. Kept in the demo on purpose - it's how scroll/layout/render perf is
+             watched at runtime. -->
+        <Border HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,120,16,0" Width="280" Padding="10"
+                Background="#CC202020"
+                IsHitTestVisible="False"
+                Visibility="{Binding DiagnosticsOpen, Converter={conv:BoolToVisibilityConverter}}">
+            <TextBlock FontSize="13" Foreground="LightGreen" TextWrapping="WrapBySymbols" Text="diagnostics…">
+                <TextBlock.Behaviors>
+                    <behaviors:DiagnosticsOverlayBehavior/>
+                </TextBlock.Behaviors>
+            </TextBlock>
+        </Border>
+
+        <!-- The SlidePanel diagnostics view, opened by the LEFT caption "Diagnostics" command (DiagnosticsPanelOpen) -
+             independent of the right-side toggle, which drives the plate above. -->
+        <SlidePanel Placement="Right" Width="264" Header="Diagnostics"
+                    IsOpen="{Binding DiagnosticsPanelOpen, Mode=TwoWay}">
+            <StackPanel Orientation="Vertical">
+                <!-- Analytic AA on/off, live: the render service re-reads Window.AnalyticAntialiasing every frame, so this
+                     flips the coverage fringe and feathered strokes WITHOUT rebuilding the render cache - an A/B of an
+                     edge artifact, which is why it belongs with the diagnostics rather than in the window chrome. -->
+                <ToggleSwitch Content="Analytic AA"
+                              IsChecked="{Binding AnalyticAa, Mode=TwoWay}"
+                              Margin="0,0,0,12"/>
+                <!-- How frames reach the screen. Unlike the AA switch this one REBUILDS the swapchain (a present mode is
+                     chosen when it is created), so the picture blinks once on change - that is the honest cost until
+                     VK_KHR_swapchain_maintenance1 is wired up, which can change the mode in place. Watch the plate:
+                     Immediate drops the acquire block to ~0.01 ms, Adaptive pays 0.6-0.8 ms a frame for a tear-free
+                     picture, VSync locks to the display. -->
+                <TextBlock Text="Presentation" Margin="0,0,0,4"/>
+                <DropDown ItemsSource="{Binding PresentPolicies}"
+                          SelectedItem="{Binding PresentPolicy, Mode=TwoWay}"
+                          Margin="0,0,0,12"/>
+                <TextBlock FontSize="13"
+                           Foreground="LightGreen"
+                           TextWrapping="WrapBySymbols"
+                           Text="diagnostics…">
+                    <TextBlock.Behaviors>
+                        <behaviors:DiagnosticsOverlayBehavior/>
+                    </TextBlock.Behaviors>
+                </TextBlock>
+            </StackPanel>
+        </SlidePanel>
+    </Grid>
+</Window>

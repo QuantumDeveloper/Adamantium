@@ -67,7 +67,7 @@
 (`<ThemeVariantDefinition><PaletteColor …/></…>`) не доезжает: у типа нет объявленного свойства-содержимого.
 Это домашний стиль движка и так (`<Theme.StyleIncludes>` пишется явно), поэтому не чинилось.
 
-Замерено 2026-08-26, Debug, x64, стенд `Adamantium.Game.Sandbox.exe`.
+Замерено 2026-08-26, Debug, x64, стенд `Adamantium.UI.Sandbox.exe`.
 
 ---
 

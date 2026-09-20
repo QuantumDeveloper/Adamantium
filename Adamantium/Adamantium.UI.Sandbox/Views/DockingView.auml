@@ -1,0 +1,131 @@
+<View xmlns="http://adamantium/ui"
+      xmlns:behaviors="clr-namespace:Adamantium.UI.Sandbox.Behaviors"
+      xmlns:nav="clr-namespace:Adamantium.UI.Controls.Navigation;assembly=Adamantium.UI.Controls"
+      xmlns:docking="clr-namespace:Adamantium.UI.Controls.Docking;assembly=Adamantium.UI.Controls">
+    <Grid RowDefinitions="Auto,Auto,Auto,Auto,*" Margin="24">
+
+        <TextBlock Grid.Row="0" MarginBottom="12" MaxWidth="820"
+                   Text="An editor-shaped arrangement written as ZONES only. Nothing here says what share of what a group takes - the author writes WHERE (centre, right, bottom) and the split tree is derived from that. Drag the grips between the areas: they rewrite the layout's own shares, which is the number a save would read."
+                   Foreground="{ResourceReference TextFillColorSecondary}"/>
+
+        <!-- The application answering the two questions the area asks, out loud - it allows everything and says what it
+             allowed. Where a pane may go AT ALL is data instead: see Pane.Allowed on Errors below, which the compass
+             reads BEFORE the drag, so forbidden indicators are never drawn. A pane allowed ONLY to float (Telerik's
+             FloatingOnly) is not written here at all: it cannot start out docked, or it would be standing where its own
+             rules forbid. Open one with "Create in: Floating" above. -->
+        <Border Grid.Row="1" MarginBottom="12" Padding="10 6 10 6"
+                Background="{ResourceReference ControlFillColorDefault}"
+                BorderBrush="{ResourceReference ControlStrokeColorDefault}" BorderThickness="1">
+            <TextBlock Text="{Binding LastAnswer}"
+                       Foreground="{ResourceReference TextFillColorSecondary}"/>
+        </Border>
+
+        <!-- The area as a navigation REGION. Nothing below names a pane, a group or a zone in code: the view model asks
+             the region for a NAME, and the docking adapter either activates the pane that name already stands for -
+             wherever it has been dragged to since - or opens a new one where "Create in" says. -->
+        <StackPanel Grid.Row="2" Orientation="Horizontal" MarginBottom="12">
+            <TextBlock Text="Pane" VerticalAlignment="Center" MarginRight="6"
+                       Foreground="{ResourceReference TextFillColorSecondary}"/>
+            <DropDown ItemsSource="{Binding Pages}" SelectedItem="{Binding SelectedPage, Mode=TwoWay}"
+                      Width="150" MarginRight="14"/>
+
+            <TextBlock Text="Create in" VerticalAlignment="Center" MarginRight="6"
+                       Foreground="{ResourceReference TextFillColorSecondary}"/>
+            <DropDown ItemsSource="{Binding Places}" SelectedItem="{Binding SelectedPlace, Mode=TwoWay}"
+                      Width="120" MarginRight="14"/>
+
+            <Button Content="Navigate" Command="{Binding NavigateCommand}" Width="100" Height="32" MarginRight="8"/>
+            <Button Content="New pane" Command="{Binding NewTabCommand}" Width="100" Height="32" MarginRight="24"/>
+
+            <!-- The arrangement is state, so it belongs to the VIEW MODEL: it owns a DockingWorkspace, the area is
+                 pointed at it below, and these commands save and restore through it. The control is never told where a
+                 layout is kept - that is the application's business. -->
+            <Button Content="Save layout" Command="{Binding SaveLayoutCommand}" Width="110" Height="32" MarginRight="8"/>
+            <Button Content="Restore" Command="{Binding RestoreLayoutCommand}" Width="90" Height="32" MarginRight="8"/>
+            <Button Content="Forget" Command="{Binding ForgetLayoutCommand}" Width="80" Height="32" MarginRight="24"/>
+
+            <!-- Pinned tabs: a row of their own (Rider) or sharing the one row (Visual Studio). The area pushes it onto
+                 every panel it holds - see DockingArea.PinnedTabsPlacement. -->
+            <CheckBox Content="Pinned tabs in a separate row" IsChecked="True"
+                      Command="{Binding TogglePinnedRowCommand}" VerticalAlignment="Center"/>
+        </StackPanel>
+
+        <TextBlock Grid.Row="3" Text="{Binding LayoutState}" MarginBottom="12" MaxWidth="900"
+                   Foreground="{ResourceReference TextFillColorSecondary}"/>
+
+        <!-- Square corners on purpose: areas meet each other along the splitters, and a rounded corner there leaves a
+             notch of background at every junction instead of a clean seam. -->
+        <Border Grid.Row="4" BorderThickness="1"
+                BorderBrush="{ResourceReference ControlStrokeColorDefault}"
+                Background="{ResourceReference CardBackgroundFillColorDefault}">
+            <docking:DockingArea DividerThickness="6" nav:RegionManager.RegionName="docking"
+                    Workspace="{Binding Workspace}" StretchSingleDocumentTab="false"
+                    SelectionIndicatorPlacement="Outer" SelectionIndicatorThickness="2">
+                <docking:DockingArea.Behaviors>
+                    <behaviors:DockingPolicyBehavior/>
+                    <!-- The tab menu, built by the APPLICATION and calling the area's own API (ClosePane,
+                         CloseOtherPanes, ClosePanesOfGroup, CloseUnpinnedPanes, CloseAllPanes). A behaviour rather than
+                         markup, so panes opened by CODE get it too - and it stands next to the control, so it works on
+                         the pane and the area directly instead of routing through the view model. -->
+                    <behaviors:TabContextMenuBehavior/>
+                </docking:DockingArea.Behaviors>
+
+                <!-- Declared first, so it is innermost: the documents.
+                     The "Unsaved changes" box tells the VIEW MODEL that this document has unsaved work, and the view
+                     model is what refuses the close (DockingWorkspace.PaneClosing): the control ASKS, the application
+                     ANSWERS, out of its own state. Tick it in Scene, then use "Close all tabs" from the tab's menu and
+                     watch everything else go while Scene stays. -->
+                <docking:PaneGroup Name="documents" Zone="Center">
+                    <docking:Pane Header="Scene">
+                        <StackPanel Margin="16">
+                            <TextBlock Text="Scene" Opacity="0.7" MarginBottom="10"/>
+                            <CheckBox Content="Unsaved changes (refuses to close outright)"
+                                      Command="{Binding ToggleUnsavedCommand}" CommandParameter="Scene" MarginBottom="6"/>
+                            <CheckBox Content="Ask in a dialog before closing"
+                                      Command="{Binding ToggleAskCommand}" CommandParameter="Scene"/>
+                        </StackPanel>
+                    </docking:Pane>
+                    <docking:Pane Header="Game">
+                        <StackPanel Margin="16">
+                            <TextBlock Text="Game" Opacity="0.7" MarginBottom="10"/>
+                            <CheckBox Content="Unsaved changes (refuses to close outright)"
+                                      Command="{Binding ToggleUnsavedCommand}" CommandParameter="Game" MarginBottom="6"/>
+                            <CheckBox Content="Ask in a dialog before closing"
+                                      Command="{Binding ToggleAskCommand}" CommandParameter="Game"/>
+                        </StackPanel>
+                    </docking:Pane>
+                </docking:PaneGroup>
+
+                <docking:PaneGroup Name="inspector" Zone="Right" Size="240">
+                    <docking:Pane Header="Inspector" Kind="Tool" MinSize="120">
+                        <TextBlock Text="Inspector" Margin="16" Opacity="0.7"/>
+                    </docking:Pane>
+                    <docking:Pane Header="Hierarchy" Kind="Tool" MinSize="120">
+                        <TextBlock Text="Hierarchy" Margin="16" Opacity="0.7"/>
+                    </docking:Pane>
+                    <docking:Pane Header="Properties" Kind="Tool" MinSize="120">
+                        <TextBlock Text="Properties" Margin="16" Opacity="0.7"/>
+                    </docking:Pane>
+                </docking:PaneGroup>
+
+                <!-- Declared last, so it is OUTERMOST: the console spans the full width beneath everything above. -->
+                <docking:PaneGroup Name="console" Zone="Bottom" Size="160">
+                    <docking:Pane Header="Console" Kind="Tool">
+                        <TextBlock Text="Console" Margin="16" Opacity="0.7"/>
+                    </docking:Pane>
+                    <docking:Pane Header="Output" Kind="Tool">
+                        <TextBlock Text="Output" Margin="16" Opacity="0.7"/>
+                    </docking:Pane>
+                    <!-- Allowed is the OTHER half of the vocabulary: where a pane may go at all, in data. Drag this one
+                         and the compass draws only the EDGES - no centre indicator, no tearing it off - because an
+                         indicator that quietly declines is worse than no indicator. -->
+                    <docking:Pane Header="Errors" Kind="Tool" Allowed="Center,Top,Bottom,Floating">
+                        <TextBlock Text="Errors - centre, top or bottom only; never the sides (Pane.Allowed)"
+                                   Margin="16" Opacity="0.7"/>
+                    </docking:Pane>
+                </docking:PaneGroup>
+
+            </docking:DockingArea>
+        </Border>
+    </Grid>
+</View>

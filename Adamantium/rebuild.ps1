@@ -16,13 +16,13 @@ $root = $PSScriptRoot
 
 # Kill the long-running processes that file-lock build outputs (host + language server + the game itself
 # + the Roslyn build server, which can also cache a stale source generator).
-Get-Process -Name 'Adamantium.UI.Designer.Host','Adamantium.UI.LanguageServer','Adamantium.Game.Sandbox','VBCSCompiler' -ErrorAction SilentlyContinue |
+Get-Process -Name 'Adamantium.UI.Designer.Host','Adamantium.UI.LanguageServer','Adamantium.UI.Sandbox','VBCSCompiler' -ErrorAction SilentlyContinue |
     ForEach-Object { Write-Host "Killing $($_.Name) ($($_.Id))"; $_ | Stop-Process -Force }
 
 $flags = @('-c', $Config, '-p:Platform=x64', '-p:UseSharedCompilation=false', '-nodeReuse:false', '-m:1')
 
 Write-Host "==> Building Sandbox ($Config)"
-dotnet build (Join-Path $root 'Adamantium.Game.Sandbox\Adamantium.Game.Sandbox.csproj') @flags
+dotnet build (Join-Path $root 'Adamantium.UI.Sandbox\Adamantium.UI.Sandbox.csproj') @flags
 if ($LASTEXITCODE -ne 0) { throw "Sandbox build failed ($LASTEXITCODE)" }
 
 Write-Host "==> Building designer host ($Config) -> artifacts/designer-host"

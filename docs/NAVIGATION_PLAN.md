@@ -185,7 +185,7 @@ Guarded-дефолты в `UIApplication.RegisterServices` (`UIApplication.cs:38
 - **`Adamantium.UI`**: `WindowNavigationBackend.cs`; `UIApplication.cs` (`RegisterServices` + init `Navigation`); **фаза 2** —
   `WindowDialogHost.cs` + модальная обвязка; ref csproj.
 - **`Adamantium.MVVM`** (опц.): `NavigationAwareViewModel`/`DialogViewModel` базы.
-- **`Adamantium.Game.Sandbox`**: удалить `TabViewSelector.cs`; правка `GalleryView.auml`/`GalleryViewModel.cs`/
+- **`Adamantium.UI.Sandbox`**: удалить `TabViewSelector.cs`; правка `GalleryView.auml`/`GalleryViewModel.cs`/
   `MainWindow.auml`/`MainViewModel.cs`; +`NavigationDemoViewModel` + `Home/Details/Settings`, +`WorkspaceShellViewModel` +
   `Doc/Chart` + вью, + кастомный `WorkspaceWindow` (оконный шелл, свой стиль); **фаза 2** — +`ConfirmDialogViewModel` + вью.
 

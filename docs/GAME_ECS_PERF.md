@@ -223,7 +223,7 @@ backpressure-гард `if (_sharedSurface.ConsumeValue < _lastProduced) return;`
 ([ForwardRenderingProcessor.cs:59-63](../Adamantium/Adamantium.Engine/EntityServices/ForwardRenderingProcessor.cs#L59); оговорка:
 узел БЕЗ Collider не рисуется вообще, [:77](../Adamantium/Adamantium.Engine/EntityServices/ForwardRenderingProcessor.cs#L77) —
 возможный источник «пропавших» мешей); Deferred/ForwardPlus — мёртвые заглушки, активен только `ForwardRenderingProcessor`
-([AdamantiumGame.cs:37](../Adamantium/Adamantium.Game.Sandbox/AdamantiumGame.cs#L37)); lock-free снапшот сервисов
+([AdamantiumGame.cs:37](../Adamantium/Adamantium.UI.Sandbox/AdamantiumGame.cs#L37)); lock-free снапшот сервисов
 ([EntityServiceManager.cs:146-168](../Adamantium/Adamantium.ECS/EntityServiceManager.cs#L146)); шина shared-surface ≈0.
 
 ---

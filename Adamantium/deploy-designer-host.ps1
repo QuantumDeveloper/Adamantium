@@ -5,7 +5,7 @@
 
 .DESCRIPTION
     The host shares the engine assemblies (Adamantium.UI.Controls, Adamantium.UI, ...) with the runtime, which
-    normally build into the shared artifacts\bin folder. A running Game.Sandbox (e.g. while you debug) locks those
+    normally build into the shared artifacts\bin folder. A running UI.Sandbox (e.g. while you debug) locks those
     DLLs and blocks a normal rebuild ("being used by another process").
 
     This deploy builds the host AND all of its dependencies into the host's OWN isolated folder

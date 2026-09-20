@@ -1,0 +1,380 @@
+﻿<View xmlns="http://adamantium/ui"
+      xmlns:x="http://adamantium/ui/xaml/extensions"
+      xmlns:conv="clr-namespace:Adamantium.UI.Sandbox.Converters"
+      xmlns:behaviors="clr-namespace:Adamantium.UI.Sandbox.Behaviors">
+    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+    <StackPanel Orientation="Vertical" Margin="24">
+
+        <TextBlock Text="Drag &amp; Drop (in-window)" FontSize="20" MarginBottom="4"/>
+        <TextBlock Text="Press an item and move past the threshold: it bakes into a ghost that follows the cursor (a real layered OS window). Release over a panel to drop - the panel's DropCommand moves the item in the view-model and the lists rebind."
+                   FontSize="13"
+                   Foreground="{ResourceReference TextFillColorSecondary}"
+                   MaxWidth="760"
+                   MarginBottom="12"/>
+
+        <StackPanel Orientation="Horizontal" MarginBottom="18">
+            <Button Content="Open drop window (cross-window test)" Command="{Binding OpenDropWindowCommand}"
+                    Width="280" Height="32"/>
+            <!-- DragCursor: Animals' DragOverCommand overrides the shape the engine picks from Effects. Tick it, pick a
+                 shape, and drag anything over Animals - the whole standard catalogue is in the list. -->
+            <CheckBox Content="Override cursor over Animals" IsChecked="{Binding OverrideDragCursor, Mode=TwoWay}"
+                      MarginLeft="24" VerticalAlignment="Center"/>
+            <DropDown ItemsSource="{Binding CursorTypes}" SelectedItem="{Binding DragCursorType, Mode=TwoWay}"
+                      Width="150" MarginLeft="10" VerticalAlignment="Center"/>
+        </StackPanel>
+
+        <StackPanel Orientation="Horizontal">
+
+            <!-- Height, not MinHeight: the list below sits in a star row, and a star row inside an UNBOUNDED height
+                 (a vertical StackPanel in a ScrollViewer) hands the list everything it asks for - all 24 items - instead
+                 of the card's leftover. Bound the card and the star row means what it looks like it means. -->
+            <Border CornerRadius="8" Padding="12" Width="220" Height="300" MarginRight="16" BorderThickness="2">
+                <!-- Behaviors form: one DropTargetBehavior instead of the DragDrop.* attached properties. Its
+                     {Binding} resolves because the behavior joins this Border's logical tree (shares its DataContext). -->
+                <Border.Behaviors>
+                    <DropTargetBehavior DropCommand="{Binding DropLeftCommand}"/>
+                </Border.Behaviors>
+                <Border.Styles>
+                    <Style Selector="Border">
+                        <Setter Property="Background" Value="{ResourceReference CardBackgroundFillColorDefault}"/>
+                        <Setter Property="BorderBrush" Value="{ResourceReference ControlStrokeColorDefault}"/>
+                        <PropertyTrigger Property="DragDrop.IsDragOver" Value="True">
+                            <Setter Property="Background" Value="{ResourceReference SubtleFillColorSecondary}"/>
+                            <Setter Property="BorderBrush" Value="{ResourceReference SystemFillColorSuccess}"/>
+                        </PropertyTrigger>
+                    </Style>
+                </Border.Styles>
+                <Grid RowDefinitions="Auto,Auto,*">
+                    <TextBlock Text="Fruits" Foreground="{ThemeResource AccentFillColorDefault}" MarginBottom="6"/>
+                    <!-- Off, and the grip goes inactive: the whole row drags again. The switch flips the SAME markup -
+                         nothing is added or removed from the tree. -->
+                    <StackPanel Grid.Row="1" 
+                                Orientation="Vertical" 
+                                MarginBottom="8">
+                        <CheckBox Content="Drag by handle only" IsChecked="{Binding HandleOnlyDrag, Mode=TwoWay}"/>
+                        <!-- Off = the plain insertion caret; on (the default) = a real hole with a placeholder card. -->
+                        <CheckBox x:Name="LeftGapToggle" Content="Spread" IsChecked="True"/>
+                    </StackPanel>
+                    <ListBox Grid.Row="2"
+                             ItemsSource="{Binding Left}"
+                             SelectedItems="{Binding LeftSelection}"
+                             DragDrop.UseDropGap="{Binding IsChecked, ElementName=LeftGapToggle}"
+                             SelectionMode="Extended"
+                             Background="Transparent">
+                        <!-- The gap between rows belongs to the CONTAINER, not to the tile inside it: on the tile it is
+                             wrapped by the row's selection plate, so the plate stands six pixels taller than what it is
+                             highlighting and the tile hugs its top. -->
+                        <ListBox.Styles>
+                            <Style Selector="ListBoxItem">
+                                <Setter Property="Margin" Value="0 3 0 3"/>
+                            </Style>
+                        </ListBox.Styles>
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <Border Background="{ResourceReference TileFillColorDefault}" CornerRadius="6" Padding="10">
+                                    <!-- DragSourceBehavior: Data={Binding} = the item (behavior inherits the item's DataContext);
+                                         the source-lifecycle commands reach the VM via the default VISUAL ancestor walk from
+                                         the behavior's host, which crosses the item's template boundary to the ItemsControl. -->
+                                    <Border.Behaviors>
+                                        <DragSourceBehavior Data="{Binding}"
+                                                            StartedCommand="{Ancestor ItemsControl, DataContext.DragStartedCommand}"
+                                                            CompletedCommand="{Ancestor ItemsControl, DataContext.DragCompletedCommand}">
+                                            <!-- Custom ghost: an accent bar filling the SOURCE ROW's width (the engine measures/arranges
+                                                 the template at the row width). Fruits demos DragTemplate; Animals uses the plain snapshot. -->
+                                            <DragSourceBehavior.DragTemplate>
+                                                <DataTemplate>
+                                                    <Border Background="{ThemeResource AccentFillColorDefault}" CornerRadius="6" Padding="12 8">
+                                                        <TextBlock Text="{Binding}" Foreground="{ThemeResource AccentForegroundColor}"/>
+                                                    </Border>
+                                                </DataTemplate>
+                                            </DragSourceBehavior.DragTemplate>
+                                        </DragSourceBehavior>
+                                    </Border.Behaviors>
+                                    <!-- Drag-handle: with the grip active only IT starts the drag, so the rest of the row
+                                         stays free to click and select. Uncheck the switch above and the grip goes
+                                         inactive - the row drags by its whole body again, like Animals, which has none. -->
+                                    <Grid ColumnDefinitions="Auto,*">
+                                        <DragHandle IsActive="{Ancestor ItemsControl, DataContext.HandleOnlyDrag}"
+                                                    MarginRight="6" VerticalAlignment="Center"/>
+                                        <!-- No explicit Foreground: inherit it, so the ListBoxItem theme's ForegroundSelected
+                                             ({ThemeResource AccentForegroundColor}) gives contrast-correct text on the accent selection. -->
+                                        <TextBlock Grid.Column="1" Text="{Binding}" VerticalAlignment="Center"/>
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                </Grid>
+            </Border>
+
+            <Border CornerRadius="8" Padding="12" Width="220" Height="300" BorderThickness="2"
+                    DragDrop.AllowDrop="{Binding AnimalsAcceptDrop}" DragDrop.DropCommand="{Binding DropRightCommand}"
+                    DragDrop.DragOverCommand="{Binding DragOverRightCommand}">
+                <Border.Styles>
+                    <Style Selector="Border">
+                        <Setter Property="Background" Value="{ResourceReference CardBackgroundFillColorDefault}"/>
+                        <Setter Property="BorderBrush" Value="{ResourceReference ControlStrokeColorDefault}"/>
+                        <PropertyTrigger Property="DragDrop.IsDragOver" Value="True">
+                            <Setter Property="Background" Value="{ResourceReference SubtleFillColorSecondary}"/>
+                            <Setter Property="BorderBrush" Value="{ResourceReference SystemFillColorSuccess}"/>
+                        </PropertyTrigger>
+                    </Style>
+                </Border.Styles>
+                <Grid RowDefinitions="Auto,Auto,*">
+                    <TextBlock Text="Animals" Foreground="{ThemeResource AccentFillColorDefault}" MarginBottom="6"/>
+                    <!-- Uncheck to reject drops here: dragging over Animals then shows the ⊘ no-drop cursor. -->
+                    <CheckBox Grid.Row="1" Content="Accept drop" IsChecked="{Binding AnimalsAcceptDrop, Mode=TwoWay}" MarginBottom="8"/>
+                    <ListBox Grid.Row="2" ItemsSource="{Binding Right}" SelectedItems="{Binding RightSelection}"
+                             SelectionMode="Extended" Background="Transparent">
+                        <!-- On the CONTAINER, not the tile - see the note on the Fruits list. -->
+                        <ListBox.Styles>
+                            <Style Selector="ListBoxItem">
+                                <Setter Property="Margin" Value="0 3 0 3"/>
+                            </Style>
+                        </ListBox.Styles>
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <Border Background="{ResourceReference TileFillColorDefault}" CornerRadius="6" Padding="10"
+                                        DragDrop.AllowDrag="True" DragDrop.DragData="{Binding}"
+                                        DragDrop.DragStartedCommand="{Ancestor ItemsControl, DataContext.DragStartedCommand}"
+                                        DragDrop.DragCompletedCommand="{Ancestor ItemsControl, DataContext.DragCompletedCommand}">
+                                    <!-- No explicit Foreground: inherit it, so the ListBoxItem theme's ForegroundSelected
+                                         ({ThemeResource AccentForegroundColor}) gives contrast-correct text on the accent selection. -->
+                                    <TextBlock Text="{Binding}"/>
+                                </Border>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                </Grid>
+            </Border>
+
+            <Border CornerRadius="8" Padding="12" Width="340" Height="300" MarginLeft="16" BorderThickness="2"
+                    DragDrop.AllowDrop="True" DragDrop.DropCommand="{Binding DropWrapCommand}">
+                <Border.Styles>
+                    <Style Selector="Border">
+                        <Setter Property="Background" Value="{ResourceReference CardBackgroundFillColorDefault}"/>
+                        <Setter Property="BorderBrush" Value="{ResourceReference ControlStrokeColorDefault}"/>
+                        <PropertyTrigger Property="DragDrop.IsDragOver" Value="True">
+                            <Setter Property="Background" Value="{ResourceReference SubtleFillColorSecondary}"/>
+                            <Setter Property="BorderBrush" Value="{ResourceReference SystemFillColorSuccess}"/>
+                        </PropertyTrigger>
+                    </Style>
+                </Border.Styles>
+                <Grid RowDefinitions="Auto,Auto,*">
+                    <TextBlock Text="Colors (WrapPanel)" Foreground="{ThemeResource AccentFillColorDefault}" MarginBottom="6"/>
+                    <StackPanel Grid.Row="1" 
+                                Orientation="Horizontal" 
+                                MarginBottom="10">
+                        <TextBlock Text="Flow:" VerticalAlignment="Center" MarginRight="8"/>
+                        <DropDown ItemsSource="{Binding Orientations}"
+                                  SelectedItem="{Binding WrapOrientation, Mode=TwoWay}" Width="130"/>
+                        <!-- Off = the plain insertion caret; on (the default) = a real hole with a placeholder card. -->
+                        <CheckBox x:Name="WrapGapToggle" Content="Spread" IsChecked="True"
+                                  VerticalAlignment="Center" MarginLeft="12"/>
+                    </StackPanel>
+                    <ListBox Grid.Row="2" ItemsSource="{Binding Wrap}" SelectedItems="{Binding WrapSelection}"
+                             DragDrop.UseDropGap="{Binding IsChecked, ElementName=WrapGapToggle}"
+                             SelectionMode="Extended" Background="Transparent"
+                             ScrollViewer.HorizontalScrollBarVisibility="{Binding WrapHScroll}"
+                             ScrollViewer.VerticalScrollBarVisibility="{Binding WrapVScroll}">
+                        <ListBox.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <WrapPanel Orientation="{Binding WrapOrientation}" ItemWidth="92" ItemHeight="40"/>
+                            </ItemsPanelTemplate>
+                        </ListBox.ItemsPanel>
+                        <!-- The chip IS the container (one plate): the theme ListBoxItem sizes to its text and shows rest +
+                             selection consistently. The template is just a transparent draggable surface + the label. -->
+                        <ListBox.ItemContainerStyle>
+                            <Style Selector="ListBoxItem">
+                                <Setter Property="Background" Value="{ResourceReference TileFillColorDefault}"/>
+                                <Setter Property="CornerRadius" Value="6"/>
+                                <Setter Property="Margin" Value="4"/>
+                            </Style>
+                        </ListBox.ItemContainerStyle>
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <Border Background="Transparent"
+                                        DragDrop.AllowDrag="True" DragDrop.DragData="{Binding}"
+                                        DragDrop.DragStartedCommand="{Ancestor ItemsControl, DataContext.DragStartedCommand}"
+                                        DragDrop.DragCompletedCommand="{Ancestor ItemsControl, DataContext.DragCompletedCommand}">
+                                    <TextBlock Text="{Binding}" VerticalAlignment="Center" VerticalTextAlignment="Center"/>
+                                </Border>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                </Grid>
+            </Border>
+
+        </StackPanel>
+
+        <TextBlock Text="Across applications (OS drag-drop)"
+                   FontSize="17"
+                   MarginTop="24"/>
+        <TextBlock Text="The same commands, now over the OS bridge: drop files or text from Explorer / an editor into the left card, and drag the right card's items OUT into Notepad or an Explorer folder. Payloads cross as neutral formats (DataFormats.Text / DataFormats.Files) - the view-model never sees a platform type."
+                   FontSize="13"
+                   Foreground="{ResourceReference TextFillColorSecondary}"
+                   MaxWidth="760"
+                   MarginBottom="12"/>
+
+        <StackPanel Orientation="Horizontal" MarginBottom="16">
+
+            <Border CornerRadius="8" Padding="12" Width="420" MinHeight="220" MarginRight="16" BorderThickness="2"
+                    DragDrop.AllowDrop="True" DragDrop.DropCommand="{Binding DropExternalCommand}">
+                <Border.Styles>
+                    <Style Selector="Border">
+                        <Setter Property="Background" Value="{ResourceReference CardBackgroundFillColorDefault}"/>
+                        <Setter Property="BorderBrush" Value="{ResourceReference ControlStrokeColorDefault}"/>
+                        <PropertyTrigger Property="DragDrop.IsDragOver" Value="True">
+                            <Setter Property="Background" Value="{ResourceReference SubtleFillColorSecondary}"/>
+                            <Setter Property="BorderBrush" Value="{ResourceReference SystemFillColorSuccess}"/>
+                        </PropertyTrigger>
+                    </Style>
+                </Border.Styles>
+                <!-- Grid, not StackPanel: a stack hands every child its desired height and never shares out what is left,
+                     so the list has to sit in a STAR row to fill the card (which is itself stretched to the tallest sibling). -->
+                <Grid RowDefinitions="Auto,Auto,Auto,*">
+                    <TextBlock Grid.Row="0" Text="Drop from another app" Foreground="{ThemeResource AccentFillColorDefault}" MarginBottom="6"/>
+                    <TextBlock Grid.Row="1"
+                               Text="Drag files here from Explorer, or selected text from an editor."
+                               FontSize="12"
+                               TextWrapping="WrapBySymbols"
+                               Foreground="{ResourceReference TextFillColorSecondary}"
+                               MarginBottom="8"/>
+                    <Button Grid.Row="2"
+                            Content="Clear"
+                            Command="{Binding ClearDroppedCommand}"
+                            Width="90"
+                            Height="28"
+                            HorizontalAlignment="Left"
+                            MarginBottom="8"/>
+                    <ListBox Grid.Row="3" ItemsSource="{Binding Dropped}" Background="Transparent"/>
+                </Grid>
+            </Border>
+
+            <!-- The drop, made visible. Everything picture-shaped that lands anywhere on this page shows up here: the
+                 payload is bytes in whatever encoding the source had, and the converter is what turns that into
+                 something an Image can draw - decoding by content, so PNG, JPEG, GIF and the rest all just work. -->
+            <Border CornerRadius="8" Padding="12" Width="420" Height="360" MarginLeft="16" BorderThickness="2"
+                    DragDrop.AllowDrop="True" DragDrop.DropCommand="{Binding DropExternalCommand}">
+                <Border.Styles>
+                    <Style Selector="Border">
+                        <Setter Property="Background" Value="{ResourceReference CardBackgroundFillColorDefault}"/>
+                        <Setter Property="BorderBrush" Value="{ResourceReference ControlStrokeColorDefault}"/>
+                        <PropertyTrigger Property="DragDrop.IsDragOver" Value="True">
+                            <Setter Property="Background" Value="{ResourceReference SubtleFillColorSecondary}"/>
+                            <Setter Property="BorderBrush" Value="{ResourceReference SystemFillColorSuccess}"/>
+                        </PropertyTrigger>
+                    </Style>
+                </Border.Styles>
+                <Grid RowDefinitions="Auto,Auto,*">
+                    <TextBlock Grid.Row="0" Text="Dropped pictures" Foreground="{ThemeResource AccentFillColorDefault}" MarginBottom="6"/>
+                    <TextBlock Grid.Row="1"
+                               Text="Drop an image file here, or drag a picture straight out of a browser."
+                               FontSize="12"
+                               TextWrapping="WrapBySymbols"
+                               Foreground="{ResourceReference TextFillColorSecondary}"
+                               MarginBottom="8"/>
+                    <ListBox Grid.Row="2" ItemsSource="{Binding DroppedPictures}" Background="Transparent"
+                             ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                             ScrollViewer.VerticalScrollBarVisibility="Auto">
+                        <ListBox.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <WrapPanel Orientation="Horizontal" ItemWidth="124" ItemHeight="124"/>
+                            </ItemsPanelTemplate>
+                        </ListBox.ItemsPanel>
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <!-- The tile shows up the moment the drop happens, with its spinner; the behavior
+                                     decodes off-thread and fills the picture in when it is ready. -->
+                                <Border Background="{ResourceReference TileFillColorDefault}" CornerRadius="6" Padding="6"
+                                        MarginRight="6" MarginBottom="6">
+                                    <Grid>
+                                        <BusyIndicator IsActive="{Binding IsLoading}" Width="28" Height="28"
+                                                       HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                       Visibility="{Binding IsLoading, Converter={conv:BoolToVisibilityConverter}}"/>
+                                        <Image Stretch="Uniform" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                            <Image.Behaviors>
+                                                <behaviors:AsyncPictureBehavior Picture="{Binding}"/>
+                                            </Image.Behaviors>
+                                        </Image>
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                </Grid>
+            </Border>
+
+            <Border CornerRadius="8" Padding="12" Width="300" MinHeight="220" BorderThickness="2">
+                <Border.Styles>
+                    <Style Selector="Border">
+                        <Setter Property="Background" Value="{ResourceReference CardBackgroundFillColorDefault}"/>
+                        <Setter Property="BorderBrush" Value="{ResourceReference ControlStrokeColorDefault}"/>
+                    </Style>
+                </Border.Styles>
+                <Grid RowDefinitions="Auto,Auto,*">
+                    <TextBlock Grid.Row="0" Text="Drag out to another app" Foreground="{ThemeResource AccentFillColorDefault}" MarginBottom="6"/>
+                    <TextBlock Grid.Row="1"
+                               Text="AllowExternalDrag hands the whole gesture to the OS, ghost image and all. The notes also carry HTML and RTF - drop one into WordPad and the formatting survives. The file is written only if the drop lands."
+                               FontSize="12"
+                               TextWrapping="WrapBySymbols"
+                               Foreground="{ResourceReference TextFillColorSecondary}"
+                               MarginBottom="8"/>
+                    <ListBox Grid.Row="2" ItemsSource="{Binding Exports}" Background="Transparent">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <Border Background="{ResourceReference TileFillColorDefault}"
+                                        CornerRadius="6"
+                                        Padding="10"
+                                        MarginBottom="6"
+                                        DragDrop.AllowDrag="True"
+                                        DragDrop.AllowExternalDrag="True"
+                                        DragDrop.DragData="{Binding}"
+                                        DragDrop.DragStartedCommand="{Ancestor ItemsControl, DataContext.ExportStartedCommand}">
+                                    <TextBlock Text="{Binding}"/>
+                                </Border>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                </Grid>
+            </Border>
+
+        </StackPanel>
+
+        <StackPanel Orientation="Horizontal" MarginTop="16">
+            <Border CornerRadius="8" Padding="12" Width="300" MinHeight="280" BorderThickness="2"
+                    DragDrop.AllowDrop="True" DragDrop.DropCommand="{Binding DropTreeCommand}">
+                <Border.Styles>
+                    <Style Selector="Border">
+                        <Setter Property="Background" Value="{ResourceReference CardBackgroundFillColorDefault}"/>
+                        <Setter Property="BorderBrush" Value="{ResourceReference ControlStrokeColorDefault}"/>
+                        <PropertyTrigger Property="DragDrop.IsDragOver" Value="True">
+                            <Setter Property="Background" Value="{ResourceReference SubtleFillColorSecondary}"/>
+                            <Setter Property="BorderBrush" Value="{ResourceReference SystemFillColorSuccess}"/>
+                        </PropertyTrigger>
+                    </Style>
+                </Border.Styles>
+                <StackPanel Orientation="Vertical">
+                    <TextBlock Text="Tree — dwell a folder to auto-expand" Foreground="{ThemeResource AccentFillColorDefault}" MarginBottom="10"/>
+                    <TreeView ItemsSource="{Binding Tree}" MaxHeight="230">
+                        <TreeView.ItemContainerStyle>
+                            <Style Selector="TreeViewItem">
+                                <Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}"/>
+                                <Setter Property="IsSelected" Value="{Binding IsSelected, Mode=TwoWay}"/>
+                            </Style>
+                        </TreeView.ItemContainerStyle>
+                        <TreeView.ItemTemplate>
+                            <HierarchicalDataTemplate ItemsSource="{Binding Children}">
+                                <Border Background="Transparent"
+                                        DragDrop.AllowDrag="True" DragDrop.DragData="{Binding}">
+                                    <TextBlock Text="{Binding Title}" VerticalAlignment="Center"/>
+                                </Border>
+                            </HierarchicalDataTemplate>
+                        </TreeView.ItemTemplate>
+                    </TreeView>
+                </StackPanel>
+            </Border>
+        </StackPanel>
+    </StackPanel>
+    </ScrollViewer>
+</View>

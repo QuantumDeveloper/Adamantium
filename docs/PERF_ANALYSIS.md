@@ -1,7 +1,7 @@
-# Анализ перфоманса: игра-в-панели (Game.Sandbox)
+# Анализ перфоманса: игра-в-панели (UI.Sandbox)
 
 _Автономное расследование 2026-06-23. Машина: Quadro RTX 4000, present=Mailbox, MSAA off, аналитическое AA вкл._
-_Метод: реальные прогоны Game.Sandbox + лог `App FPS` + временный per-service Stopwatch + A/B-тумблеры (откатаны)._
+_Метод: реальные прогоны UI.Sandbox + лог `App FPS` + временный per-service Stopwatch + A/B-тумблеры (откатаны)._
 
 ## TL;DR
 

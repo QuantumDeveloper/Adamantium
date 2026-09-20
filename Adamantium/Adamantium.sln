@@ -111,7 +111,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution 
 		SourceGeneratorsDocs.txt = SourceGeneratorsDocs.txt
 	EndProjectSection
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Adamantium.Game.Sandbox", "Adamantium.Game.Sandbox\Adamantium.Game.Sandbox.csproj", "{1D3A8E6B-5D56-4FD5-A4B9-6A44F4A77734}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Adamantium.UI.Sandbox", "Adamantium.UI.Sandbox\Adamantium.UI.Sandbox.csproj", "{1D3A8E6B-5D56-4FD5-A4B9-6A44F4A77734}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Adamantium.Fonts", "Adamantium.Fonts\Adamantium.Fonts.csproj", "{FE62CA11-1BD3-4C88-B0F4-7C0A1F593F0E}"
 EndProject

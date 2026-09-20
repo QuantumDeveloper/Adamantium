@@ -12,9 +12,9 @@ internal static class LspSelfTest
 {
     public static int Run()
     {
-        const string dir = "file:///c:/AdamantiumEngine/Adamantium/Adamantium/Adamantium.Game.Sandbox";
+        const string dir = "file:///c:/AdamantiumEngine/Adamantium/Adamantium/Adamantium.UI.Sandbox";
         // VS Code percent-encodes the drive colon (file:///c%3A/...) — UriToLocalPath must still resolve the project.
-        const string dirEncoded = "file:///c%3A/AdamantiumEngine/Adamantium/Adamantium/Adamantium.Game.Sandbox";
+        const string dirEncoded = "file:///c%3A/AdamantiumEngine/Adamantium/Adamantium/Adamantium.UI.Sandbox";
         const string encodedUri = dirEncoded + "/Encoded.auml";
         const string completionUri = dir + "/Completion.auml";
         const string diagUri = dir + "/Diag.auml";
@@ -272,7 +272,7 @@ internal static class LspSelfTest
         try
         {
             var model = new AumlWorkspace().GetModelForFile(
-                @"c:\AdamantiumEngine\Adamantium\Adamantium\Adamantium.Game.Sandbox\Completion.auml");
+                @"c:\AdamantiumEngine\Adamantium\Adamantium\Adamantium.UI.Sandbox\Completion.auml");
             var objectSymbol = model?.Compilation.GetTypeByMetadataName("System.Object");
             if (objectSymbol is not null)
             {

@@ -11,7 +11,7 @@ namespace Adamantium.UITests;
 [TestFixture]
 public class AnimatedImageDecodeTests
 {
-    private const string TexturesDir = @"C:\AdamantiumEngine\Adamantium\Adamantium\Adamantium.Game.Sandbox\Textures\";
+    private const string TexturesDir = @"C:\AdamantiumEngine\Adamantium\Adamantium\Adamantium.UI.Sandbox\Textures\";
 
     [Test]
     public void Apng_DecodesMultipleFrames()

@@ -357,7 +357,7 @@
 
 ## Стенд
 
-Вкладка **Markup** в песочнице ([MarkupView.auml](../Adamantium/Adamantium.Game.Sandbox/Views/MarkupView.auml)) —
+Вкладка **Markup** в песочнице ([MarkupView.auml](../Adamantium/Adamantium.UI.Sandbox/Views/MarkupView.auml)) —
 показывает сделанное, а не рассказывает о нём. Там, где у механики есть НЕВЕРНЫЙ ответ, он стоит рядом с верным:
 
 - `x:Shared="False"` — две пары кнопок под одинаковой разметкой: слева одно меню на обеих (умолчание), справа у каждой
