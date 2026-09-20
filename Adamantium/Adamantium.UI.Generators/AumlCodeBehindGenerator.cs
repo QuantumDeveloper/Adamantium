@@ -14,26 +14,38 @@ namespace Adamantium.UI.Generators
     {
         public void Initialize(IncrementalGeneratorInitializationContext context)
         {
-           var filesProvider = context.AdditionalTextsProvider
+            // Only the two properties this generator reads. The options PROVIDER is a fresh object per run, so combining
+            // with it would invalidate everything; two strings compare by value and hold still.
+            var buildProperties = context.AnalyzerConfigOptionsProvider.Select((options, _) =>
+            {
+                options.GlobalOptions.TryGetValue("build_property.RootNamespace", out var rootNamespace);
+                options.GlobalOptions.TryGetValue("build_property.projectdir", out var projectDir);
+                return (RootNamespace: rootNamespace, ProjectDir: projectDir);
+            });
+
+            // PARSING IS ITS OWN STEP, and a per-file one. It depends on the file's text and nothing else, so Roslyn
+            // caches each document separately: editing one .auml reparses that file, and editing C# reparses none.
+            // It used to sit inside the output below, which carries the Compilation - and the compilation is a new
+            // object whenever any code changes, so every run reparsed all of the markup. That is where the minute went.
+            var parsedFiles = context.AdditionalTextsProvider
                 .Where(file => file.Path.EndsWith(".xml") || file.Path.EndsWith(".auml"))
                 .Select((text, cancellationToken) => (
                     Path: text.Path,
                     Content: text.GetText(cancellationToken)!.ToString()))
+                .Combine(buildProperties)
+                .Select((pair, _) => ParseDocument(pair.Left.Path, pair.Left.Content, pair.Right.RootNamespace, pair.Right.ProjectDir))
+                .WithTrackingName(ParseStepName)
                 .Collect();
 
-            var compilationProvider = context.CompilationProvider.Combine(context.AnalyzerConfigOptionsProvider);
-            var sourceProvider = filesProvider.Combine(compilationProvider);
+            var sourceProvider = parsedFiles.Combine(context.CompilationProvider).Combine(buildProperties);
 
             context.RegisterSourceOutput(sourceProvider, (spc, source) =>
             {
-                var (collectedFiles, (compilation, configOptions)) = source;
+                var ((parsed, compilation), properties) = source;
 
                 var resourceDictionaries = new List<ResourceDictionaryInfo>();
 
-                configOptions.GlobalOptions.TryGetValue("build_property.RootNamespace", out var rootNamespace);
-                configOptions.GlobalOptions.TryGetValue("build_property.projectdir", out var projectDir);
-
-                if (string.IsNullOrEmpty(rootNamespace))
+                if (string.IsNullOrEmpty(properties.RootNamespace))
                 {
                     spc.ReportDiagnostic(Diagnostic.Create("AUI001", "Build", "No RootNamespace Compiler option provided. Please add <CompilerVisibleProperty Include=\"RootNamespace\" /> to your csproj file.", DiagnosticSeverity.Error, DiagnosticSeverity.Error, true, 0));
                     return;
@@ -42,33 +54,26 @@ namespace Adamantium.UI.Generators
                 var typeResolver = new RoslynTypeResolver(compilation);
                 var transformer = new DefaultAumlTransformer();
                 var codeGenerator = new AumlSourceGenerator();
-                
+
                 var metadata = new List<AumlDocument>();
 
-                // Phase 1 - parsing and metadata collection
-                foreach (var file in collectedFiles)
+                // Phase 1 - report what parsing found, and take a COPY of each document to work on. The parsed one is
+                // the cache's, and the transform below resolves types by writing back into the tree.
+                foreach (var file in parsed)
                 {
                     var diagnostics = new RoslynDiagnosticSink(spc);
 
-                    var aumlDoc = AumlParser.Parse(file.Content);
-                    if (aumlDoc.HasErrors)
+                    if (file.Document.HasErrors)
                     {
-                        foreach (var message in aumlDoc.Logger.Messages)
+                        foreach (var message in file.Document.Logger.Messages)
                         {
                             diagnostics.ReportLogMessage(file.Path, message);
                         }
                         continue;
                     }
 
-                    // Get a relative file path for further calculations
-                    var relativePath = file.Path.Replace(projectDir, string.Empty).Replace("\\", "/");
-                    if (relativePath.StartsWith("/"))
-                    {
-                        relativePath = relativePath.Substring(1);
-                    }
-                    
-                    aumlDoc.RelativeFilePath = relativePath;
-                    aumlDoc.RootNamespace = rootNamespace;
+                    var aumlDoc = file.Document.Clone();
+                    var relativePath = aumlDoc.RelativeFilePath;
 
                     foreach (var finding in QuickAccessMenuCheck.Run(aumlDoc))
                     {
@@ -148,6 +153,35 @@ namespace Adamantium.UI.Generators
             });
         }
         
+        /// <summary>The name the parse step is tracked under, so a test can see whether it was served from cache -
+        /// which a build cannot show, the cache living in the driver and every csc run building a fresh one.</summary>
+        internal const string ParseStepName = "AumlParse";
+
+        // The whole of the per-file work: it takes text and two strings, and touches nothing else. Anything that needs
+        // the compilation belongs in the output step, not here, or this stops being cacheable.
+        private static ParsedAumlFile ParseDocument(string path, string content, string rootNamespace, string projectDir)
+        {
+            var document = AumlParser.Parse(content);
+
+            var relativePath = path.Replace(projectDir ?? string.Empty, string.Empty).Replace("\\", "/");
+            if (relativePath.StartsWith("/"))
+            {
+                relativePath = relativePath.Substring(1);
+            }
+
+            document.RelativeFilePath = relativePath;
+            document.RootNamespace = rootNamespace;
+
+            return new ParsedAumlFile(path, document);
+        }
+
+        private readonly struct ParsedAumlFile(string path, AumlDocument document)
+        {
+            public string Path { get; } = path;
+
+            public AumlDocument Document { get; } = document;
+        }
+
         private int GetGenerationPriority(AumlAstObjectNode rootNode)
         {
             return rootNode.TypeReference.Name switch

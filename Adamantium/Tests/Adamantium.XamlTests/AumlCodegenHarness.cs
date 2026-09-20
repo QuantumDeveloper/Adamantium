@@ -81,6 +81,27 @@ internal static class AumlCodegenHarness
         return output.GetDiagnostics().Where(d => d.Severity == DiagnosticSeverity.Error).ToArray();
     }
 
+    /// <summary>A driver that RECORDS its incremental steps, plus the compilation to run it against. The only way to
+    /// see whether a step was served from cache: a command-line build cannot show it, because every csc invocation
+    /// builds a fresh driver and the cache lives in the driver.</summary>
+    public static (CSharpGeneratorDriver Driver, CSharpCompilation Compilation) TrackingDriver(string auml)
+    {
+        var optionsProvider = new DictOptionsProvider(new Dictionary<string, string>
+        {
+            ["build_property.RootNamespace"] = "Test.App",
+            ["build_property.projectdir"] = @"C:\Test\",
+        });
+
+        var driver = CSharpGeneratorDriver.Create(
+            generators: [new AumlCodeBehindGenerator().AsSourceGenerator()],
+            additionalTexts: [new InMemoryAdditionalText(@"C:\Test\MainWindow.auml", auml)],
+            parseOptions: null,
+            optionsProvider: optionsProvider,
+            driverOptions: new GeneratorDriverOptions(IncrementalGeneratorOutputKind.None, trackIncrementalGeneratorSteps: true));
+
+        return (driver, Compilation());
+    }
+
     private static CSharpCompilation Compilation()
     {
         _ = _seed.Length;   // touch the seed so the assemblies are loaded
