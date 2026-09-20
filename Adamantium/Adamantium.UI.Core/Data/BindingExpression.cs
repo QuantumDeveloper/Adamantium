@@ -418,7 +418,21 @@ public class BindingExpression : BindingExpressionBase
    // Returns the engine's UNSET token - never a bare null - when there is nothing to say: no source, no such property,
    // and no fallback either. A null that came from a source that DID resolve is a VALUE and is returned as one; the two
    // used to arrive as the same null, and the caller could only guess, so it dropped both.
-   private object ComputeValue(Type targetType)
+   private object ComputeValue(Type targetType) => Formatted(ReadValue(targetType), targetType);
+
+   // StringFormat lived on every binding, travelled into every expression, and was read by NOBODY except MultiBinding:
+   // a single binding took the format, ignored it and showed the raw value without a word. Only where it can mean
+   // something - a string target, a value that exists. A PRODUCER (trigger condition, MultiBinding input) asks for
+   // object and must keep its type: a comparison against a formatted string is not the comparison that was written.
+   private object Formatted(object value, Type targetType)
+   {
+      if (targetType != typeof(string) || string.IsNullOrEmpty(BindingBase.StringFormat)) return value;
+      if (value == null || ReferenceEquals(value, AdamantiumProperty.UnsetValue)) return value;
+
+      return string.Format(CultureInfo.CurrentCulture, BindingBase.StringFormat, value);
+   }
+
+   private object ReadValue(Type targetType)
    {
       // Empty-path binding: the value is the resolved source object itself (optionally run through the converter).
       if (_bindToSource)

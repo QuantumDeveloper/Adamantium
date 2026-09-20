@@ -110,9 +110,21 @@ public class MarkupExtensionParser
             return Parse(context, value, info, namespaceMappings);
         }
 
-        return new AumlAstMarkupExtensionLiteral(info, value);
+        return new AumlAstMarkupExtensionLiteral(info, Unquote(value));
     }
-    
+
+    // Quotes around an argument are the SYNTAX for "this is one value, spaces and commas included" - they were never
+    // part of it. Kept, they reached the property: a StringFormat arrived with apostrophes and printed them.
+    private static string Unquote(string value)
+    {
+        if (value.Length < 2) return value;
+
+        var quote = value[0];
+        return (quote == '\'' || quote == '"') && value[value.Length - 1] == quote
+            ? value.Substring(1, value.Length - 2)
+            : value;
+    }
+
     private static List<string> SplitByCommasRespectingBraces(string input)
     {
         var result = new List<string>();
@@ -120,9 +132,26 @@ public class MarkupExtensionParser
 
         var sb = new StringBuilder();
         int depth = 0;
+        var quote = '\0';
 
         foreach (char c in input)
         {
+            // Inside quotes nothing is punctuation: a comma there belongs to the text, which is the whole reason for
+            // quoting an argument in the first place.
+            if (quote != '\0')
+            {
+                if (c == quote) quote = '\0';
+                sb.Append(c);
+                continue;
+            }
+
+            if (c is '\'' or '"')
+            {
+                quote = c;
+                sb.Append(c);
+                continue;
+            }
+
             if (c == '{') depth++;
             if (c == '}') depth--;
             if (c == ',' && depth == 0)
