@@ -11,6 +11,22 @@ public abstract class AumlAstNode : IAumlAstNode
     public int Line { get; set; }
     public int Position { get; set; }
     
+    /// <inheritdoc cref="IAumlAstNode.Clone"/>
+    /// <remarks>ABSTRACT on purpose: a node type added later does not compile until it can copy itself, which is the
+    /// whole point - a copier written as one switch somewhere else is a copier someone forgets to extend.</remarks>
+    public abstract IAumlAstNode Clone(AumlAstObjectNode parent);
+
+    // Guards the one hole the compiler leaves: a DERIVED node inherits its base's Clone, says nothing, and quietly
+    // copies itself as the base - losing whatever it added. Each base that can be derived from calls this.
+    protected void EnsureNotDerived(System.Type self)
+    {
+        if (GetType() == self) return;
+
+        throw new System.NotSupportedException(
+            $"{GetType().Name} inherits {self.Name}.Clone and would be copied as a {self.Name}, losing its own state. " +
+            "Override Clone in it.");
+    }
+
     public virtual void VisitChildren(IAumlAstVisitor visitor)
     {
     }

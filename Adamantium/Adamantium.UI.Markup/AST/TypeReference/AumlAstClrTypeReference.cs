@@ -18,6 +18,10 @@ public class AumlAstClrTypeReference : AumlAstNode, IAumlAstTypeReference
     public bool IsXmlNamespaceDeclaration => false;
     public virtual bool IsResolved => false;
 
+    /// <summary>ITSELF - see <see cref="AumlAstXmlTypeReference.Clone"/>. Returning this is right for the resolved
+    /// subclass too, which is why it does not override.</summary>
+    public override IAumlAstNode Clone(AumlAstObjectNode parent) => this;
+
     public bool IsEqual(IAumlAstTypeReference other)
     {
         if (other is AumlAstClrTypeReference clr)

@@ -15,6 +15,13 @@ public class AumlAstTextNode : AumlAstNode, IAumlAstValueNode
 
     public IAumlAstTypeReference TypeReference { get; set; }
 
+    public override IAumlAstNode Clone(AumlAstObjectNode parent)
+    {
+        EnsureNotDerived(typeof(AumlAstTextNode));
+
+        return new AumlAstTextNode(this, Text) { TypeReference = TypeReference };
+    }
+
     public override string ToString()
     {
         return Text;

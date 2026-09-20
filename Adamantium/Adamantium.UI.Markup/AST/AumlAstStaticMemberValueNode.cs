@@ -19,4 +19,7 @@ public class AumlAstStaticMemberValueNode : AumlAstNode, IAumlAstValueNode
 
     /// <summary>The static field or property to read.</summary>
     public string MemberName { get; }
+
+    public override IAumlAstNode Clone(AumlAstObjectNode parent) =>
+        new AumlAstStaticMemberValueNode(this, TypeReference, MemberName);
 }

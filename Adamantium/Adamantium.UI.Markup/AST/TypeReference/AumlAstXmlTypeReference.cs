@@ -18,6 +18,10 @@ public class AumlAstXmlTypeReference : AumlAstNode, IAumlAstTypeReference
     public bool IsXmlNamespaceDeclaration => true;
     public bool IsResolved => false;
 
+    /// <summary>ITSELF. A type reference is REPLACED when it resolves, never edited - what it says about a type cannot
+    /// change - so a copy of the tree can share it.</summary>
+    public override IAumlAstNode Clone(AumlAstObjectNode parent) => this;
+
     public bool IsEqual(IAumlAstTypeReference other)
     {
         if (other is AumlAstXmlTypeReference xml)

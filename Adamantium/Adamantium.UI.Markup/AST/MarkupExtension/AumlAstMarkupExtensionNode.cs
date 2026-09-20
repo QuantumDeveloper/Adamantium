@@ -13,7 +13,19 @@ public class AumlAstMarkupExtensionNode : AumlAstNode, IAumlAstMarkupExtensionNo
     public IAumlAstTypeReference TypeReference { get; set; }
 
     public List<IAumlAstMarkupExtensionArgument> Arguments { get; }
-    
+
+    public override IAumlAstNode Clone(AumlAstObjectNode parent)
+    {
+        var copy = new AumlAstMarkupExtensionNode(this, TypeReference);
+
+        foreach (var argument in Arguments)
+        {
+            copy.Arguments.Add((IAumlAstMarkupExtensionArgument)argument.Clone(parent));
+        }
+
+        return copy;
+    }
+
     public override string ToString()
     {
         return $"{TypeReference.Name}, Arguments: {Arguments.Count}";
@@ -32,6 +44,9 @@ public class MarkupArgument : AumlAstNode, IAumlAstMarkupExtensionArgument
     
     public IAumlAstValueNode Value { get; set; }
 
+    public override IAumlAstNode Clone(AumlAstObjectNode parent) =>
+        new MarkupArgument(this, Name, (IAumlAstValueNode)Value?.Clone(parent));
+
     public override string ToString()
     {
         return string.IsNullOrEmpty(Name) ? $"{Value}" : $"{Name} = {Value}";
@@ -43,4 +58,7 @@ public class AumlAstMarkupExtensionLiteral : AumlAstTextNode, IAumlAstMarkupExte
     public AumlAstMarkupExtensionLiteral(IAumlLineInfo info, string text) : base(info, text)
     {
     }
+
+    public override IAumlAstNode Clone(AumlAstObjectNode parent) =>
+        new AumlAstMarkupExtensionLiteral(this, Text) { TypeReference = TypeReference };
 }

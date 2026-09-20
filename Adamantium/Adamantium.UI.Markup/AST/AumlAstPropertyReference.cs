@@ -28,6 +28,10 @@ public class AumlAstPropertyReference : AumlAstNode
         Name = name;
     }
 
+    // Points back at the object it belongs to, so the copy takes the copy of that object.
+    public override IAumlAstNode Clone(AumlAstObjectNode parent) =>
+        new AumlAstPropertyReference(this, IsAttachedProperty, parent ?? ParentNode, OwnerType, TargetType, Name);
+
     public override string ToString()
     {
         return $"{Name}, TargetType: {TargetType}, OwnerType: {OwnerType}";

@@ -10,4 +10,7 @@ public class AumlAstTypeReferenceValueNode : AumlAstNode, IAumlAstValueNode
     }
 
     public IAumlAstTypeReference TypeReference { get; set; }
+
+    public override IAumlAstNode Clone(AumlAstObjectNode parent) =>
+        new AumlAstTypeReferenceValueNode(this, TypeReference);
 }

@@ -13,4 +13,7 @@ public class AumlAstNullValueNode : AumlAstNode, IAumlAstValueNode
 
     /// <summary>Nothing has no type - the property's own decides what null means for it.</summary>
     public IAumlAstTypeReference TypeReference { get; set; }
+
+    public override IAumlAstNode Clone(AumlAstObjectNode parent) =>
+        new AumlAstNullValueNode(this) { TypeReference = TypeReference };
 }

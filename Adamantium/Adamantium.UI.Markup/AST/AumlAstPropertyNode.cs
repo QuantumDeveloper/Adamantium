@@ -21,8 +21,12 @@ public class AumlAstPropertyNode : AumlAstNode
     }
     
     public IAumlAstNode Property { get; set; }
-    
+
     public List<IAumlAstValueNode> Values { get; set; }
+
+    public override IAumlAstNode Clone(AumlAstObjectNode parent) =>
+        new AumlAstPropertyNode(this, Property?.Clone(parent),
+            Values.Select(value => (IAumlAstValueNode)value.Clone(parent)));
 
     public override string ToString()
     {
