@@ -17,10 +17,12 @@ public static class MeshRenderExtensions
         new(data.IsWireFrame, data.CullMode, data.DepthTestEnabled, data.DepthWriteEnabled, data.TopologyOverride);
 
     // Draws the mesh through the cache. The caller applies the effect pass first (the pass family follows the same
-    // RenderMode this uses to pick the vertex format).
-    public static void DrawMesh(this MeshGeometryCache cache, IGraphicsDevice device, MeshData data)
+    // RenderMode this uses to pick the vertex format). instanceCount above 1 needs a pass that reads the per-instance
+    // tables - the caller fills those before applying it.
+    public static void DrawMesh(this MeshGeometryCache cache, IGraphicsDevice device, MeshData data,
+        uint instanceCount = 1)
     {
         if (data?.Mesh == null) return;
-        cache.GetOrCreate(data.Mesh, data.ResolveVertexType()).Draw(device, data.ToRenderState());
+        cache.GetOrCreate(data.Mesh, data.ResolveVertexType()).Draw(device, data.ToRenderState(), instanceCount);
     }
 }

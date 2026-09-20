@@ -1,6 +1,16 @@
 ﻿float4x4 wvp;
+// Rotation for NORMALS. wvp bakes the projection in, and a normal put through that is no longer a direction - lighting
+// has to be done in a space the light is fixed in, and for a head-lit gizmo that space is the view.
+float4x4 world;
 float3 meshColor;
 float transparency;
+
+// One draw, many copies of the SAME mesh: each copy's own world matrix and colour, with the projection shared. The
+// gizmo's seven balls are one sphere seven times over, its three arms one cylinder, its four arrows one triangle.
+// The length is the cap on a single instanced draw - see InstanceCapacity.
+float4x4 instanceWorld[64];
+float4 instanceColor[64];
+float4x4 viewProjection;
 sampler sampleType;
 Texture2D shaderTexture;
 float4 foregroundColor;
@@ -40,6 +50,7 @@ struct PS_OUTPUT_BASIC
     float4 position : SV_POSITION;
     float2 uv : TEXCOORD0;
     float4 color : COLOR0;
+    float3 normal : NORMAL;
 };
 
 
@@ -71,7 +82,54 @@ PS_OUTPUT_BASIC Basic_VS(MESH_VERTEX input)
     output.position = mul(input.position, wvp);
     output.uv = input.uv0;
     output.color = input.color;
+    output.normal = input.normal;
     return output;
+}
+
+PS_OUTPUT_BASIC BasicLit_VS(MESH_VERTEX input)
+{
+    PS_OUTPUT_BASIC output;
+
+    input.position.w = 1.0f;
+    output.position = mul(input.position, wvp);
+    output.uv = input.uv0;
+    output.color = float4(meshColor, transparency);
+    output.normal = mul(input.normal, (float3x3)world);
+    return output;
+}
+
+// The instanced twin: the placement and the colour come from the tables above, everything else is identical. The
+// normal rides the copy's OWN matrix, so copies of one mesh may be turned any way and still light correctly.
+PS_OUTPUT_BASIC BasicLitInstanced_VS(MESH_VERTEX input, uint instanceId : SV_InstanceID)
+{
+    PS_OUTPUT_BASIC output;
+
+    float4x4 placement = instanceWorld[instanceId];
+
+    input.position.w = 1.0f;
+    output.position = mul(mul(input.position, placement), viewProjection);
+    output.uv = input.uv0;
+    output.color = instanceColor[instanceId];
+    output.normal = mul(input.normal, (float3x3)placement);
+    return output;
+}
+
+// Flat colour gives a shape no form at all - every face of it reads as one silhouette. Lit from just off the viewer's
+// shoulder, so a gizmo shades the same however the view turns: a diffuse term for the body, a tight specular so a ball
+// reads as round, and a rim that keeps a dark one off a dark background without an outline pass.
+float4 BasicLit_PS(PS_OUTPUT_BASIC input) : SV_TARGET
+{
+    float3 normal = normalize(input.normal);
+    float3 eye = float3(0, 0, -1);
+    float3 key = normalize(float3(-0.35f, -0.55f, -1.0f));
+
+    float lambert = saturate(dot(normal, key));
+    float3 halfway = normalize(key + eye);
+    float specular = pow(saturate(dot(normal, halfway)), 40.0f) * 0.45f;
+    float rim = pow(1.0f - saturate(dot(normal, eye)), 3.0f) * 0.35f;
+
+    float3 shade = input.color.rgb * (0.42f + 0.58f * lambert + rim) + specular;
+    return float4(saturate(shade), input.color.a);
 }
 
 float4 BasicColored_PS(PS_OUTPUT_BASIC input) : SV_TARGET
@@ -231,6 +289,18 @@ technique Basic
     {
         VertexShader = Basic_VS;
         PixelShader = BasicVertexColored_PS;
+    }
+
+    pass Lit
+    {
+        VertexShader = BasicLit_VS;
+        PixelShader = BasicLit_PS;
+    }
+
+    pass LitInstanced
+    {
+        VertexShader = BasicLitInstanced_VS;
+        PixelShader = BasicLit_PS;
     }
     
     pass SmallGlyph

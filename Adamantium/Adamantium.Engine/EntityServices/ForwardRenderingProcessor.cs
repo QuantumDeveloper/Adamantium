@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using Adamantium.Core;
 using Adamantium.ECS;
@@ -46,6 +47,10 @@ public class ForwardRenderingProcessor : RenderingProcessor
         {
             OnDraw(entity, gameTime);
         }
+
+        // Over the scene, in screen space: the orientation gizmo. Its logic has run every frame all along - only the
+        // draw was missing, and it lived in a service nothing creates.
+        DrawHUD();
     }
     
     private void OnDraw(Entity entity, AppTime gameTime)
@@ -199,23 +204,20 @@ public class ForwardRenderingProcessor : RenderingProcessor
     protected void DrawHUD()
     {
         var tools = EntityWorld.EntityManager.GetGroup("HUD");
-//            DeferredDevice.ClearTargets(Colors.Gray, ClearOptions.DepthBuffer);
-//            DeferredDevice.RasterizerState = DeferredDevice.RasterizerStates.CullBackClipDisabled;
-//            DeferredDevice.BlendState = DeferredDevice.BlendStates.Opaque;
-//            DeferredDevice.DepthStencilState = DeferredDevice.DepthStencilStates.DepthEnableGreaterEqual;
 
         foreach (var tool in tools)
         {
             try
             {
-                tool.TraverseInDepth(ProcessHUD);
+                _hudParts.Clear();
+                tool.TraverseInDepth(CollectHUD);
+                DrawHudParts();
             }
             catch (Exception exception)
             {
                 MessageBox.Show(exception.Message + exception.StackTrace);
             }
         }
-//            BasicEffect.Techniques["MeshVertex"].Passes["NoLight"].UnApply(true);
     }
 
 
@@ -267,7 +269,17 @@ public class ForwardRenderingProcessor : RenderingProcessor
         }
     }
 
-    private void ProcessHUD(Entity current)
+    // What one drawable part of a HUD tool amounts to: a mesh, where it stands, and what colour it is.
+    private readonly record struct HudPart(MeshData Data, Matrix4x4F World, Vector4F Color);
+
+    private readonly List<HudPart> _hudParts = [];
+    private readonly Matrix4x4F[] _instanceWorld = new Matrix4x4F[InstanceCapacity];
+    private readonly Vector4F[] _instanceColors = new Vector4F[InstanceCapacity];
+
+    // Matches the table length declared in BasicEffect.fx.
+    private const int InstanceCapacity = 64;
+
+    private void CollectHUD(Entity current)
     {
         var transformation = current.Transform.GetMetadata(ActiveCamera);
         if (!transformation.Enabled || !current.Visible)
@@ -276,30 +288,54 @@ public class ForwardRenderingProcessor : RenderingProcessor
         }
 
         var material = current.GetComponent<Material>();
-        var geometries = current.GetComponents<MeshData>();
-        foreach (var component in geometries)
-        {
-            var world = transformation.WorldMatrixF;
-            var wvp = world * ActiveCamera.UiProjection;
-//                BasicEffect.Parameters["wvp"].SetValue(wvp);
 
-//                if (material != null)
-//                {
-//                    if (transformation.IsSelected)
-//                    {
-//                        BasicEffect.Parameters["meshColor"].SetValue(material.HighlightColor);
-//                    }
-//                    else
-//                    {
-//                        BasicEffect.Parameters["meshColor"].SetValue(material.MeshColor);
-//                    }
-//
-//                    BasicEffect.Parameters["transparency"].SetValue(material.Transparency);
-//                }
-//
-//                BasicEffect.Techniques["MeshVertex"].Passes["NoLight"].Apply();
-//
-//                component.Draw(DeferredDevice, GameTime);
+        var color = material == null
+            ? Colors.White.ToVector4()
+            : transformation.IsSelected
+                ? material.HighlightColor
+                : new Vector4F(material.MeshColor, material.Transparency);
+
+        foreach (var component in current.GetComponents<MeshData>())
+        {
+            if (component?.Mesh == null || !component.IsEnabled) continue;
+
+            _hudParts.Add(new HudPart(component, transformation.WorldMatrixF, color));
+        }
+    }
+
+    // Parts that SHARE a mesh go out as ONE instanced draw: the orientation gizmo is seven balls, three arms and four
+    // arrows - three meshes, three draws. Only the placement and the colour differ per copy.
+    private void DrawHudParts()
+    {
+        if (_hudParts.Count == 0) return;
+
+        // UI projection, not the scene's: a tool places itself in screen pixels.
+        BasicEffect.ViewProjection.SetValue(ActiveCamera.UiProjection);
+
+        var drawn = new bool[_hudParts.Count];
+
+        for (var i = 0; i < _hudParts.Count; ++i)
+        {
+            if (drawn[i]) continue;
+
+            var head = _hudParts[i];
+            var count = 0;
+
+            for (var j = i; j < _hudParts.Count && count < InstanceCapacity; ++j)
+            {
+                if (drawn[j] || !ReferenceEquals(_hudParts[j].Data.Mesh, head.Data.Mesh)) continue;
+
+                _instanceWorld[count] = _hudParts[j].World;
+                _instanceColors[count] = _hudParts[j].Color;
+                drawn[j] = true;
+                ++count;
+            }
+
+            BasicEffect.InstanceWorld.SetValue(_instanceWorld);
+            BasicEffect.InstanceColor.SetValue(_instanceColors);
+            BasicEffect.BasicLitInstancedPass.Apply();
+
+            _geometryCache.DrawMesh(GraphicsDevice, head.Data, (uint)count);
         }
     }
 

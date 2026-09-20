@@ -302,6 +302,15 @@ public sealed class EffectParameter : NamedObject
     /// <param name = "values">An array of matrices to be written to the current buffer.</param>
     public unsafe void SetValue(Matrix4x4F[] values)
     {
+        // An ARRAY member of a constant buffer reflects as one opaque block, not as a matrix - so there is no layout to
+        // remap into and no element stride to step by (see docs/TECH_DEBT.md). Its elements sit 64 bytes apart, which
+        // is exactly what the direct copy below writes for a single matrix; this used to die on the null delegate.
+        if (CopyMatrix == null)
+        {
+            Buffer.BackingBuffer.Set(offset, values);
+            return;
+        }
+
         var localOffset = offset;
         // Fix the whole buffer
         fixed (Matrix4x4F* pMatrix = values)

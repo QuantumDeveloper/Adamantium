@@ -57,9 +57,9 @@ public sealed class RenderGeometry : DisposableObject
     // pass first. The indexed path is a single DrawIndexed (it binds VB+IB itself) - no separate SetVertexBuffer/
     // SetIndexBuffer pre-bind, which is what collapses the old double bind (D2). The non-indexed path keeps its one
     // SetVertexBuffer + Draw.
-    public void Draw(IGraphicsDevice device, in RenderState state)
+    public void Draw(IGraphicsDevice device, in RenderState state, uint instanceCount = 1)
     {
-        if (_vertexBuffer == null || _vertexBuffer.IsDisposed) return;
+        if (_vertexBuffer == null || _vertexBuffer.IsDisposed || instanceCount == 0) return;
 
         device.VertexType = VertexType;
         device.PrimitiveTopology = state.TopologyOverride ?? Topology;
@@ -70,12 +70,12 @@ public sealed class RenderGeometry : DisposableObject
 
         if (HasIndices)
         {
-            device.DrawIndexed(_vertexBuffer, _indexBuffer);
+            device.DrawIndexed(_vertexBuffer, _indexBuffer, instanceCount);
         }
         else
         {
             device.SetVertexBuffer(_vertexBuffer);
-            device.Draw(_vertexBuffer.ElementCount, 1);
+            device.Draw(_vertexBuffer.ElementCount, instanceCount);
         }
     }
 
