@@ -34,8 +34,26 @@ public class SceneDataContentReader : IContentReader
         if (scene != null)
         {
             scene.Name = parameters.AssetName;
+            PointImagesAtTheModel(scene, parameters.AssetName);
         }
 
         return Task.FromResult((object)scene);
+    }
+
+    // A baked scene carries the ABSOLUTE texture paths of the machine that baked it, so another checkout - or a
+    // renamed folder - leaves a model silently untextured. Where the model itself was asked for is the authority.
+    private static void PointImagesAtTheModel(SceneData scene, string assetName)
+    {
+        if (scene.Images == null || string.IsNullOrEmpty(assetName)) return;
+
+        var beside = Path.GetDirectoryName(assetName.Replace('/', Path.DirectorySeparatorChar)) ?? string.Empty;
+
+        foreach (var image in scene.Images.Values)
+        {
+            if (string.IsNullOrEmpty(image?.ImageName)) continue;
+
+            var near = Path.GetFullPath(Path.Combine(beside, image.ImageName));
+            if (File.Exists(near)) image.FilePath = near;
+        }
     }
 }
