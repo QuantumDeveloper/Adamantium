@@ -60,6 +60,9 @@ public class ConnectionItem : ICanvasItem
     /// plane may move it, nor count the room it covers as taken.</summary>
     public bool IsPlaced => false;
 
+    /// <summary>Where it stands in paint order - stamped by the scene. See ICanvasItem.Order.</summary>
+    public int Order { get; set; }
+
     public Rect Bounds
     {
         get

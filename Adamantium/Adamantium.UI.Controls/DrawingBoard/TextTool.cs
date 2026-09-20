@@ -66,7 +66,7 @@ public class TextTool : ICanvasTool
 
         canvas.Focus();
         StartBlink(canvas);
-        canvas.InvalidateRender(false);
+        canvas.Repaint();
         e.Handled = true;
     }
 
@@ -93,7 +93,7 @@ public class TextTool : ICanvasTool
 
             _blinkAccum -= BlinkSeconds;
             _caretVisible = !_caretVisible;
-            canvas.InvalidateRender(false);
+            canvas.Repaint();
 
             return false;
         });
@@ -181,10 +181,10 @@ public class TextTool : ICanvasTool
 
         if (finished == null) return;
 
-        if (_fresh && finished.Text.Length > 0) canvas.Scene?.Add(finished);
+        if (_fresh && finished.Text.Length > 0) canvas.Place(finished);
         else if (!_fresh && finished.Text.Length == 0) canvas.Scene?.Remove(finished);
 
-        canvas.InvalidateRender(false);
+        canvas.Repaint();
     }
 
     // A piece that is already in the scene has to be told it changed - the scene cannot notice, because what an item
@@ -192,7 +192,7 @@ public class TextTool : ICanvasTool
     private void Touch(InfiniteCanvas canvas)
     {
         if (!_fresh) canvas.Scene?.Touch();
-        canvas.InvalidateRender(false);
+        canvas.Repaint();
     }
 
     private static TextItem Existing(InfiniteCanvas canvas, Vector2 world)

@@ -51,7 +51,7 @@ namespace Adamantium.ProceduralGeometry.Shapes
             /// <para>The angle turns the shape along the ELLIPSE the box inscribes (it offsets the parameter, it does not
             /// rotate the result), so a squashed polygon stays inside its box however far it is turned - which is also
             /// what the SDF batch does with the same number.</para></summary>
-            private static List<Vector3> Corners(Vector2 radii, int tessellation, double startAngle)
+            public static List<Vector3> Corners(Vector2 radii, int tessellation, double startAngle)
             {
                 var start = MathHelper.DegreesToRadians(startAngle);
                 var points = new List<Vector3>(tessellation);

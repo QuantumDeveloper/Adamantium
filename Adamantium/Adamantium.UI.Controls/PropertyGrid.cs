@@ -371,6 +371,18 @@ public class PropertyGrid : Control
                 section.SetCurrentValue(Expander.IsExpandedProperty, true);
             }
         }
+
+        // ...AND NOW ASK EVERY LINE'S OWN BINDINGS AGAIN, with the sections finally standing in the tree.
+        //
+        // A definition can be written anywhere - in a control's template, or in a resource an application hands in -
+        // and the ones from a resource are built long before they are anywhere near the panel that will show them. An
+        // {Ancestor} on such a line has nothing to resolve against at that moment and would keep the nothing. The rows
+        // are built BEFORE their section is put on screen (the panel is filled and then added), so this cannot be done
+        // as each row is made: it has to be here, once, when the whole pass has landed.
+        foreach (var row in _rows)
+        {
+            if (row.Definition is { } line && BindingEngine.HasBindings(line)) BindingEngine.RefreshBindings(line);
+        }
     }
 
     private void ReleaseOpened()
@@ -470,7 +482,7 @@ public class PropertyGrid : Control
         // INTO the value first, where the definition says the value is an object with parts rather than a thing to be
         // replaced. Nothing is written through the binding then: the property still points at the same object, which is
         // the whole point - everything else holding it follows.
-        if (row.Definition.WriteInto(row.Value, edited))
+        if (row.WriteInto(edited))
         {
             ValueChanged?.Invoke(this, about);
             Refresh(null, row.Definition);
@@ -627,6 +639,14 @@ public class PropertyGrid : Control
         grid.Rebuild();
     }
 
+    /// <summary>The sections this is actually showing - what was written into <see cref="Sections"/>, or what
+    /// <see cref="SectionsSource"/> hands over when an inspector is assembled rather than written out.
+    /// <para>ONE question with one answer, for anything outside that needs to know what the panel holds. Asking
+    /// <see cref="Sections"/> gets the written ones and nothing else, which is an empty list for every generated
+    /// inspector - and an empty list reads as "the panel has nothing in it" rather than "you asked the wrong
+    /// half".</para></summary>
+    public IEnumerable<PropertySection> Displayed => DisplayedSections();
+
     private IEnumerable<PropertySection> DisplayedSections()
     {
         if (SectionsSource == null) return Sections;
@@ -643,6 +663,16 @@ public class PropertyGrid : Control
     private void AddRow(Panel host, PropertyDefinition definition, IReadOnlyList<object> targets, int depth,
         String wanted, ref int at)
     {
+        // WHAT THE LINE IS ABOUT, before anything is asked of it: a line can be written to depend on the state of the
+        // very thing it describes - IsVisible="{Self Inspected.HasLabel}" - and that binding has to have been given its
+        // object before its answer is read one line below. Nothing for a multiple selection: the line then stands for
+        // several things at once and no single one of them is what it is about.
+        definition.Inspected = targets.Count == 1 ? targets[0] : null;
+
+        // ...and its own bindings settled RIGHT HERE, before the answer is read one line below. This one line only -
+        // flushing the whole queue would push every pending binding in the application through, per row, per pass.
+        if (BindingEngine.HasBindings(definition)) BindingEngine.RefreshBindings(definition);
+
         if (!definition.IsVisible) return;
 
         var searching = !String.IsNullOrEmpty(wanted);
@@ -767,9 +797,15 @@ public class PropertyGrid : Control
     // so an edit made by pointing at a file can be taken back like any other.
     private void OnPicturePicked(ImageSourceProperty definition, String path)
     {
-        foreach (var row in _rows)
+        // THE FIRST ROW THIS LINE HAS, and then out. Writing a picture can change which lines apply - a plain surface
+        // becomes one painted with a picture - so the panel is rebuilt from under this very walk, and every row after
+        // this point belongs to the pass that has just been thrown away.
+        for (var i = 0; i < _rows.Count; i++)
         {
-            if (ReferenceEquals(row.Definition, definition)) Write(row, path);
+            if (!ReferenceEquals(_rows[i].Definition, definition)) continue;
+
+            Write(_rows[i], path);
+            return;
         }
     }
 

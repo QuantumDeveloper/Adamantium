@@ -52,11 +52,18 @@ public class InfiniteCanvas : Control
     private List<ICanvasItem> _editBefore;
     private Dictionary<ICanvasItem, Rect> _editWasAt;
 
-    private CanvasElementLayer _elements;
+    private Panel _layers;
     private CanvasFrontLayer _front;
-    private readonly List<ElementItem> _visibleElements = new();
+    private readonly List<(bool Hosted, List<ICanvasItem> Items)> _runs = new();
+
+    // Where the frame round what is held goes - see MarkChrome. One of the three at a time.
+    private ICanvasItem _chromeAfter;
+    private ICanvasItem _chromeBefore;
+    private bool _chromeOnGlass;
+    private readonly List<ElementItem> _hosted = new();
 
     private CanvasChromeLayer _chromeLayer;
+    private CanvasPane _palette;
     private CanvasTools _tools;
     private readonly CanvasFrameGesture _frame = new();
     private bool _publishing;
@@ -112,7 +119,192 @@ public class InfiniteCanvas : Control
         typeof(Double), typeof(InfiniteCanvas), new PropertyMetadata(0.01));
 
     public static readonly AdamantiumProperty MaxScaleProperty = AdamantiumProperty.Register(nameof(MaxScale),
-        typeof(Double), typeof(InfiniteCanvas), new PropertyMetadata(1024.0));
+        typeof(Double), typeof(InfiniteCanvas), new PropertyMetadata(65536.0));
+
+    /// <summary>How the canvas was left, as text - panels, camera, tool. Two-way: bind it to wherever the application
+    /// keeps such things; where that is, is the application's business. See <see cref="CanvasLayoutSerializer"/>.
+    /// </summary>
+    public static readonly AdamantiumProperty LayoutProperty = AdamantiumProperty.Register(nameof(Layout),
+        typeof(String), typeof(InfiniteCanvas),
+        new PropertyMetadata(null, PropertyMetadataOptions.BindsTwoWayByDefault, OnLayoutChanged));
+
+    /// <summary>Whether where the PANELS were left is remembered: their place, their width, what was folded and what
+    /// was switched off.</summary>
+    public static readonly AdamantiumProperty RemembersPanesProperty = AdamantiumProperty.Register(
+        nameof(RemembersPanes), typeof(Boolean), typeof(InfiniteCanvas),
+        new PropertyMetadata(true, PropertyMetadataOptions.BindsTwoWayByDefault, OnRememberingChanged));
+
+    /// <summary>Whether WHERE THE CAMERA WAS LOOKING is remembered.</summary>
+    public static readonly AdamantiumProperty RemembersCameraProperty = AdamantiumProperty.Register(
+        nameof(RemembersCamera), typeof(Boolean), typeof(InfiniteCanvas),
+        new PropertyMetadata(true, PropertyMetadataOptions.BindsTwoWayByDefault, OnRememberingChanged));
+
+    /// <summary>Whether the ZOOM is remembered - its own switch, because the two are wanted apart.</summary>
+    public static readonly AdamantiumProperty RemembersZoomProperty = AdamantiumProperty.Register(
+        nameof(RemembersZoom), typeof(Boolean), typeof(InfiniteCanvas),
+        new PropertyMetadata(true, PropertyMetadataOptions.BindsTwoWayByDefault, OnRememberingChanged));
+
+    /// <summary>Whether the TOOL in hand is remembered.</summary>
+    public static readonly AdamantiumProperty RemembersToolProperty = AdamantiumProperty.Register(
+        nameof(RemembersTool), typeof(Boolean), typeof(InfiniteCanvas),
+        new PropertyMetadata(true, PropertyMetadataOptions.BindsTwoWayByDefault, OnRememberingChanged));
+
+    /// <summary>The world point <c>Home</c> goes to, and the zoom it goes there at. The world's origin at one to one
+    /// until something says otherwise - <see cref="RememberViewCommand"/> is what says otherwise.</summary>
+    public static readonly AdamantiumProperty HomeAtProperty = AdamantiumProperty.Register(nameof(HomeAt),
+        typeof(Vector2), typeof(InfiniteCanvas),
+        new PropertyMetadata(Vector2.Zero, PropertyMetadataOptions.BindsTwoWayByDefault, OnHomeChanged));
+
+    public static readonly AdamantiumProperty HomeScaleProperty = AdamantiumProperty.Register(nameof(HomeScale),
+        typeof(Double), typeof(InfiniteCanvas),
+        new PropertyMetadata(1.0, PropertyMetadataOptions.BindsTwoWayByDefault, OnHomeChanged));
+
+    /// <summary>What one nudge of a thickness is worth, in WORLD units - a tenth of a screen pixel, whatever the
+    /// camera is at. A step stated in world units is a step that means something different at every zoom: a tenth is
+    /// a hair at 1:1 and a hundred and seventy pixels at seventeen thousand, where every line is one white blob.
+    /// <para>Never coarser than a tenth, so zooming OUT does not turn the nudge into a jump.</para></summary>
+    public static readonly AdamantiumProperty ThicknessStepProperty = AdamantiumProperty.RegisterReadOnly(
+        nameof(ThicknessStep), typeof(Double), typeof(InfiniteCanvas), new PropertyMetadata(0.1));
+
+    /// <summary>...and the thinnest a line may be set to: a hundredth of a screen pixel.</summary>
+    public static readonly AdamantiumProperty ThicknessLeastProperty = AdamantiumProperty.RegisterReadOnly(
+        nameof(ThicknessLeast), typeof(Double), typeof(InfiniteCanvas), new PropertyMetadata(0.01));
+
+    public Double ThicknessStep => GetValue<Double>(ThicknessStepProperty);
+
+    public Double ThicknessLeast => GetValue<Double>(ThicknessLeastProperty);
+
+    private void SyncThicknessSteps()
+    {
+        var scale = Scale > 0 ? Scale : 1;
+
+        SetValue(ThicknessStepProperty, Math.Min(0.1, 0.1 / scale));
+        SetValue(ThicknessLeastProperty, Math.Min(0.01, 0.01 / scale));
+    }
+
+    /// <summary>Whether a view has been kept, so that giving it up can be offered only where there is something to
+    /// give up.</summary>
+    public static readonly AdamantiumProperty KeepsHomeFaceProperty = AdamantiumProperty.RegisterReadOnly(
+        nameof(KeepsHomeFace), typeof(Visibility), typeof(InfiniteCanvas),
+        new PropertyMetadata(Visibility.Collapsed));
+
+    public Visibility KeepsHomeFace => GetValue<Visibility>(KeepsHomeFaceProperty);
+
+    private static void OnHomeChanged(AdamantiumComponent component, AdamantiumPropertyChangedEventArgs e)
+    {
+        if (component is not InfiniteCanvas canvas) return;
+
+        var kept = canvas.HomeAt != Vector2.Zero || Math.Abs(canvas.HomeScale - 1) > 1e-6;
+
+        canvas.SetValue(KeepsHomeFaceProperty, kept ? Visibility.Visible : Visibility.Collapsed);
+    }
+
+    /// <summary>Puts <c>Home</c> back to the world's origin at one to one - what takes back a view that was kept.
+    /// </summary>
+    public CanvasCommand ForgetViewCommand => _forgetView ??= new CanvasCommand(_ => ForgetView());
+
+    private CanvasCommand _forgetView;
+
+    public void ForgetView()
+    {
+        HomeAt = Vector2.Zero;
+        HomeScale = 1;
+        RememberLayout();
+    }
+
+    public String Layout
+    {
+        get => GetValue<String>(LayoutProperty);
+        set => SetValue(LayoutProperty, value);
+    }
+
+    public Boolean RemembersPanes
+    {
+        get => GetValue<Boolean>(RemembersPanesProperty);
+        set => SetValue(RemembersPanesProperty, value);
+    }
+
+    public Boolean RemembersCamera
+    {
+        get => GetValue<Boolean>(RemembersCameraProperty);
+        set => SetValue(RemembersCameraProperty, value);
+    }
+
+    public Boolean RemembersZoom
+    {
+        get => GetValue<Boolean>(RemembersZoomProperty);
+        set => SetValue(RemembersZoomProperty, value);
+    }
+
+    public Boolean RemembersTool
+    {
+        get => GetValue<Boolean>(RemembersToolProperty);
+        set => SetValue(RemembersToolProperty, value);
+    }
+
+    public Vector2 HomeAt
+    {
+        get => GetValue<Vector2>(HomeAtProperty);
+        set => SetValue(HomeAtProperty, value);
+    }
+
+    public Double HomeScale
+    {
+        get => GetValue<Double>(HomeScaleProperty);
+        set => SetValue(HomeScaleProperty, value);
+    }
+
+    /// <summary>The panels this canvas is wearing. Empty until it has a template.</summary>
+    public IReadOnlyList<CanvasPane> Panes => _chromeLayer?.Panes ?? Array.Empty<CanvasPane>();
+
+    // The text the canvas itself wrote: coming back as a change like any other it would be applied over the top of
+    // what it already describes.
+    private string _wrote;
+    private bool _dressing;
+
+    private static void OnLayoutChanged(AdamantiumComponent component, AdamantiumPropertyChangedEventArgs e)
+    {
+        if (component is not InfiniteCanvas canvas || canvas._dressing) return;
+        if (e.NewValue as string == canvas._wrote) return;
+
+        canvas._dressing = true;
+        try
+        {
+            CanvasLayoutSerializer.Load(canvas, e.NewValue as string);
+        }
+        finally
+        {
+            canvas._dressing = false;
+        }
+    }
+
+    private static void OnRememberingChanged(AdamantiumComponent component, AdamantiumPropertyChangedEventArgs e) =>
+        (component as InfiniteCanvas)?.RememberLayout();
+
+    /// <summary>Writes how the canvas is set up now into <see cref="Layout"/>. Called whenever something settles;
+    /// offered because an application closing down may want to ask rather than wait.</summary>
+    public void RememberLayout()
+    {
+        if (_dressing || _chromeLayer == null) return;
+
+        var said = CanvasLayoutSerializer.Save(this);
+        if (said == null || said == _wrote) return;
+
+        _wrote = said;
+        SetCurrentValue(LayoutProperty, said);
+    }
+
+    /// <summary>Takes THIS view as the one <c>Home</c> goes back to.</summary>
+    public CanvasCommand RememberViewCommand => _rememberView ??= new CanvasCommand(_ => RememberView());
+
+    private CanvasCommand _rememberView;
+
+    public void RememberView()
+    {
+        HomeAt = Looking;
+        HomeScale = Scale;
+        RememberLayout();
+    }
 
     public static readonly AdamantiumProperty ZoomWithWheelProperty = AdamantiumProperty.Register(nameof(ZoomWithWheel),
         typeof(Boolean), typeof(InfiniteCanvas), new PropertyMetadata(true));
@@ -290,6 +482,35 @@ public class InfiniteCanvas : Control
         if (component is InfiniteCanvas canvas) canvas._drawing.SetTemplateSelector(e.NewValue as DataTemplateSelector);
     }
 
+    /// <summary>WHAT THE PANEL SHOWS FOR THINGS THIS APPLICATION PUTS ON THE PLANE - its own sets of inspector lines,
+    /// laid OVER the ones the theme ships.
+    /// <para>A set naming a kind the default already covers replaces it; a set naming a new kind is added. So a new
+    /// kind of thing costs the lines it is set by and nothing else - no flag on the panel, no edit to a theme. To
+    /// replace the lot, declare a resource under the default's own key instead.</para>
+    /// <para>The same door for the TOOL page - see <see cref="ToolSections"/>: a new tool that brings settings of its
+    /// own has somewhere to put them.</para></summary>
+    public static readonly AdamantiumProperty InspectorSectionsProperty = AdamantiumProperty.Register(
+        nameof(InspectorSections), typeof(CanvasInspectorSections), typeof(InfiniteCanvas),
+        new PropertyMetadata(null));
+
+    public CanvasInspectorSections InspectorSections
+    {
+        get => GetValue<CanvasInspectorSections>(InspectorSectionsProperty);
+        set => SetValue(InspectorSectionsProperty, value);
+    }
+
+    /// <summary>The same for the page shown while nothing is selected: what a TOOL is set by. Matched against the
+    /// tool's <see cref="ICanvasTool.Name"/>.</summary>
+    public static readonly AdamantiumProperty ToolSectionsProperty = AdamantiumProperty.Register(
+        nameof(ToolSections), typeof(CanvasInspectorSections), typeof(InfiniteCanvas),
+        new PropertyMetadata(null));
+
+    public CanvasInspectorSections ToolSections
+    {
+        get => GetValue<CanvasInspectorSections>(ToolSectionsProperty);
+        set => SetValue(ToolSectionsProperty, value);
+    }
+
     /// <summary>The KINDS of node this application has, said by the application itself - a collection of
     /// <see cref="ICanvasNodeKind"/>, each of which knows its word and can make the inside of a node of that sort.
     /// <para>Given to the canvas rather than gathered from what is already on the plane: a list collected that way is
@@ -362,6 +583,74 @@ public class InfiniteCanvas : Control
         set => SetValue(ModeProperty, value);
     }
 
+    // WHAT CAN BE CHOSEN, for the lines that offer a choice. On the CANVAS rather than on whatever panel is showing
+    // them: these are the kinds of thing this plane deals in, they are the same however the panel is dressed, and a
+    // set of lines held as a resource can reach them through the canvas it is pointed at. A panel that kept its own
+    // copy would be a second list to keep in step with this one.
+    private static readonly IReadOnlyList<CanvasGridStyle> Styles =
+        [CanvasGridStyle.Dots, CanvasGridStyle.Lines, CanvasGridStyle.None, CanvasGridStyle.Transparent];
+
+    private static readonly IReadOnlyList<CanvasArrowHead> Heads =
+        [CanvasArrowHead.None, CanvasArrowHead.Barbs, CanvasArrowHead.Triangle];
+
+    private static readonly IReadOnlyList<CanvasCurve> Curving =
+        [CanvasCurve.Bezier, CanvasCurve.BSpline, CanvasCurve.Nurbs];
+
+    // A PICTURE's own catalogues. Every one of them is a brush's property: what is offered is the whole of what the
+    // engine can paint a picture with, so a plane is not a poorer place to use a texture than a window is.
+    private static readonly IReadOnlyList<Stretch> Filling =
+        [Stretch.Fill, Stretch.Uniform, Stretch.UniformToFill, Stretch.None];
+
+    private static readonly IReadOnlyList<TileMode> Tiling =
+        [TileMode.None, TileMode.Tile, TileMode.FlipX, TileMode.FlipY, TileMode.FlipXY];
+
+    private static readonly IReadOnlyList<ImageBackgroundState> Grounding =
+        [ImageBackgroundState.WhenEmpty, ImageBackgroundState.Always, ImageBackgroundState.Never];
+
+    /// <summary>The grids a plane can wear, for the line that chooses one.</summary>
+    public static readonly AdamantiumProperty GridStylesProperty = AdamantiumProperty.Register(nameof(GridStyles),
+        typeof(IEnumerable), typeof(InfiniteCanvas), new PropertyMetadata(Styles));
+
+    public IEnumerable GridStyles => GetValue<IEnumerable>(GridStylesProperty);
+
+    /// <summary>The ends an arrow can wear.</summary>
+    public static readonly AdamantiumProperty ArrowHeadsProperty = AdamantiumProperty.Register(nameof(ArrowHeads),
+        typeof(IEnumerable), typeof(InfiniteCanvas), new PropertyMetadata(Heads));
+
+    public IEnumerable ArrowHeads => GetValue<IEnumerable>(ArrowHeadsProperty);
+
+    /// <summary>The kinds of curve a drawn line can be made into.</summary>
+    public static readonly AdamantiumProperty CurvesProperty = AdamantiumProperty.Register(nameof(Curves),
+        typeof(IEnumerable), typeof(InfiniteCanvas), new PropertyMetadata(Curving));
+
+    public IEnumerable Curves => GetValue<IEnumerable>(CurvesProperty);
+
+    /// <summary>The ways a picture can fill its tile.</summary>
+    public static readonly AdamantiumProperty FillsProperty = AdamantiumProperty.Register(nameof(Fills),
+        typeof(IEnumerable), typeof(InfiniteCanvas), new PropertyMetadata(Filling));
+
+    public IEnumerable Fills => GetValue<IEnumerable>(FillsProperty);
+
+    /// <summary>...and the ways that tile can repeat, mirrored or not.</summary>
+    public static readonly AdamantiumProperty TilingsProperty = AdamantiumProperty.Register(nameof(Tilings),
+        typeof(IEnumerable), typeof(InfiniteCanvas), new PropertyMetadata(Tiling));
+
+    public IEnumerable Tilings => GetValue<IEnumerable>(TilingsProperty);
+
+    /// <summary>When the ground behind a picture is painted.</summary>
+    public static readonly AdamantiumProperty GroundsProperty = AdamantiumProperty.Register(nameof(Grounds),
+        typeof(IEnumerable), typeof(InfiniteCanvas), new PropertyMetadata(Grounding));
+
+    public IEnumerable Grounds => GetValue<IEnumerable>(GroundsProperty);
+
+    /// <summary>Whether the plane is being used as a DRAWING - <see cref="Mode"/> said as a plain switch, because that
+    /// is what a binding can ask. A line offered only on a drawing - snapping, which a graph does none of - says so
+    /// itself: <c>IsVisible="{Binding IsDrawing}"</c>, with no help from whatever panel it is written in.</summary>
+    public static readonly AdamantiumProperty IsDrawingProperty = AdamantiumProperty.Register(nameof(IsDrawing),
+        typeof(Boolean), typeof(InfiniteCanvas), new PropertyMetadata(true));
+
+    public Boolean IsDrawing => GetValue<Boolean>(IsDrawingProperty);
+
     /// <summary>Raised after <see cref="Mode"/> changes, so a rail can offer the tools that mode admits.</summary>
     public event EventHandler ModeChanged;
 
@@ -421,6 +710,12 @@ public class InfiniteCanvas : Control
         // an item to the control inside it, and through a node to one of its sockets - and a socket is not an item, so
         // asking left a recoloured socket's wire the old colour. Nothing is saved by asking: this inspector is pointed
         // at this canvas, and being told twice costs one repaint of what is visible.
+        //
+        // A LAYER NUMBER WRITTEN IN THE PANEL is a request to stand at that place, and this is where it is granted.
+        // Asked here rather than by watching one particular row: the panel writes through a binding like any other, and
+        // a canvas that had to know which line carried the number would be a canvas a theme could not restate.
+        SettleOrder();
+
         Scene?.Touch();
         Repaint();
 
@@ -1156,14 +1451,11 @@ public class InfiniteCanvas : Control
         if (ordered.Count < 2) return null;
 
         var group = new GroupItem(ordered);
-        var topmost = ordered[^1];
 
-        if (!Scene.Replace(topmost, new ICanvasItem[] { group })) return null;
-
-        foreach (var child in ordered)
-        {
-            if (!ReferenceEquals(child, topmost)) Scene.Remove(child);
-        }
+        // ONE STEP: the canvas redraws on every edit, so a replace plus a removal apiece let it walk a plane holding
+        // the group and its contents at once - a picture met twice was made a child of the same layer twice and ended
+        // up belonging to neither, until the next full walk brought it back.
+        if (!Scene.Fold(ordered, group)) return null;
 
         Select(group, false);
         return group;
@@ -1596,8 +1888,9 @@ public class InfiniteCanvas : Control
         BeginEdit("Frame");
         try
         {
-            // UNDER what it is about, and the scene draws in order - so it goes to the BACK. The band already keeps it
-            // behind the nodes; this keeps it behind the other frames it may be nested in.
+            // UNDER what it is about, and the scene draws in order - so it goes to the BACK. This is the WHOLE of what
+            // keeps it there: the plane has one order and a frame is in it like everything else, so a frame left where
+            // it was made would be a sheet of colour over the very nodes it is drawn round.
             scene.Add(frame);
             scene.SendToBack(frame);
 
@@ -2041,11 +2334,15 @@ public class InfiniteCanvas : Control
     private CanvasCommand _ungroup;
     private CanvasCommand _toFront;
     private CanvasCommand _toBack;
+    private CanvasCommand _forward;
+    private CanvasCommand _backward;
     private CanvasCommand _align;
     private CanvasCommand _spread;
     private CanvasCommand _comment;
     private CanvasCommand _fitView;
     private CanvasCommand _clear;
+    private CanvasCommand _toSvg;
+    private CanvasCommand _fromSvg;
 
     /// <summary>Takes the last step back. Off when there is nothing behind it.</summary>
     public CanvasCommand UndoCommand => _undo ??= new CanvasCommand(_ => Undo(), _ => History is { CanUndo: true });
@@ -2096,6 +2393,136 @@ public class InfiniteCanvas : Control
     public CanvasCommand SendToBackCommand =>
         _toBack ??= new CanvasCommand(_ => Reorder(false), _ => _selection.Count > 0 && Scene != null);
 
+    /// <summary>Moves what is selected past the next thing IN ITS WAY - the nearest one along paint order whose box
+    /// meets it - forward or back.
+    /// <para>The pair above only reaches the ends, and everything worth arranging is in the middle: a shape that has
+    /// to sit BETWEEN two others cannot be put there by a command that can only put it on top of both.</para>
+    /// <para>Past what OVERLAPS and not one place along the list, which is the difference between one press and three
+    /// hundred: on a plane of five hundred things the two that cover each other may be the two hundredth and the five
+    /// hundredth, and everything between them is somewhere else on the screen. How deep a thing sits is not something
+    /// a drawing shows, so a count of presses is not something a person can know.</para>
+    /// <para>Off when nothing on that side meets it - which says "there is nothing in front of this", not "this did
+    /// not work".</para></summary>
+    public CanvasCommand BringForwardCommand =>
+        _forward ??= new CanvasCommand(_ => Step(true), _ => Steppable(true));
+
+    public CanvasCommand SendBackwardCommand =>
+        _backward ??= new CanvasCommand(_ => Step(false), _ => Steppable(false));
+
+    // FROM THE END IT IS HEADING FOR, so a selection of several keeps its own order: moving the front one first would
+    // walk it into the one behind it and the two would swap places instead of both moving.
+    private void Step(bool forward)
+    {
+        if (Scene is not { } scene || _selection.Count == 0) return;
+
+        var shown = Shown();
+
+        for (var i = 0; i < _selection.Count; i++)
+        {
+            var item = forward ? _selection[_selection.Count - 1 - i] : _selection[i];
+
+            if (Neighbour(shown, item, forward) is { } neighbour) scene.MoveNextTo(item, neighbour, forward);
+        }
+    }
+
+    // Whether there is still room to go that way. ANY of the selected, because a selection where one has reached the
+    // end and the rest have not is still a selection that can move.
+    private bool Steppable(bool forward)
+    {
+        if (Scene == null || _selection.Count == 0) return false;
+
+        var shown = Shown();
+
+        foreach (var item in _selection)
+        {
+            if (Neighbour(shown, item, forward) != null) return true;
+        }
+
+        return false;
+    }
+
+    // The next thing that is ACTUALLY IN THE WAY on that side - the nearest one along the order whose box meets this
+    // one's.
+    //
+    // NOT the next one in the list, which is the trap this exists to avoid. On a plane of five hundred things, the two
+    // that overlap each other may be the two hundredth and the five hundredth, and a step defined by the list would be
+    // three hundred presses to put one over the other - three hundred presses whose count nobody can know in advance,
+    // since how deep a thing sits is not something the drawing shows. Every one of those presses would move it past
+    // something on the other side of the screen that it never touched.
+    //
+    // Defined by what OVERLAPS, one press does what the person meant, whatever lies between. And when nothing on that
+    // side meets it there is nothing to get past: the button greys, which is the truth - not "this did not work", but
+    // "there is nothing in front of this to get above".
+    private static ICanvasItem Neighbour(List<ICanvasItem> shown, ICanvasItem item, bool forward)
+    {
+        var at = shown.IndexOf(item);
+
+        if (at < 0) return null;
+
+        var box = item.Bounds;
+
+        for (var i = at + (forward ? 1 : -1); i >= 0 && i < shown.Count; i += forward ? 1 : -1)
+        {
+            if (Meets(shown[i].Bounds, box)) return shown[i];
+        }
+
+        return null;
+    }
+
+    // Touching counts: two things that share an edge are one in front of the other, and a drawing where the top one
+    // cannot be raised because it only just touches would be a drawing nobody can arrange.
+    private static bool Meets(Rect one, Rect other) =>
+        one.X <= other.X + other.Width && other.X <= one.X + one.Width &&
+        one.Y <= other.Y + other.Height && other.Y <= one.Y + one.Height;
+
+    /// <summary>Puts the selected items where their own <see cref="ICanvasItem.Order"/> says they should be.
+    /// <para>The number an item carries is normally a stamp the scene writes: where it stands, written down. WRITING to
+    /// it turns the stamp into a request, and this is what grants it - the disagreement between the number and the
+    /// place IS the request. Called for you when the panel writes; public because an application that moves things by
+    /// setting numbers rather than by calling the commands needs the same door.</para></summary>
+    public void SettleOrder()
+    {
+        if (Scene is not { } scene || _selection.Count == 0) return;
+
+        // EVERY NUMBER READ BEFORE ANY OF THEM IS ACTED ON. The scene restamps the whole list on every move, so the
+        // first item moved rewrites the very numbers the rest of this pass was about to read - and a selection of three
+        // would end up obeying two numbers it was never given.
+        var asked = new List<(ICanvasItem Item, int Wanted)>(_selection.Count);
+
+        foreach (var item in _selection) asked.Add((item, item.Order));
+
+        foreach (var (item, wanted) in asked)
+        {
+            if (Placed(item) != wanted) scene.Reposition(item, wanted);
+        }
+    }
+
+    // Where the item actually stands AMONG WHAT CAN BE SEEN - what the stamp would say if nobody had written over it.
+    // Counted the same way the scene writes the number, or every write would look like a request to move.
+    private int Placed(ICanvasItem item)
+    {
+        var at = 0;
+
+        foreach (var other in ItemsHere())
+        {
+            if (ReferenceEquals(other, item)) return at;
+
+            at++;
+        }
+
+        return -1;
+    }
+
+    // Everything of this mode, in the order the scene holds it.
+    private List<ICanvasItem> Shown()
+    {
+        var shown = new List<ICanvasItem>();
+
+        foreach (var item in ItemsHere()) shown.Add(item);
+
+        return shown;
+    }
+
     /// <summary>Lines the selection up on one edge - the parameter is which, a <see cref="CanvasAlignment"/> or its
     /// word. ONE command taking a word rather than four: a button says which edge it means, and four properties saying
     /// the same thing four times is a surface nobody can keep in step.</summary>
@@ -2126,6 +2553,138 @@ public class InfiniteCanvas : Control
     /// does. Off when there is nothing on it.</summary>
     public CanvasCommand ClearCommand =>
         _clear ??= new CanvasCommand(_ => RequestClear(), _ => Anything());
+
+    /// <summary>Writes the drawing out as SVG - what is SELECTED when something is, and everything when nothing is,
+    /// which is the same rule the fit button follows.
+    /// <para>SVG because a drawing is the half of a canvas other people's tools have a claim on. A graph means
+    /// something only here and is kept as JSON; see <see cref="CanvasSvg"/>.</para></summary>
+    public CanvasCommand ExportSvgCommand => _toSvg ??= new CanvasCommand(_ => ExportSvg(), _ => Drawn());
+
+    /// <summary>...and reads one in, adding what it holds to the plane rather than replacing it: a drawing opened on
+    /// top of nothing is the same thing as opening it, and one opened onto work already there is a person bringing a
+    /// piece in from elsewhere.</summary>
+    public CanvasCommand ImportSvgCommand => _fromSvg ??= new CanvasCommand(_ => ImportSvg(), _ => Scene != null);
+
+    /// <summary>Raised when a drawing was read but something in it could not be - an arc, a gradient, a foreign
+    /// element. The canvas says nothing on its own: what to tell the user, and how, is the application's.</summary>
+    public event EventHandler<CanvasSvgReadEventArgs> SvgRead;
+
+    /// <summary>Puts a freshly made item on the plane - what a TOOL calls when a gesture is finished.
+    /// <para>ON TOP, because the plane has ONE order and a new thing goes at the top of it. Everything already there
+    /// keeps its place; what has just been drawn is over it, including over the controls, which is what drawing on a
+    /// picture means. Anything can be moved afterwards - "bring to front" and "send to back" move a control and a
+    /// stroke through the same order, so a picture can be raised above a drawing as easily as a drawing over a
+    /// picture.</para>
+    /// <para>One door rather than six calls to the scene: a tool says what it made, and where that goes is one
+    /// decision in one place.</para></summary>
+    public void Place(ICanvasItem item)
+    {
+        if (item == null || Scene == null) return;
+
+        Scene.Add(item);
+    }
+
+    private bool Drawn()
+    {
+        if (Scene == null) return false;
+
+        foreach (var item in ItemsHere())
+        {
+            if (CanvasSvg.Drawable(item)) return true;
+        }
+
+        return false;
+    }
+
+    private void ExportSvg()
+    {
+        if (!FileDialog.IsAvailable) return;
+
+        var chosen = FileDialog.Save(new SaveFileRequest
+        {
+            Title = "Export the drawing",
+            DefaultExtension = "svg",
+            FileTypes = SvgFiles,
+
+            // ITS OWN MEMORY, and its own window. The first means this dialog comes back the size it was left and in
+            // the folder a drawing was last written to - not wherever some other dialog of this application was. The
+            // second means it opens on the screen the canvas is on: a dialog belongs to a window, and one belonging to
+            // nothing opens on the main screen, which on two monitors is the wrong one half the time.
+            Key = "canvas.svg.export",
+            Owner = GetWindow()?.Handle ?? IntPtr.Zero
+        });
+
+        if (chosen == null) return;   // cancelled is an answer
+
+        var wanted = new List<ICanvasItem>();
+
+        // WHAT IS SELECTED, or everything: a person who has picked three shapes out of a drawing and pressed export
+        // meant those three.
+        foreach (var item in _selection.Count > 0 ? _selection : (IEnumerable<ICanvasItem>)ItemsHere())
+        {
+            if (CanvasSvg.Drawable(item)) wanted.Add(item);
+        }
+
+        try
+        {
+            File.WriteAllText(chosen, CanvasSvg.Save(wanted));
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException or System.Security.SecurityException)
+        {
+            // A file that cannot be written - a full disk, a folder somebody else owns - is a fact about the world.
+            SvgRead?.Invoke(this, new CanvasSvgReadEventArgs(0, 0, e.Message));
+        }
+    }
+
+    private void ImportSvg()
+    {
+        if (Scene == null || !FileDialog.IsAvailable) return;
+
+        var chosen = FileDialog.Open(new OpenFileRequest
+        {
+            Title = "Open a drawing",
+            FileTypes = SvgFiles,
+            Key = "canvas.svg.import",
+            Owner = GetWindow()?.Handle ?? IntPtr.Zero
+        });
+
+        if (chosen == null) return;
+
+        string text;
+        try
+        {
+            text = File.ReadAllText(chosen);
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException or System.Security.SecurityException)
+        {
+            SvgRead?.Invoke(this, new CanvasSvgReadEventArgs(0, 0, e.Message));
+            return;
+        }
+
+        var made = CanvasSvg.Load(text, out var skipped);
+
+        // ONE STEP in the canvas's memory, however many shapes arrived: opening a drawing is one thing a person did,
+        // and taking it back should not mean pressing undo four hundred times.
+        BeginEdit("Open a drawing");
+        try
+        {
+            foreach (var item in made) Scene.Add(item);
+
+            SelectMany(made, false);
+        }
+        finally
+        {
+            EndEdit();
+        }
+
+        SvgRead?.Invoke(this, new CanvasSvgReadEventArgs(made.Count, skipped, null));
+    }
+
+    private static readonly IReadOnlyList<FileType> SvgFiles =
+    [
+        new("Drawings", "svg"),
+        new("All files", "*")
+    ];
 
     private static CanvasAlignment? Edge(object said) => said switch
     {
@@ -2189,10 +2748,14 @@ public class InfiniteCanvas : Control
         _ungroup?.RaiseCanExecuteChanged();
         _toFront?.RaiseCanExecuteChanged();
         _toBack?.RaiseCanExecuteChanged();
+        _forward?.RaiseCanExecuteChanged();
+        _backward?.RaiseCanExecuteChanged();
         _align?.RaiseCanExecuteChanged();
         _spread?.RaiseCanExecuteChanged();
         _comment?.RaiseCanExecuteChanged();
         _clear?.RaiseCanExecuteChanged();
+        _toSvg?.RaiseCanExecuteChanged();
+        _fromSvg?.RaiseCanExecuteChanged();
     }
 
     private void Selected()
@@ -2204,6 +2767,10 @@ public class InfiniteCanvas : Control
         _publishing = false;
 
         HasSelection = _selection.Count > 0;
+
+        // The frame stands where the held thing stands, so a new selection is a new place for it - and the runs have
+        // not changed, so nothing else would work it out.
+        MarkChrome();
 
         // A pane that FOLLOWS the selection is shown by there being one, so the moment the selection changes is the
         // moment to say so - and not the arrange pass, where writing a layout input would invalidate the pass running.
@@ -2364,13 +2931,53 @@ public class InfiniteCanvas : Control
         if (dx != 0 || dy != 0) PanBy(new Vector2(dx, dy));
     }
 
+    /// <summary>The world point in the middle of the usable viewport - the one thing about the camera that means the
+    /// same in a window of another size, which is why it and not the origin in pixels is what gets written down.
+    /// </summary>
+    public Vector2 Looking
+    {
+        get
+        {
+            var room = UsableBounds;
+
+            return ScreenToWorld(new Vector2(room.X + room.Width / 2, room.Y + room.Height / 2));
+        }
+    }
+
+    private Vector2? _lookWanted;
+    private Thickness _lastInset = new(-1);
+
+    private static bool Same(Thickness one, Thickness other) =>
+        Math.Abs(one.Left - other.Left) < 0.01 && Math.Abs(one.Top - other.Top) < 0.01
+        && Math.Abs(one.Right - other.Right) < 0.01 && Math.Abs(one.Bottom - other.Bottom) < 0.01;
+
+    /// <summary>Look at a world point - now, or as soon as the canvas is on screen: a saved setup arrives before the
+    /// first layout, and a viewport of nothing has no middle.</summary>
+    public void Look(Vector2 world)
+    {
+        if (RenderSize is { Width: > 0, Height: > 0 })
+        {
+            CenterOn(world);
+            return;
+        }
+
+        _lookWanted = world;
+        InvalidateArrange();
+    }
+
     /// <summary>Puts a world point in the middle of the USABLE viewport - the middle of what is not behind a docked
     /// panel. With nothing docked that is the middle of the control, which is what it was before there were panes.
     /// </summary>
-    public void CenterOn(Vector2 world)
+    public void CenterOn(Vector2 world) => CenterOn(world, RenderSize);
+
+    // ...against a viewport SAID rather than read. Inside an arrange pass RenderSize is still what the canvas used to
+    // be - this pass is what sets it - and centring then lands against a size of nothing.
+    private void CenterOn(Vector2 world, Size viewport)
     {
-        var room = UsableBounds;
-        var middle = new Vector2(room.X + room.Width / 2, room.Y + room.Height / 2);
+        var taken = _chromeLayer?.Inset() ?? new Thickness(0);
+        var width = Math.Max(1, viewport.Width - taken.Left - taken.Right);
+        var height = Math.Max(1, viewport.Height - taken.Top - taken.Bottom);
+        var middle = new Vector2(taken.Left + width / 2, taken.Top + height / 2);
 
         SetCurrentValue(OffsetProperty, middle - world * Scale);
     }
@@ -2462,8 +3069,8 @@ public class InfiniteCanvas : Control
     public void ResetCamera()
     {
         StopZoom();
-        SetCurrentValue(ScaleProperty, Math.Clamp(1.0, MinScale, MaxScale));
-        CenterOn(Vector2.Zero);
+        SetCurrentValue(ScaleProperty, Math.Clamp(HomeScale, MinScale, MaxScale));
+        CenterOn(HomeAt);
     }
 
     /// <summary>Zooms about a point ON SCREEN, keeping the world under it still - what the wheel does, offered for a
@@ -2500,8 +3107,36 @@ public class InfiniteCanvas : Control
         var world = ScreenToWorld(screen);
 
         StopZoom();
-        SetCurrentValue(ScaleProperty, Math.Clamp(scale, MinScale, MaxScale));
+        _holdingPoint = true;
+
+        try
+        {
+            SetCurrentValue(ScaleProperty, Math.Clamp(scale, MinScale, MaxScale));
+        }
+        finally
+        {
+            _holdingPoint = false;
+        }
+
         SetCurrentValue(OffsetProperty, screen - world * Scale);
+    }
+
+    // Keeps whatever was in the middle of the viewport in the middle of it, when the scale is written with nothing
+    // else holding a point - see OnCameraChanged. Whoever DOES hold one (the wheel, the buttons, SetScaleAt) says so.
+    private bool _holdingPoint;
+
+    private void KeepTheMiddle(Double was)
+    {
+        if (_holdingPoint || _zoomActive || was <= 0 || !_cameraPlaced) return;
+
+        var room = UsableBounds;
+        var middle = new Vector2(room.X + room.Width / 2, room.Y + room.Height / 2);
+        var world = (middle - Offset) * (1.0 / was);
+
+        SetCurrentValue(OffsetProperty, middle - world * Scale);
+
+        // A number typed into the panel is a finished gesture by itself.
+        RememberLayout();
     }
 
     protected override void OnRender(IDrawingContext context)
@@ -2519,17 +3154,11 @@ public class InfiniteCanvas : Control
         // it does not have.
         if (GridStyle != CanvasGridStyle.Transparent) DrawGround(session, size);
 
-        DrawBand(session, CanvasBand.Under);
-
-        // What the TOOL is making but has not put in the scene yet - a stroke still under the pen, a shape being dragged
-        // out, the selection band. It goes in when the gesture ends, so a half-made thing cannot be hit-tested, saved or
-        // undone halfway through.
-        Tool?.Render(session, this);
-
-        // THE OVERLAY: what is drawn on the glass rather than on the plane. It comes last, it is stated in SCREEN
-        // pixels, and it never scales - a mark that grew with the zoom would be part of the drawing, which is exactly
-        // what it is not.
-        DrawOverlay(session);
+        // WHAT IS ON THE PLANE IS NOT DRAWN HERE, and neither is the chrome over it. The canvas's own pass is ONE place
+        // in paint order - the one underneath everything - and the plane has many: a picture, a stroke over it, another
+        // picture over that. So the items are drawn by the stack of layers cut from the scene's own order, and the
+        // frame round what is selected is drawn on the glass in front of them all. Drawn here, it went under whatever
+        // the person had just sent to the top - and the frame is how they can see what they are holding.
     }
 
     // What the canvas draws is drawn in TWO places - here, and in the layer that stands in front of the controls - so
@@ -2538,6 +3167,12 @@ public class InfiniteCanvas : Control
     internal void Repaint()
     {
         InvalidateRender(false);
+
+        // EVERY LAYER OF THE STACK. What is on the plane is drawn by them now, and a repaint that marked only the
+        // canvas would leave the drawing showing what it looked like a moment ago - in as many ages of itself as
+        // there are layers.
+        Drawn(layer => layer.Repaint());
+
         _front?.InvalidateRender(false);
     }
 
@@ -2568,13 +3203,116 @@ public class InfiniteCanvas : Control
     /// <para>Public because the front band is drawn by a layer of the template and not by the canvas: a layer is one
     /// place in paint order, so the only way for an item to be in front of a control is for something in front of that
     /// control to draw it. See <see cref="CanvasFrontLayer"/>.</para></summary>
-    public void DrawBand(IDrawingSession session, CanvasBand band)
-    {
-        if (session == null) return;
+    /// <summary>Draws what the TOOL is making but has not put on the plane yet - a stroke still under the pen, a shape
+    /// being dragged out, the selection band. It goes in when the gesture ends, so a half-made thing cannot be
+    /// hit-tested, saved or undone halfway through.
+    /// <para>ON TOP OF EVERYTHING, which is where it is going: a new thing is put at the top of the order, so a
+    /// gesture that showed itself anywhere else would be showing one thing and meaning another. This is what the front
+    /// layer is for now that the plane's own order decides the rest.</para></summary>
+    public void DrawInProgress(IDrawingSession session) => Tool?.Render(session, this);
 
-        foreach (var item in ItemsHere(VisibleWorld))
+    /// <summary>Draws what is ABOUT the drawing rather than part of it - the frame and grips round what is selected, the
+    /// snap mark, the plate that says where the pointer is.
+    /// <para>WHERE ITS OBJECT STANDS, not over everything: a person changing what is in front of what is asking exactly
+    /// where the thing they are holding sits, and a frame that floated over the lot answered a different question. So
+    /// it is drawn by the layer that holds the topmost selected item, straight after that item - see
+    /// <see cref="ChromeGoesAfter"/> - and only reaches the glass when nothing is drawn above it at all.</para>
+    /// <para>Stated in SCREEN pixels and never scaled: a grip that grew with the zoom would be part of the drawing,
+    /// which is exactly what it is not.</para></summary>
+    /// <summary>Whether the frame belongs straight AFTER this item - true for the topmost selected thing that a layer
+    /// draws itself. Asked by the layers as they paint; nothing else has any use for it.</summary>
+    public bool ChromeGoesAfter(ICanvasItem item) => _chromeAfter != null && ReferenceEquals(item, _chromeAfter);
+
+    /// <summary>Whether the frame belongs BEFORE this item - true when what is held is a CONTROL, which no layer draws.
+    /// A control is a child of its own layer, so the frame round it goes at the start of the first drawn run above it:
+    /// over the control, under whatever was put on the plane after it.</summary>
+    public bool ChromeGoesBefore(ICanvasItem item) => _chromeBefore != null && ReferenceEquals(item, _chromeBefore);
+
+    /// <summary>Whether the frame has nowhere on the plane to be drawn and falls to the glass - what happens when what
+    /// is held is at the very top, or is off the screen entirely.</summary>
+    public bool ChromeGoesOnGlass => _chromeOnGlass;
+
+    public void DrawChrome(IDrawingSession session) => DrawManipulation(session);
+
+    /// <summary>Draws what belongs to the POINTER rather than to the plane - the snap mark it has caught and the plate
+    /// saying where it is. Always on the glass: these are about where the hand is, not about where anything stands, and
+    /// a plate read through the drawing it is measuring is no plate at all.</summary>
+    public void DrawPointer(IDrawingSession session)
+    {
+        if (_snap is not { } at || SnapMarkBrush == null || SnapMarkSize <= 0) return;
+
+        var mark = WorldToScreen(at);
+        var half = SnapMarkSize / 2;
+
+        session.DrawEllipse(new Rect(mark.X - half, mark.Y - half, SnapMarkSize, SnapMarkSize),
+            SnapMarkBrush, 0, 360, EllipseType.Sector);
+
+        DrawReadout(session, at);
+    }
+
+    // WHERE THE FRAME GOES, worked out once whenever the stack or the selection changes rather than per item as the
+    // layers paint - the answer is one place in the order, and finding it is a walk over the runs.
+    private void MarkChrome()
+    {
+        _chromeAfter = null;
+        _chromeBefore = null;
+        _chromeOnGlass = false;
+
+        if (Held is not { } held) return;
+
+        var found = false;
+
+        foreach (var (hosted, items) in _runs)
         {
-            if (item.Band == band) item.Render(session, this);
+            if (!found)
+            {
+                foreach (var item in items)
+                {
+                    if (!ReferenceEquals(item, held)) continue;
+
+                    found = true;
+                    break;
+                }
+
+                if (!found) continue;
+
+                // Drawn by its own layer, so the frame follows it there. A control is not drawn by anybody, and the
+                // search goes on: the frame belongs at the start of the first run that IS drawn above it.
+                if (!hosted)
+                {
+                    _chromeAfter = held;
+                    return;
+                }
+
+                continue;
+            }
+
+            if (hosted || items.Count == 0) continue;
+
+            _chromeBefore = items[0];
+            return;
+        }
+
+        // Nothing is drawn over it - or it is not on the screen at all, in which case the frame is what says so.
+        _chromeOnGlass = true;
+    }
+
+    // THE TOPMOST OF WHAT IS HELD. One frame is drawn round the whole selection, so it stands at the place of the one
+    // furthest forward - anywhere lower and it would be cut by something the selection itself contains.
+    private ICanvasItem Held
+    {
+        get
+        {
+            if (!IsDesignMode || _selection.Count == 0) return null;
+
+            var top = _selection[0];
+
+            for (var i = 1; i < _selection.Count; i++)
+            {
+                if (_selection[i].Order > top.Order) top = _selection[i];
+            }
+
+            return top;
         }
     }
 
@@ -2597,21 +3335,6 @@ public class InfiniteCanvas : Control
         _ground.AxisColor = ColorOf(AxisBrush, new Color(0, 0, 0, 0));
 
         session.DrawRectangle(_ground, new Rect(0, 0, size.Width, size.Height));
-    }
-
-    private void DrawOverlay(IDrawingSession session)
-    {
-        DrawManipulation(session);
-
-        if (_snap is not { } at || SnapMarkBrush == null || SnapMarkSize <= 0) return;
-
-        var mark = WorldToScreen(at);
-        var half = SnapMarkSize / 2;
-
-        session.DrawEllipse(new Rect(mark.X - half, mark.Y - half, SnapMarkSize, SnapMarkSize),
-            SnapMarkBrush, 0, 360, EllipseType.Sector);
-
-        DrawReadout(session, at);
     }
 
     // The plate that says where the pointer is, beside the pointer. Beside and not under it: a number drawn where the
@@ -2734,7 +3457,12 @@ public class InfiniteCanvas : Control
         // line it is not even where the line is - the box of a diagonal is a huge rectangle, most of which is nowhere
         // near the shape, and it reads as though the line were everywhere inside it. What says a line or a curve is
         // selected is its own ends, which are drawn below.
-        if (corners || sides) session.DrawRectangle(null, frame, pen);
+        //
+        // SEVERAL THINGS AT ONCE ARE THE EXCEPTION. The reasoning above is about ONE thing whose own shape says where
+        // it is; a band round five says nothing by itself, and its box is the only mark that says what was caught. The
+        // grips are a separate question - a stroke among them still offers none, and none are drawn - but without the
+        // box a person drags a band, lets go, and sees no answer at all.
+        if (corners || sides || _selection.Count > 1) session.DrawRectangle(null, frame, pen);
 
         if (HandleSize <= 0) return;
 
@@ -3173,6 +3901,11 @@ public class InfiniteCanvas : Control
         Cursor = overGrip ?? OverSelection(screen) ?? Tool?.Cursor ?? Cursors.Arrow;
     }
 
+    /// <summary>Works out what the pointer should look like at a place on screen, and wears it - what a move of the
+    /// mouse does. Public so that what the pointer PROMISES can be asked without a mouse: it is a promise about what
+    /// the next press will do, and the two are easy to let drift apart.</summary>
+    public void ShowPointerAt(Vector2 screen) => ShowPointer(screen);
+
     // What is under the pointer WITHIN the selection: one of its points, or the thing itself.
     // <para>The only thing that says so on a line. A box says where it can be grabbed by being drawn; a line has no box
     // - and now no frame either - so without this there is nothing at all to tell a hand that it has crossed into the
@@ -3190,6 +3923,14 @@ public class InfiniteCanvas : Control
         // Only what MOVES with a press here. A press inside the frame of something that offers no body drag does
         // nothing, and a cursor promising otherwise is the same lie a grip drawn where nothing drags would be.
         if (!OfferedHandles.HasFlag(CanvasHandles.Body)) return null;
+
+        // ...AND ONLY WITH SOMETHING THAT MOVES IT IN HAND. A press inside the frame belongs to the TOOL - that is what
+        // lets a stroke be drawn over a picture that is already selected - so with a pen in hand the body drags
+        // nothing. Wearing the move cursor there, drawing over something selected LOOKED like dragging it, which is the
+        // one thing a person reads the pointer to tell apart. The tool's own cursor is the honest answer, and the
+        // grips keep theirs: those the canvas does answer, whatever is in hand.
+        if (Tool is not (null or SelectTool)) return null;
+
 
         var world = ScreenToWorld(screen);
         var reach = ScreenToWorldLength(Math.Max(4, HandleSize) / 2 + 2);
@@ -3230,6 +3971,9 @@ public class InfiniteCanvas : Control
             {
                 _panning = false;
                 ReleaseMouseCapture();
+
+                // When the gesture ends, not while it runs: a pan raises the camera on every mouse move.
+                RememberLayout();
                 e.Handled = true;
                 return;
             }
@@ -3260,7 +4004,7 @@ public class InfiniteCanvas : Control
     // the event came from is the only thing there is to go on.
     private bool FromGlass(object source)
     {
-        if (_overlayRoot == null && _elements == null && _chromeLayer == null) return false;
+        if (_overlayRoot == null && _layers == null && _chromeLayer == null) return false;
 
         for (var at = source as IUIComponent; at != null; at = at.VisualParent)
         {
@@ -3271,7 +4015,9 @@ public class InfiniteCanvas : Control
             if (at is CanvasPane) return true;
             if (ReferenceEquals(at, _chromeLayer)) return false;
 
-            if (ReferenceEquals(at, _overlayRoot) || ReferenceEquals(at, _elements)) return true;
+            // A LAYER THAT HOSTS CONTROLS, whichever of them it is: there is one per run of neighbouring controls now,
+            // and a press on any of them came from something standing on the plane rather than from the plane.
+            if (ReferenceEquals(at, _overlayRoot) || at is CanvasElementLayer) return true;
         }
 
         return false;
@@ -3474,14 +4220,17 @@ public class InfiniteCanvas : Control
     {
         base.OnApplyTemplate();
 
-        _elements = GetTemplateChild("PART_Elements") as CanvasElementLayer;
-        if (_elements != null) _elements.Owner = this;
+        // THE STACK, which the canvas fills itself: how many layers there are and what sort each is depends on the
+        // order of the scene, so a template cannot state them - it states the place they go.
+        _layers = GetTemplateChild("PART_Layers") as Panel;
 
         _front = GetTemplateChild("PART_Front") as CanvasFrontLayer;
         if (_front != null) _front.Owner = this;
 
         _chromeLayer = GetTemplateChild("PART_Chrome") as CanvasChromeLayer;
         if (_chromeLayer != null) _chromeLayer.Owner = this;
+
+        _palette = GetTemplateChild("PART_NodePalette") as CanvasPane;
 
         SyncChrome();
 
@@ -3524,7 +4273,8 @@ public class InfiniteCanvas : Control
 
         if (_overlayGrip != null) _overlayGrip.Click -= OnGripClicked;
 
-        if (_elements != null) _elements.Owner = null;
+        Hosts(host => host.Owner = null);
+        Drawn(drawn => drawn.Owner = null);
 
         if (_chromeLayer != null)
         {
@@ -3532,7 +4282,7 @@ public class InfiniteCanvas : Control
             _chromeLayer.Owner = null;
         }
 
-        _elements = null;
+        _layers = null;
         _chromeLayer = null;
         _overlay = null;
         _overlayRoot = null;
@@ -3715,6 +4465,7 @@ public class InfiniteCanvas : Control
 
         canvas.ToolChanged?.Invoke(canvas, EventArgs.Empty);
         canvas.Repaint();
+        canvas.RememberLayout();
     }
 
     /// <summary>The tool in hand changed - a rail marks a different button on it.</summary>
@@ -3759,6 +4510,8 @@ public class InfiniteCanvas : Control
     {
         if (component is not InfiniteCanvas canvas) return;
 
+        canvas.SetCurrentValue(IsDrawingProperty, canvas.Mode == CanvasMode.Drawing);
+
         // LET GO FIRST. What was selected belongs to the mode that has just been left, and a frame round something the
         // canvas no longer draws is a frame round nothing that still answers Delete.
         canvas.ClearSelection();
@@ -3772,8 +4525,11 @@ public class InfiniteCanvas : Control
         }
 
         canvas.SyncElements();
-        canvas._elements?.InvalidateMeasure();
-        canvas._elements?.InvalidateArrange();
+        canvas.Hosts(host =>
+        {
+            host.InvalidateMeasure();
+            host.InvalidateArrange();
+        });
         canvas.Repaint();
 
         canvas.ModeChanged?.Invoke(canvas, EventArgs.Empty);
@@ -3809,8 +4565,11 @@ public class InfiniteCanvas : Control
         // A whole scene arriving is as much a change as an item being put in one, and the controls in it have to reach
         // the layer the same way.
         canvas.SyncElements();
-        canvas._elements?.InvalidateMeasure();
-        canvas._elements?.InvalidateArrange();
+        canvas.Hosts(host =>
+        {
+            host.InvalidateMeasure();
+            host.InvalidateArrange();
+        });
 
         canvas.Repaint();
     }
@@ -3823,8 +4582,11 @@ public class InfiniteCanvas : Control
         // ...and place them again even when the SET has not changed. An edit here is just as often one item's rectangle
         // moving - which is exactly what dragging a control does - and a layer that only answered to items appearing and
         // disappearing left the control behind while its frame walked off.
-        _elements?.InvalidateMeasure();
-        _elements?.InvalidateArrange();
+        Hosts(host =>
+        {
+            host.InvalidateMeasure();
+            host.InvalidateArrange();
+        });
 
         // The same for a pane that follows the selection: an item moving moves the frame, and the bar sits on the
         // frame. This is the one place every edit passes through - a drag, a resize, an inspector writing a number -
@@ -3920,11 +4682,24 @@ public class InfiniteCanvas : Control
         if (e.Property == OffsetProperty)
             canvas._cameraPlaced = true;
 
+        // A SCALE WRITTEN STRAIGHT ZOOMS WHERE YOU ARE LOOKING. Scale alone leaves the world's ORIGIN where it is on
+        // screen, so everything else swings round it - type 8000 into the panel and the drawing flies off sideways
+        // while the empty middle of the plane fills the window. The wheel and the buttons never showed this because
+        // they go through ZoomAt, which holds a point still; a number typed in had nothing holding it.
+        if (e.Property == ScaleProperty)
+        {
+            canvas.SyncThicknessSteps();
+            canvas.KeepTheMiddle(e.OldValue as Double? ?? 0);
+        }
+
         // The controls on the plane MOVE with the camera, and moving them is an arrange: what is inside one was measured
         // for its own rectangle, which the camera does not change. A zoom changes that rectangle, so it measures again.
         canvas.SyncElements();
-        canvas._elements?.InvalidateArrange();
-        if (e.Property == ScaleProperty) canvas._elements?.InvalidateMeasure();
+        canvas.Hosts(host =>
+        {
+            host.InvalidateArrange();
+            if (e.Property == ScaleProperty) host.InvalidateMeasure();
+        });
 
         // A pane that FOLLOWS THE SELECTION is placed from where the frame is on screen, and the camera is half of that
         // sum - so moving the camera has to re-place it just as it re-places the controls. Without this the bar kept
@@ -3948,7 +4723,7 @@ public class InfiniteCanvas : Control
     // contents cannot be clicked is a picture of a node - so it stays live and is dragged by its title strip instead.
     private void ApplyDesignMode()
     {
-        _elements?.ApplyDesignMode();
+        Hosts(host => host.ApplyDesignMode());
 
         Repaint();
     }
@@ -4075,6 +4850,7 @@ public class InfiniteCanvas : Control
         _askedWorld = world;
 
         PaletteAt = WorldToScreen(world);
+        _palette?.PlaceAt(PaletteAt);
         IsPaletteOpen = true;
 
         return true;
@@ -4168,17 +4944,182 @@ public class InfiniteCanvas : Control
     // it: arranging with a new size asked "what can be seen" of the size before it, so everything that had just come
     // into view was left off the plane - and nothing asked again until something else re-synced (a zoom, a pan, a node
     // added). Which is exactly what it looked like: a window resized, and half the graph gone until the first zoom.
+    // WHAT THE LAYERS ARE CUT FROM: the plane's order with every GROUP OPENED OUT, in place.
+    //
+    // A group is a way of holding several things at once - it is moved, resized and selected as one - but it is not a
+    // way of DRAWING them: a drawn child is drawn by the group asking it to, and a control is not drawn at all, it is
+    // seen because it is a living child of a layer. Left folded, a picture gathered into a group simply vanished, and
+    // with it every press it would have answered.
+    //
+    // Opened out HERE and nowhere else: the group is still one item to the scene, to picking, and to whoever moves it.
+    // This is only about which layer each thing is laid in, which is what a group has no opinion about.
+    private static IEnumerable<ICanvasItem> Laid(IEnumerable<ICanvasItem> items)
+    {
+        foreach (var item in items)
+        {
+            if (item is not GroupItem group)
+            {
+                yield return item;
+                continue;
+            }
+
+            // A group inside a group is opened the same way - it is the same statement made twice.
+            foreach (var child in Laid(group.Children)) yield return child;
+        }
+    }
+
     private void SyncElements(Size viewport)
     {
-        if (_elements == null) return;
+        if (_layers == null) return;
 
-        _visibleElements.Clear();
-        foreach (var item in ItemsHere(WorldAcross(viewport)))
+        // ONE ORDER FOR EVERYTHING, and the layers are cut from it. Walked in the scene's own order, a run of items of
+        // the same sort - drawn things, or controls - becomes one layer, and the next sort starts the next layer. That
+        // is what makes a picture, a stroke over it and another picture over that three places in paint order rather
+        // than two buckets with the controls wedged between them.
+        //
+        // PER RUN and not per item, which is what keeps it affordable: a drawing with two pictures is three layers
+        // however much is drawn on it, and a graph of ten thousand nodes with nothing drawn between them is one.
+        _runs.Clear();
+
+        List<ICanvasItem> run = null;
+        var hosted = false;
+
+        foreach (var item in Laid(ItemsHere(WorldAcross(viewport))))
         {
-            if (item is ElementItem element) _visibleElements.Add(element);
+            var control = item is ElementItem;
+
+            if (run == null || control != hosted)
+            {
+                run = new List<ICanvasItem>();
+                hosted = control;
+                _runs.Add((control, run));
+            }
+
+            run.Add(item);
         }
 
-        _elements.Sync(_visibleElements);
+        // The frame's place is a place in THESE runs, so it is settled here rather than looked for as the layers paint.
+        MarkChrome();
+
+        Restack(viewport);
+    }
+
+    // Puts the stack's layers in step with the runs. MATCHED BY SORT, and only then rebuilt: a layer that is already
+    // the right kind keeps the controls it is holding, and a control that stays put is never detached. Emptying the
+    // stack and filling it again would take every control off the plane and put it back - re-templated, re-recorded,
+    // and with whatever it was in the middle of (a focus, an animation, a half-typed word) gone.
+    private void Restack(Size viewport)
+    {
+        var changed = false;
+
+        for (var i = 0; i < _runs.Count; i++)
+        {
+            var (hosted, items) = _runs[i];
+            var standing = i < _layers.Children.Count ? _layers.Children[i] : null;
+
+            if (hosted && standing is CanvasElementLayer host)
+            {
+                _hosted.Clear();
+                foreach (var item in items) _hosted.Add((ElementItem)item);
+                host.Sync(_hosted);
+                continue;
+            }
+
+            if (!hosted && standing is CanvasDrawLayer drawn)
+            {
+                drawn.Sync(items);
+                continue;
+            }
+
+            var made = Layer(hosted, items);
+
+            if (standing != null) _layers.Children.RemoveAt(i);
+
+            _layers.Children.Insert(i, made);
+
+            // PLACED NOW, at the size the canvas has this very moment. The stack is filled from inside the canvas's
+            // own arrange, by which time the template's children have already been placed - so a layer left for the
+            // next pass would stand at no size at all, and a thing of no size draws nothing. The pass that comes
+            // afterwards places it again in exactly the same box, so nothing is lost by doing it here first.
+            if (viewport is { Width: > 0, Height: > 0 })
+            {
+                made.Measure(viewport);
+                made.Arrange(new Rect(0, 0, viewport.Width, viewport.Height));
+            }
+
+            changed = true;
+        }
+
+        while (_layers.Children.Count > _runs.Count)
+        {
+            var last = _layers.Children.Count - 1;
+
+            if (_layers.Children[last] is CanvasElementLayer host) host.Owner = null;
+            if (_layers.Children[last] is CanvasDrawLayer drawn) drawn.Owner = null;
+
+            _layers.Children.RemoveAt(last);
+            changed = true;
+        }
+
+        // A LAYER THAT ARRIVED HAS NOT BEEN LAID OUT. The stack is filled from inside the canvas's own arrange, by
+        // which time the template's children have already been placed - so a layer made here would stand at no size at
+        // all until something else happened to ask for a pass, and a thing of no size draws nothing.
+        if (!changed) return;
+
+        _layers.InvalidateMeasure();
+        _layers.InvalidateArrange();
+
+        // ...AND THE WHOLE STACK RECORDED AGAIN, not patched. A layer appearing or going means controls have CHANGED
+        // PARENTS - gathering a picture and a stroke into a group cuts the runs afresh, and the layer the picture was
+        // in may not exist any anymore. What is kept of a frame is kept per element, and an element that moved is an
+        // element whose record belongs to a place that is gone: patched, it simply stops being drawn, and stays that
+        // way until something else forces a full pass - which is exactly how it looked, a picture that came back the
+        // moment anything else on the plane was touched.
+        //
+        // Only when the stack itself changed, which is rare: a camera move, a drag, a value typed into the panel all
+        // leave the runs alone and cost nothing here.
+        InvalidateRender(true);
+    }
+
+    // EVERY layer of a sort, because there is no longer one of each. What a camera move has to tell them all is the
+    // same thing it always told the single layer; what changed is only how many there are.
+    private void Hosts(Action<CanvasElementLayer> what)
+    {
+        if (_layers == null) return;
+
+        foreach (var child in _layers.Children)
+        {
+            if (child is CanvasElementLayer host) what(host);
+        }
+    }
+
+    private void Drawn(Action<CanvasDrawLayer> what)
+    {
+        if (_layers == null) return;
+
+        foreach (var child in _layers.Children)
+        {
+            if (child is CanvasDrawLayer drawn) what(drawn);
+        }
+    }
+
+    private IMeasurableComponent Layer(bool hosted, List<ICanvasItem> items)
+    {
+        if (!hosted)
+        {
+            var drawn = new CanvasDrawLayer { Owner = this };
+
+            drawn.Sync(items);
+            return drawn;
+        }
+
+        var host = new CanvasElementLayer { Owner = this };
+
+        _hosted.Clear();
+        foreach (var item in items) _hosted.Add((ElementItem)item);
+        host.Sync(_hosted);
+
+        return host;
     }
 
     // The world's origin starts in the MIDDLE of the viewport, not in its top-left corner. Zero offset would put it in
@@ -4193,6 +5134,27 @@ public class InfiniteCanvas : Control
         {
             _cameraPlaced = true;
             SetCurrentValue(OffsetProperty, new Vector2(finalSize.Width / 2, finalSize.Height / 2));
+        }
+
+        // A VIEW ASKED FOR BEFORE THERE WAS A VIEWPORT. What is in the middle of the screen can only be worked out once
+        // there is a screen to be in the middle of - a canvas dressed from a saved setup is asked before its first
+        // layout, and centring then lands against a size of nothing.
+        // ...and only once the panels have stopped moving: the middle is measured against the room the docked ones
+        // leave, and one folded away by the same saved setup is still at its old size on this pass.
+        if (_lookWanted is { } wanted && finalSize is { Width: > 0, Height: > 0 })
+        {
+            var inset = _chromeLayer?.Inset() ?? new Thickness(0);
+
+            if (Same(inset, _lastInset))
+            {
+                _lookWanted = null;
+                CenterOn(wanted, finalSize);
+            }
+            else
+            {
+                _lastInset = inset;
+                InvalidateArrange();
+            }
         }
 
         // The controls on the plane are asked for again HERE, because "which of them can be seen" is answered from the
@@ -4220,7 +5182,17 @@ public class InfiniteCanvas : Control
         var next = current + (_targetScale - current) * (1.0 - Math.Exp(-ZoomSmoothRate * dt));
         if (Math.Abs(_targetScale - next) < _targetScale * 1e-3) next = _targetScale;
 
-        SetCurrentValue(ScaleProperty, next);
+        _holdingPoint = true;
+
+        try
+        {
+            SetCurrentValue(ScaleProperty, next);
+        }
+        finally
+        {
+            _holdingPoint = false;
+        }
+
         SetCurrentValue(OffsetProperty, _zoomAnchorScreen - _zoomAnchorWorld * Scale);
 
         var done = Scale == _targetScale;
@@ -4228,6 +5200,7 @@ public class InfiniteCanvas : Control
         {
             _zoomActive = false;
             _zoomTickerRegistered = false;
+            RememberLayout();
         }
 
         return done;

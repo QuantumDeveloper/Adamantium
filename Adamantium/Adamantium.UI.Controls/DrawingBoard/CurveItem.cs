@@ -79,6 +79,14 @@ public class CurveItem : ICanvasItem, ICanvasPoints
     /// second way to do it that fights the first.</summary>
     public CanvasHandles Handles => CanvasHandles.Body;
 
+    /// <summary>Where it stands in paint order - stamped by the scene. See ICanvasItem.Order.</summary>
+    public int Order { get; set; }
+
+    /// <summary>WHAT THIS IS: the curve, not the class - "Bezier", "Nurbs", "CatmullRom". A bezier is set by handles and
+    /// a NURBS by weights, so a panel pointed at one has no use for the other's lines. See
+    /// <see cref="ICanvasItem.Sort"/>.</summary>
+    public string Sort => Kind.ToString();
+
     /// <summary>What it covers: the box round its POINTS, grown by half the line.
     /// <para>The points and not the curve itself. Every one of these three curves stays inside the hull of its points,
     /// so this is a box that certainly contains the line - a little larger than it needs to be where the curve pulls
@@ -261,6 +269,11 @@ public class CurveItem : ICanvasItem, ICanvasPoints
                 return MathHelper.GetBezier(points, (uint)steps);
         }
     }
+
+    /// <summary>The curve AS IT IS DRAWN - the control points walked into a line, in world units. What anything that
+    /// has to follow the curve rather than state it reads: picking it, and writing it out to a format that has no
+    /// splines of its own.</summary>
+    public IReadOnlyList<Vector2> Sampled => Walk();
 
     // The curve in WORLD units, sampled finely enough that picking it agrees with seeing it at any zoom.
     private List<Vector2> Walk() => Walk(_points, Kind, Degree, IsUniform, 128);

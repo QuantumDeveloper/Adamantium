@@ -122,7 +122,7 @@ public class SelectTool : ICanvasTool
             _band = new Rect(Math.Min(_fromPointer.X, e.Pointer.X), Math.Min(_fromPointer.Y, e.Pointer.Y),
                 Math.Abs(e.Pointer.X - _fromPointer.X), Math.Abs(e.Pointer.Y - _fromPointer.Y));
 
-            canvas.InvalidateRender(false);
+            canvas.Repaint();
             e.Handled = true;
             return;
         }
@@ -147,7 +147,7 @@ public class SelectTool : ICanvasTool
         }
 
         canvas.Scene?.Touch();
-        canvas.InvalidateRender(false);
+        canvas.Repaint();
         e.Handled = true;
     }
 
@@ -177,7 +177,7 @@ public class SelectTool : ICanvasTool
                 canvas.SelectMany(Inside(canvas, band), _bandExtends);
             }
 
-            canvas.InvalidateRender(false);
+            canvas.Repaint();
             e.Handled = true;
             return;
         }

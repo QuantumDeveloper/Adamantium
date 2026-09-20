@@ -22,7 +22,11 @@ public class CanvasPane : ContentControl
     private ButtonBase _turn;
     private ToggleButton _snap;
     private IUIComponent _headerPart;
-    private IUIComponent _sizer;
+    private IUIComponent _sizerLeft;
+    private IUIComponent _sizerRight;
+    private Dock _sizingSide;
+    private double _leftAtPress;
+    private double _rightAtPress;
     private bool _dragging;
     private bool _sizing;
     private bool _moved;
@@ -41,7 +45,9 @@ public class CanvasPane : ContentControl
         typeof(CanvasPaneKind), typeof(CanvasPane),
         new PropertyMetadata(CanvasPaneKind.Sheet, PropertyMetadataOptions.AffectsMeasure));
 
-    public static readonly AdamantiumProperty OffsetProperty = AdamantiumProperty.Register(nameof(Offset),
+    /// <summary>Where a free pane sits, as a fraction of the room it can travel across (0 near edge, 1 far). Not
+    /// pixels: a panel parked by the right edge would end up in the middle of a wider window.</summary>
+    public static readonly AdamantiumProperty AnchorProperty = AdamantiumProperty.Register(nameof(Anchor),
         typeof(Vector2), typeof(CanvasPane),
         new PropertyMetadata(Vector2.Zero,
             PropertyMetadataOptions.AffectsParentArrange | PropertyMetadataOptions.BindsTwoWayByDefault));
@@ -167,12 +173,11 @@ public class CanvasPane : ContentControl
         set => SetValue(KindProperty, value);
     }
 
-    /// <summary>Where it sits under <see cref="CanvasPanePlacement.Free"/>, in screen pixels from the canvas's
-    /// top-left.</summary>
-    public Vector2 Offset
+    /// <summary>Where it sits under <see cref="CanvasPanePlacement.Free"/> - see <see cref="AnchorProperty"/>.</summary>
+    public Vector2 Anchor
     {
-        get => GetValue<Vector2>(OffsetProperty);
-        set => SetValue(OffsetProperty, value);
+        get => GetValue<Vector2>(AnchorProperty);
+        set => SetValue(AnchorProperty, value);
     }
 
     /// <summary>Whether the body is shown. Closed, the pane is its grip and nothing else - which is how a panel gets
@@ -284,7 +289,8 @@ public class CanvasPane : ContentControl
         _headerPart = GetTemplateChild("PART_Header") as IUIComponent;
         SyncHeader();
 
-        _sizer = GetTemplateChild("PART_Sizer") as IUIComponent;
+        _sizerLeft = GetTemplateChild("PART_SizerLeft") as IUIComponent;
+        _sizerRight = GetTemplateChild("PART_SizerRight") as IUIComponent;
         SyncSizer();
 
         MouseDown += OnPressed;
@@ -308,7 +314,8 @@ public class CanvasPane : ContentControl
         _turn = null;
         _snap = null;
         _headerPart = null;
-        _sizer = null;
+        _sizerLeft = null;
+        _sizerRight = null;
     }
 
     // An EMPTY presenter is not free: it draws nothing but keeps its margin, so a pane with no header stood its content
@@ -324,31 +331,57 @@ public class CanvasPane : ContentControl
     private static void OnHeaderChanged(AdamantiumComponent component, AdamantiumPropertyChangedEventArgs e) =>
         (component as CanvasPane)?.SyncHeader();
 
-    // The grip goes on the side that faces INTO the canvas, which is the side there is room to pull towards: a panel
-    // against the right edge widens leftwards, one against the left edge rightwards. Put on the outer side it would
-    // either hang off the viewport or make the pane walk across the screen as it grew.
+    // An edge on either side, each pulling its own way. A pane pinned against an edge of the canvas gets only the
+    // inner one: its outer edge has nowhere to travel.
     private void SyncSizer()
     {
-        if (_sizer == null) return;
-
-        var wanted = CanResize ? Visibility.Visible : Visibility.Collapsed;
-        if (_sizer.Visibility != wanted) _sizer.Visibility = wanted;
-
-        DockPanel.SetDock(_sizer, Inner() < 0 ? Dock.Left : Dock.Right);
+        Show(_sizerLeft, CanResize && Pulls(Dock.Left));
+        Show(_sizerRight, CanResize && Pulls(Dock.Right));
     }
 
-    // How wide the pane becomes when its edge has been dragged `reach` pixels along X from a width of `from`. The
-    // ceiling is the viewport: a panel wider than the canvas leaves nothing behind it to look at.
-    internal double Widened(double from, double reach, double room) =>
-        Math.Clamp(from + reach * Inner(), MinResizeWidth, Math.Max(MinResizeWidth, room));
-
-    // -1 when the pane's own inner edge is its LEFT one, +1 when it is its right one. Also the sign a drag along X has
-    // to be multiplied by to become a change in width.
-    private int Inner() => Placement switch
+    private static void Show(IUIComponent part, bool yes)
     {
-        CanvasPanePlacement.TopRight or CanvasPanePlacement.Right or CanvasPanePlacement.BottomRight => -1,
-        _ => 1
+        if (part == null) return;
+
+        var wanted = yes ? Visibility.Visible : Visibility.Collapsed;
+        if (part.Visibility != wanted) part.Visibility = wanted;
+    }
+
+    private bool Pulls(Dock side) => Placement switch
+    {
+        CanvasPanePlacement.TopRight or CanvasPanePlacement.Right or CanvasPanePlacement.BottomRight => side == Dock.Left,
+        CanvasPanePlacement.TopLeft or CanvasPanePlacement.Left or CanvasPanePlacement.BottomLeft => side == Dock.Right,
+        _ => true
     };
+
+    // How wide the pane becomes when the edge on `side` has been dragged `reach` pixels along X from a width of
+    // `from`. The ceiling is the viewport: a panel wider than the canvas leaves nothing behind it to look at.
+    internal double Widened(double from, double reach, double room, Dock side = Dock.Right) =>
+        Math.Clamp(from + (side == Dock.Left ? -reach : reach), MinResizeWidth, Math.Max(MinResizeWidth, room));
+
+    /// <summary>Which edge is being pulled and where both stood when it was taken hold of - what a press records.
+    /// Offered so a resize can be staged without a mouse.</summary>
+    internal void HoldingEdge(Dock side, double left, double right)
+    {
+        _sizingSide = side;
+        _leftAtPress = left;
+        _rightAtPress = right;
+    }
+
+    /// <summary>Puts the pane at that width, leaving the edge that is NOT being pulled where it was: an anchor is a
+    /// fraction of the travel, which shrinks as the pane widens, so a width written on its own slides it sideways.
+    /// </summary>
+    internal void SizeTo(double width, Size room)
+    {
+        Width = width;
+
+        if (Placement != CanvasPanePlacement.Free) return;
+
+        var left = _sizingSide == Dock.Left ? _rightAtPress - width : _leftAtPress;
+
+        SetCurrentValue(AnchorProperty,
+            AnchorFor(new Vector2(Math.Max(0, left), Bounds.Y), room, new Size(width, RenderSize.Height)));
+    }
 
     private static void OnCanResizeChanged(AdamantiumComponent component, AdamantiumPropertyChangedEventArgs e) =>
         (component as CanvasPane)?.SyncSizer();
@@ -384,11 +417,15 @@ public class CanvasPane : ContentControl
         if (_moved) return;
 
         SetCurrentValue(IsOpenProperty, !IsOpen);
+        Settled();
     }
 
     private void OnSnapClicked(object sender, RoutedEventArgs e)
     {
-        if (_snap != null) SetCurrentValue(SnapsToEdgesProperty, _snap.IsChecked == true);
+        if (_snap == null) return;
+
+        SetCurrentValue(SnapsToEdgesProperty, _snap.IsChecked == true);
+        Settled();
     }
 
     // The button is a VIEW of the property and never its owner: set from markup or a binding, it has to move too.
@@ -419,10 +456,13 @@ public class CanvasPane : ContentControl
 
         // The edge is asked about FIRST and answers for itself. It is inside the pane, so a press on it is also a press
         // on the pane, and whichever of the two gestures is read first is the only one the hand can ever get.
-        if (CanResize && Within(e.OriginalSource, _sizer))
+        if (CanResize && (Within(e.OriginalSource, _sizerLeft) || Within(e.OriginalSource, _sizerRight)))
         {
             _from = e.GetPosition(Layer);
             _wide = ActualWidth;
+
+            HoldingEdge(Within(e.OriginalSource, _sizerLeft) ? Dock.Left : Dock.Right,
+                Bounds.X, Bounds.X + ActualWidth);
             _sizing = true;
             _captured = true;
             CaptureMouse();
@@ -435,7 +475,7 @@ public class CanvasPane : ContentControl
         if (!onGrip && !IsChrome(e.OriginalSource)) return;
 
         _from = e.GetPosition(Layer);
-        _at = Placement == CanvasPanePlacement.Free ? Offset : new Vector2(Bounds.X, Bounds.Y);
+        _at = new Vector2(Bounds.X, Bounds.Y);
         _dragging = true;
 
         // Taken only when NOBODY below took it. The grip captures the press for itself, and stealing that would leave
@@ -449,7 +489,10 @@ public class CanvasPane : ContentControl
     {
         if (_sizing && Layer != null)
         {
-            Width = Widened(_wide, (e.GetPosition(Layer) - _from).X, Layer.RenderSize.Width);
+            var across = Layer.RenderSize;
+
+            SizeTo(Widened(_wide, (e.GetPosition(Layer) - _from).X, across.Width, _sizingSide), across);
+
             e.Handled = true;
             return;
         }
@@ -468,9 +511,9 @@ public class CanvasPane : ContentControl
         // Kept INSIDE the canvas: a pane dragged off the edge is a pane nobody can get back, and there is no edge on
         // the plane itself to find it by.
         SetCurrentValue(PlacementProperty, CanvasPanePlacement.Free);
-        SetCurrentValue(OffsetProperty, new Vector2(
+        SetCurrentValue(AnchorProperty, AnchorFor(new Vector2(
             Math.Clamp(wanted.X, 0, Math.Max(0, room.Width - size.Width)),
-            Math.Clamp(wanted.Y, 0, Math.Max(0, room.Height - size.Height))));
+            Math.Clamp(wanted.Y, 0, Math.Max(0, room.Height - size.Height))), room, size));
 
         e.Handled = true;
     }
@@ -484,6 +527,7 @@ public class CanvasPane : ContentControl
             _sizing = false;
             if (_captured) ReleaseMouseCapture();
             _captured = false;
+            Settled();
             return;
         }
 
@@ -494,7 +538,42 @@ public class CanvasPane : ContentControl
         _captured = false;
 
         if (_moved) StickToEdge();
+
+        Settled();
     }
+
+    // When the hand lets go: the canvas writes down the finished state, not every pixel passed through on the way.
+    private void Settled() => Canvas?.RememberLayout();
+
+    private Vector2? _pending;
+
+    /// <summary>Puts the pane at a point in screen pixels, once - what "open under the pointer" means. The layer turns
+    /// it into an <see cref="Anchor"/> when the room and the pane's own size are both known.</summary>
+    public void PlaceAt(Vector2 screenPoint)
+    {
+        _pending = screenPoint;
+        SetCurrentValue(PlacementProperty, CanvasPanePlacement.Free);
+        Layer?.InvalidateArrange();
+    }
+
+    /// <summary>The point this was asked to open at, if it has not been placed yet. For the layer.</summary>
+    public bool TakePending(out Vector2 at)
+    {
+        at = _pending ?? Vector2.Zero;
+
+        var had = _pending.HasValue;
+        _pending = null;
+        return had;
+    }
+
+    /// <summary>Pixels into the fraction of the travel they are; nothing to travel across answers zero.</summary>
+    public static Vector2 AnchorFor(Vector2 at, Size room, Size size) =>
+        new(room.Width - size.Width is var across and > 0 ? Math.Clamp(at.X / across, 0, 1) : 0,
+            room.Height - size.Height is var down and > 0 ? Math.Clamp(at.Y / down, 0, 1) : 0);
+
+    /// <summary>...and back: where a fraction puts the pane, in pixels.</summary>
+    public static Vector2 PlaceOf(Vector2 anchor, Size room, Size size) =>
+        new(anchor.X * Math.Max(0, room.Width - size.Width), anchor.Y * Math.Max(0, room.Height - size.Height));
 
     // Dropped near an edge, the pane takes that edge. Which SLOT of the edge is decided by where along it the pane
     // came to rest - thirds, so that aiming at a corner is aiming at a corner and not at a pixel.
@@ -506,16 +585,17 @@ public class CanvasPane : ContentControl
         var size = RenderSize;
         if (room.Width <= 0 || room.Height <= 0) return;
 
-        var left = Offset.X;
-        var top = Offset.Y;
-        var right = room.Width - (Offset.X + size.Width);
-        var bottom = room.Height - (Offset.Y + size.Height);
+        var at = PlaceOf(Anchor, room, size);
+        var left = at.X;
+        var top = at.Y;
+        var right = room.Width - (at.X + size.Width);
+        var bottom = room.Height - (at.Y + size.Height);
 
         var nearest = Math.Min(Math.Min(left, right), Math.Min(top, bottom));
         if (nearest > SnapDistance) return;
 
-        var centerX = Offset.X + size.Width / 2;
-        var centerY = Offset.Y + size.Height / 2;
+        var centerX = at.X + size.Width / 2;
+        var centerY = at.Y + size.Height / 2;
 
         CanvasPanePlacement wanted;
 

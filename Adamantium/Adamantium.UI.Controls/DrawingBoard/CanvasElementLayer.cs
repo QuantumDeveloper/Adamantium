@@ -196,6 +196,24 @@ public class CanvasElementLayer : Panel
 
             if (Children[i] is not IUIComponent visual) continue;
 
+            // A CONTROL CANNOT BE SMALLER THAN IT CAN BE, and the item has to say so - the floor is the control's own
+            // (a theme's MinWidth, its content) and the camera changes none of it. Dragged out at 8x, a box 200 screen
+            // pixels wide is 25 in the world, which a field refuses: it stood at 120 and drew eight times that, while
+            // the frame and every hit stayed on the 25 nobody could see. Read after the arrange, because that is where
+            // a floor shows - a measure answers within what it was offered.
+            //
+            // A control TOLD what size to be is left alone: that size is the application's word, not a floor, and the
+            // item's box stays what it was given.
+            if (!_items[i].SizeFollowsContent && Free(visual)
+                && (visual.RenderSize.Width > world.Width + 0.5 || visual.RenderSize.Height > world.Height + 0.5))
+            {
+                _items[i].Smallest = visual.RenderSize;
+                _items[i].World = new Rect(world.X, world.Y,
+                    Math.Max(world.Width, visual.RenderSize.Width), Math.Max(world.Height, visual.RenderSize.Height));
+
+                world = _items[i].World;
+            }
+
             if (visual.RenderTransform is not { } transform)
             {
                 transform = new Transform();
@@ -226,6 +244,11 @@ public class CanvasElementLayer : Panel
 
         return finalSize;
     }
+
+    // Whether the control's size is its OWN business - nothing was written into Width/Height from outside.
+    private static bool Free(IUIComponent visual) =>
+        visual is not IMeasurableComponent sized || (Double.IsNaN(sized.Width) && Double.IsNaN(sized.Height));
+
 
     private bool Same(List<ElementItem> items)
     {

@@ -130,6 +130,25 @@ public abstract class PropertyDefinition : FundamentalUIComponent
         set => SetValue(BindingProperty, value);
     }
 
+    /// <summary>WHAT THIS LINE IS ABOUT RIGHT NOW - the object the grid has pointed it at, put here by the grid before
+    /// the row is built. Nothing while several objects are selected: the line then stands for all of them and no single
+    /// one of them is the answer.
+    /// <para>Here so that a line can be written to depend on the STATE of the thing it describes, with an ordinary
+    /// binding and no machinery of its own: <c>IsVisible="{Self Inspected.HasLabel}"</c>. Without it the only way was a
+    /// property on whatever control hosts the panel, reached by a template binding - which means the lines can only be
+    /// written inside that control's template, and a set of lines handed in from outside could say nothing at
+    /// all.</para>
+    /// <para>Why not simply the DataContext: that one already means the panel's own view-model, and lines use it to
+    /// reach a list of choices the application holds. Two meanings on one slot would take that away.</para></summary>
+    public static readonly AdamantiumProperty InspectedProperty = AdamantiumProperty.Register(nameof(Inspected),
+        typeof(object), typeof(PropertyDefinition), new PropertyMetadata(null));
+
+    public object Inspected
+    {
+        get => GetValue(InspectedProperty);
+        internal set => SetValue(InspectedProperty, value);
+    }
+
     /// <summary>One line about what the property means - a tooltip, and the status line in an editor.</summary>
     public String Description
     {
@@ -559,11 +578,18 @@ public class SolidColorBrushProperty : PropertyDefinition
     protected internal override DataTemplate DefaultEditorTemplate =>
         _editor ??= new DataTemplate(() => new TemplateResult { RootComponent = PropertyEditors.Swatch() });
 
-    protected internal override bool EditorCanShowNothing => false;
+    // A SWATCH SHOWING NOTHING IS STILL A SWATCH TO PRESS. Refused, the line lost its editor the moment the selected
+    // objects disagreed - and putting ONE colour on several is exactly what a colour line of a multiple selection is
+    // for. What it must not do is show a colour none of them holds, which is what IsIndeterminate says.
+    protected internal override bool EditorCanShowNothing => true;
 
     protected internal override void PrepareEditor(IUIComponent editor, object value)
     {
-        if (editor is ColorPickerButton swatch && value is SolidColorBrush brush) swatch.SelectedColor = brush.Color;
+        if (editor is not ColorPickerButton swatch) return;
+
+        swatch.IsIndeterminate = value is not SolidColorBrush;
+
+        if (value is SolidColorBrush brush) swatch.SelectedColor = brush.Color;
     }
 
     protected internal override object ReadEditor(IUIComponent editor) => (editor as ColorPickerButton)?.SelectedColor;
@@ -698,7 +724,13 @@ public class ImageSourceProperty : PropertyDefinition
             var path = FileDialog.Open(new OpenFileRequest
             {
                 Title = "Pick a picture",
-                FileTypes = Pictures
+                FileTypes = Pictures,
+
+                // ITS OWN MEMORY - the size it was left at and the folder pictures were last taken from, kept apart
+                // from every other dialog this application opens - and the window it belongs to, which is what decides
+                // the screen it appears on.
+                Key = "inspector.picture",
+                Owner = Owner(_line)
             });
 
             if (path == null) return;   // cancelled is an answer, and nothing is written
@@ -707,6 +739,19 @@ public class ImageSourceProperty : PropertyDefinition
         }
 
         public void RaiseCanExecuteChanged() => CanExecuteChanged?.Invoke(this, EventArgs.Empty);
+
+        // THE WINDOW THIS LINE IS SHOWN IN, walked up the tree it stands in: a definition is not an element itself, so
+        // the first one above it that is answers. Nothing when it is not in a tree at all - a dialog with no owner
+        // still opens, on the main screen.
+        private static IntPtr Owner(PropertyDefinition line)
+        {
+            for (IFundamentalUIComponent at = line; at != null; at = at.LogicalParent)
+            {
+                if (at is Base.InputUIComponent element) return element.GetWindow()?.Handle ?? IntPtr.Zero;
+            }
+
+            return IntPtr.Zero;
+        }
     }
 
     /// <summary>A file was chosen for this line. The GRID listens, so the write goes through the same path a typed one

@@ -257,6 +257,38 @@ public class PropertyGridResetTests
         Assert.That(reset.Visibility, Is.EqualTo(Visibility.Collapsed), "a panel that offers none still shows one");
     }
 
+    // A LINE NOBODY CAN WRITE TO OFFERS NO RESET. Putting a default back where there is no way to move off it is a
+    // button that can never do anything - and a row of them down a panel of read-only lines says the opposite.
+    [Test]
+    public void ALineThatCannotBeWrittenToOffersNoReset()
+    {
+        var button = new Button { Content = "Press me" };
+        var section = new PropertySection { Header = "Look", Target = button, IsExpanded = true };
+
+        section.Properties.Add(new StringProperty
+        {
+            Header = "Kind",
+            IsReadOnly = true,
+            Binding = new Adamantium.UI.Core.Data.Binding(nameof(Button.Name))
+        });
+
+        var grid = new PropertyGrid();
+        grid.Sections.Add(section);
+
+        var window = new Window { Width = 400, Height = 300, Content = grid };
+
+        button.ApplyCurrentTheme();
+        Settle(window);
+
+        var row = Rows(grid).FirstOrDefault(one => one.Definition?.Header == "Kind");
+
+        Assert.That(row, Is.Not.Null, "the read-only line was not built");
+
+        var reset = row.GetTemplateChild("PART_Reset") as IUIComponent;
+
+        Assert.That(reset.Visibility, Is.EqualTo(Visibility.Collapsed), "a line that cannot be written to offers a reset");
+    }
+
     // HOW MANY DECIMALS A LINE SHOWS. The definition has carried this from the start and nothing read it, so every
     // number printed at whatever precision a double prints at - a width dragged by hand read "182.99999999999997",
     // which is not an answer to "how wide is it".

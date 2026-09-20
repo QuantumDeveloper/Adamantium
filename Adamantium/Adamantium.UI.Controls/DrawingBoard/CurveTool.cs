@@ -65,7 +65,7 @@ public class CurveTool : ICanvasTool
         _making.Add(e.World);
         _pointer = e.World;
 
-        canvas.InvalidateRender(false);
+        canvas.Repaint();
         e.Handled = true;
     }
 
@@ -74,7 +74,7 @@ public class CurveTool : ICanvasTool
         if (_making == null) return;
 
         _pointer = e.World;
-        canvas.InvalidateRender(false);
+        canvas.Repaint();
         e.Handled = true;
     }
 
@@ -108,7 +108,7 @@ public class CurveTool : ICanvasTool
         if (_making == null) return;
 
         _making = null;
-        canvas.InvalidateRender(false);
+        canvas.Repaint();
     }
 
     private void Finish(InfiniteCanvas canvas)
@@ -119,10 +119,10 @@ public class CurveTool : ICanvasTool
         // Two points at the least: one is a dot nobody asked for, and a curve through one point draws nothing at all.
         if (made != null && made.Count >= 2)
         {
-            canvas.Scene?.Add(made);
+            canvas.Place(made);
             canvas.Select(made, false);
         }
 
-        canvas.InvalidateRender(false);
+        canvas.Repaint();
     }
 }

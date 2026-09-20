@@ -1,0 +1,532 @@
+<ResourceDictionary xmlns:x="http://adamantium/ui/xaml/extensions"
+        xmlns="http://adamantium/ui">
+
+    <!-- WHAT THE CANVAS'S INSPECTOR SHOWS - the panel's CONTENT, and the one thing in this project that is content and
+         still ships with the themes.
+
+         It is here rather than in a theme's control template because it is not a look. A template says what a control
+         is made of - a border, a pair of face buttons, a scroller, the grids - and it belongs to whoever is dressing
+         the control. The list of what a canvas can hold and what each kind is set by belongs to the canvas, changes
+         when the canvas gains a kind, and has nothing to do with Fluent or macOS. Written into the template, it was
+         carried three times over, no application could add a line to it without rewriting a theme, and every new kind
+         of thing cost a flag on the panel and an edit to all three files.
+
+         SHARED, and outside all three themes for the same reason CanvasIcons is: a theme that wants a different panel
+         still declares this key of its own; what lives here is only where the DEFAULT is.
+
+         x:Shared="False" ON BOTH: a section is a live control and stands in one place at a time, so two canvases on one
+         page must not be handed the same objects. Every ask builds its own.
+
+         HOW A SET IS CHOSEN. Each CanvasSectionSet says what it is For; a thing gets every set that matches it, in the
+         order written here. Empty matches everything. Otherwise it is either the item's CLASS - where a whole family's
+         lines live - or its narrowest name, ICanvasItem.Sort: "Rectangle", "Image", "Bezier". That is what replaces the
+         flags this panel used to keep: corners are a rectangle's, so they are written under Rectangle and nowhere else,
+         and a picture's Source is under Image, where a button can never meet it.
+
+         AN APPLICATION ADDS ITS OWN through InfiniteCanvas.InspectorSections: a set naming something here replaces it,
+         a set naming something new is added. Nobody has to copy this file to add a line. -->
+
+    <CanvasInspectorSections x:Key="CanvasSelectionSections" x:Shared="False">
+
+        <!-- WHERE IT STANDS, as a number, for anything on the plane. The buttons in the bar do this by pointing at what
+             is in the way, which is what a hand wants; this is for when a person knows the answer - "this one is
+             seventh" - and would rather say it than press a button and count. Counting from the BACK: 0 is underneath
+             everything, which is the order the file is written in too. -->
+        <CanvasSectionSet>
+            <PropertySection Header="Layer" IsExpanded="True">
+                <NumericProperty ShowButtons="{Ancestor CanvasInspector, Canvas.ShowsNumberButtons}" ButtonsPlacement="{Ancestor CanvasInspector, Canvas.NumberButtonsPlacement}" Header="Index" Binding="{Binding Order}"
+                                 Minimum="0" Maximum="100000" Step="1"/>
+            </PropertySection>
+        </CanvasSectionSet>
+
+        <!-- WHERE and HOW BIG on every kind that has a box, because that is true of everything drawn on a plane. The
+             four numbers are said in terms of Bounds, Move and Resize, so they mean the same on a stroke, a shape and a
+             piece of text - and a new kind gets them by copying four lines. -->
+        <CanvasSectionSet For="StrokeItem">
+            <PropertySection Header="Stroke" IsExpanded="True">
+                <SolidColorBrushProperty Header="Color" Binding="{Binding Brush}"/>
+                <!-- Step and floor come from the CAMERA: thickness is in world units, so a fixed step is a hair at
+                     1:1 and a white blob at seventeen thousand. See InfiniteCanvas.ThicknessStep. -->
+                <NumericProperty ShowButtons="{Ancestor CanvasInspector, Canvas.ShowsNumberButtons}" ButtonsPlacement="{Ancestor CanvasInspector, Canvas.NumberButtonsPlacement}" Header="Thickness" Binding="{Binding Thickness}"
+                                 Minimum="{Ancestor CanvasInspector, Canvas.ThicknessLeast}" Maximum="400"
+                                 Step="{Ancestor CanvasInspector, Canvas.ThicknessStep}" Decimals="6"/>
+                <CompositeProperty Header="Position">
+                    <NumericProperty ShowButtons="{Ancestor CanvasInspector, Canvas.ShowsNumberButtons}" ButtonsPlacement="{Ancestor CanvasInspector, Canvas.NumberButtonsPlacement}" Header="X" Binding="{Binding X}" Step="1"/>
+                    <NumericProperty ShowButtons="{Ancestor CanvasInspector, Canvas.ShowsNumberButtons}" ButtonsPlacement="{Ancestor CanvasInspector, Canvas.NumberButtonsPlacement}" Header="Y" Binding="{Binding Y}" Step="1"/>
+                </CompositeProperty>
+                <CompositeProperty Header="Size">
+                    <NumericProperty ShowButtons="{Ancestor CanvasInspector, Canvas.ShowsNumberButtons}" ButtonsPlacement="{Ancestor CanvasInspector, Canvas.NumberButtonsPlacement}" Header="Width" Binding="{Binding Width}" Step="1"
+                                     Minimum="0.01"/>
+                    <NumericProperty ShowButtons="{Ancestor CanvasInspector, Canvas.ShowsNumberButtons}" ButtonsPlacement="{Ancestor CanvasInspector, Canvas.NumberButtonsPlacement}" Header="Height" Binding="{Binding Height}" Step="1"
+                                     Minimum="0.01"/>
+                </CompositeProperty>
+            </PropertySection>
+        </CanvasSectionSet>
+
+        <!-- EVERY SHAPE, whatever its form: a fill, an edge, a place, a size and a transform. What only one form has is
+             written under that form below. -->
+        <CanvasSectionSet For="ShapeItem">
+            <PropertySection Header="Shape" IsExpanded="True">
+                <SolidColorBrushProperty Header="Fill" Binding="{Binding Fill}"/>
+                <SolidColorBrushProperty Header="Stroke" Binding="{Binding Stroke}"/>
+                <!-- Down to ZERO, unlike a stroke's: a filled shape with no edge at all is a perfectly ordinary thing
+                     to want, while a line of no thickness is nothing. -->
+                <NumericProperty ShowButtons="{Ancestor CanvasInspector, Canvas.ShowsNumberButtons}" ButtonsPlacement="{Ancestor CanvasInspector, Canvas.NumberButtonsPlacement}" Header="Thickness" Binding="{Binding Thickness}"
+                                 Minimum="0" Maximum="400"
+                                 Step="{Ancestor CanvasInspector, Canvas.ThicknessStep}" Decimals="6"/>
+                <CompositeProperty Header="Position">
+                    <NumericProperty ShowButtons="{Ancestor CanvasInspector, Canvas.ShowsNumberButtons}" ButtonsPlacement="{Ancestor CanvasInspector, Canvas.NumberButtonsPlacement}" Header="X" Binding="{Binding X}" Step="1"/>
+                    <NumericProperty ShowButtons="{Ancestor CanvasInspector, Canvas.ShowsNumberButtons}" ButtonsPlacement="{Ancestor CanvasInspector, Canvas.NumberButtonsPlacement}" Header="Y" Binding="{Binding Y}" Step="1"/>
+                </CompositeProperty>
+                <CompositeProperty Header="Size">
+                    <NumericProperty ShowButtons="{Ancestor CanvasInspector, Canvas.ShowsNumberButtons}" ButtonsPlacement="{Ancestor CanvasInspector, Canvas.NumberButtonsPlacement}" Header="Width" Binding="{Binding Width}" Step="1"
+                                     Minimum="0.01"/>
+                    <NumericProperty ShowButtons="{Ancestor CanvasInspector, Canvas.ShowsNumberButtons}" ButtonsPlacement="{Ancestor CanvasInspector, Canvas.NumberButtonsPlacement}" Header="Height" Binding="{Binding Height}" Step="1"
+                                     Minimum="0.01"/>
+                </CompositeProperty>
+                <!-- ONE transform, not two tools: a turn and a lean are the same kind of statement about a shape, and
+                     kept apart they would be two coordinate systems in one item. About the MIDDLE of its own box,
+                     which is what turning means to a hand. -->
+                <CompositeProperty Header="Transform">
+                    <NumericProperty ShowButtons="{Ancestor CanvasInspector, Canvas.ShowsNumberButtons}" ButtonsPlacement="{Ancestor CanvasInspector, Canvas.NumberButtonsPlacement}" Header="Angle" Binding="{Binding Angle}" DefaultValue="0"
+                                     Minimum="-360" Maximum="360" Step="5"
+                                     Description="Degrees clockwise, about the middle of the shape"/>
+                    <NumericProperty ShowButtons="{Ancestor CanvasInspector, Canvas.ShowsNumberButtons}" ButtonsPlacement="{Ancestor CanvasInspector, Canvas.NumberButtonsPlacement}" Header="Skew X" Binding="{Binding SkewX}" DefaultValue="0"
+                                     Minimum="-89" Maximum="89" Step="5"/>
+                    <NumericProperty ShowButtons="{Ancestor CanvasInspector, Canvas.ShowsNumberButtons}" ButtonsPlacement="{Ancestor CanvasInspector, Canvas.NumberButtonsPlacement}" Header="Skew Y" Binding="{Binding SkewY}" DefaultValue="0"
+                                     Minimum="-89" Maximum="89" Step="5"/>
+                </CompositeProperty>
+            </PropertySection>
+        </CanvasSectionSet>
+
+        <!-- ROUNDING is a rectangle's and nothing else's. It used to be a row inside the section above, shown by a flag
+             the panel kept; here it is simply written where it belongs, and an ellipse never meets it. -->
+        <CanvasSectionSet For="Rectangle">
+            <PropertySection Header="Corner" IsExpanded="True">
+                <NumericProperty ShowButtons="{Ancestor CanvasInspector, Canvas.ShowsNumberButtons}" ButtonsPlacement="{Ancestor CanvasInspector, Canvas.NumberButtonsPlacement}" Header="Top left" Binding="{Binding CornerTopLeft}" DefaultValue="0"
+                                 Minimum="0" Maximum="2000" Step="1"/>
+                <NumericProperty ShowButtons="{Ancestor CanvasInspector, Canvas.ShowsNumberButtons}" ButtonsPlacement="{Ancestor CanvasInspector, Canvas.NumberButtonsPlacement}" Header="Top right" Binding="{Binding CornerTopRight}" DefaultValue="0"
+                                 Minimum="0" Maximum="2000" Step="1"/>
+                <NumericProperty ShowButtons="{Ancestor CanvasInspector, Canvas.ShowsNumberButtons}" ButtonsPlacement="{Ancestor CanvasInspector, Canvas.NumberButtonsPlacement}" Header="Bottom right" Binding="{Binding CornerBottomRight}" DefaultValue="0"
+                                 Minimum="0" Maximum="2000" Step="1"/>
+                <NumericProperty ShowButtons="{Ancestor CanvasInspector, Canvas.ShowsNumberButtons}" ButtonsPlacement="{Ancestor CanvasInspector, Canvas.NumberButtonsPlacement}" Header="Bottom left" Binding="{Binding CornerBottomLeft}" DefaultValue="0"
+                                 Minimum="0" Maximum="2000" Step="1"/>
+            </PropertySection>
+        </CanvasSectionSet>
+
+        <CanvasSectionSet For="Polygon">
+            <PropertySection Header="Polygon" IsExpanded="True">
+                <NumericProperty ShowButtons="{Ancestor CanvasInspector, Canvas.ShowsNumberButtons}" ButtonsPlacement="{Ancestor CanvasInspector, Canvas.NumberButtonsPlacement}" Header="Sides" Binding="{Binding Sides}"
+                                 Minimum="3" Maximum="64" Step="1" Decimals="0"/>
+            </PropertySection>
+        </CanvasSectionSet>
+
+        <!-- A head is measured in LINE THICKNESSES, so it stays part of its own line however thick that line is made. -->
+        <CanvasSectionSet For="Arrow">
+            <PropertySection Header="Head" IsExpanded="True">
+                <ChoiceProperty Header="Start" Binding="{Binding StartHead}"
+                                ItemsSource="{Ancestor CanvasInspector, Canvas.ArrowHeads}"/>
+                <ChoiceProperty Header="End" Binding="{Binding EndHead}"
+                                ItemsSource="{Ancestor CanvasInspector, Canvas.ArrowHeads}"/>
+                <NumericProperty ShowButtons="{Ancestor CanvasInspector, Canvas.ShowsNumberButtons}" ButtonsPlacement="{Ancestor CanvasInspector, Canvas.NumberButtonsPlacement}" Header="Length" Binding="{Binding HeadLength}"
+                                 Minimum="0.5" Maximum="200" Step="0.5"
+                                 Description="How long the head is, measured in line thicknesses"/>
+                <NumericProperty ShowButtons="{Ancestor CanvasInspector, Canvas.ShowsNumberButtons}" ButtonsPlacement="{Ancestor CanvasInspector, Canvas.NumberButtonsPlacement}" Header="Width" Binding="{Binding HeadWidth}"
+                                 Minimum="0.5" Maximum="200" Step="0.5"
+                                 Description="How wide the head is across its base, in line thicknesses"/>
+            </PropertySection>
+        </CanvasSectionSet>
+
+        <CanvasSectionSet For="TextItem">
+            <PropertySection Header="Text" IsExpanded="True">
+                <StringProperty Header="Text" Binding="{Binding Text}"/>
+                <NumericProperty ShowButtons="{Ancestor CanvasInspector, Canvas.ShowsNumberButtons}" ButtonsPlacement="{Ancestor CanvasInspector, Canvas.NumberButtonsPlacement}" Header="Size" Binding="{Binding FontSize}"
+                                 Minimum="4" Maximum="400" Step="1"/>
+                <SolidColorBrushProperty Header="Color" Binding="{Binding Brush}"/>
+                <CompositeProperty Header="Position">
+                    <NumericProperty ShowButtons="{Ancestor CanvasInspector, Canvas.ShowsNumberButtons}" ButtonsPlacement="{Ancestor CanvasInspector, Canvas.NumberButtonsPlacement}" Header="X" Binding="{Binding X}" Step="1"/>
+                    <NumericProperty ShowButtons="{Ancestor CanvasInspector, Canvas.ShowsNumberButtons}" ButtonsPlacement="{Ancestor CanvasInspector, Canvas.NumberButtonsPlacement}" Header="Y" Binding="{Binding Y}" Step="1"/>
+                </CompositeProperty>
+            </PropertySection>
+        </CanvasSectionSet>
+
+        <!-- A COMMENT FRAME. Its title is the whole point of it, so that is the first row: a frame with nothing written
+             on it documents nothing. -->
+        <CanvasSectionSet For="CanvasFrameItem">
+            <PropertySection Header="Frame" IsExpanded="True">
+                <StringProperty Header="Title" Binding="{Binding Title}"/>
+                <SolidColorBrushProperty Header="Outline" Binding="{Binding Stroke}"/>
+                <SolidColorBrushProperty Header="Wash" Binding="{Binding Fill}"
+                                         Description="Behind the nodes, so keep it faint - it must not change how they read"/>
+                <NumericProperty ShowButtons="{Ancestor CanvasInspector, Canvas.ShowsNumberButtons}" ButtonsPlacement="{Ancestor CanvasInspector, Canvas.NumberButtonsPlacement}" Header="Thickness" Binding="{Binding Thickness}"
+                                 Minimum="0" Maximum="20"
+                                 Step="{Ancestor CanvasInspector, Canvas.ThicknessStep}" Decimals="6"/>
+                <NumericProperty ShowButtons="{Ancestor CanvasInspector, Canvas.ShowsNumberButtons}" ButtonsPlacement="{Ancestor CanvasInspector, Canvas.NumberButtonsPlacement}" Header="Title bar" Binding="{Binding TitleHeight}"
+                                 Minimum="8" Maximum="120" Step="1"
+                                 Description="How tall the strip is - and that strip is what the frame is dragged by"/>
+            </PropertySection>
+        </CanvasSectionSet>
+
+        <!-- A drawing read in from an SVG. It had no set at all, so a whole imported icon arrived with no way to
+             paint it. -->
+        <CanvasSectionSet For="PathItem">
+            <PropertySection Header="Path" IsExpanded="True">
+                <SolidColorBrushProperty Header="Fill" Binding="{Binding Fill}"/>
+                <SolidColorBrushProperty Header="Stroke" Binding="{Binding Stroke}"/>
+                <NumericProperty ShowButtons="{Ancestor CanvasInspector, Canvas.ShowsNumberButtons}" ButtonsPlacement="{Ancestor CanvasInspector, Canvas.NumberButtonsPlacement}" Header="Thickness" Binding="{Binding Thickness}"
+                                 Minimum="0" Maximum="400"
+                                 Step="{Ancestor CanvasInspector, Canvas.ThicknessStep}" Decimals="6"/>
+                <CompositeProperty Header="Position">
+                    <NumericProperty ShowButtons="{Ancestor CanvasInspector, Canvas.ShowsNumberButtons}" ButtonsPlacement="{Ancestor CanvasInspector, Canvas.NumberButtonsPlacement}" Header="X" Binding="{Binding X}" Step="1"/>
+                    <NumericProperty ShowButtons="{Ancestor CanvasInspector, Canvas.ShowsNumberButtons}" ButtonsPlacement="{Ancestor CanvasInspector, Canvas.NumberButtonsPlacement}" Header="Y" Binding="{Binding Y}" Step="1"/>
+                </CompositeProperty>
+                <CompositeProperty Header="Size">
+                    <NumericProperty ShowButtons="{Ancestor CanvasInspector, Canvas.ShowsNumberButtons}" ButtonsPlacement="{Ancestor CanvasInspector, Canvas.NumberButtonsPlacement}" Header="Width" Binding="{Binding Width}" Minimum="0.1" Step="1"/>
+                    <NumericProperty ShowButtons="{Ancestor CanvasInspector, Canvas.ShowsNumberButtons}" ButtonsPlacement="{Ancestor CanvasInspector, Canvas.NumberButtonsPlacement}" Header="Height" Binding="{Binding Height}" Minimum="0.1" Step="1"/>
+                </CompositeProperty>
+            </PropertySection>
+        </CanvasSectionSet>
+
+        <!-- A CURVE is one item for three kinds, and the kind is CHANGED here: which curve suits a line is decided by
+             looking at it, not before drawing it. -->
+        <CanvasSectionSet For="CurveItem">
+            <PropertySection Header="Curve" IsExpanded="True">
+                <ChoiceProperty Header="Kind" Binding="{Binding Kind}"
+                                ItemsSource="{Ancestor CanvasInspector, Canvas.Curves}"/>
+                <SolidColorBrushProperty Header="Stroke" Binding="{Binding Stroke}"/>
+                <NumericProperty ShowButtons="{Ancestor CanvasInspector, Canvas.ShowsNumberButtons}" ButtonsPlacement="{Ancestor CanvasInspector, Canvas.NumberButtonsPlacement}" Header="Thickness" Binding="{Binding Thickness}"
+                                 Minimum="{Ancestor CanvasInspector, Canvas.ThicknessLeast}" Maximum="400"
+                                 Step="{Ancestor CanvasInspector, Canvas.ThicknessStep}" Decimals="6"/>
+                <NumericProperty ShowButtons="{Ancestor CanvasInspector, Canvas.ShowsNumberButtons}" ButtonsPlacement="{Ancestor CanvasInspector, Canvas.NumberButtonsPlacement}" Header="Points" Binding="{Binding Count}" IsReadOnly="True"
+                                 Decimals="0"/>
+                <CompositeProperty Header="Position">
+                    <NumericProperty ShowButtons="{Ancestor CanvasInspector, Canvas.ShowsNumberButtons}" ButtonsPlacement="{Ancestor CanvasInspector, Canvas.NumberButtonsPlacement}" Header="X" Binding="{Binding Bounds.X}" IsReadOnly="True"/>
+                    <NumericProperty ShowButtons="{Ancestor CanvasInspector, Canvas.ShowsNumberButtons}" ButtonsPlacement="{Ancestor CanvasInspector, Canvas.NumberButtonsPlacement}" Header="Y" Binding="{Binding Bounds.Y}" IsReadOnly="True"/>
+                </CompositeProperty>
+            </PropertySection>
+        </CanvasSectionSet>
+
+        <!-- READ ONLY, and that is the honest answer: a Bezier through N+1 points is of degree N and can be nothing
+             else. -->
+        <CanvasSectionSet For="Bezier">
+            <PropertySection Header="Bezier" IsExpanded="True">
+                <NumericProperty ShowButtons="{Ancestor CanvasInspector, Canvas.ShowsNumberButtons}" ButtonsPlacement="{Ancestor CanvasInspector, Canvas.NumberButtonsPlacement}" Header="Order" Binding="{Binding Degree}" IsReadOnly="True"
+                                 Decimals="0"
+                                 Description="A Bezier through N+1 points is of degree N - add or remove a point to change it"/>
+            </PropertySection>
+        </CanvasSectionSet>
+
+        <CanvasSectionSet For="Nurbs">
+            <PropertySection Header="Nurbs" IsExpanded="True">
+                <NumericProperty ShowButtons="{Ancestor CanvasInspector, Canvas.ShowsNumberButtons}" ButtonsPlacement="{Ancestor CanvasInspector, Canvas.NumberButtonsPlacement}" Header="Degree" Binding="{Binding Degree}"
+                                 Minimum="0" Maximum="16" Step="1" Decimals="0"
+                                 Description="Zero lets the degree follow the number of points"/>
+                <BooleanProperty Header="Even" Binding="{Binding IsUniform}"
+                                 Description="Whether the knots are evenly spaced"/>
+            </PropertySection>
+        </CanvasSectionSet>
+
+        <!-- A GROUP has no color and no thickness of its own - what it has is a place, a size and a count. Without this
+             the panel went blank the moment anything was grouped, which reads as something broken. -->
+        <CanvasSectionSet For="GroupItem">
+            <PropertySection Header="Group" IsExpanded="True">
+                <NumericProperty ShowButtons="{Ancestor CanvasInspector, Canvas.ShowsNumberButtons}" ButtonsPlacement="{Ancestor CanvasInspector, Canvas.NumberButtonsPlacement}" Header="Holds" Binding="{Binding Count}" IsReadOnly="True"
+                                 Decimals="0"/>
+                <CompositeProperty Header="Position">
+                    <NumericProperty ShowButtons="{Ancestor CanvasInspector, Canvas.ShowsNumberButtons}" ButtonsPlacement="{Ancestor CanvasInspector, Canvas.NumberButtonsPlacement}" Header="X" Binding="{Binding X}" Step="1"/>
+                    <NumericProperty ShowButtons="{Ancestor CanvasInspector, Canvas.ShowsNumberButtons}" ButtonsPlacement="{Ancestor CanvasInspector, Canvas.NumberButtonsPlacement}" Header="Y" Binding="{Binding Y}" Step="1"/>
+                </CompositeProperty>
+                <CompositeProperty Header="Size">
+                    <NumericProperty ShowButtons="{Ancestor CanvasInspector, Canvas.ShowsNumberButtons}" ButtonsPlacement="{Ancestor CanvasInspector, Canvas.NumberButtonsPlacement}" Header="Width" Binding="{Binding Width}" Step="1"
+                                     Minimum="0.01"/>
+                    <NumericProperty ShowButtons="{Ancestor CanvasInspector, Canvas.ShowsNumberButtons}" ButtonsPlacement="{Ancestor CanvasInspector, Canvas.NumberButtonsPlacement}" Header="Height" Binding="{Binding Height}" Step="1"
+                                     Minimum="0.01"/>
+                </CompositeProperty>
+            </PropertySection>
+        </CanvasSectionSet>
+
+        <!-- EVERY CONTROL ON THE PLANE - a button, a field, a picture, a node. Where it is, how big, how turned, and
+             what it looks like. What only a picture has is under Image below, what only a node has under CanvasNode. -->
+        <CanvasSectionSet For="ElementItem">
+            <PropertySection Header="Control" IsExpanded="True">
+                <!-- Hidden for a NODE, which has a Title line of its own: two lines writing one name disagree the
+                     moment one of them is used. Asked of the ITEM, which knows whether it stands for something. -->
+                <StringProperty Header="Label" Binding="{Binding Label}"
+                                IsVisible="{Self Inspected.HasLabel, FallbackValue=False}"/>
+                <CompositeProperty Header="Position">
+                    <NumericProperty ShowButtons="{Ancestor CanvasInspector, Canvas.ShowsNumberButtons}" ButtonsPlacement="{Ancestor CanvasInspector, Canvas.NumberButtonsPlacement}" Header="X" Binding="{Binding X}" Step="1"/>
+                    <NumericProperty ShowButtons="{Ancestor CanvasInspector, Canvas.ShowsNumberButtons}" ButtonsPlacement="{Ancestor CanvasInspector, Canvas.NumberButtonsPlacement}" Header="Y" Binding="{Binding Y}" Step="1"/>
+                </CompositeProperty>
+                <CompositeProperty Header="Size">
+                    <NumericProperty ShowButtons="{Ancestor CanvasInspector, Canvas.ShowsNumberButtons}" ButtonsPlacement="{Ancestor CanvasInspector, Canvas.NumberButtonsPlacement}" Header="Width" Binding="{Binding Width}"
+                                     Minimum="1" Maximum="4000" Step="1"/>
+                    <NumericProperty ShowButtons="{Ancestor CanvasInspector, Canvas.ShowsNumberButtons}" ButtonsPlacement="{Ancestor CanvasInspector, Canvas.NumberButtonsPlacement}" Header="Height" Binding="{Binding Height}"
+                                     Minimum="1" Maximum="4000" Step="1"/>
+                </CompositeProperty>
+
+                <!-- A CONTROL TURNS TOO, and says so the same way a shape does - the same three numbers about the
+                     middle of its own box. A render transform, so the turn costs no layout and a turned button is
+                     still pressed where it is seen. -->
+                <CompositeProperty Header="Transform">
+                    <NumericProperty ShowButtons="{Ancestor CanvasInspector, Canvas.ShowsNumberButtons}" ButtonsPlacement="{Ancestor CanvasInspector, Canvas.NumberButtonsPlacement}" Header="Angle" Binding="{Binding Angle}" DefaultValue="0"
+                                     Minimum="-360" Maximum="360" Step="5"
+                                     Description="Degrees clockwise, about the middle of the control"/>
+                    <NumericProperty ShowButtons="{Ancestor CanvasInspector, Canvas.ShowsNumberButtons}" ButtonsPlacement="{Ancestor CanvasInspector, Canvas.NumberButtonsPlacement}" Header="Skew X" Binding="{Binding SkewX}" DefaultValue="0"
+                                     Minimum="-89" Maximum="89" Step="5"/>
+                    <NumericProperty ShowButtons="{Ancestor CanvasInspector, Canvas.ShowsNumberButtons}" ButtonsPlacement="{Ancestor CanvasInspector, Canvas.NumberButtonsPlacement}" Header="Skew Y" Binding="{Binding SkewY}" DefaultValue="0"
+                                     Minimum="-89" Maximum="89" Step="5"/>
+                </CompositeProperty>
+
+                <!-- THROUGH to the control itself: what is selected on the plane is the item, so the lines about the
+                     control reach it by name and one row list holds both. -->
+                <CompositeProperty Header="Look">
+                    <SolidColorBrushProperty Header="Background" Binding="{Binding Painted.Background}"/>
+                    <SolidColorBrushProperty Header="Foreground" Binding="{Binding Painted.Foreground}"/>
+                    <SolidColorBrushProperty Header="Border" Binding="{Binding Painted.BorderBrush}"/>
+                    <NumericProperty ShowButtons="{Ancestor CanvasInspector, Canvas.ShowsNumberButtons}" ButtonsPlacement="{Ancestor CanvasInspector, Canvas.NumberButtonsPlacement}" Header="Opacity" Binding="{Binding Painted.Opacity}"
+                                     Minimum="0" Maximum="1" Step="0.05"/>
+                    <NumericProperty ShowButtons="{Ancestor CanvasInspector, Canvas.ShowsNumberButtons}" ButtonsPlacement="{Ancestor CanvasInspector, Canvas.NumberButtonsPlacement}" Header="Z" Binding="{Binding Element.ZIndex}"
+                                     Minimum="-1000" Maximum="1000" Step="1"/>
+                    <CompositeProperty Header="Corner">
+                        <NumericProperty ShowButtons="{Ancestor CanvasInspector, Canvas.ShowsNumberButtons}" ButtonsPlacement="{Ancestor CanvasInspector, Canvas.NumberButtonsPlacement}" Header="Top left" Binding="{Binding CornerTopLeft}" DefaultValue="0"
+                                         Minimum="0" Maximum="200" Step="1"/>
+                        <NumericProperty ShowButtons="{Ancestor CanvasInspector, Canvas.ShowsNumberButtons}" ButtonsPlacement="{Ancestor CanvasInspector, Canvas.NumberButtonsPlacement}" Header="Top right" Binding="{Binding CornerTopRight}" DefaultValue="0"
+                                         Minimum="0" Maximum="200" Step="1"/>
+                        <NumericProperty ShowButtons="{Ancestor CanvasInspector, Canvas.ShowsNumberButtons}" ButtonsPlacement="{Ancestor CanvasInspector, Canvas.NumberButtonsPlacement}" Header="Bottom right" Binding="{Binding CornerBottomRight}" DefaultValue="0"
+                                         Minimum="0" Maximum="200" Step="1"/>
+                        <NumericProperty ShowButtons="{Ancestor CanvasInspector, Canvas.ShowsNumberButtons}" ButtonsPlacement="{Ancestor CanvasInspector, Canvas.NumberButtonsPlacement}" Header="Bottom left" Binding="{Binding CornerBottomLeft}" DefaultValue="0"
+                                         Minimum="0" Maximum="200" Step="1"/>
+                    </CompositeProperty>
+                    <NumericProperty ShowButtons="{Ancestor CanvasInspector, Canvas.ShowsNumberButtons}" ButtonsPlacement="{Ancestor CanvasInspector, Canvas.NumberButtonsPlacement}" Header="Border" Binding="{Binding BorderWidth}" DefaultValue="0"
+                                     Minimum="0" Maximum="40" Step="1"/>
+                </CompositeProperty>
+            </PropertySection>
+        </CanvasSectionSet>
+
+        <!-- A PICTURE's own lines. Everything here is a property of the BRUSH and reached straight through it: the
+             engine can already fit, repeat, mirror, turn and tint a picture, and a plane should not be a poorer place
+             to use a texture than a window is.
+
+             This is the set that answers the question the panel used to get wrong: Source is a picture's, so it is
+             written here, and a button - which is an ElementItem too - never meets it. -->
+        <CanvasSectionSet For="Image">
+            <PropertySection Header="Picture" IsExpanded="True">
+                <!-- THE FILE, in plain sight rather than folded away: for a texture it is the whole point of the
+                     object, and a line that has to be unfolded to be found is a line nobody finds. The row carries its
+                     own "..." and repeats the path in its tip, since a file two folders deep does not fit the cell. -->
+                <ImageSourceProperty Header="Source"
+                                     Binding="{Binding Painted.Source}"
+                                     Description="The picture this shows"/>
+                <ChoiceProperty Header="Fill" Binding="{Binding Painted.Stretch}"
+                                ItemsSource="{Ancestor CanvasInspector, Canvas.Fills}"
+                                Description="How the picture is fitted to the element"/>
+                <ChoiceProperty Header="Repeat" Binding="{Binding Painted.TileMode}"
+                                ItemsSource="{Ancestor CanvasInspector, Canvas.Tilings}"
+                                Description="Whether the picture repeats, and whether every other copy is mirrored"/>
+
+                <!-- ONE TILE's rectangle, as a fraction of the element: a quarter across and a quarter down is sixteen
+                     copies. Four lines because a Rect is a struct and cannot be written a side at a time - the same
+                     reason the corners are four. -->
+                <CompositeProperty Header="Tile">
+                    <NumericProperty ShowButtons="{Ancestor CanvasInspector, Canvas.ShowsNumberButtons}" ButtonsPlacement="{Ancestor CanvasInspector, Canvas.NumberButtonsPlacement}" Header="X" Binding="{Binding TileX}" DefaultValue="0"
+                                     Minimum="-10" Maximum="10" Step="0.05"/>
+                    <NumericProperty ShowButtons="{Ancestor CanvasInspector, Canvas.ShowsNumberButtons}" ButtonsPlacement="{Ancestor CanvasInspector, Canvas.NumberButtonsPlacement}" Header="Y" Binding="{Binding TileY}" DefaultValue="0"
+                                     Minimum="-10" Maximum="10" Step="0.05"/>
+                    <NumericProperty ShowButtons="{Ancestor CanvasInspector, Canvas.ShowsNumberButtons}" ButtonsPlacement="{Ancestor CanvasInspector, Canvas.NumberButtonsPlacement}" Header="Width" Binding="{Binding TileWidth}" DefaultValue="1"
+                                     Minimum="0.01" Maximum="10" Step="0.05"/>
+                    <NumericProperty ShowButtons="{Ancestor CanvasInspector, Canvas.ShowsNumberButtons}" ButtonsPlacement="{Ancestor CanvasInspector, Canvas.NumberButtonsPlacement}" Header="Height" Binding="{Binding TileHeight}" DefaultValue="1"
+                                     Minimum="0.01" Maximum="10" Step="0.05"/>
+                </CompositeProperty>
+
+                <!-- THE PICTURE ITSELF, on or off. Off keeps the file and everything set about how it is laid out, and
+                     simply stops painting it - which is how a texture is put aside for its plain ground without
+                     choosing the file again to bring it back. -->
+                <BooleanProperty Header="Show picture" Binding="{Binding Painted.ShowsForeground}"
+                                 Description="Draw the picture, or leave only the ground behind it"/>
+
+                <!-- WHEN THE GROUND SHOWS. A picture that leaves room - fitted by Uniform, or not chosen yet - has
+                     something behind it, and whether that something is seen is not a decision to make once for
+                     everybody: a placeholder gets out of the way when the picture arrives, a letterbox colour must
+                     not. -->
+                <ChoiceProperty Header="Ground" Binding="{Binding Painted.BackgroundState}"
+                                ItemsSource="{Ancestor CanvasInspector, Canvas.Grounds}"
+                                Description="When the background colour is painted: only while there is no picture, under it as well, or never"/>
+
+                <!-- Multiplied into every pixel, so one grey skin serves several themes. -->
+                <SolidColorBrushProperty Header="Tint" Binding="{Binding Painted.FilterBrush}"
+                                         Description="A colour multiplied into the picture; white leaves it alone"/>
+
+                <!-- ITS OWN SIZE, which is the one thing about a picture nobody can type: a file is 1024 by 768 and
+                     there is no way to know that until it is on the plane. The lines read it; the button takes it. -->
+                <CompositeProperty Header="Pixels"
+                                   ShowActionButton="True"
+                                   ActionCommand="{Ancestor CanvasInspector, ActualSizeCommand}"
+                                   ActionIcon="FitIcon"
+                                   ActionTip="Size it to the picture's own pixels">
+                    <NumericProperty ShowButtons="{Ancestor CanvasInspector, Canvas.ShowsNumberButtons}" ButtonsPlacement="{Ancestor CanvasInspector, Canvas.NumberButtonsPlacement}" Header="Width" IsReadOnly="True"
+                                     Binding="{Binding Painted.Source.Width}"/>
+                    <NumericProperty ShowButtons="{Ancestor CanvasInspector, Canvas.ShowsNumberButtons}" ButtonsPlacement="{Ancestor CanvasInspector, Canvas.NumberButtonsPlacement}" Header="Height" IsReadOnly="True"
+                                     Binding="{Binding Painted.Source.Height}"/>
+                </CompositeProperty>
+            </PropertySection>
+        </CanvasSectionSet>
+
+        <!-- THE NODE's own lines, under the ones every control has - a node is an ElementItem like a button is, so its
+             place and size come from the set above and only what makes it a node is here. Bound to the node's own
+             OBJECT and not to the control drawn for it: the control is a picture of the node, and editing a picture
+             changes nothing. -->
+        <CanvasSectionSet For="CanvasNode">
+            <PropertySection Header="Node" IsExpanded="True">
+                <!-- Picked from the catalogue rather than typed: a kind is a key the loader looks up, so a typo in it
+                     is a node that comes back with its behaviour gone. The list is the same one the palette offers, so
+                     the two cannot drift apart. -->
+                <ChoiceProperty Header="Kind" Binding="{Binding Model.Kind}"
+                                ItemsSource="{Ancestor CanvasInspector, Canvas.NodeKinds}" ValuePath="Kind"
+                                Description="What sort of node this is - what the application looks up to know what it does"/>
+                <!-- ...and what it is CALLED, which is a label a person writes for themselves. The two are separate on
+                     purpose: renaming a node must not change what it is. -->
+                <StringProperty Header="Title" Binding="{Binding Model.Title}"/>
+                <!-- A COLOUR, not a brush: what a person picks is a value the node keeps and the file saves, and the
+                     brush that paints the strip is made by the binding. -->
+                <ColorProperty Header="Accent" Binding="{Binding Model.Accent}"/>
+                <BooleanProperty Header="Folded" Binding="{Binding Model.IsCollapsed}"
+                                 Description="Fold the node down to its title strip; its sockets move to the edges"/>
+
+                <!-- THE SOCKETS THEMSELVES, one group of lines each. A count can say how many there are and nothing
+                     else - what each one is CALLED and what it carries are the things a graph is read by, and they are
+                     per socket. The bin beside a name drops THAT one: asked through a count, "drop the second of
+                     three" takes the third. -->
+                <ItemsProperty Header="In" IsExpanded="True"
+                               Binding="{Binding Model.Inputs}"
+                               ItemHeader="{Binding Name}"
+                               ItemAction="{Ancestor CanvasInspector, RemoveSocketCommand}"
+                               ItemActionIcon="BinIcon"
+                               ItemActionTip="Remove this socket"
+                               ShowActionButton="True"
+                               ActionCommand="{Ancestor CanvasInspector, AddSocketCommand}"
+                               ActionCommandParameter="In"
+                               ActionIcon="ToolAddIcon"
+                               ActionTip="Add an input">
+                    <StringProperty Header="Name" Binding="{Binding Name}"/>
+                    <ChoiceProperty Header="Kind" Binding="{Binding Kind}"
+                                    ItemsSource="{Ancestor CanvasInspector, Canvas.SocketKinds}" ValuePath="Kind"
+                                    Description="What flows through it - two sockets are joined when they agree, and one saying nothing takes anything"/>
+                    <NumericProperty ShowButtons="{Ancestor CanvasInspector, Canvas.ShowsNumberButtons}" ButtonsPlacement="{Ancestor CanvasInspector, Canvas.NumberButtonsPlacement}" Header="Takes" Binding="{Binding Capacity}"
+                                     Minimum="0" Maximum="32" Step="1"
+                                     Description="How many wires may sit here - zero means as many as come; a full socket loses its oldest"/>
+                </ItemsProperty>
+
+                <ItemsProperty Header="Out" IsExpanded="True"
+                               Binding="{Binding Model.Outputs}"
+                               ItemHeader="{Binding Name}"
+                               ItemAction="{Ancestor CanvasInspector, RemoveSocketCommand}"
+                               ItemActionIcon="BinIcon"
+                               ItemActionTip="Remove this socket"
+                               ShowActionButton="True"
+                               ActionCommand="{Ancestor CanvasInspector, AddSocketCommand}"
+                               ActionCommandParameter="Out"
+                               ActionIcon="ToolAddIcon"
+                               ActionTip="Add an output">
+                    <StringProperty Header="Name" Binding="{Binding Name}"/>
+                    <ChoiceProperty Header="Kind" Binding="{Binding Kind}"
+                                    ItemsSource="{Ancestor CanvasInspector, Canvas.SocketKinds}" ValuePath="Kind"
+                                    Description="What flows through it - two sockets are joined when they agree, and one saying nothing takes anything"/>
+                    <NumericProperty ShowButtons="{Ancestor CanvasInspector, Canvas.ShowsNumberButtons}" ButtonsPlacement="{Ancestor CanvasInspector, Canvas.NumberButtonsPlacement}" Header="Takes" Binding="{Binding Capacity}"
+                                     Minimum="0" Maximum="32" Step="1"
+                                     Description="How many wires may sit here - zero means as many as come; a full socket loses its oldest"/>
+                </ItemsProperty>
+            </PropertySection>
+        </CanvasSectionSet>
+    </CanvasInspectorSections>
+
+    <!-- WHAT THE TOOL IN HAND IS SET BY - the page shown while nothing is selected. Matched against the tool's own
+         Name, so a tool an application adds brings its settings with it: the rail already builds a button out of any
+         tool in the canvas's Tools, and this is the other half of that.
+
+         The lines are about the CANVAS - a pen's colour is the canvas's Ink - because a tool is a piece of behaviour
+         and the settings outlive it: put the pen down, pick it up again, and it is still the colour it was. -->
+    <CanvasInspectorSections x:Key="CanvasToolSections" x:Shared="False">
+
+        <CanvasSectionSet For="PenTool">
+            <PropertySection Header="Pen" IsExpanded="True">
+                <SolidColorBrushProperty Header="Color" Binding="{Binding Ink}"/>
+                <NumericProperty ShowButtons="{Ancestor CanvasInspector, Canvas.ShowsNumberButtons}" ButtonsPlacement="{Ancestor CanvasInspector, Canvas.NumberButtonsPlacement}" Header="Thickness" Binding="{Binding InkThickness}"
+                                 Minimum="0.1" Maximum="24" Step="0.1"/>
+            </PropertySection>
+        </CanvasSectionSet>
+
+        <CanvasSectionSet For="EraseTool">
+            <PropertySection Header="Eraser" IsExpanded="True">
+                <NumericProperty ShowButtons="{Ancestor CanvasInspector, Canvas.ShowsNumberButtons}" ButtonsPlacement="{Ancestor CanvasInspector, Canvas.NumberButtonsPlacement}" Header="Diameter" Binding="{Binding EraserSize}"
+                                 Minimum="2" Maximum="240" Step="2"/>
+            </PropertySection>
+        </CanvasSectionSet>
+
+        <CanvasSectionSet For="TextTool">
+            <PropertySection Header="Text" IsExpanded="True">
+                <NumericProperty ShowButtons="{Ancestor CanvasInspector, Canvas.ShowsNumberButtons}" ButtonsPlacement="{Ancestor CanvasInspector, Canvas.NumberButtonsPlacement}" Header="Size" Binding="{Binding TextSize}"
+                                 Minimum="6" Maximum="96" Step="1"/>
+                <SolidColorBrushProperty Header="Color" Binding="{Binding Ink}"/>
+            </PropertySection>
+        </CanvasSectionSet>
+
+        <CanvasSectionSet For="ShapeTool">
+            <PropertySection Header="Shape" IsExpanded="True">
+                <SolidColorBrushProperty Header="Fill" Binding="{Binding ShapeFill}"/>
+                <SolidColorBrushProperty Header="Stroke" Binding="{Binding Ink}"/>
+                <NumericProperty ShowButtons="{Ancestor CanvasInspector, Canvas.ShowsNumberButtons}" ButtonsPlacement="{Ancestor CanvasInspector, Canvas.NumberButtonsPlacement}" Header="Thickness" Binding="{Binding InkThickness}"
+                                 Minimum="0.1" Maximum="24" Step="0.1"/>
+            </PropertySection>
+        </CanvasSectionSet>
+
+        <!-- The SURFACE: what the plane looks like and what it pulls to. Shown under every tool, because it is about
+             the paper rather than the pen - which is what an empty For says. -->
+        <CanvasSectionSet>
+            <PropertySection Header="Canvas" IsExpanded="True">
+                <ChoiceProperty Header="Grid" Binding="{Binding GridStyle}"
+                                ItemsSource="{Ancestor CanvasInspector, Canvas.GridStyles}"/>
+                <!-- A graph snaps to nothing, so the switch does not belong there: one that changes nothing is worse
+                     than one that is not offered. Asked of the CANVAS, which is what this page is about. -->
+                <BooleanProperty Header="Snap" Binding="{Binding SnapToGrid}"
+                                 IsVisible="{Self Inspected.IsDrawing, FallbackValue=False}"/>
+                <BooleanProperty Header="Readout" Binding="{Binding ShowsPointerReadout}"/>
+                <!-- Typed rather than only wheeled: a drawing worked at 40x needs a way to say 40. The ceiling is what
+                     a PERSON may type, not what the camera can do - zoom costs no precision, see InfiniteCanvas.MinScale. -->
+                <CompositeProperty Header="Zoom">
+                    <NumericProperty ShowButtons="{Ancestor CanvasInspector, Canvas.ShowsNumberButtons}" ButtonsPlacement="{Ancestor CanvasInspector, Canvas.NumberButtonsPlacement}" Header="Now" Binding="{Binding Scale}"
+                                     Minimum="0.001" Maximum="65536" Step="0.1"/>
+                    <NumericProperty ShowButtons="{Ancestor CanvasInspector, Canvas.ShowsNumberButtons}" ButtonsPlacement="{Ancestor CanvasInspector, Canvas.NumberButtonsPlacement}" Header="Least" Binding="{Binding MinScale}"
+                                     Minimum="0.0001" Maximum="1" Step="0.01"/>
+                    <NumericProperty ShowButtons="{Ancestor CanvasInspector, Canvas.ShowsNumberButtons}" ButtonsPlacement="{Ancestor CanvasInspector, Canvas.NumberButtonsPlacement}" Header="Most" Binding="{Binding MaxScale}"
+                                     Minimum="1" Maximum="65536" Step="1"/>
+                </CompositeProperty>
+                <!-- Where the world's origin sits on screen - typed as well as read: a plane with no edges cannot be
+                     looked at to find out where it is being looked at. -->
+                <CompositeProperty Header="Origin" IsExpanded="True">
+                    <NumericProperty ShowButtons="{Ancestor CanvasInspector, Canvas.ShowsNumberButtons}" ButtonsPlacement="{Ancestor CanvasInspector, Canvas.NumberButtonsPlacement}" Header="X" Binding="{Binding Offset.X}" Step="1"/>
+                    <NumericProperty ShowButtons="{Ancestor CanvasInspector, Canvas.ShowsNumberButtons}" ButtonsPlacement="{Ancestor CanvasInspector, Canvas.NumberButtonsPlacement}" Header="Y" Binding="{Binding Offset.Y}" Step="1"/>
+                </CompositeProperty>
+                <!-- Where Home goes - what the bookmark keeps, in numbers, so it can be typed and put back. -->
+                <CompositeProperty Header="Home" IsExpanded="True">
+                    <NumericProperty ShowButtons="{Ancestor CanvasInspector, Canvas.ShowsNumberButtons}" ButtonsPlacement="{Ancestor CanvasInspector, Canvas.NumberButtonsPlacement}" Header="X" Binding="{Binding HomeAt.X}" Step="1" DefaultValue="0"/>
+                    <NumericProperty ShowButtons="{Ancestor CanvasInspector, Canvas.ShowsNumberButtons}" ButtonsPlacement="{Ancestor CanvasInspector, Canvas.NumberButtonsPlacement}" Header="Y" Binding="{Binding HomeAt.Y}" Step="1" DefaultValue="0"/>
+                    <NumericProperty ShowButtons="{Ancestor CanvasInspector, Canvas.ShowsNumberButtons}" ButtonsPlacement="{Ancestor CanvasInspector, Canvas.NumberButtonsPlacement}" Header="Zoom" Binding="{Binding HomeScale}"
+                                     Minimum="0.001" Maximum="65536" Step="0.1" DefaultValue="1"/>
+                </CompositeProperty>
+                <!-- What comes back next time. The zoom has a switch of its own: it is wanted apart from the place. -->
+                <CompositeProperty Header="Remember" IsExpanded="True">
+                    <BooleanProperty Header="Panels" Binding="{Binding RemembersPanes}"
+                                     Description="Where the panels stand, how wide they were pulled, and which were folded away."/>
+                    <BooleanProperty Header="Camera" Binding="{Binding RemembersCamera}"
+                                     Description="Where the camera was looking."/>
+                    <BooleanProperty Header="Zoom" Binding="{Binding RemembersZoom}"/>
+                    <BooleanProperty Header="Tool" Binding="{Binding RemembersTool}"/>
+                </CompositeProperty>
+                <!-- Only for ONE object. Clearing the whole scene always asks, and that is not a setting: nothing does
+                     it by accident. -->
+                <BooleanProperty Header="Confirm" Binding="{Binding ConfirmsDelete}"
+                                 Description="Ask before removing what is selected. Clearing the whole canvas always asks."/>
+            </PropertySection>
+        </CanvasSectionSet>
+    </CanvasInspectorSections>
+</ResourceDictionary>

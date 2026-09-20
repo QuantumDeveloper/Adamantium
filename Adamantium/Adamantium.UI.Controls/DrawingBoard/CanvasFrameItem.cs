@@ -14,7 +14,7 @@ namespace Adamantium.UI.Controls.DrawingBoard;
 /// harmless: nodes are added, moved and deleted without ever consulting it, and a frame drawn round a node that has
 /// since moved away is simply a frame with nothing in it. What it DOES do is carry them: dragged, it takes along
 /// whatever was standing on it when the drag began - see <see cref="Catch"/>.</para>
-/// <para>In the band UNDER the controls, which is what <see cref="CanvasBand"/> exists for: a frame over its own nodes
+/// <para>Made at the BOTTOM of the order, and sent there when it is drawn round something: a frame over its own nodes
 /// would be a sheet of colour over the thing it is about.</para></summary>
 public class CanvasFrameItem : ICanvasItem
 {
@@ -57,9 +57,12 @@ public class CanvasFrameItem : ICanvasItem
     public CanvasMode Mode => CanvasMode.Nodes;
 
     /// <summary>UNDER the nodes. Over them it would be a sheet of colour across the thing it is about.</summary>
-    public CanvasBand Band => CanvasBand.Under;
+
+    /// <summary>Where it stands in paint order - stamped by the scene. See ICanvasItem.Order.</summary>
+    public int Order { get; set; }
 
     /// <summary>Its own box. Resized by its grips like any other box.</summary>
+
     public Rect Bounds => World;
 
     string ICanvasItem.Title => string.IsNullOrEmpty(Title) ? "Frame" : $"Frame \"{Title}\"";

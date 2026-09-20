@@ -24,9 +24,24 @@ public interface ICanvasItem
     /// wants; something reshaped another way - by its own points, or by whatever it is attached to - says so.</summary>
     CanvasHandles Handles => CanvasHandles.All;
 
-    /// <summary>Which side of the canvas's hosted controls this is drawn on. BEHIND them by default: what is on the
-    /// plane is the drawing, and a control put there is part of the same picture rather than a pane over it.</summary>
-    CanvasBand Band => CanvasBand.Under;
+    /// <summary>WHERE IT STANDS IN PAINT ORDER, counting from the back: 0 is under everything, and the last number is
+    /// on top of everything. The plane has one order and everything is in it, controls included.
+    /// <para>NOT a second way of saying what the scene already knows. The scene's order IS the order; this is that
+    /// position written down, stamped by the scene whenever anything moves. What makes it worth having is the other
+    /// direction: written, it is a request to stand at that place - which is how a person says "this one goes
+    /// seventh" instead of pressing a step button and counting.</para>
+    /// <para>Kept in step by the scene, so nothing that holds an item has to maintain it - and a number nobody
+    /// maintained would be a second truth, which is the thing to avoid here.</para></summary>
+    int Order { get; set; }
+
+    /// <summary>WHAT THIS IS, by name, at its NARROWEST - "Rectangle" for a rectangle, "Image" for a placed picture,
+    /// "Bezier" for a bezier. Whatever is not narrower than its class says the class: a stroke is a "StrokeItem".
+    /// <para>Here so a panel can say which of its lines belong to which kind of thing WITHOUT knowing the kinds: a
+    /// picture's Source line means nothing on a button, corners mean nothing on an ellipse. The panel matches a set of
+    /// lines against this and against the class name - the class is where what a whole family shares lives, this is
+    /// where what only one of them has does.</para>
+    /// <para>Read-only: what a thing IS is not something a panel gets to change.</para></summary>
+    string Sort => GetType().Name;
 
     /// <summary>Whether it has a PLACE OF ITS OWN - true for almost everything, because a stroke, a shape or a control
     /// is exactly where somebody put it.

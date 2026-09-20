@@ -255,11 +255,6 @@ public class CanvasTextureTests
 
         Settle(window);
 
-        var inspector = Found<CanvasInspector>(canvas);
-
-        Assert.That(inspector.TextureSection, Is.EqualTo(Visibility.Visible),
-            "a surface painted with a picture was offered no texture rows");
-
         Open(canvas, window);
 
         var fill = Row(canvas, "Fill");

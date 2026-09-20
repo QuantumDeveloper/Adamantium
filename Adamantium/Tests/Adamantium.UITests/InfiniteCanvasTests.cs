@@ -707,15 +707,18 @@ public class InfiniteCanvasTests
         });
     }
 
-    // ...and an ordinary control still takes its size in SCREEN pixels: a button dropped at any zoom should look the
-    // same size to whoever is looking at it.
+    // ...AND SO DOES AN ORDINARY CONTROL. It used to take its size in SCREEN pixels, so that one dropped at any zoom
+    // looked the same to whoever was looking - but that made its WORLD size follow the camera: dropped at 0.36x a
+    // checkbox landed nearly three times its own size, while the box and the label inside it stayed what they always
+    // are. A small control adrift in the corner of a large empty frame, and no way back but resizing it by hand.
+    // It is small on screen when it is dropped zoomed out, like everything else on the plane.
     [Test]
-    public void AButtonDroppedByAClickTakesTheSizeItLooks()
+    public void AButtonDroppedByAClickIsTheSameSizeWhateverTheZoom()
     {
         var near = Dropped(4, () => new Button { Content = "Press" });
         var far = Dropped(0.25, () => new Button { Content = "Press" });
 
-        Assert.That(far.World.Width, Is.GreaterThan(near.World.Width * 4), "zoomed out, it has to be wider in world");
+        Assert.That(far.World.Width, Is.EqualTo(near.World.Width).Within(0.5), "its width followed the camera");
     }
 
     private static ElementItem Dropped(double scale, Func<IUIComponent> what = null)

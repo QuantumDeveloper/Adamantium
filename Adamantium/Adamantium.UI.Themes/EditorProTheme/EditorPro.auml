@@ -35,6 +35,8 @@
     <ResourceLink Source="{x:Type editor:Metrics}"/>
     <!-- FIRST - see Fluent's. The canvas's pictures belong to no theme. -->
     <ResourceLink Source="{x:Type shared:CanvasIcons}"/>
+    <!-- ...and what its inspector SHOWS - see the note in Fluent's: content, shared by all three. -->
+    <ResourceLink Source="{x:Type shared:CanvasInspectorContent}"/>
     <ResourceLink Source="{x:Type fluent:Icons}"/>
   </ResourceContext.Resources>
 

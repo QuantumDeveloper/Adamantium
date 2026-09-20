@@ -77,7 +77,7 @@ public class ShapeTool : ICanvasTool
         };
 
         canvas.CaptureMouse();
-        canvas.InvalidateRender(false);
+        canvas.Repaint();
         e.Handled = true;
     }
 
@@ -86,7 +86,7 @@ public class ShapeTool : ICanvasTool
         if (_making == null) return;
 
         Stretch(e.World);
-        canvas.InvalidateRender(false);
+        canvas.Repaint();
         e.Handled = true;
     }
 
@@ -105,11 +105,11 @@ public class ShapeTool : ICanvasTool
         var least = canvas.ScreenToWorldLength(3);
         if (made.World.Width >= least || made.World.Height >= least)
         {
-            canvas.Scene?.Add(made);
+            canvas.Place(made);
             canvas.Select(made, false);
         }
 
-        canvas.InvalidateRender(false);
+        canvas.Repaint();
         e.Handled = true;
     }
 
@@ -121,7 +121,7 @@ public class ShapeTool : ICanvasTool
 
         _making = null;
         canvas.ReleaseMouseCapture();
-        canvas.InvalidateRender(false);
+        canvas.Repaint();
     }
 
     private void Stretch(Vector2 to, ShapeItem shape = null)

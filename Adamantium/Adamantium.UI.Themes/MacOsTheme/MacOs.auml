@@ -17,6 +17,8 @@
     <!-- FIRST - see Fluent's. The canvas's pictures belong to no theme, so MacOsIcons can still override any of them.
          -->
     <ResourceLink Source="{x:Type shared:CanvasIcons}"/>
+    <!-- ...and what its inspector SHOWS - see the note in Fluent's: content, shared by all three. -->
+    <ResourceLink Source="{x:Type shared:CanvasInspectorContent}"/>
     <ResourceLink Source="{x:Type fluent:Icons}"/>
     <ResourceLink Source="{x:Type fluent:Metrics}"/>
     <ResourceLink Source="{x:Type fluent:Materials}"/>

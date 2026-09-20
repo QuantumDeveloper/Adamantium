@@ -134,21 +134,23 @@
                                      set. -->
                                 <!-- ALWAYS THERE and disabled until there is something to put back - see Fluent's set:
                                      its room is kept, so a line does not change shape because somebody typed in it. -->
+                                <!-- The reset is LAST - see Fluent's set: it must stand the same distance from the
+                                     edge on every line. -->
+                                <Button x:Name="PART_Action"
+                                        Content="..." Visibility="Collapsed"
+                                        Width="22" Height="22" MinWidth="0" MinHeight="0"
+                                        Padding="0" Margin="0 0 2 0"
+                                        FontSize="{ResourceReference FontSizeCaption}"
+                                        ToolTipService.ToolTip="More"/>
+
                                 <Button x:Name="PART_Reset"
                                         IsEnabled="False"
                                         Width="22" Height="22" MinWidth="0" MinHeight="0"
-                                        Padding="0" Margin="0 0 2 0"
+                                        Padding="0" Margin="0 0 6 0"
                                         ToolTipService.ToolTip="Reset to the default">
                                     <Image Source="{ResourceReference RevertIcon}" Width="10" Height="10"
                                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
                                 </Button>
-
-                                <Button x:Name="PART_Action"
-                                        Content="..." Visibility="Collapsed"
-                                        Width="22" Height="22" MinWidth="0" MinHeight="0"
-                                        Padding="0" Margin="0 0 6 0"
-                                        FontSize="{ResourceReference FontSizeCaption}"
-                                        ToolTipService.ToolTip="More"/>
                             </StackPanel>
                         </Grid>
                     </Border>
@@ -172,15 +174,20 @@
                         <PropertyTrigger Property="ResetButton" Value="Never">
                             <Setter TargetName="PART_Reset" Property="Visibility" Value="Collapsed"/>
                         </PropertyTrigger>
+                        <!-- ...AND NEVER ON THE LINE THAT OPENS A GROUP - see Fluent's set: a group is not a value,
+                             and the lines it holds carry their own buttons. -->
                         <PropertyTrigger Property="HasChildren" Value="true">
                             <Setter TargetName="Glyph" Property="Visibility" Value="Visible"/>
+                            <Setter TargetName="PART_Reset" Property="Visibility" Value="Collapsed"/>
                         </PropertyTrigger>
                         <PropertyTrigger Property="IsExpanded" Value="true">
                             <Setter TargetName="Glyph" Property="Source" Value="{ResourceReference ChevronDownIcon}"/>
                         </PropertyTrigger>
+                        <!-- No reset on a line nobody can write to - see Fluent's set. -->
                         <PropertyTrigger Property="IsReadOnly" Value="true">
                             <Setter TargetName="PART_Value" Property="Foreground"
                                     Value="{ObservableResource TextFillColorDisabled}"/>
+                            <Setter TargetName="PART_Reset" Property="Visibility" Value="Collapsed"/>
                         </PropertyTrigger>
                         <PropertyTrigger Property="IsMouseOver" Value="true">
                             <Setter TargetName="RowBorder" Property="Background"

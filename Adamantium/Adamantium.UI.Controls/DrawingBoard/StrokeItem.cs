@@ -89,6 +89,10 @@ public class StrokeItem : ICanvasItem
     /// thing that tells them apart at a glance.</summary>
     public string Title => $"Stroke ({_points.Count})";
 
+
+    /// <summary>Where it stands in paint order - stamped by the scene. See ICanvasItem.Order.</summary>
+    public int Order { get; set; }
+
     public Rect Bounds
     {
         get

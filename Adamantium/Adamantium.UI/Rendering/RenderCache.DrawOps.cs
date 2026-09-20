@@ -869,7 +869,7 @@ public partial class RenderCache
             // Through RemoveFromOrder, not by hand: leaving the order is not just a flag and a list entry, it is also the
             // one moment the sweep can be told that this group's instances are now nobody's. Dropped here, they keep
             // being issued with the range they sit in - a scrollbar the window outgrew, still painting at the size it had.
-            RemoveFromOrder(group);
+            RemoveFromOrder(group, "leftTheTree");
             removed++;
         }
 
@@ -937,7 +937,7 @@ public partial class RenderCache
 
         foreach (var unit in group.Units)
             unit?.DeferDispose();
-        RemoveFromOrder(group);
+        RemoveFromOrder(group, "disposed");
 
         // ...and the TAG map, which nothing has ever removed from. _groupByTag exists so an arena slot can name its owner
         // however far its bytes have been copied, and it is written once per group and left. Every other map here is

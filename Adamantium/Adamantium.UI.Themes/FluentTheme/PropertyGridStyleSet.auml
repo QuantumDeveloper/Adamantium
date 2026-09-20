@@ -154,21 +154,24 @@
                                      line must not change shape because somebody typed in it.
                                      Greyed rather than invisible: a button that is there and dim says what it would do
                                      and why it cannot yet, where a blank gap says nothing at all. -->
+                                <!-- THE RESET IS THE LAST THING IN THE ROW, so it stands the same distance from the
+                                     edge on every line. Put first, it slid left on the few lines that also offer "..."
+                                     and the column of buttons read as ragged. -->
+                                <Button x:Name="PART_Action"
+                                        Content="..." Visibility="Collapsed"
+                                        Width="24" Height="24" MinWidth="0" MinHeight="0"
+                                        Padding="0" Margin="0 0 2 0"
+                                        FontSize="{ResourceReference FontSizeCaption}"
+                                        ToolTipService.ToolTip="More"/>
+
                                 <Button x:Name="PART_Reset"
                                         IsEnabled="False"
                                         Width="24" Height="24" MinWidth="0" MinHeight="0"
-                                        Padding="0" Margin="0 0 2 0"
+                                        Padding="0" Margin="0 0 6 0"
                                         ToolTipService.ToolTip="Reset to the default">
                                     <Image Source="{ResourceReference RevertIcon}" Width="10" Height="10"
                                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
                                 </Button>
-
-                                <Button x:Name="PART_Action"
-                                        Content="..." Visibility="Collapsed"
-                                        Width="24" Height="24" MinWidth="0" MinHeight="0"
-                                        Padding="0" Margin="0 0 6 0"
-                                        FontSize="{ResourceReference FontSizeCaption}"
-                                        ToolTipService.ToolTip="More"/>
                             </StackPanel>
                         </Grid>
                     </Border>
@@ -195,15 +198,24 @@
                         <PropertyTrigger Property="ResetButton" Value="Never">
                             <Setter TargetName="PART_Reset" Property="Visibility" Value="Collapsed"/>
                         </PropertyTrigger>
+
+                        <!-- ...AND NEVER ON THE LINE THAT OPENS A GROUP. A group is not a value: it holds the lines
+                             that are, and each of those carries its own button. One on the header offers to put back
+                             something that was never there, and a person reading the panel has to work out what a
+                             revert arrow beside the word "Position" would even mean. -->
                         <PropertyTrigger Property="HasChildren" Value="true">
                             <Setter TargetName="Glyph" Property="Visibility" Value="Visible"/>
+                            <Setter TargetName="PART_Reset" Property="Visibility" Value="Collapsed"/>
                         </PropertyTrigger>
                         <PropertyTrigger Property="IsExpanded" Value="true">
                             <Setter TargetName="Glyph" Property="Source" Value="{ResourceReference ChevronDownIcon}"/>
                         </PropertyTrigger>
+                        <!-- ...AND NO RESET ON A LINE NOBODY CAN WRITE TO. Putting a default back where there is no
+                             way to move off it is a button that can never do anything. -->
                         <PropertyTrigger Property="IsReadOnly" Value="true">
                             <Setter TargetName="PART_Value" Property="Foreground"
                                     Value="{ObservableResource TextFillColorDisabled}"/>
+                            <Setter TargetName="PART_Reset" Property="Visibility" Value="Collapsed"/>
                         </PropertyTrigger>
                         <PropertyTrigger Property="IsMouseOver" Value="true">
                             <Setter TargetName="RowBorder" Property="Background"

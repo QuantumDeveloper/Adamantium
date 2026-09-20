@@ -1,6 +1,7 @@
 using Adamantium.Mathematics;
 using Adamantium.UI.Controls;
 using Adamantium.UI.Controls.DrawingBoard;
+using Adamantium.UI.Controls.Panels;
 using Adamantium.UI.Core;
 using NUnit.Framework;
 
@@ -100,12 +101,40 @@ public class CanvasChromeTests
     [Test]
     public void AFreePaneSitsWhereItWasPut()
     {
-        var pane = Pane(CanvasPanePlacement.Free);
-        pane.Offset = new Vector2(123, 77);
+        var pane = Pane(CanvasPanePlacement.Free, width: 80, height: 40);
+
+        pane.Anchor = CanvasPane.AnchorFor(new Vector2(123, 77), new Size(Room, Room), new Size(80, 40));
         Laid(pane);
 
-        Assert.That(pane.Bounds.X, Is.EqualTo(123));
-        Assert.That(pane.Bounds.Y, Is.EqualTo(77));
+        Assert.That(pane.Bounds.X, Is.EqualTo(123).Within(0.5));
+        Assert.That(pane.Bounds.Y, Is.EqualTo(77).Within(0.5));
+    }
+
+    // ...AND STAYS WHERE IT WAS PUT WHEN THE WINDOW CHANGES SIZE. Held in pixels, a panel parked against the right
+    // edge is left standing in the middle of a wider window, and every panel has to be dragged back.
+    [Test]
+    public void AFreePaneKeepsItsPlaceWhenTheRoomChangesSize()
+    {
+        var pane = Pane(CanvasPanePlacement.Free, width: 80, height: 40);
+        var layer = Laid(pane);
+
+        // Three quarters of the way across and a quarter of the way down.
+        pane.Anchor = new Vector2(0.75, 0.25);
+        layer.Measure(new Size(Room, Room), force: true);
+        layer.Arrange(new Rect(0, 0, Room, Room));
+
+        Assert.That(pane.Bounds.X, Is.EqualTo(0.75 * (Room - 80)).Within(0.5));
+
+        var wider = Room * 2;
+
+        layer.Measure(new Size(wider, wider), force: true);
+        layer.Arrange(new Rect(0, 0, wider, wider));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(pane.Bounds.X, Is.EqualTo(0.75 * (wider - 80)).Within(0.5), "it did not travel with the window");
+            Assert.That(pane.Bounds.Y, Is.EqualTo(0.25 * (wider - 40)).Within(0.5), "it did not travel with the window");
+        });
     }
 
     // A pane that cannot be reached is a pane that is gone, and an edgeless plane has no corner to find it in.
@@ -113,7 +142,7 @@ public class CanvasChromeTests
     public void APaneIsNeverPlacedOffTheEdge()
     {
         var pane = Pane(CanvasPanePlacement.Free, width: 80, height: 40);
-        pane.Offset = new Vector2(5000, 5000);
+        pane.Anchor = new Vector2(5, 5);
         Laid(pane);
 
         Assert.That(pane.Bounds.X, Is.EqualTo(Room - 80));
@@ -167,26 +196,68 @@ public class CanvasChromeTests
         Assert.That(pane.Visibility, Is.EqualTo(Visibility.Collapsed));
     }
 
-    // Widening is a drag along X read against the side the pane's inner edge is on: a panel against the RIGHT edge gets
-    // wider when its edge is pulled LEFT, and one against the left edge the other way round.
+    // EACH EDGE PULLS ITS OWN WAY, and that is the whole rule: the right one widens the pane when it is pulled right,
+    // the left one when it is pulled left. One edge doing both - wider one way, narrower the other - is a direction
+    // that has to be learned, and learned again for every side the pane is docked to.
     [Test]
-    public void APaneAgainstTheRightEdgeWidensWhenItsEdgeIsPulledLeft()
+    public void TheRightEdgeWidensWhenItIsPulledRight()
     {
-        var pane = Pane(CanvasPanePlacement.TopRight, width: 200);
+        var pane = Pane(CanvasPanePlacement.Free, width: 200);
         pane.MinResizeWidth = 100;
 
-        Assert.That(pane.Widened(200, -60, Room), Is.EqualTo(260));
-        Assert.That(pane.Widened(200, 60, Room), Is.EqualTo(140));
+        Assert.That(pane.Widened(200, 60, Room, Dock.Right), Is.EqualTo(260));
+        Assert.That(pane.Widened(200, -60, Room, Dock.Right), Is.EqualTo(140));
     }
 
     [Test]
-    public void APaneAgainstTheLeftEdgeWidensTheOtherWay()
+    public void TheLeftEdgeWidensWhenItIsPulledLeft()
     {
-        var pane = Pane(CanvasPanePlacement.TopLeft, width: 200);
+        var pane = Pane(CanvasPanePlacement.Free, width: 200);
         pane.MinResizeWidth = 100;
 
-        Assert.That(pane.Widened(200, 60, Room), Is.EqualTo(260));
-        Assert.That(pane.Widened(200, -60, Room), Is.EqualTo(140));
+        Assert.That(pane.Widened(200, -60, Room, Dock.Left), Is.EqualTo(260));
+        Assert.That(pane.Widened(200, 60, Room, Dock.Left), Is.EqualTo(140));
+    }
+
+    // ...AND THE OTHER EDGE STAYS PUT. A free pane is placed by its anchor, and an anchor is a fraction of the room it
+    // can travel across - which shrinks as the pane widens. So a width written on its own slides the pane sideways:
+    // pulled by its RIGHT edge it grew leftwards, away from the hand.
+    [Test]
+    [TestCase(Dock.Right)]
+    [TestCase(Dock.Left)]
+    public void WideningAFreePaneLeavesTheOtherEdgeWhereItWas(Dock pulled)
+    {
+        var pane = Pane(CanvasPanePlacement.Free, width: 120, height: 60);
+        var layer = Laid(pane);
+
+        pane.Anchor = new Vector2(0.5, 0.5);
+        layer.Measure(new Size(Room, Room), force: true);
+        layer.Arrange(new Rect(0, 0, Room, Room));
+
+        var left = pane.Bounds.X;
+        var right = pane.Bounds.X + pane.Bounds.Width;
+
+        // THE PANE'S OWN ARITHMETIC, the same two calls a press and a move make. The drag itself cannot be staged - it
+        // reads the pointer off the device - but what it does to the pane is this and nothing else.
+        pane.HoldingEdge(pulled, left, right);
+        pane.SizeTo(180, new Size(Room, Room));
+
+        layer.Measure(new Size(Room, Room), force: true);
+        layer.Arrange(new Rect(0, 0, Room, Room));
+
+        if (pulled == Dock.Right)
+        {
+            Assert.That(pane.Bounds.X, Is.EqualTo(left).Within(0.5), "pulled by the right edge, it moved leftwards");
+            Assert.That(pane.Bounds.X + pane.Bounds.Width, Is.EqualTo(right + 60).Within(0.5),
+                "pulled by the right edge, that edge did not follow the hand");
+        }
+        else
+        {
+            Assert.That(pane.Bounds.X + pane.Bounds.Width, Is.EqualTo(right).Within(0.5),
+                "pulled by the left edge, the right one moved");
+            Assert.That(pane.Bounds.X, Is.EqualTo(left - 60).Within(0.5),
+                "pulled by the left edge, that edge did not follow the hand");
+        }
     }
 
     // A panel pulled to nothing is a panel with no edge left to pull back out by.
@@ -196,7 +267,7 @@ public class CanvasChromeTests
         var pane = Pane(CanvasPanePlacement.TopRight, width: 200);
         pane.MinResizeWidth = 160;
 
-        Assert.That(pane.Widened(200, 400, Room), Is.EqualTo(160));
+        Assert.That(pane.Widened(200, -400, Room, Dock.Right), Is.EqualTo(160));
     }
 
     // ...nor wider than the canvas, which would leave nothing behind it to look at.
@@ -205,7 +276,7 @@ public class CanvasChromeTests
     {
         var pane = Pane(CanvasPanePlacement.TopRight, width: 200);
 
-        Assert.That(pane.Widened(200, -5000, Room), Is.EqualTo(Room));
+        Assert.That(pane.Widened(200, 5000, Room, Dock.Right), Is.EqualTo(Room));
     }
 
     // A viewport narrower than the floor: the floor wins, because Clamp throws when the ceiling is below it - and a
@@ -216,6 +287,6 @@ public class CanvasChromeTests
         var pane = Pane(CanvasPanePlacement.TopRight, width: 200);
         pane.MinResizeWidth = 160;
 
-        Assert.That(pane.Widened(200, -5000, room: 40), Is.EqualTo(160));
+        Assert.That(pane.Widened(200, 5000, room: 40), Is.EqualTo(160));
     }
 }

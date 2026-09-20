@@ -37,24 +37,26 @@ public class CanvasPaintOrderTests
     // from a theme, because the question is about paint order and not about how a theme dresses a canvas.
     private static ControlTemplate Template() => new(() =>
     {
-        var layer = new CanvasElementLayer();
+        // THE STACK IS EMPTY HERE, and that is the point: how many layers there are and what sort each is depends on
+        // the order of the scene, so the canvas fills it. The template only says where it goes.
+        var layers = new Grid();
         var front = new CanvasFrontLayer();
         var grid = new Grid();
-        grid.Children.Add(layer);
+        grid.Children.Add(layers);
         grid.Children.Add(front);
 
         var result = new TemplateResult { RootComponent = grid };
-        result.RegisterName("PART_Elements", layer);
+        result.RegisterName("PART_Layers", layers);
         result.RegisterName("PART_Front", front);
         return result;
     });
 
     // Something drawn in a GRAPH that is not a node or a wire: a note pointing at a node, or the frame a group of them
-    // is gathered by. Which band it is in is the whole question these ask.
+    // is gathered by. WHERE IN THE ORDER it stands against the controls is the whole question these ask.
     private sealed class Marker : ICanvasItem
     {
         public Rect Bounds { get; init; }
-        public CanvasBand Band { get; init; }
+        public int Order { get; set; }
         public CanvasMode Mode => CanvasMode.Nodes;
         public bool HitTest(Vector2 world, double tolerance) => Bounds.Contains(world);
         public void Render(IDrawingSession session, InfiniteCanvas canvas) { }
@@ -109,10 +111,10 @@ public class CanvasPaintOrderTests
         var element = new ElementItem(node, new Rect(40, 40, 160, 90));
 
         scene.Add(element);
-        scene.Add(new Marker { Bounds = new Rect(0, 0, 120, 120), Band = CanvasBand.Under });
+        scene.Add(new Marker { Bounds = new Rect(0, 0, 120, 120) });
         Frame(root, canvas, cache);
 
-        var layer = canvas.GetTemplateChild("PART_Elements") as CanvasElementLayer;
+        var layer = Layer<CanvasElementLayer>(canvas);
 
         TestContext.Out.WriteLine($"canvas size   = {canvas.RenderSize}");
         TestContext.Out.WriteLine($"visible world = {canvas.VisibleWorld}");
@@ -144,7 +146,7 @@ public class CanvasPaintOrderTests
         var element = new ElementItem(node, new Rect(40, 40, 160, 90));
 
         scene.Add(element);
-        scene.Add(new Marker { Bounds = new Rect(0, 0, 120, 120), Band = CanvasBand.Under });
+        scene.Add(new Marker { Bounds = new Rect(0, 0, 120, 120) });
 
         Frame(root, canvas, cache);
 
@@ -162,15 +164,16 @@ public class CanvasPaintOrderTests
             "the camera changed which of the two is in front");
     }
 
-    // THE SCENE DOES NOT DECIDE ACROSS A BAND, and no amount of bringing to front will make it. A hosted control lives
-    // in a layer of the template and a drawn item is drawn by the canvas itself, so within one band the control is
-    // always in front - which is why what is in front is said by the BAND and not by the order.
+    // THE SCENE DECIDES, AND IT DECIDES ACROSS CONTROLS TOO. There is one order on the plane and everything stands in
+    // it: a drawn thing brought to the front goes over a hosted control, and a control brought to the front goes over
+    // the drawing. That is what "equal" means here, and it is the whole reason the layers are cut from the order
+    // rather than fixed by the template.
     [Test]
-    public void BringingADrawnItemToTheFrontDoesNotPutItOverAHostedControl()
+    public void BringingADrawnItemToTheFrontPutsItOverAHostedControl()
     {
         var (root, canvas, scene, cache) = Stage();
 
-        var marker = new Marker { Bounds = new Rect(0, 0, 120, 120), Band = CanvasBand.Under };
+        var marker = new Marker { Bounds = new Rect(0, 0, 120, 120) };
         var node = new CanvasNode { Title = "Multiply" };
         var element = new ElementItem(node, new Rect(40, 40, 160, 90));
 
@@ -178,12 +181,82 @@ public class CanvasPaintOrderTests
         scene.Add(marker);
         Frame(root, canvas, cache);
 
-        scene.BringToFront(marker);
-        scene.SendToBack(element);
+        var drawn = Layer<CanvasDrawLayer>(canvas);
+
+        Assert.That(cache.PaintRankOf(drawn), Is.GreaterThan(cache.PaintRankOf(node)),
+            "the thing added last is under the control that was added first");
+
+        // ...AND BACK AGAIN. The same order that lifted it puts it down.
+        scene.SendToBack(marker);
         Frame(root, canvas, cache);
 
-        Assert.That(cache.PaintRankOf(node), Is.GreaterThan(cache.PaintRankOf(canvas)),
-            "the node is behind it now - which would mean the order decides across a band, and it does not");
+        drawn = Layer<CanvasDrawLayer>(canvas);
+
+        Assert.That(cache.PaintRankOf(drawn), Is.LessThan(cache.PaintRankOf(node)),
+            "sent to the back, it is still over the control");
+    }
+
+    // A PICTURE CAN BE RAISED over a drawing just as a drawing can be drawn over a picture - the same order, read the
+    // same way. This is the half that a fixed ladder of bands could never do.
+    [Test]
+    public void BringingAControlToTheFrontPutsItOverWhatIsDrawn()
+    {
+        var (root, canvas, scene, cache) = Stage();
+
+        var node = new CanvasNode { Title = "Multiply" };
+        var element = new ElementItem(node, new Rect(40, 40, 160, 90));
+
+        scene.Add(element);
+        scene.Add(new Marker { Bounds = new Rect(0, 0, 120, 120) });
+        Frame(root, canvas, cache);
+
+        scene.BringToFront(element);
+        Frame(root, canvas, cache);
+
+        Assert.That(cache.PaintRankOf(node), Is.GreaterThan(cache.PaintRankOf(Layer<CanvasDrawLayer>(canvas))),
+            "the control was brought to the front and stayed under the drawing");
+    }
+
+    // ...AND WITH SOMETHING REALLY DRAWN UNDER IT. The two above use a Marker, which draws NOTHING - so they pin the
+    // ranks of the layers and say nothing about the pixels. A shape with a fill is drawn through the batches, and a
+    // batch is flushed by its own layer number rather than by the order it was collected in: that is a second order,
+    // running alongside the scene's, and it is the one a person sees.
+    [Test]
+    public void AControlRaisedOverAFilledShapeIsDrawnOverIt()
+    {
+        var (root, canvas, scene, cache) = Stage();
+
+        canvas.Mode = CanvasMode.Drawing;
+
+        var shape = new ShapeItem(CanvasShape.Rectangle, new Rect(40, 40, 200, 140), null, 0, Brushes.DeepPink);
+        var picture = new Image { Background = Brushes.White, Width = 160, Height = 90 };
+        var element = new ElementItem(picture, new Rect(60, 60, 160, 90));
+
+        scene.Add(element);
+        scene.Add(shape);
+        Frame(root, canvas, cache);
+
+        scene.BringToFront(element);
+        Frame(root, canvas, cache);
+
+        Assert.That(cache.PaintRankOf(picture), Is.GreaterThan(cache.PaintRankOf(Layer<CanvasDrawLayer>(canvas))),
+            "the picture was raised over the shape and is still recorded under it");
+    }
+
+    // The first layer of the stack of the wanted sort. The stack is the canvas's own, so a test reads it the way the
+    // canvas built it rather than by a name a template would have had to know in advance.
+    private static T Layer<T>(InfiniteCanvas canvas) where T : class
+    {
+        var stack = canvas.GetTemplateChild("PART_Layers") as Panel;
+
+        if (stack == null) return null;
+
+        foreach (var child in stack.Children)
+        {
+            if (child is T wanted) return wanted;
+        }
+
+        return null;
     }
 
     // A NODE STAYS LIVE. What is in one is a field, a switch, a list, so a node that went deaf to the pointer while the
@@ -222,45 +295,57 @@ public class CanvasPaintOrderTests
         Assert.That(button.IsHitTestVisible, Is.True, "...and using the plane makes it live again");
     }
 
-    // ...and THAT is what the bands are for. What a thing is drawn in front of is not a number it carries but which
-    // side of the controls it is on, and there is a layer for each side.
+    // A LAYER PER RUN, and no more than that: the affordability of the whole thing rests on it. Two pictures with a
+    // stroke between them is three layers; a hundred nodes in a row is one.
     [Test]
-    public void AnItemInTheFrontBandIsDrawnAfterTheControls()
+    public void OneLayerPerRunOfNeighboursAndNoMore()
     {
         var (root, canvas, scene, cache) = Stage();
 
-        var node = new CanvasNode { Title = "Multiply" };
-        scene.Add(new ElementItem(node, new Rect(40, 40, 160, 90)));
-        scene.Add(new Marker { Bounds = new Rect(0, 0, 120, 120), Band = CanvasBand.Over });
+        scene.Add(new ElementItem(new CanvasNode { Title = "One" }, new Rect(0, 0, 80, 40)));
+        scene.Add(new ElementItem(new CanvasNode { Title = "Two" }, new Rect(100, 0, 80, 40)));
+        scene.Add(new Marker { Bounds = new Rect(0, 60, 120, 40) });
+        scene.Add(new ElementItem(new CanvasNode { Title = "Three" }, new Rect(0, 120, 80, 40)));
 
         Frame(root, canvas, cache);
 
-        var front = canvas.GetTemplateChild("PART_Front") as CanvasFrontLayer;
+        var stack = canvas.GetTemplateChild("PART_Layers") as Panel;
 
-        Assert.Multiple(() =>
-        {
-            Assert.That(cache.PaintRankOf(front), Is.GreaterThan(cache.PaintRankOf(node)),
-                "a note drawn over a node would come out under it");
-            Assert.That(front.IsHitTestVisible, Is.False,
-                "the front band would take the presses meant for what is under it");
-        });
+        Assert.That(stack.Children.Count, Is.EqualTo(3),
+            "two controls, a drawn thing and a control is three runs - one layer each");
     }
 
-    // The band in front is drawn by ANOTHER component, so a repaint that only marked the canvas left it showing what
-    // the plane looked like a moment ago - the drawing in two ages of itself.
+    // THE GLASS takes no presses: what a gesture is making is drawn over everything, and if it answered the pointer it
+    // would be the thing found instead of the plane.
     [Test]
-    public void RepaintingTheCanvasAlsoRepaintsTheBandInFrontOfIt()
+    public void TheGlassDoesNotTakeThePresses()
     {
-        var (root, canvas, scene, cache) = Stage();
+        var (root, canvas, _, cache) = Stage();
 
-        scene.Add(new Marker { Bounds = new Rect(0, 0, 120, 120), Band = CanvasBand.Over });
         Frame(root, canvas, cache);
 
         var front = canvas.GetTemplateChild("PART_Front") as CanvasFrontLayer;
-        Assert.That(front.IsGeometryValid, Is.True, "nothing was recorded for the front band at all");
+
+        Assert.That(front.IsHitTestVisible, Is.False);
+    }
+
+    // WHAT IS ON THE PLANE IS DRAWN BY THE LAYERS, so a repaint that marked only the canvas left the drawing showing
+    // what it looked like a moment ago - in as many ages of itself as there are layers.
+    [Test]
+    public void RepaintingTheCanvasAlsoRepaintsTheLayersThatDrawIt()
+    {
+        var (root, canvas, scene, cache) = Stage();
+
+        scene.Add(new Marker { Bounds = new Rect(0, 0, 120, 120) });
+        Frame(root, canvas, cache);
+
+        var drawn = Layer<CanvasDrawLayer>(canvas);
+
+        Assert.That(drawn, Is.Not.Null, "the drawn item got no layer at all");
+        Assert.That(drawn.IsGeometryValid, Is.True, "nothing was recorded for it");
 
         canvas.Scale = 2.0;
 
-        Assert.That(front.IsGeometryValid, Is.False, "the camera moved and the band in front did not hear about it");
+        Assert.That(drawn.IsGeometryValid, Is.False, "the camera moved and the layer did not hear about it");
     }
 }

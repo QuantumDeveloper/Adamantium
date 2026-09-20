@@ -71,7 +71,7 @@
         </models:PlacedThingSelector>
     </ResourceContext.Resources>
 
-    <Grid RowDefinitions="Auto,Auto,Auto,*,Auto" Margin="16">
+    <Grid RowDefinitions="Auto,Auto,Auto,*" Margin="16">
 
 
         <TextBlock Grid.Row="0" Text="InfiniteCanvas" FontSize="18"/>
@@ -116,8 +116,9 @@
                             History="{Binding History}"
                             Tools="{Binding Tools}"
                             Selection="{Binding Selection, Mode=TwoWay}"
-                            Tool="{Binding Tool}"
+                            Tool="{Binding Tool, Mode=TwoWay}"
                             DefaultTool="{Binding SelectTool}"
+                            Layout="{Binding Layout, Mode=TwoWay}"
                             Ink="{Binding Ink}"
                             ShapeFill="{Binding ShapeFillOrNothing}"
                             InkThickness="{Binding InkThickness}"
@@ -142,14 +143,5 @@
             </Grid>
         </Border>
 
-        <StackPanel Grid.Row="4" Orientation="Horizontal" Margin="0,10,0,0">
-            <TextBlock Text="{Binding Camera}" Foreground="{ObservableResource TextFillColorSecondary}"/>
-            <TextBlock Text="{Binding Drawn}" Margin="24,0,0,0"
-                       Foreground="{ObservableResource TextFillColorSecondary}"/>
-            <!-- WHAT is selected. A straight ink stroke and a line are the same picture on screen and are reshaped in
-                 different ways, so which one is in front of you has to be readable rather than guessed at. -->
-            <TextBlock Text="{Binding Chosen}" Margin="24,0,0,0"
-                       Foreground="{ObservableResource TextFillColorPrimary}"/>
-        </StackPanel>
     </Grid>
 </View>

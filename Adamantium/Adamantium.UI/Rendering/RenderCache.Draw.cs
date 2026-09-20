@@ -274,9 +274,17 @@ public partial class RenderCache
         foreach (var group in _leftTheOrder)
         {
             if (group.InOrder || group.Tag == 0) continue;   // came back before anyone looked
+
+            LayerProbe.Say($"left the order: {Named(group)} arena={ArenaName(group)} tag={group.Tag} runs={group.Runs.Count}"
+                           + $" units={group.Units.Count}");
+
             // OWNERSHIP rides in the instance, and only a rect instance carries it (RectItem.OwnerTag). Another family's
             // orphans are left to the next walk rather than blanked on a guess about whose slots those are.
-            if (!ReferenceEquals(group.Arena, _rectBatch)) continue;
+            if (!ReferenceEquals(group.Arena, _rectBatch))
+            {
+                LayerProbe.Say($"  ...not swept: {Named(group)} draws in {ArenaName(group)}, so nothing marks it unrecorded");
+                continue;
+            }
             var reclaimedAll = true;
             foreach (var run in group.Runs)
             {
@@ -314,6 +322,26 @@ public partial class RenderCache
         }
 
         LayerProbe.OrphanSweeps++;
+    }
+
+    // For the watch above only - a group is named by the control it draws for, which is the only name a person can
+    // match against what they just did.
+    private static string Named(ControlGroup group) =>
+        group.Component is not { } component
+            ? "(no control)"
+            : component.GetType().Name
+              + (string.IsNullOrEmpty(component.Name) ? "" : $" '{component.Name}'")
+              // WHOSE CHILD IT IS, because a type name alone names half the panel: the picture on the plane and the
+              // icon on a button are both an Image, and only the parent says which one just went dark.
+              + $" in {component.RenderParent?.GetType().Name ?? "NOWHERE"}";
+
+    private string ArenaName(ControlGroup group)
+    {
+        if (group.Arena == null) return "none";
+        if (ReferenceEquals(group.Arena, _rectBatch)) return "rect";
+        if (ReferenceEquals(group.Arena, _textBatch)) return "text";
+
+        return group.Arena.GetType().Name;
     }
 
     /// <summary>How many draw operations the recorded frame replays. Tests read it to see that work actually LEFT the
@@ -1837,6 +1865,15 @@ public partial class RenderCache
         }
 
         if (layer < 1 && _ellipseBatch.OverlapsPending(lb))
+        {
+            return true;
+        }
+
+        // ...AND ITS POLYGON SIBLING, which sits in the same fill layer and was the one batch this guard never asked
+        // about. A rectangle drawn AFTER a polygon therefore never flushed, and the polygon - flushed later, as the
+        // higher layer - landed on top of it whatever the scene said. On a plane where everything stands in one order
+        // that reads as a polygon that ignores "bring to front" entirely, which is exactly how it was found.
+        if (layer < 1 && (_polygonBatch?.OverlapsPending(lb) ?? false))
         {
             return true;
         }

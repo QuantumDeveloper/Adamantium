@@ -26,6 +26,24 @@ public class GroupItem : ICanvasItem
     /// </summary>
     public IReadOnlyList<ICanvasItem> Children => _children;
 
+    /// <summary>The same things TOPMOST FIRST - what a panel showing the plane's structure puts under this one, read
+    /// the same way round as the level above it. Only groups have it: a tree asks each node for it by name, and having
+    /// nothing of the sort is what makes everything else a leaf.</summary>
+    public IReadOnlyList<ICanvasItem> Inside
+    {
+        get
+        {
+            if (_inside != null) return _inside;
+
+            var top = new List<ICanvasItem>(_children);
+
+            top.Reverse();
+            return _inside = top;
+        }
+    }
+
+    private List<ICanvasItem> _inside;
+
     /// <summary>The colour of what is IN it, when everything in it agrees - and nothing when they do not, because a
     /// group of a red stroke and a blue one is not any one colour.</summary>
     public Color? Paint
@@ -66,6 +84,10 @@ public class GroupItem : ICanvasItem
 
         return copies.Count == 0 ? null : new GroupItem(copies);
     }
+
+
+    /// <summary>Where it stands in paint order - stamped by the scene. See ICanvasItem.Order.</summary>
+    public int Order { get; set; }
 
     /// <summary>Everything its children cover. Asked rather than kept: a child that is moved through the inspector
     /// moves inside the group too, and a remembered box would be wrong from that moment on.</summary>
@@ -172,7 +194,12 @@ public class GroupItem : ICanvasItem
     public bool Remove(ICanvasItem item)
     {
         if (item == null) return false;
-        if (_children.Remove(item)) return true;
+
+        if (_children.Remove(item))
+        {
+            _inside = null;
+            return true;
+        }
 
         foreach (var child in _children)
         {

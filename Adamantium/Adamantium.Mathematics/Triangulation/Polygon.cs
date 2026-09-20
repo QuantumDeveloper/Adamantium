@@ -146,6 +146,7 @@ namespace Adamantium.Mathematics.Triangulation
                     // Reached only for genuinely intersecting/overlapping contours (the clean nesting case was
                     // handled by TryFastTriangulate above). The scanline resolves crossings per fill rule.
                     var result = Triangulator.Triangulate(this);
+
                     lock (vertexLocker)
                     {
                         vertices.AddRange(result);
@@ -171,7 +172,14 @@ namespace Adamantium.Mathematics.Triangulation
             foreach (var container in contourContainers)
                 foreach (var contour in container.Contours)
                 {
-                    if (!contour.IsGeometryClosed || contour.Points == null || contour.Points.Length < 3) return false;
+                    // FOR A FILL A CONTOUR IS CLOSED whether or not it says so: a ring of points bounds an area, and
+                    // "Z" is about the OUTLINE - it joins the ends and makes the corner there. Refusing an open one
+                    // here sent it to the general pipeline, which fills by a different rule, so a drawing whose
+                    // sub-paths carry no Z - which exporters leave out freely - came out filled inside out.
+                    //
+                    // The contour itself is NOT touched: closing it would put a phantom edge in the STROKE, which is
+                    // what turns an open mark - a check, an arc, an icon drawn as three lines - into a triangle.
+                    if (contour.Points == null || contour.Points.Length < 3) return false;
                     var copy = contour.Copy();
                     copy.SplitOnSegments();
                     if (copy.Points.Length < 3) return false;
@@ -189,12 +197,29 @@ namespace Adamantium.Mathematics.Triangulation
                 return true;
             }
 
-            // Reject anything that isn't pure nesting (self- or inter-contour crossings) -> full pipeline.
-            if (HasProperIntersections(rings)) return false;
+            // CROSSINGS ARE NOT A REFUSAL ANY MORE. Where contours genuinely cross, what is filled is a question
+            // about each REGION they cut the plane into, not about any one contour - PlanarFill cuts them apart,
+            // walks the regions out and asks the rule once per region. Sent to the general pipeline instead, they
+            // were merely united: the fill rule is never consulted there, so every hole in a drawing was lost the
+            // moment anything overlapped anywhere.
+            if (HasProperIntersections(rings))
+            {
+                ProcessedContours.AddRange(processedContours);
+                result = triangulate ? PlanarFill.Fill(rings, FillRule) : new List<Vector3>();
+
+                return true;
+            }
 
             ProcessedContours.AddRange(processedContours);
-            result = new List<Vector3>();
-            if (!triangulate) return true;
+            result = triangulate ? FillRings(rings, FillRule) : new List<Vector3>();
+            return true;
+        }
+
+        /// <summary>Triangulates rings that do not cross, by the fill rule: which ring is solid and which is a hole is
+        /// decided here, and earcut is handed the answer.</summary>
+        private List<Vector3> FillRings(List<Vector2[]> rings, FillRule rule)
+        {
+            var result = new List<Vector3>();
 
             // Nesting depth of each ring (number of other rings that contain it).
             var depth = new int[rings.Count];
@@ -202,31 +227,57 @@ namespace Adamantium.Mathematics.Triangulation
                 for (var j = 0; j < rings.Count; j++)
                     if (i != j && PointInPolygon(rings[i][0], rings[j])) depth[i]++;
 
-            // NonZero here fills only the outermost rings, solid (drops holes). EvenOdd: even-depth rings fill,
-            // odd-depth rings directly inside them are holes. (Matches the merge+scanline result for clean
-            // nesting — guarded by the fill-rule truth-table tests.)
-            var nonZero = FillRule == FillRule.NonZero;
-            for (var i = 0; i < rings.Count; i++)
-            {
-                var isFill = nonZero ? depth[i] == 0 : (depth[i] & 1) == 0;
-                if (!isFill) continue;
+            // NonZero is the WINDING rule: a region is filled when the rings enclosing it do not cancel out, and a
+            // ring cancels the one round it by running the other way. Read as "fill the outermost ring solid" instead,
+            // a hole could only ever be made by even-odd - so every ring in an imported drawing came out filled and a
+            // magnifier arrived as a solid disc.
+            // EvenOdd: even-depth rings fill, odd-depth rings directly inside them are holes.
+            var nonZero = rule == FillRule.NonZero;
+            var winding = new int[rings.Count];
 
-                List<IReadOnlyList<Vector2>> holes = null;
-                if (!nonZero)
+            if (nonZero)
+            {
+                var way = new int[rings.Count];
+
+                for (var i = 0; i < rings.Count; i++) way[i] = Area(rings[i]) >= 0 ? 1 : -1;
+
+                for (var i = 0; i < rings.Count; i++)
                 {
+                    winding[i] = way[i];
+
                     for (var j = 0; j < rings.Count; j++)
                     {
-                        if (i == j || depth[j] != depth[i] + 1) continue;
-                        if (PointInPolygon(rings[j][0], rings[i])) (holes ??= new List<IReadOnlyList<Vector2>>()).Add(rings[j]);
+                        if (i != j && PointInPolygon(rings[i][0], rings[j])) winding[i] += way[j];
                     }
+                }
+            }
+
+            for (var i = 0; i < rings.Count; i++)
+            {
+                var isFill = nonZero ? winding[i] != 0 : (depth[i] & 1) == 0;
+                if (!isFill) continue;
+
+                // ...and a filled ring INSIDE another filled one adds nothing: that ground is already covered, and
+                // triangulating it again is two more triangles drawn over themselves.
+                if (nonZero && depth[i] > 0 && Within(rings, winding, i)) continue;
+
+                List<IReadOnlyList<Vector2>> holes = null;
+
+                for (var j = 0; j < rings.Count; j++)
+                {
+                    if (i == j || depth[j] != depth[i] + 1) continue;
+                    if (nonZero && winding[j] != 0) continue;   // it fills too, so it is not a hole in this one
+                    if (PointInPolygon(rings[j][0], rings[i])) (holes ??= new List<IReadOnlyList<Vector2>>()).Add(rings[j]);
                 }
 
                 if (holes == null)
                     result.AddRange(MathHelper.IsConvex(rings[i]) ? Triangulator.FanTriangulate(rings[i]) : Triangulator.EarcutTriangulate(rings[i]));
                 else
                     result.AddRange(Triangulator.EarcutWithHoles(rings[i], holes));
+
             }
-            return true;
+
+            return result;
         }
 
         /// <summary>True if any two non-adjacent edges of the given rings cross or touch (T-junction). X-sweep
@@ -258,15 +309,17 @@ namespace Adamantium.Mathematics.Triangulation
             return false;
         }
 
+        /// <summary>Whether two segments cross PROPERLY - each passing through the inside of the other. Touching is not
+        /// crossing: rings that share a vertex, or lie along the same line, still nest cleanly and earcut fills them
+        /// with their holes.
+        /// <para>Counting a touch as a crossing sent anything drawn on a grid to the general pipeline, where the
+        /// winding rule is not applied - so an imported icon whose cells sit corner to corner came out solid.</para>
+        /// </summary>
         private static bool SegmentsIntersect(Vector2 p1, Vector2 p2, Vector2 p3, Vector2 p4)
         {
             int o1 = Orient(p1, p2, p3), o2 = Orient(p1, p2, p4), o3 = Orient(p3, p4, p1), o4 = Orient(p3, p4, p2);
-            if (o1 != o2 && o3 != o4) return true;
-            if (o1 == 0 && OnSegment(p1, p2, p3)) return true;
-            if (o2 == 0 && OnSegment(p1, p2, p4)) return true;
-            if (o3 == 0 && OnSegment(p3, p4, p1)) return true;
-            if (o4 == 0 && OnSegment(p3, p4, p2)) return true;
-            return false;
+
+            return o1 != o2 && o3 != o4 && o1 != 0 && o2 != 0 && o3 != 0 && o4 != 0;
         }
 
         private static int Orient(Vector2 a, Vector2 b, Vector2 c)
@@ -279,6 +332,35 @@ namespace Adamantium.Mathematics.Triangulation
         {
             return Math.Min(a.X, b.X) - 1e-9 <= p.X && p.X <= Math.Max(a.X, b.X) + 1e-9 &&
                    Math.Min(a.Y, b.Y) - 1e-9 <= p.Y && p.Y <= Math.Max(a.Y, b.Y) + 1e-9;
+        }
+
+
+
+        private static bool Within(List<Vector2[]> rings, int[] winding, int i)
+        {
+            for (var k = 0; k < rings.Count; k++)
+            {
+                if (k != i && winding[k] != 0 && PointInPolygon(rings[i][0], rings[k])) return true;
+            }
+
+            return false;
+        }
+
+        /// <summary>Twice the signed area of a ring - positive one way round, negative the other. Which way a ring
+        /// runs is the whole of the non-zero rule.</summary>
+        private static double Area(IReadOnlyList<Vector2> ring)
+        {
+            double sum = 0;
+
+            for (var i = 0; i < ring.Count; i++)
+            {
+                var a = ring[i];
+                var b = ring[(i + 1) % ring.Count];
+
+                sum += a.X * b.Y - b.X * a.Y;
+            }
+
+            return sum;
         }
 
         private static bool PointInPolygon(Vector2 p, IReadOnlyList<Vector2> polygon)
@@ -465,7 +547,7 @@ namespace Adamantium.Mathematics.Triangulation
                     foreach (var container in localContourContainers)
                     {
                         if (container == checkedContainer) continue;
-                        
+
                         arguableSegments.AddRange(ContourProcessingHelper.MarkSegments(container.MergeContoursSegments(), checkedContainer.MergeContoursSegments()));
                     }
                 }

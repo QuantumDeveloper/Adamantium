@@ -23,8 +23,8 @@ public enum CanvasPanePlacement
 
     BottomRight,
 
-    /// <summary>Wherever it was put: <see cref="CanvasPane.Offset"/> says where, in screen pixels from the canvas's
-    /// top-left. Dragging a pane sets this - and because it is a property like any other, an application can save
+    /// <summary>Wherever it was put: <see cref="CanvasPane.Anchor"/> says where, as a fraction of the room the pane can
+    /// travel across. Dragging a pane sets this - and because it is a property like any other, an application can save
     /// where the user left it and put it back.</summary>
     Free,
 

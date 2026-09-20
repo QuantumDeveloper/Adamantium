@@ -24,10 +24,12 @@ struct CanvasGridData
 {
     float4 Bounds;     // NODE-local x, y, w, h
     float4 Params;     // .x transform slot, .y marks (1 dots, 2 lines), .z opacity slot, .w mark size (logical px)
-    float4 Camera;     // .xy where the world's ORIGIN sits on screen (logical px), .z screen px per world unit, .w spare
+    float4 Camera;     // .xy the lattice's PHASE within one cell (logical px) - NEVER the distance travelled, which a
+                       // float cannot carry; .z screen px per world unit, .w spare
     float4 Step;       // .x the step to draw (world units, ALREADY coarsened); .y coarsening; .z 1 / the pitch a mark
                        // must keep on screen, as a RECIPROCAL - the shader must not divide; .w spare
-    float4 Clip;       // .x the ancestor's rounded-clip slot, or -1
+    float4 Clip;       // .x the ancestor's rounded-clip slot, or -1; .yz where the world's ORIGIN sits (logical px),
+                       // penned in to the element's reach - the axes' own place, which the phase cannot say
     float4 Background; // the GROUND, straight RGBA - carried here because the grid is flushed first of its clip group
     float4 GridColor;  // straight RGBA
     float4 AxisColor;  // straight RGBA; alpha 0 leaves the world's axes undrawn
@@ -111,6 +113,12 @@ float4 CanvasGridPS(GridPSInput i) : SV_Target
     // Everything below is in DEVICE pixels: the camera is stated in logical ones, and Scale is how many device pixels a
     // logical unit is worth. Doing it once here is what keeps the grid the same weight on a high-DPI monitor.
     float pixelsPerUnit = it.Camera.z * i.Scale;
+
+    // Camera.xy is the lattice's PHASE - where it stands within one cell - and never how far the camera has travelled.
+    // The grid repeats every cell, so this draws exactly what the true offset would; what it also does is stay inside
+    // one cell, where a float still resolves a fraction of a pixel. Given the distance instead, a million pixels out
+    // the gaps between neighbouring floats were wider than a pixel, so neighbouring fragments read the same world
+    // point: the dots ran into lines and a pan stepped the grid instead of sliding it.
     float2 world = (i.Local - it.Camera.xy) / max(it.Camera.z, 1e-6);
 
     // The step arrives ALREADY COARSENED - the canvas works it out from the camera and hands it over, which it has to
@@ -155,7 +163,10 @@ float4 CanvasGridPS(GridPSInput i) : SV_Target
     // is. Drawn as full lines whatever the marks are - an axis made of dots would not read as an axis.
     if (it.AxisColor.a > 0.0)
     {
-        float2 axisDistance = abs(world) * pixelsPerUnit;
+        // FROM THE AXES' OWN PLACE, not from the phase: the phase says where the lattice stands, and every cell of a
+        // lattice looks like every other - an axis worked out from it would be drawn once per cell. Clip.yz is where
+        // the origin sits, penned in to the element's reach so the number stays exact.
+        float2 axisDistance = abs(i.Local - it.Clip.yz) * i.Scale;
         float onAxis = max(MarkCoverage(axisDistance.x, halfWidth), MarkCoverage(axisDistance.y, halfWidth));
         float4 axis = it.AxisColor;
         axis.a *= onAxis;

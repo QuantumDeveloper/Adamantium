@@ -30,6 +30,12 @@ public interface ICanvasScene
     /// stroke that was behind a control has to stay behind it, in both halves.</para></summary>
     bool Replace(ICanvasItem item, IReadOnlyList<ICanvasItem> pieces);
 
+    /// <summary>The other way round: takes <paramref name="gathered"/> out and puts <paramref name="into"/> where the
+    /// TOPMOST of them stood - what making a group is.
+    /// <para>ONE call, because the scene is read after every edit: a replace plus a removal apiece leaves it holding
+    /// the group AND the things inside it, so a walk meets those twice.</para></summary>
+    bool Fold(IReadOnlyList<ICanvasItem> gathered, ICanvasItem into);
+
     /// <summary>Moves an item to the front or the back of PAINT order - what "bring to front" and "send to back" mean.
     /// <para>Here rather than left to the application, because order in this scene IS paint order: taking an item out
     /// and putting it back would raise it, and there is no way at all to lower one from outside. Both return false for
@@ -37,6 +43,18 @@ public interface ICanvasScene
     bool BringToFront(ICanvasItem item);
 
     bool SendToBack(ICanvasItem item);
+
+    /// <summary>Puts an item straight after another in paint order, or straight before it - which is how a thing is
+    /// put BETWEEN two others, and the ends above cannot do it.
+    /// <para>Said as "next to THIS ONE" rather than as "one place along" on purpose: one place along is not something
+    /// a person can see. A scene may hold a drawing and a graph at once, and a step that moved an item past something
+    /// the current mode does not show is a press that appears to do nothing. The caller names the neighbour, which it
+    /// knows and the scene does not.</para></summary>
+    bool MoveNextTo(ICanvasItem item, ICanvasItem neighbour, bool after);
+
+    /// <summary>Puts an item at a PLACE in paint order, counting from the back - what writing a layer number means.
+    /// Clamped rather than refused: asked for the hundredth place in a scene of ten, a person means the top.</summary>
+    bool Reposition(ICanvasItem item, int place);
 
     /// <summary>Puts the scene in EXACTLY this state: these items, in this order, and nothing else.
     /// <para>What undo needs, and the one thing the rest of this contract cannot express. Membership can be rebuilt

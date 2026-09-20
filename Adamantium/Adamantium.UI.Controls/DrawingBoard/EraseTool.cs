@@ -77,7 +77,7 @@ public class EraseTool : ICanvasTool
         // BEFORE it is used, or it can only be found out by rubbing something out.
         _at = e.Screen;
         _over = true;
-        canvas.InvalidateRender(false);
+        canvas.Repaint();
 
         if (!_erasing) return;
 
@@ -155,6 +155,6 @@ public class EraseTool : ICanvasTool
         }
 
         canvas.ClearSelection();
-        canvas.InvalidateRender(false);
+        canvas.Repaint();
     }
 }

@@ -16,6 +16,9 @@ public sealed class StreamGeometry : Geometry
 
     public override Rect Bounds => bounds;
 
+    /// <summary>The figures it holds. What a reader needs to state the geometry again instead of drawing it.</summary>
+    public IReadOnlyList<PathFigure> Figures => context.Figures;
+
     public StreamGeometryContext Open()
     {
         context = new StreamGeometryContext();

@@ -28,10 +28,10 @@ public class BindingExpression : BindingExpressionBase
    public string SourcePropertyName { get; private set; }
 
    /// <inheritdoc/>
-   public override bool IsResolved => ResolvedSource != null && (_bindToSource || _sourceProperty != null);
+   public override bool IsResolved => ResolvedSource != null && (_bindToSource || _sourceProperty != null || _leaf != null);
 
    /// <inheritdoc/>
-   public override Type SourceType => _sourceProperty?.PropertyType;
+   public override Type SourceType => _leaf?.Type ?? _sourceProperty?.PropertyType;
 
    /// <inheritdoc/>
    public override bool IsSourceEdited
@@ -58,6 +58,9 @@ public class BindingExpression : BindingExpressionBase
    // nothing there that knows what "untouched" means - and the answer is then nothing.
    private (AdamantiumComponent Component, AdamantiumProperty Property) SourceSlot()
    {
+      // A path ending inside a struct has no slot of its own: the slot belongs to the WHOLE value, and putting one
+      // number back by clearing all of them is not what the line says it does.
+      if (_leaf != null) return (null, null);
       if (ResolvedSource is not AdamantiumComponent component || SourcePropertyName == null) return (null, null);
 
       return (component, component.GetProperty(SourcePropertyName));
@@ -85,6 +88,45 @@ public class BindingExpression : BindingExpressionBase
          var body = Expression.Convert(Expression.Property(Expression.Convert(o, key.Item1), prop), typeof(object));
          return (prop, Expression.Lambda<Func<object, object>>(body, o).Compile());
       });
+
+   // A PATH THAT ENDS INSIDE A STRUCT (`Offset.X`, `Bounds.X`): the walk reaches a box - a copy made on the way - so a
+   // read is frozen at the moment the path resolved and a write lands in the copy and is dropped, both silently. Such
+   // a path is therefore walked fresh on every read and written back UP, and it is watched at the object the path
+   // STARTS at, by its first segment: the box has nothing to announce.
+   private sealed record Hop(Type Type, bool CanWrite, Func<object, object> Get, Action<object, object> Set);
+
+   private static readonly ConcurrentDictionary<(Type, string), Hop> _hops = new();
+
+   // Fields as well as properties: the maths types are fields (Vector2.X), and a path that cannot see them cannot see
+   // a position.
+   private static Hop HopTo(Type type, string name) => _hops.GetOrAdd((type, name), static key =>
+   {
+      var (owner, member) = key;
+      var o = Expression.Parameter(typeof(object), "o");
+      var self = Expression.Convert(o, owner);
+
+      if (owner.GetProperty(member) is { } prop)
+      {
+         var read = prop.CanRead
+            ? Expression.Lambda<Func<object, object>>(Expression.Convert(Expression.Property(self, prop), typeof(object)), o).Compile()
+            : null;
+
+         return new Hop(prop.PropertyType, prop.CanWrite, read, prop.SetValue);
+      }
+
+      if (owner.GetField(member) is { } field)
+      {
+         var read = Expression.Lambda<Func<object, object>>(
+            Expression.Convert(Expression.Field(self, field), typeof(object)), o).Compile();
+
+         return new Hop(field.FieldType, !field.IsInitOnly, read, field.SetValue);
+      }
+
+      return null;
+   });
+
+   private Hop _leaf;      // set only for a struct-ended path; the fast path leaves it null
+   private object[] _boxes;   // what each segment was read from, reused between walks
 
    public Binding Binding { get; set; }
    public BindingMode Mode { get; set; }
@@ -212,6 +254,7 @@ public class BindingExpression : BindingExpressionBase
       _sourceGetter = null;
       SourcePropertyName = null;
       _bindToSource = false;
+      _leaf = null;
 
       var root = Binding.Source ?? ResolveElementName() ?? DataContextSource?.DataContext;
       var path = Binding.Path?.Path;
@@ -236,6 +279,17 @@ public class BindingExpression : BindingExpressionBase
 
       if (current == null)
          return;
+
+      if (current.GetType().IsValueType)
+      {
+         _leaf = HopTo(current.GetType(), segments[^1]);
+         if (_leaf == null) return;
+
+         _boxes ??= new object[segments.Length];
+         ResolvedSource = root;
+         SourcePropertyName = segments[0];
+         return;
+      }
 
       ResolvedSource = current;
       SourcePropertyName = segments[^1];
@@ -374,6 +428,14 @@ public class BindingExpression : BindingExpressionBase
 
          return Binding.Converter != null ? ConvertCached(ResolvedSource, targetType) : ResolvedSource;
       }
+      if (_leaf != null)
+      {
+         if (!Walk()) return BindingBase.FallbackValue ?? AdamantiumProperty.UnsetValue;
+
+         var read = _leaf.Get(_boxes[^1]);
+         if (Binding.Converter != null) read = ConvertCached(read, targetType);
+         return read ?? BindingBase.TargetNullValue ?? BindingBase.FallbackValue;
+      }
       if (_sourceProperty == null) return BindingBase.FallbackValue ?? AdamantiumProperty.UnsetValue;
       var value = _sourceGetter != null ? _sourceGetter(ResolvedSource) : _sourceProperty.GetValue(ResolvedSource);
       if (Binding.Converter != null)
@@ -427,32 +489,81 @@ public class BindingExpression : BindingExpressionBase
       RuntimeStats.BindingUpdatesApplied++;   // diagnostics: a binding wrote its target (initial/establish, DataContext re-resolve, or a batched source change)
    }
 
+   // Walks the path from the root, remembering what each segment was read FROM - the last of them owns the leaf.
+   private bool Walk()
+   {
+      object current = ResolvedSource;
+
+      for (var i = 0; i < _segments.Length; i++)
+      {
+         if (current == null) return false;
+
+         _boxes[i] = current;
+         if (i < _segments.Length - 1) current = HopTo(current.GetType(), _segments[i])?.Get?.Invoke(current);
+      }
+
+      return true;
+   }
+
+   // The leaf into its box, then each box into whatever held it - until something that is not a copy is reached.
+   private void Backfill(object written)
+   {
+      _leaf.Set(_boxes[^1], written);
+
+      for (var i = _segments.Length - 1; i >= 1; i--)
+      {
+         if (!_boxes[i].GetType().IsValueType) return;
+
+         var into = HopTo(_boxes[i - 1].GetType(), _segments[i - 1]);
+         if (into is not { CanWrite: true }) return;
+
+         into.Set(_boxes[i - 1], _boxes[i]);
+      }
+   }
+
+   private object ReadSource()
+   {
+      if (_leaf == null) return _sourceProperty.GetValue(ResolvedSource);
+
+      return Walk() ? _leaf.Get(_boxes[^1]) : null;
+   }
+
+   private void WriteSource(object written)
+   {
+      if (_leaf != null) Backfill(written);
+      else _sourceProperty.SetValue(ResolvedSource, written);
+   }
+
    public override void UpdateSource()
    {
-      if (_sourceProperty is not { CanWrite: true } || TargetProperty == null) return;
+      var sourceType = _leaf?.Type ?? _sourceProperty?.PropertyType;
+      var writable = _leaf?.CanWrite ?? _sourceProperty is { CanWrite: true };
+
+      if (sourceType == null || !writable || TargetProperty == null) return;
+      if (_leaf != null && !Walk()) return;
+
       var targetValue = Target.GetValue(TargetProperty);
       var value = targetValue;
       if (Binding.Converter != null)
-         value = Binding.Converter.ConvertBack(value, _sourceProperty.PropertyType, Binding.ConverterParameter,
+         value = Binding.Converter.ConvertBack(value, sourceType, Binding.ConverterParameter,
             CultureInfo.CurrentCulture);
 
       // "No value" cannot be written into a source that has no way to hold it: a NumericUpDown that was cleared has a
       // null Value, and a view-model exposing a plain double would take it as a reflection error mid-keystroke. Leave
       // the source at what it last agreed to instead - and leave our own copy of it alone too, since nothing moved.
-      if (value == null && _sourceProperty.PropertyType.IsValueType &&
-          Nullable.GetUnderlyingType(_sourceProperty.PropertyType) == null)
+      if (value == null && sourceType.IsValueType && Nullable.GetUnderlyingType(sourceType) == null)
       {
          return;
       }
 
       // Guard the ECHO (see _writingSource): our synchronous source write must not schedule a source->target push back.
-      var written = Coerce(value, _sourceProperty.PropertyType);
+      var written = Coerce(value, sourceType);
 
       _sourceSpoke = false;
       _writingSource = true;
       try
       {
-         _sourceProperty.SetValue(ResolvedSource, written);
+         WriteSource(written);
       }
       finally
       {
@@ -484,7 +595,7 @@ public class BindingExpression : BindingExpressionBase
          // buttons clears the other, the view-model behind it ignores "you are not the choice" (it hears only the
          // positive half), and pushing that back re-checked the button the click had just cleared - both halves of one
          // choice lit, and the pair stopped switching at all.
-         if (_sourceSpoke && !Equals(_sourceProperty.GetValue(ResolvedSource), written))
+         if (_sourceSpoke && !Equals(ReadSource(), written))
          {
             UpdateTarget();
          }

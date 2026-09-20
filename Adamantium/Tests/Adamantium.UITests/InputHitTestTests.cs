@@ -32,6 +32,25 @@ public class InputHitTestTests
         Assert.That(hit, Is.SameAs(inner), "the button inside the Border must be the hit target, not the Grid");
     }
 
+    // A DISABLED CONTROL TAKES THE PRESS AND DOES NOTHING WITH IT. It used to be skipped entirely, which made it a
+    // HOLE: the press went through to whatever was behind, so a greyed button sitting on a row folded the row instead,
+    // and turning a control off quietly changed what the thing under it does.
+    [Test]
+    public void HitTest_ADisabledControlTakesThePressRatherThanLettingItThrough()
+    {
+        var button = new Button { Width = 100, Height = 50, IsEnabled = false };
+        var root = new Grid { Background = Brushes.White };
+
+        root.Children.Add(button);
+
+        root.Measure(new Size(100, 50));
+        root.Arrange(new Rect(0, 0, 100, 50));
+
+        var hit = ((IInputComponent)root).HitTest(new Vector2(50, 25));
+
+        Assert.That(hit, Is.SameAs(button), "the press went through the disabled button to what was behind it");
+    }
+
     // A RENDER TRANSFORM moves what you see, so it must move what you can hit. Scaled up, the element was still
     // hit-tested where it was LAID OUT - so an infinite canvas that scales the controls it hosts could be operated at
     // 1:1 and nowhere else, and the miss grew with the distance from the element's own origin.

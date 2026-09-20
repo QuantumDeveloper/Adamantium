@@ -79,7 +79,7 @@ public class CanvasElementLookTests
     // shape has a Corner block and so does a control.
     private static void Open(PropertyGrid grid)
     {
-        foreach (var section in grid.Sections)
+        foreach (var section in grid.Displayed)
         {
             foreach (var definition in section.Properties) Unfold(definition);
         }
@@ -98,7 +98,7 @@ public class CanvasElementLookTests
     // what is being asked here is whether the line can write at all, not whether it happens to be unfolded.
     private static PropertyDefinition Line(PropertyGrid grid, string header)
     {
-        foreach (var section in grid.Sections)
+        foreach (var section in grid.Displayed)
         {
             foreach (var definition in section.Properties)
             {
@@ -156,6 +156,42 @@ public class CanvasElementLookTests
         }
 
         return (window, canvas);
+    }
+
+    // WRITING A VALUE DOES NOT REBUILD THE PANEL. A row is what a popup hangs off - a colour surface is dragged across
+    // and writes continuously - so a panel that rebuilt itself on every write would take the row out from under the
+    // gesture, and the popup would shut the moment it was touched. The rows a write leaves behind must be the SAME
+    // objects.
+    [Test]
+    public void WritingAValueLeavesTheRowsStanding()
+    {
+        Use(new Adamantium.UI.Themes.FluentTheme.Fluent());
+
+        var (window, canvas) = Stage();
+        var (_, _, grid) = WithButtonSelected(window, canvas);
+
+        Open(grid);
+
+        for (var i = 0; i < 4; i++)
+        {
+            Adamantium.UI.Extensions.WindowExtension.UpdateTree(window);
+            Adamantium.UI.Core.Data.BindingUpdateQueue.Flush();
+        }
+
+        var background = Row(canvas, "Background");
+
+        Assert.That(background, Is.Not.Null, "no Background row to write through");
+
+        grid.Write(background, Colors.Tomato);
+
+        for (var i = 0; i < 4; i++)
+        {
+            Adamantium.UI.Extensions.WindowExtension.UpdateTree(window);
+            Adamantium.UI.Core.Data.BindingUpdateQueue.Flush();
+        }
+
+        Assert.That(Row(canvas, "Background"), Is.SameAs(background),
+            "the row was rebuilt by its own write - a popup hanging off it would have been shut");
     }
 
     // WHAT THE THREE COLOUR ROWS ARE ABOUT, and whether writing one reaches the control at all.

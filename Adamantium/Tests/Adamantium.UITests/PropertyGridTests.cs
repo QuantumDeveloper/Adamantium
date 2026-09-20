@@ -841,6 +841,54 @@ public class PropertyGridTests
             "the definition reached the view-model through the tree it stands in");
     }
 
+    // ...AND THE OBJECT IT IS POINTED AT is reachable too, through Inspected. Two different questions on one line - the
+    // panel's own view-model and the thing being edited - so they are two different ways in, and neither takes the
+    // other's slot.
+    [Test]
+    public void ADefinitionCanBeWrittenToDependOnWhatItIsPointedAt()
+    {
+        var target = new Target { IsEnabled = true };
+        var scale = new NumericProperty { Header = "Scale", Binding = new Binding("Scale") };
+
+        new Self { Path = "Inspected.IsEnabled" }.Apply(scale, nameof(PropertyDefinition.IsVisible));
+
+        var grid = Built(Section(target, scale));
+
+        Assert.That(RowsOf(grid, scale), Has.Count.EqualTo(1), "the line was written for an object that admits it");
+
+        // ...and the same line, pointed at something that says no, is not built at all.
+        target.IsEnabled = false;
+        Adamantium.UI.Core.Data.BindingUpdateQueue.Flush();
+        grid.Rebuild();
+
+        Assert.That(RowsOf(grid, scale), Is.Empty, "the line stayed after the object it is about said it should not");
+    }
+
+    // NOTHING WHILE SEVERAL ARE SELECTED: the line then stands for all of them, and no single one of them is what it is
+    // about - so a condition read off "the object" has no honest answer and the line is left out.
+    [Test]
+    public void WhatALineIsPointedAtIsNothingForAMultipleSelection()
+    {
+        var one = new Target { IsEnabled = true };
+        var two = new Target { IsEnabled = true };
+        var scale = new NumericProperty { Header = "Scale", Binding = new Binding("Scale") };
+
+        new Self { Path = "Inspected.IsEnabled", FallbackValue = false }
+            .Apply(scale, nameof(PropertyDefinition.IsVisible));
+
+        var section = new PropertySection { Header = "General", IsExpanded = true };
+
+        section.Properties.Add(scale);
+
+        var grid = new PropertyGrid { Template = Chrome(), SelectedObjects = new[] { one, two } };
+
+        grid.Sections.Add(section);
+        grid.Measure(new Size(400, 400), force: true);
+        grid.Arrange(new Rect(0, 0, 400, 400));
+
+        Assert.That(scale.Inspected, Is.Null, "one of several selected objects was taken as what the line is about");
+    }
+
     // A line that says it is not shown is not built at all - which is what an inspector with a "show advanced" switch
     // is made of, and the switch itself is an ordinary binding.
     [Test]

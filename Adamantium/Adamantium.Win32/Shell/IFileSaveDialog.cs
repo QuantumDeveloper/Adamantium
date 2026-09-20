@@ -88,4 +88,14 @@ public interface IFileSaveDialog
     /// <summary>Appended when the user types a name with no extension. Without the dot.</summary>
     [PreserveSig]
     int SetDefaultExtension([MarshalAs(UnmanagedType.LPWStr)] string extension);
+
+    /// <summary>Closes a dialog that is showing. Not called here, and present because the slot is - see the note on the
+    /// flattened vtable above.</summary>
+    [PreserveSig]
+    int Close(int result);
+
+    /// <summary>WHICH DIALOG THIS IS, as far as the shell's memory goes - see <see cref="IFileOpenDialog.SetClientGuid"/>.
+    /// </summary>
+    [PreserveSig]
+    int SetClientGuid(ref Guid guid);
 }

@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 
 namespace Adamantium.UI.Core;
@@ -18,4 +19,12 @@ public sealed class SaveFileRequest
     /// <summary>The kinds of file on offer, first one selected. Also what the dialog filters the folder by, so a user
     /// saving a table is not shown every file already in it.</summary>
     public IReadOnlyList<FileType> FileTypes { get; init; }
+
+    /// <summary>WHAT THIS DIALOG IS FOR, as a name of the application's own choosing - see
+    /// <see cref="OpenFileRequest.Key"/>. Its size, place and last folder are remembered under it.</summary>
+    public string Key { get; init; }
+
+    /// <summary>The window this is being asked on behalf of - see <see cref="OpenFileRequest.Owner"/>. It decides which
+    /// screen the dialog opens on.</summary>
+    public IntPtr Owner { get; init; }
 }

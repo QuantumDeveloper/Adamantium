@@ -95,6 +95,21 @@ public class ElementItem : ICanvasItem, ICanvasTransformed
         set => _sizeFollowsContent = value;
     }
 
+    /// <summary>Where it stands in paint order - stamped by the scene. See ICanvasItem.Order.</summary>
+    public int Order { get; set; }
+
+    /// <summary>WHAT IS ON THE PLANE HERE - the control's own type name: "Image", "Button", "CanvasNode".
+    /// <para>The thing itself and not the container round it, for the same reason <see cref="Painted"/> exists: what a
+    /// person put down is the picture, not the presenter that carries it, and a panel asking what this is means the
+    /// picture. See <see cref="ICanvasItem.Sort"/> for what it is for.</para></summary>
+    public string Sort => (Painted ?? Element)?.GetType().Name ?? nameof(ElementItem);
+
+    /// <summary>Whether a NAME OF ITS OWN means anything here - false for something standing for an object of the
+    /// application's, which carries its own name and would then have two.
+    /// <para>On the item rather than on whatever panel is showing it: a panel that had to know which kinds have their
+    /// own name would have to be told about the next one too.</para></summary>
+    public bool HasLabel => Model == null;
+
     public Rect Bounds => World;
 
     /// <summary>The LEAST it may be pulled to, in world units.
@@ -155,7 +170,9 @@ public class ElementItem : ICanvasItem, ICanvasTransformed
     {
         get
         {
-            var kind = Element?.GetType().Name ?? "Element";
+            // The control a person put down, not the presenter carrying it - the same rule as Sort. Read off Element,
+            // every hosted object on the plane was called a ContentPresenter.
+            var kind = (Painted ?? Element)?.GetType().Name ?? "Element";
             var says = Label;
 
             return string.IsNullOrWhiteSpace(says) ? kind : $"{kind} \"{says}\"";

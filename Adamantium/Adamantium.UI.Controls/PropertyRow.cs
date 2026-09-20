@@ -210,6 +210,23 @@ public class PropertyRow : Control
         return Owner?.Write(this, Definition.ReadEditor(_editor)) ?? false;
     }
 
+    // EVERY OBJECT'S OWN VALUE, not the row's. A write INTO a value edits the object that holds it and nothing else -
+    // the row's copy belongs to the first of them, so a colour written that way landed on one shape of a selection and
+    // left the rest as they were.
+    internal bool WriteInto(object edited)
+    {
+        if (_values.Count == 0 || Definition == null) return false;
+
+        var all = true;
+
+        foreach (var bound in _values)
+        {
+            if (!Definition.WriteInto(bound.Value, edited)) all = false;
+        }
+
+        return all;
+    }
+
     /// <summary>Pushes one value into every object the row stands for, through their bindings.</summary>
     internal bool WriteValue(object value)
     {

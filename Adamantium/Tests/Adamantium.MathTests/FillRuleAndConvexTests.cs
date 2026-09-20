@@ -24,8 +24,8 @@ namespace Adamantium.MathTests
             Assert.IsFalse(MathHelper.IsConvex(new[] { V(0, 0), V(10, 0) }), "degenerate (2 pts)");
         }
 
-        // Locks CURRENT behaviour: EvenOdd = real even-odd; NonZero currently drops inner contours and fills the
-        // outermost solid (outer-contour semantics). (When a true non-zero winding lands, update these.)
+        // EvenOdd = real even-odd. NonZero = real non-zero WINDING: a ring that runs the other way round cancels the
+        // one enclosing it and becomes a hole; one running the same way does not.
         [Test]
         public void FillRule_TruthTable()
         {
@@ -41,8 +41,8 @@ namespace Adamantium.MathTests
 
             Donut(false, FillRule.EvenOdd, false);
             Donut(true, FillRule.EvenOdd, false);
-            Donut(false, FillRule.NonZero, true);          // NonZero drops the inner ring -> solid
-            Donut(true, FillRule.NonZero, true);
+            Donut(false, FillRule.NonZero, true);          // same way round: the windings add up, so it stays solid
+            Donut(true, FillRule.NonZero, false);          // the other way round: they cancel, which is the hole
 
             // Overlap of two same-wound squares: even-odd hollows it, NonZero fills it.
             void Overlap(FillRule rule, bool overlapFilled)
@@ -101,6 +101,27 @@ namespace Adamantium.MathTests
             var nz = FillDonut(FillRule.NonZero);
             Assert.IsTrue(Covered(nz, V(50, 50)), "hole filled solid");
             Assert.AreEqual(2, nz.Count / 3, "solid quad => 2 triangles");
+        }
+
+        // OPEN. A hole must survive a neighbour that crosses the outline: clean nesting is resolved by the fast path
+        // and its winding rule, but ONE crossing sends the whole shape to the general pipeline, where no fill rule is
+        // consulted at all - the contours are merely united and every hole is lost. Closing it means finding the FACES
+        // of the cut-up contours (a walk over the planar graph); the scanline there pairs crossings by their upper
+        // point, which is not their order across a slanted edge.
+        [Test]
+        public void NonZero_KeepsHoles_WhenSomethingCrossesTheOutline()
+        {
+            var p = new Polygon { FillRule = FillRule.NonZero };
+
+            p.AddContour(new MeshContour(Rect(0, 0, 100, 100)));          // the body
+            p.AddContour(new MeshContour(RectCW(25, 25, 45, 45)));        // a cell, cut by running the other way
+            p.AddContour(new MeshContour(new[] { V(90, 60), V(130, 60), V(90, 90) }));   // sticks out through the side
+
+            var tris = p.FillIndirect();
+
+            Assert.IsTrue(Covered(tris, V(10, 10)), "the body is not filled");
+            Assert.IsTrue(Covered(tris, V(110, 65)), "what sticks out is not filled");
+            Assert.IsFalse(Covered(tris, V(35, 35)), "the cell was filled in");
         }
 
         static List<Vector3> FillDonut(FillRule rule)

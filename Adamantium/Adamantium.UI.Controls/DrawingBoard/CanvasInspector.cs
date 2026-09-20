@@ -44,6 +44,18 @@ public class CanvasInspector : Control, ICanvasPart
     public static readonly AdamantiumProperty StructureProperty = AdamantiumProperty.Register(nameof(Structure),
         typeof(IEnumerable), typeof(CanvasInspector), new PropertyMetadata(null));
 
+    /// <summary>How much is on the plane, in words - shown over the list, where what is on the plane is being looked
+    /// at anyway. Said here rather than left to the application: a panel that lists everything and cannot say how much
+    /// of it there is makes the count something to go and find elsewhere.</summary>
+    public static readonly AdamantiumProperty CountedProperty = AdamantiumProperty.Register(nameof(Counted),
+        typeof(String), typeof(CanvasInspector), new PropertyMetadata("Nothing drawn yet"));
+
+    public String Counted
+    {
+        get => GetValue<String>(CountedProperty);
+        private set => SetCurrentValue(CountedProperty, value);
+    }
+
     /// <summary>The row picked in that list. Picking one selects it on the plane, because there is one selection and
     /// not two.</summary>
     public static readonly AdamantiumProperty ListedProperty = AdamantiumProperty.Register(nameof(Listed),
@@ -67,36 +79,21 @@ public class CanvasInspector : Control, ICanvasPart
 
     public static readonly AdamantiumProperty StructureFaceProperty = Face(nameof(StructureFace));
 
-    public static readonly AdamantiumProperty PenSettingsProperty = Face(nameof(PenSettings));
-    public static readonly AdamantiumProperty EraserSettingsProperty = Face(nameof(EraserSettings));
-    public static readonly AdamantiumProperty TextSettingsProperty = Face(nameof(TextSettings));
-    public static readonly AdamantiumProperty ShapeSettingsProperty = Face(nameof(ShapeSettings));
-
-    public static readonly AdamantiumProperty StrokeSectionProperty = Face(nameof(StrokeSection));
-    public static readonly AdamantiumProperty ShapeSectionProperty = Face(nameof(ShapeSection));
-    public static readonly AdamantiumProperty TextSectionProperty = Face(nameof(TextSection));
-    public static readonly AdamantiumProperty CurveSectionProperty = Face(nameof(CurveSection));
-    public static readonly AdamantiumProperty GroupSectionProperty = Face(nameof(GroupSection));
-    public static readonly AdamantiumProperty FrameSectionProperty = Face(nameof(FrameSection));
-    public static readonly AdamantiumProperty ElementSectionProperty = Face(nameof(ElementSection));
-    public static readonly AdamantiumProperty NodeSectionProperty = Face(nameof(NodeSection));
-
-    /// <summary>Shown where what is selected is painted with a PICTURE: how it fits, whether it repeats, which way up,
-    /// its turn and its tint. Not "is this a texture" - a texture is only a surface with a picture on it, and a button
-    /// with one has exactly the same questions to answer.</summary>
-    public static readonly AdamantiumProperty TextureSectionProperty = Face(nameof(TextureSection));
+    // WHICH SECTIONS FIT WHAT IS SELECTED is no longer a row of flags here. There used to be one per kind of thing -
+    // and one per VARIANT of a kind: has corners, has sides, has heads - so a panel had to be told about every kind the
+    // canvas could hold, and the next kind meant a new flag here and an edit to three themes. The sets of lines now say
+    // what they are for (see CanvasSectionSet), and what a thing IS answers them: ICanvasItem.Sort.
 
     /// <summary>Whether the actions that only mean something to a GRAPH are offered - lining nodes up, spreading them
     /// out, framing them, bringing them into view and the file the graph is kept in. Emptying the plane is NOT among
     /// them and is offered in both modes: it is about the canvas rather than about what is on it.</summary>
     public static readonly AdamantiumProperty GraphActionsProperty = Face(nameof(GraphActions));
 
-    public static readonly AdamantiumProperty HasCornersProperty = Fact(nameof(HasCorners));
-    public static readonly AdamantiumProperty HasSidesProperty = Fact(nameof(HasSides));
-    public static readonly AdamantiumProperty HasHeadsProperty = Fact(nameof(HasHeads));
-    public static readonly AdamantiumProperty IsBezierProperty = Fact(nameof(IsBezier));
-    public static readonly AdamantiumProperty IsNurbsProperty = Fact(nameof(IsNurbs));
-    public static readonly AdamantiumProperty HasPlainLabelProperty = Fact(nameof(HasPlainLabel));
+    /// <summary>...and the ones that only mean something to a DRAWING: the file it is written out to and read back
+    /// from. A drawing is written as SVG because other people's tools have a claim on it; a graph means something only
+    /// here and is kept as JSON, which is why these two are not one pair of buttons.</summary>
+    public static readonly AdamantiumProperty DrawingActionsProperty = Face(nameof(DrawingActions));
+
 
     /// <summary>Whether the canvas is being used as a drawing - which the rows that only mean something to one are
     /// shown by.</summary>
@@ -167,28 +164,10 @@ public class CanvasInspector : Control, ICanvasPart
     public Visibility SelectionFace => GetValue<Visibility>(SelectionFaceProperty);
     public Visibility StructureFace => GetValue<Visibility>(StructureFaceProperty);
 
-    public Visibility PenSettings => GetValue<Visibility>(PenSettingsProperty);
-    public Visibility EraserSettings => GetValue<Visibility>(EraserSettingsProperty);
-    public Visibility TextSettings => GetValue<Visibility>(TextSettingsProperty);
-    public Visibility ShapeSettings => GetValue<Visibility>(ShapeSettingsProperty);
-
-    public Visibility StrokeSection => GetValue<Visibility>(StrokeSectionProperty);
-    public Visibility ShapeSection => GetValue<Visibility>(ShapeSectionProperty);
-    public Visibility TextSection => GetValue<Visibility>(TextSectionProperty);
-    public Visibility CurveSection => GetValue<Visibility>(CurveSectionProperty);
-    public Visibility GroupSection => GetValue<Visibility>(GroupSectionProperty);
-    public Visibility FrameSection => GetValue<Visibility>(FrameSectionProperty);
-    public Visibility ElementSection => GetValue<Visibility>(ElementSectionProperty);
-    public Visibility NodeSection => GetValue<Visibility>(NodeSectionProperty);
-    public Visibility TextureSection => GetValue<Visibility>(TextureSectionProperty);
     public Visibility GraphActions => GetValue<Visibility>(GraphActionsProperty);
+    public Visibility DrawingActions => GetValue<Visibility>(DrawingActionsProperty);
 
-    public Boolean HasCorners => GetValue<Boolean>(HasCornersProperty);
-    public Boolean HasSides => GetValue<Boolean>(HasSidesProperty);
-    public Boolean HasHeads => GetValue<Boolean>(HasHeadsProperty);
-    public Boolean IsBezier => GetValue<Boolean>(IsBezierProperty);
-    public Boolean IsNurbs => GetValue<Boolean>(IsNurbsProperty);
-    public Boolean HasPlainLabel => GetValue<Boolean>(HasPlainLabelProperty);
+
 
     // EVERY ROW THE TEMPLATE READS IS A REGISTERED PROPERTY, including the fixed lists and the two commands.
     // {TemplateBinding} resolves an AdamantiumProperty on the templated parent and nothing else: pointed at a plain
@@ -215,27 +194,12 @@ public class CanvasInspector : Control, ICanvasPart
     private static readonly IReadOnlyList<ImageBackgroundState> Grounding =
         [ImageBackgroundState.WhenEmpty, ImageBackgroundState.Always, ImageBackgroundState.Never];
 
-    /// <summary>The grids a plane can wear, for the row that chooses one.</summary>
-    public static readonly AdamantiumProperty GridStylesProperty = AdamantiumProperty.Register(nameof(GridStyles),
-        typeof(IEnumerable), typeof(CanvasInspector), new PropertyMetadata(Grids));
 
-    public static readonly AdamantiumProperty ArrowHeadsProperty = AdamantiumProperty.Register(nameof(ArrowHeads),
-        typeof(IEnumerable), typeof(CanvasInspector), new PropertyMetadata(Heads));
+    // WHAT CAN BE CHOSEN is NOT kept here any more - the grids a plane can wear, the ends an arrow takes, the ways a
+    // picture fills its tile. They are the canvas's own (see InfiniteCanvas.GridStyles and the rest), and a line that
+    // offers one reaches it through this panel's Canvas. Kept here as well, they were a second list to hold in step
+    // with the first for no gain at all.
 
-    public static readonly AdamantiumProperty CurvesProperty = AdamantiumProperty.Register(nameof(Curves),
-        typeof(IEnumerable), typeof(CanvasInspector), new PropertyMetadata(Kinds));
-
-    /// <summary>The ways a picture can fill its tile, for the row that chooses one.</summary>
-    public static readonly AdamantiumProperty FillsProperty = AdamantiumProperty.Register(nameof(Fills),
-        typeof(IEnumerable), typeof(CanvasInspector), new PropertyMetadata(Filling));
-
-    /// <summary>...and the ways that tile can repeat, mirrored or not.</summary>
-    public static readonly AdamantiumProperty TilingsProperty = AdamantiumProperty.Register(nameof(Tilings),
-        typeof(IEnumerable), typeof(CanvasInspector), new PropertyMetadata(Tiling));
-
-    /// <summary>When the ground behind a picture is painted, for the row that chooses one.</summary>
-    public static readonly AdamantiumProperty GroundsProperty = AdamantiumProperty.Register(nameof(Grounds),
-        typeof(IEnumerable), typeof(CanvasInspector), new PropertyMetadata(Grounding));
 
     /// <summary>The catalogues, straight off the canvas - so the row that names a node's kind offers exactly what the
     /// palette offers and the two cannot drift apart.</summary>
@@ -260,17 +224,6 @@ public class CanvasInspector : Control, ICanvasPart
     public static readonly AdamantiumProperty ActualSizeCommandProperty = AdamantiumProperty.Register(
         nameof(ActualSizeCommand), typeof(ICommand), typeof(CanvasInspector), new PropertyMetadata(null));
 
-    public IEnumerable GridStyles => GetValue<IEnumerable>(GridStylesProperty);
-
-    public IEnumerable ArrowHeads => GetValue<IEnumerable>(ArrowHeadsProperty);
-
-    public IEnumerable Curves => GetValue<IEnumerable>(CurvesProperty);
-
-    public IEnumerable Fills => GetValue<IEnumerable>(FillsProperty);
-
-    public IEnumerable Tilings => GetValue<IEnumerable>(TilingsProperty);
-
-    public IEnumerable Grounds => GetValue<IEnumerable>(GroundsProperty);
 
     public IEnumerable NodeKinds => GetValue<IEnumerable>(NodeKindsProperty);
 
@@ -348,6 +301,7 @@ public class CanvasInspector : Control, ICanvasPart
     }
 
     private PropertyGrid _grid;
+    private PropertyGrid _tools;
 
     /// <summary>Hands the canvas the grid that shows what is selected, so that a number typed into a row becomes a step
     /// in the canvas's memory and a repaint of the plane. The canvas does the listening because it is the specialised
@@ -359,6 +313,7 @@ public class CanvasInspector : Control, ICanvasPart
         if (_grid != null) _grid.ValueChanged -= OnRowWritten;
 
         _grid = GetTemplateChild("PART_Selected") as PropertyGrid;
+        _tools = GetTemplateChild("PART_Tool") as PropertyGrid;
 
         // An EDIT can change which sections apply - a picture painted onto a surface brings a texture's lines with it -
         // and nothing else would ever say so: the selection has not changed, and the scene's own signal is about what
@@ -366,6 +321,17 @@ public class CanvasInspector : Control, ICanvasPart
         if (_grid != null) _grid.ValueChanged += OnRowWritten;
 
         Wire();
+
+        // A NEW TEMPLATE MEANS A NEW THEME, and a theme can ship a different default set - so what was kept from the
+        // last one is dropped rather than carried into a panel it was not written for.
+        _selectionSections = null;
+        _toolSections = null;
+
+        // THE SECTIONS, now that there is somewhere to put them. What the panel shows is worked out whenever the
+        // selection or the tool changes - and both of those can have happened before this control had a template at
+        // all, in which case the answer was handed to nobody.
+        ReadSections();
+        ReadTool();
     }
 
     public override void OnRemoveTemplate()
@@ -375,6 +341,7 @@ public class CanvasInspector : Control, ICanvasPart
         if (_grid != null) _grid.ValueChanged -= OnRowWritten;
 
         _grid = null;
+        _tools = null;
     }
 
     private void OnRowWritten(object sender, PropertyValuesChangedEventArgs e) => ReadSections();
@@ -414,11 +381,29 @@ public class CanvasInspector : Control, ICanvasPart
         inspector.ReadAll();
     }
 
-    private void OnSelectionChanged(object sender, EventArgs e) => Read();
+    private void OnSelectionChanged(object sender, EventArgs e)
+    {
+        // WHAT WAS REACHED FOR LAST, remembered here and nowhere else. Picking something up is a person pointing at
+        // the thing they mean; the panel shows it, even if a tool was picked up a moment earlier.
+        _toolWanted = false;
+        Read();
+    }
 
     private void OnPlaneChanged(object sender, EventArgs e) => ReadStructure();
 
-    private void OnToolChanged(object sender, EventArgs e) => ReadTool();
+    private void OnToolChanged(object sender, EventArgs e)
+    {
+        // ...and picking up a TOOL is a person saying what they are about to do, so its settings come forward - with
+        // whatever is selected left exactly as it is. A tool that selects what it touches is the exception: reaching
+        // for it is reaching for what is on the plane.
+        _toolWanted = Canvas?.Tool is not null and not SelectTool;
+
+        ReadTool();
+        ReadSections();
+    }
+
+    // Which of the two faces the person asked for last - see the note where the faces are settled.
+    private bool _toolWanted;
 
     private void OnModeChanged(object sender, EventArgs e) => ReadMode();
 
@@ -503,25 +488,23 @@ public class CanvasInspector : Control, ICanvasPart
         }
 
         SetCurrentValue(GraphActionsProperty, Shown(!drawing));
+        SetCurrentValue(DrawingActionsProperty, Shown(drawing));
     }
 
     // WHICH TOOL'S settings belong in the panel. Asked of the tool itself: the canvas holds the tools, and what a pen
     // has to say about itself is that it is a pen.
-    private void ReadTool()
-    {
-        var tool = Canvas?.Tool;
-
-        SetCurrentValue(PenSettingsProperty, Shown(tool is PenTool));
-        SetCurrentValue(EraserSettingsProperty, Shown(tool is EraseTool));
-        SetCurrentValue(TextSettingsProperty, Shown(tool is TextTool));
-        SetCurrentValue(ShapeSettingsProperty, Shown(tool is ShapeTool or CurveTool));
-    }
+    // WHAT THE TOOL IN HAND IS SET BY. A tool used to be answered by a flag apiece - pen, eraser, text, shape - so a
+    // tool an application added had nowhere at all to put its settings, however easily it got itself a button on the
+    // rail. Now the sets say which tool they are for, matched against the tool's own name.
+    private void ReadTool() =>
+        Fill(_tools, Sections(ToolSetsKey, Canvas?.ToolSections, ref _toolSections), Names(Canvas?.Tool));
 
     private void ReadStructure()
     {
         if (Canvas is not { } canvas)
         {
             Structure = null;
+            Counted = "Nothing drawn yet";
             return;
         }
 
@@ -531,6 +514,12 @@ public class CanvasInspector : Control, ICanvasPart
         listed.Reverse();
 
         Structure = listed;
+        Counted = listed.Count switch
+        {
+            0 => "Nothing drawn yet",
+            1 => "1 item",
+            var many => $"{many} items"
+        };
     }
 
     private static void OnListedChanged(AdamantiumComponent component, AdamantiumPropertyChangedEventArgs e)
@@ -567,39 +556,133 @@ public class CanvasInspector : Control, ICanvasPart
         var chosen = Canvas?.Selection;
         var many = chosen?.Count ?? 0;
 
-        SetCurrentValue(StrokeSectionProperty, Shown<StrokeItem>(chosen));
-        SetCurrentValue(ShapeSectionProperty, Shown<ShapeItem>(chosen));
-        SetCurrentValue(TextSectionProperty, Shown<TextItem>(chosen));
-        SetCurrentValue(CurveSectionProperty, Shown<CurveItem>(chosen));
-        SetCurrentValue(GroupSectionProperty, Shown<GroupItem>(chosen));
-        SetCurrentValue(FrameSectionProperty, Shown<CanvasFrameItem>(chosen));
-        SetCurrentValue(ElementSectionProperty, Shown<ElementItem>(chosen));
-        SetCurrentValue(NodeSectionProperty, Shown(Any(chosen, item => item is ElementItem { Model: ICanvasNode })));
-        SetCurrentValue(TextureSectionProperty, Shown(Any(chosen, item => item is ElementItem { Tiled: not null })));
-        SetCurrentValue(HasCornersProperty, Any(chosen, item => item is ShapeItem { Shape: CanvasShape.Rectangle }));
-        SetCurrentValue(HasSidesProperty, Any(chosen, item => item is ShapeItem { Shape: CanvasShape.Polygon }));
-        SetCurrentValue(HasHeadsProperty, Any(chosen, item => item is ShapeItem { Shape: CanvasShape.Arrow }));
-        SetCurrentValue(IsBezierProperty, Any(chosen, item => item is CurveItem { Kind: CanvasCurve.Bezier }));
-        SetCurrentValue(IsNurbsProperty, Any(chosen, item => item is CurveItem { Kind: CanvasCurve.Nurbs }));
+        // WHETHER THERE IS ANYTHING TO SHOW is the answer this gives - a kind of thing the sets say nothing about has
+        // an empty page, and an empty page is not worth turning to. Asked of the SETS and not of a list of classes: a
+        // list of classes has to be edited for every new kind, and the one written from an SVG was not on it, so a
+        // whole imported drawing could not be painted.
+        var lines = Fill(_grid, Sections(SelectionSetsKey, Canvas?.InspectorSections, ref _selectionSections), Names(chosen));
 
-        // A NODE says its name on its own Title row, so the generic one would be the same name written twice - and two
-        // rows writing one thing disagree the moment one of them is used.
-        SetCurrentValue(HasPlainLabelProperty,
-            Any(chosen, item => item is ElementItem and not ElementItem { Model: ICanvasNode }));
+        Fill(_tools, Sections(ToolSetsKey, Canvas?.ToolSections, ref _toolSections), Names(Canvas?.Tool));
 
+        // WHICHEVER WAS REACHED FOR LAST. Picking up a tool is a person saying what they are about to do, and the
+        // answer to "what is this tool set to" must not be "let go of what you are holding first": settings are chosen
+        // BEFORE the stroke, and dropping the selection to see them means drawing with whatever the last settings were.
+        // Touching the selection says the opposite - it is the thing that is being worked on - and the panel follows
+        // back.
         var anything = many > 0;
+        var tool = _toolWanted || !anything;
 
-        SetCurrentValue(ToolFaceProperty, Shown(ShowsProperties && !anything));
-        SetCurrentValue(SelectionFaceProperty, Shown(ShowsProperties && anything && Describable(chosen)));
+        SetCurrentValue(ToolFaceProperty, Shown(ShowsProperties && tool));
+        SetCurrentValue(SelectionFaceProperty, Shown(ShowsProperties && !tool && anything && lines > 0));
         SetCurrentValue(StructureFaceProperty, Shown(ShowsStructure));
     }
 
-    // Whether the panel has a section for what is selected. A WIRE has none and wants none - it is the two sockets it
-    // joins and nothing else - and without this the panel stood there as a border round no rows, which reads as a panel
-    // that has lost its contents rather than as "nothing to set here".
-    private static bool Describable(IReadOnlyList<ICanvasItem> chosen) =>
-        Any(chosen, item => item is StrokeItem or ShapeItem or TextItem or CurveItem or GroupItem or ElementItem
-            or CanvasFrameItem);
+    /// <summary>The key the default set of SELECTION lines ships under. A theme links the dictionary that holds it, and
+    /// an application that wants to replace the lot declares this key of its own.</summary>
+    public const string SelectionSetsKey = "CanvasSelectionSections";
+
+    /// <summary>...and the same for the page shown while nothing is selected - what the TOOL in hand is set by.</summary>
+    public const string ToolSetsKey = "CanvasToolSections";
+
+    // WHAT THIS PANEL SHOWS, which is content and not a theme's business: the default set is a resource the themes
+    // ship, and whatever the canvas was given is laid over it.
+    //
+    // KEPT, not asked for again. The resource is declared x:Shared="False" - it must be, since a section is a live
+    // control and two canvases cannot be handed the same one - so every ask builds a fresh set. Used directly that
+    // means every repaint of the panel hands the grid different objects, and everything the person had done to the
+    // ones before is gone with them: a block they opened closes itself the moment anything is written.
+    private CanvasInspectorSections Sections(string key, CanvasInspectorSections mine, ref CanvasInspectorSections kept)
+    {
+        kept ??= UIAppContext.Current?.ResourceManager?.FindResource(this, key) as CanvasInspectorSections;
+
+        if (kept == null) return mine;
+
+        // THE LAYING-OVER IS DONE EVERY TIME, and only the default is kept. What an application hands in can be bound,
+        // and a binding arrives after the panel has been built - so a merge done once would be a merge done before the
+        // application had said anything. It costs a list of references; the SECTIONS in it are the same objects either
+        // way, which is what matters: they are what a person has opened and folded.
+        return mine == null ? kept : kept.With(mine);
+    }
+
+    // What was built from the resource, until a new template says a new theme is in - that one can ship a different
+    // default, and what was kept was not written for it.
+    private CanvasInspectorSections _selectionSections;
+    private CanvasInspectorSections _toolSections;
+
+    // WHAT A THING ANSWERS TO: its class, where a family's lines live, and its own narrowest name, where one kind's do.
+    //
+    // WHAT THEY ALL ANSWER TO, when several are selected. A name only counts where EVERY one of them carries it: a
+    // line written for a rectangle has no meaning for the ellipse beside it, and shown for both it would write corners
+    // into something that has none. What is left when they agree about nothing is the empty list - which still matches
+    // the sets written for everything, so a mixed selection keeps the lines every kind has (where it stands, how big
+    // it is) instead of the panel going blank and looking broken.
+    private static IReadOnlyList<string> Names(IReadOnlyList<ICanvasItem> chosen)
+    {
+        if (chosen == null || chosen.Count == 0) return null;
+
+        var first = chosen[0];
+
+        if (first == null) return null;
+
+        var family = first.GetType().Name;
+        var sort = first.Sort;
+
+        for (var i = 1; i < chosen.Count; i++)
+        {
+            if (chosen[i] == null) return null;
+
+            if (chosen[i].GetType().Name != family) family = null;
+            if (!string.Equals(chosen[i].Sort, sort, StringComparison.Ordinal)) sort = null;
+        }
+
+        var names = new List<string>(2);
+
+        if (family != null) names.Add(family);
+        if (sort != null && sort != family) names.Add(sort);
+
+        return names;
+    }
+
+    // A TOOL answers to its own name and its class, for the same reasons.
+    // NO TOOL IS STILL A PAGE. The sets whose For is empty are about the CANVAS - the grid, the snap, how far it may
+    // zoom - and they belong under every tool and under none. Answered with nothing at all, the page came up blank
+    // whenever the hand was empty, and the canvas's own settings were reachable only while a tool was held.
+    private static IReadOnlyList<string> Names(ICanvasTool tool) =>
+        tool == null ? Array.Empty<string>() : new[] { tool.GetType().Name, tool.Name };
+
+    // Hands a grid the sections that fit. Through SectionsSource, which is the grid's own door for an inspector that is
+    // assembled rather than written out - see PropertyGrid.SectionsSource.
+    private static int Fill(PropertyGrid grid, CanvasInspectorSections sections, IReadOnlyList<string> names)
+    {
+        if (grid == null) return 0;
+
+        var wanted = names == null || sections == null ? null : sections.For(names);
+
+        // ONLY WHEN IT IS ACTUALLY DIFFERENT. This is worked out again after every write - a picture painted onto a
+        // surface brings a texture's lines with it - and handing over a fresh list of the SAME sections still counts as
+        // a change, so the grid would rebuild its rows on every keystroke. A person dragging across a colour surface
+        // writes continuously, and the row their popup belongs to was being taken out from under it mid-gesture.
+        if (!Same(grid.SectionsSource, wanted)) grid.SectionsSource = wanted;
+
+        return wanted?.Count ?? 0;
+    }
+
+    private static bool Same(IEnumerable one, IReadOnlyList<PropertySection> other)
+    {
+        if (one == null) return other == null;
+        if (other == null) return false;
+
+        var at = 0;
+
+        foreach (var section in one)
+        {
+            if (at >= other.Count || !ReferenceEquals(section, other[at])) return false;
+
+            at++;
+        }
+
+        return at == other.Count;
+    }
 
     private static Visibility Shown<T>(IReadOnlyList<ICanvasItem> chosen) where T : ICanvasItem =>
         Shown(Any(chosen, item => item is T));

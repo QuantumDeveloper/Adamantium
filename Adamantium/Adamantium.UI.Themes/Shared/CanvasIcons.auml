@@ -202,6 +202,21 @@
                          StrokeThickness="1.2"/>
     </DrawingImage>
 
+    <!-- ONE PLACE, not all the way: the same stack of lines, and an arrow that steps over ONE of them rather than
+         running past the lot. The pair beside these go to the ends; these two are how a thing is put BETWEEN two
+         others, which is where most arranging actually happens. -->
+    <DrawingImage x:Key="BringForwardIcon">
+        <GeometryDrawing Geometry="M0.8,3.2 L6,3.2 M0.8,5.5 L6,5.5 M0.8,7.8 L6,7.8 M8.4,7 L8.4,3.4 M7.2,4.6 L8.4,3.4 L9.6,4.6"
+                         Stroke="{ResourceReference TextFillColorSecondary}"
+                         StrokeThickness="1.2"/>
+    </DrawingImage>
+
+    <DrawingImage x:Key="SendBackwardIcon">
+        <GeometryDrawing Geometry="M0.8,3.2 L6,3.2 M0.8,5.5 L6,5.5 M0.8,7.8 L6,7.8 M8.4,3 L8.4,6.6 M7.2,5.4 L8.4,6.6 L9.6,5.4"
+                         Stroke="{ResourceReference TextFillColorSecondary}"
+                         StrokeThickness="1.2"/>
+    </DrawingImage>
+
     <DrawingImage x:Key="SendToBackIcon">
         <GeometryDrawing Geometry="M0.8,3.2 L6,3.2 M0.8,5.5 L6,5.5 M0.8,7.8 L6,7.8 M8.4,1 L8.4,8.4 M7.2,7.2 L8.4,8.4 L9.6,7.2"
                          Stroke="{ResourceReference TextFillColorSecondary}"
@@ -316,6 +331,26 @@
         <GeometryDrawing Geometry="M1.4,1.6 L1.4,8.4 M5,1.6 L5,8.4 M8.6,1.6 L8.6,8.4"
                          Stroke="{ResourceReference TextFillColorSecondary}"
                          StrokeThickness="1.1"/>
+    </DrawingImage>
+
+    <!-- A BOOKMARK: this view is the one to come back to. Filled, because it stands beside Home, which is where it is
+         come back to from - an outline there would read as a second, quieter kind of button. -->
+    <DrawingImage x:Key="KeepViewIcon">
+        <GeometryDrawing Geometry="M2.4,0.8 L7.6,0.8 L7.6,9.2 L5,6.7 L2.4,9.2 Z"
+                         Brush="{ResourceReference TextFillColorSecondary}"/>
+    </DrawingImage>
+
+    <!-- ...and the same bookmark struck through: the kept view given up, so Home means the origin again. -->
+    <DrawingImage x:Key="ForgetViewIcon">
+        <GeometryDrawing Geometry="M2.6,1.4 L7.4,1.4 L7.4,8.6 L5,6.5 L2.6,8.6 Z M1,9.4 L9,1"
+                         Stroke="{ResourceReference TextFillColorSecondary}"
+                         StrokeThickness="1.1"/>
+    </DrawingImage>
+
+    <!-- HOME, as a house with a door - the one picture everything means by "back to where I started". -->
+    <DrawingImage x:Key="HomeIcon">
+        <GeometryDrawing Geometry="M5,0.7 L9.6,5.1 L8.3,5.1 L8.3,9.3 L6,9.3 L6,6.5 L4,6.5 L4,9.3 L1.7,9.3 L1.7,5.1 L0.4,5.1 Z"
+                         Brush="{ResourceReference TextFillColorSecondary}"/>
     </DrawingImage>
 
 </ResourceDictionary>

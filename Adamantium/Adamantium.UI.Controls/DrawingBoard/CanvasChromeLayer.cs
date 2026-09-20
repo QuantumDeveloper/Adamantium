@@ -120,6 +120,9 @@ public class CanvasChromeLayer : Panel
         if (changed) SyncSelection();
     }
 
+    /// <summary>The panes this layer places, in the order the template wrote them.</summary>
+    public IReadOnlyList<CanvasPane> Panes => _panes;
+
     /// <summary>Lets go of every pane - what a canvas does when its template is taken away.</summary>
     public void Release()
     {
@@ -277,8 +280,14 @@ public class CanvasChromeLayer : Panel
                     break;
 
                 default:
-                    x = pane.Offset.X;
-                    y = pane.Offset.Y;
+                    // Asked to open at a POINT - here is where both the room and the pane's own size are known, so
+                    // here is where that point becomes the fraction everything else is kept in.
+                    if (pane.TakePending(out var asked))
+                        pane.Anchor = CanvasPane.AnchorFor(asked, finalSize, size);
+
+                    var put = CanvasPane.PlaceOf(pane.Anchor, finalSize, size);
+                    x = put.X;
+                    y = put.Y;
                     break;
             }
 

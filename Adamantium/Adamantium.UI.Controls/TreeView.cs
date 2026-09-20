@@ -50,6 +50,37 @@ public class TreeView : ItemsControl
     public static readonly AdamantiumProperty ExpandOnDoubleClickProperty = AdamantiumProperty.Register(nameof(ExpandOnDoubleClick),
         typeof(bool), typeof(TreeView), new PropertyMetadata(true));
 
+    /// <summary>WHAT A DOUBLE CLICK ON A LEAF MEANS - open it, go to it, put it in view. The item is handed over as the
+    /// parameter.
+    /// <para>A branch keeps its own answer: a double click opens and folds it (see <see cref="ExpandOnDoubleClick"/>),
+    /// which is what the gesture has always meant on a tree. A leaf has nothing to open, and that is the room this
+    /// fills - it used to do nothing at all, so anything an application wanted from it had to be written as a press
+    /// handler counting clicks, exactly as a list's did before <see cref="ListBox.ItemActivatedCommand"/>.</para>
+    /// <para>A branch WITH folding switched off is activated too: with nothing to open, a double click on it means the
+    /// same thing it means anywhere else in the tree.</para></summary>
+    public static readonly AdamantiumProperty ItemActivatedCommandProperty = AdamantiumProperty.Register(
+        nameof(ItemActivatedCommand), typeof(ICommand), typeof(TreeView), new PropertyMetadata(null));
+
+    public ICommand ItemActivatedCommand
+    {
+        get => GetValue<ICommand>(ItemActivatedCommandProperty);
+        set => SetValue(ItemActivatedCommandProperty, value);
+    }
+
+    /// <summary>Raised on the same gesture, for whoever would rather have an event than a command.</summary>
+    public event EventHandler<ItemActivatedEventArgs> ItemActivated;
+
+    // WHAT WAS DOUBLE CLICKED is what is selected: the first of the two presses selected it, which is the rule a single
+    // click follows and the one the list follows.
+    internal void Activate()
+    {
+        if (SelectedItem is not { } item) return;
+
+        ItemActivated?.Invoke(this, new ItemActivatedEventArgs(item));
+
+        if (ItemActivatedCommand is { } command && command.CanExecute(item)) command.Execute(item);
+    }
+
     /// <summary>The vertical scroll offset (px), two-way. Bind it to the view-model to PERSIST the scroll position across a
     /// view rebuild (a tab switch recreates this view) - or to DRIVE the scroll from the VM. Reflects live scrolling; setting
     /// it scrolls the tree (restored once the content's extent is known).</summary>

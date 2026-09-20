@@ -88,6 +88,10 @@ public class StreamGeometryContext : IFigureSegments
         return this;
     }
 
+    /// <summary>The figures this context has been given, in the order they were begun. Read by anything that has to
+    /// state the geometry again rather than draw it - writing it back out as SVG path data, for one.</summary>
+    public IReadOnlyList<PathFigure> Figures => figures;
+
     internal void ProcessFigures()
     {
         if (isProcessed) return;

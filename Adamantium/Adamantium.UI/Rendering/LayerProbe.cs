@@ -54,6 +54,26 @@ public static class LayerProbe
     public static string LastOpDump = "";
     public static int LastOpCount;
 
+    // A CONTROL THAT STOPS BEING DRAWN WHILE IT IS STILL THERE cannot be seen from outside the render thread: the tree
+    // says the control is present, visible and the right size, and the picture says otherwise. What decides it is
+    // whether the bytes it drew survived its trip out of the paint order - so the two ends of that trip are written
+    // down here, named by the control they belong to.
+    //
+    // ADAM_RENDER_WATCH=<file>: off by default and free when off (one null check on a static). A hand can then do the
+    // gesture that loses the picture and the file says what happened to it, which no timing or counter can.
+    public static readonly string WatchPath = Environment.GetEnvironmentVariable("ADAM_RENDER_WATCH");
+
+    private static readonly object WatchLock = new();
+
+    public static void Say(string line)
+    {
+        if (WatchPath == null) return;
+
+        // The render thread writes these while the UI thread may be writing its own - a probe that loses lines, or
+        // throws, is worse than no probe.
+        lock (WatchLock) System.IO.File.AppendAllText(WatchPath, line + Environment.NewLine);
+    }
+
     public static string Dump()
     {
         var f = Math.Max(1, Frames);

@@ -22,7 +22,6 @@ public class CanvasFrameTests
     {
         ICanvasItem frame = Frame();
 
-        Assert.That(frame.Band, Is.EqualTo(CanvasBand.Under));
         Assert.That(frame.Mode, Is.EqualTo(CanvasMode.Nodes), "a frame is a way of reading a GRAPH");
     }
 

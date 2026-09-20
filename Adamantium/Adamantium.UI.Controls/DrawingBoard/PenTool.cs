@@ -66,7 +66,7 @@ public class PenTool : ICanvasTool
             // which follows the pointer until the click that fixes it in turn.
             _drawing.Add(e.World);
 
-            canvas.InvalidateRender(false);
+            canvas.Repaint();
             e.Handled = true;
             return;
         }
@@ -75,7 +75,7 @@ public class PenTool : ICanvasTool
         _drawing.Add(e.World);
 
         canvas.CaptureMouse();
-        canvas.InvalidateRender(false);
+        canvas.Repaint();
         e.Handled = true;
     }
 
@@ -88,7 +88,7 @@ public class PenTool : ICanvasTool
         if (_chaining)
         {
             _drawing.MoveLast(e.World);
-            canvas.InvalidateRender(false);
+            canvas.Repaint();
             e.Handled = true;
             return;
         }
@@ -101,7 +101,7 @@ public class PenTool : ICanvasTool
         _from = e.Screen;
         _drawing.Add(e.World);
 
-        canvas.InvalidateRender(false);
+        canvas.Repaint();
         e.Handled = true;
     }
 
@@ -126,8 +126,8 @@ public class PenTool : ICanvasTool
         finished.Smooth(canvas.ScreenToWorldLength(0.6), canvas.ScreenToWorldLength(4));
 
         canvas.ReleaseMouseCapture();
-        canvas.Scene?.Add(finished);
-        canvas.InvalidateRender(false);
+        canvas.Place(finished);
+        canvas.Repaint();
 
         e.Handled = true;
     }
@@ -153,7 +153,7 @@ public class PenTool : ICanvasTool
         // The vertex that was still following the pointer never became one.
         finished.RemoveLast();
 
-        if (finished.Points.Count >= 2) canvas.Scene?.Add(finished);
-        canvas.InvalidateRender(false);
+        if (finished.Points.Count >= 2) canvas.Place(finished);
+        canvas.Repaint();
     }
 }

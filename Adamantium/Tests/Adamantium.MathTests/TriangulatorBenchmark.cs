@@ -107,6 +107,17 @@ namespace Adamantium.MathTests
                 sb.AppendLine($"  tess={tess,3}  median={ms,9:F3} ms  min={min,9:F3} ms  tris={tris,4}");
             }
 
+            // CONTOURS THAT CROSS - the shape of an exported icon: a body with cells cut out of it by running them
+            // the other way round, plus one shape overlapping the outline. Nesting alone never reaches this; it is the
+            // planar fill's own cost, and the case that used to fall to the scanline.
+            sb.AppendLine();
+            sb.AppendLine("== Crossing contours (body + cells + an overlap -> planar fill) ==");
+            foreach (var cells in new[] { 4, 16, 64, 144 })
+            {
+                var (ms, min, tris) = Measure(() => Grid(cells), 2, cells <= 64 ? 10 : 5);
+                sb.AppendLine($"  cells={cells,4}  tris={tris,6}  median={ms,9:F3} ms  min={min,9:F3} ms");
+            }
+
             var text = sb.ToString();
             try { System.IO.File.WriteAllText(@"C:\Temp\tri_bench.txt", text); } catch { }
             TestContext.Progress.WriteLine(text);
@@ -194,6 +205,31 @@ namespace Adamantium.MathTests
         {
             var p = new Polygon { FillRule = FillRule.EvenOdd };
             p.AddContour(new MeshContour(pts));
+            return p;
+        }
+
+        // A body with k cells cut out of it (each wound the other way) and one triangle across its edge.
+        static Polygon Grid(int cells)
+        {
+            var p = new Polygon { FillRule = FillRule.NonZero };
+            var side = (int)Math.Ceiling(Math.Sqrt(cells));
+            var step = 100.0 / (side + 1);
+
+            p.AddContour(new MeshContour(new[] {
+                new Vector2(0, 0), new Vector2(100, 0), new Vector2(100, 100), new Vector2(0, 100) }));
+
+            for (var i = 0; i < cells; i++)
+            {
+                double x = step * (i % side) + step / 2, y = step * (i / side) + step / 2;
+                var w = step * 0.6;
+
+                p.AddContour(new MeshContour(new[] {
+                    new Vector2(x, y), new Vector2(x, y + w), new Vector2(x + w, y + w), new Vector2(x + w, y) }));
+            }
+
+            p.AddContour(new MeshContour(new[] {
+                new Vector2(90, 40), new Vector2(130, 40), new Vector2(90, 70) }));
+
             return p;
         }
 

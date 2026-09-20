@@ -106,6 +106,7 @@ public class CanvasArrangeTests
     private sealed class Attached : ICanvasItem
     {
         public Rect Bounds { get; init; }
+        public int Order { get; set; }
         public bool IsPlaced => false;
         public CanvasHandles Handles => CanvasHandles.None;
         public bool HitTest(Vector2 world, double tolerance) => false;

@@ -80,6 +80,1011 @@ public class Program
             opener.Start();
         }
 
+        // ADAM_CANVAS_PRESSLOG=1: write down every press on the plane - what tool was in hand, what was selected, and
+        // whether anything else had already taken it. A press is a hand's gesture and this harness touches no mouse, so
+        // a report about presses can only be answered by watching real ones.
+        if (Environment.GetEnvironmentVariable("ADAM_CANVAS_PRESSLOG") == "1")
+        {
+            var watcher = new System.Threading.Thread(() =>
+            {
+                System.Threading.Thread.Sleep(
+                    Environment.GetEnvironmentVariable("ADAM_CANVAS_SETTLE") is { } wait ? int.Parse(wait) : 8000);
+
+                var beside = Environment.GetEnvironmentVariable("ADAM_PROBE_LOG") ?? "canvas";
+                var win = Adamantium.UI.UIApplication.Current?.MainWindow;
+                var canvas = win?.Content is Adamantium.UI.Core.IUIComponent root ? FindCanvas(root) : null;
+
+                if (canvas == null)
+                {
+                    System.IO.File.AppendAllText(beside + ".press.txt", "no canvas on this tab" + Environment.NewLine);
+                    return;
+                }
+
+                Adamantium.UI.Threading.Dispatcher.CurrentDispatcher?.Post(() =>
+                {
+                    // THE TUNNELLING PHASE, before anything has had the press. Watched on the bubbling one, the log
+                    // stayed empty - which is itself a fact: by then the press has been marked handled and a plain
+                    // handler is not called at all.
+                    canvas.PreviewMouseDown += (_, e) =>
+                    {
+                        System.IO.File.AppendAllText(beside + ".press.txt",
+                            $"press: tool={canvas.Tool?.GetType().Name ?? "none"}"
+                            + $" button={e.ChangedButton} handled={e.Handled}"
+                            + $" source={e.OriginalSource?.GetType().Name ?? "none"}"
+                            + $" selected={canvas.Selection.Count}" + Environment.NewLine);
+                    };
+
+                    System.IO.File.AppendAllText(beside + ".press.txt", "watching presses" + Environment.NewLine);
+                });
+            })
+            { IsBackground = true, Name = "press-log" };
+
+            watcher.Start();
+        }
+
+        // ADAM_CANVAS_PICTURE=<file>: put a texture down, give it that file, draw a stroke over it, and gather the two -
+        // the sequence a picture is reported to vanish from. Every step is the one a hand takes, through the tools and
+        // through the panel's own write.
+        //
+        // A STEP PER PASS, each in its own turn of the dispatcher with a wait between: done in ONE turn the whole
+        // sequence costs a single frame, and a frame that draws the finished state writes it from nothing. What a hand
+        // does is spread over frames, so every step is drawn, and the frame after a change is PATCHED from the one
+        // before it - which is the only path on which anything here could go dark.
+        if (Environment.GetEnvironmentVariable("ADAM_CANVAS_PICTURE") is { } picture)
+        {
+            var hand = new System.Threading.Thread(() =>
+            {
+                System.Threading.Thread.Sleep(
+                    Environment.GetEnvironmentVariable("ADAM_CANVAS_SETTLE") is { } warm ? int.Parse(warm) : 9000);
+
+                var beside = Environment.GetEnvironmentVariable("ADAM_PROBE_LOG") ?? "canvas";
+                var win = Adamantium.UI.UIApplication.Current?.MainWindow;
+                var canvas = win?.Content is Adamantium.UI.Core.IUIComponent root ? FindCanvas(root) : null;
+
+                if (canvas?.Scene == null)
+                {
+                    System.IO.File.AppendAllText(beside + ".canvas.txt", "no canvas for the picture steps" + Environment.NewLine);
+                    return;
+                }
+
+                Adamantium.UI.Controls.DrawingBoard.ElementItem put = null;
+
+                void Step(Action what)
+                {
+                    Adamantium.UI.Threading.Dispatcher.CurrentDispatcher?.Post(what);
+                    System.Threading.Thread.Sleep(900);
+                }
+
+                Step(() =>
+                {
+                    var texture = new Adamantium.UI.Controls.DrawingBoard.TextureTool();
+
+                    canvas.Tool = texture;
+                    texture.OnPressed(canvas, At(canvas, 60, 60));
+                    texture.OnMoved(canvas, At(canvas, 260, 200));
+                    texture.OnReleased(canvas, At(canvas, 260, 200));
+
+                    foreach (var item in canvas.ItemsHere()) put = item as Adamantium.UI.Controls.DrawingBoard.ElementItem ?? put;
+                });
+
+                Step(() =>
+                {
+                    if (put?.Painted is Adamantium.UI.Controls.Image surface && System.IO.File.Exists(picture))
+                    {
+                        surface.Source = new Adamantium.UI.Core.Media.Imaging.BitmapImage(new Uri(picture));
+                    }
+                });
+
+                Step(() =>
+                {
+                    // TWO of them, which is the condition: with one stroke the picture survives being gathered, with
+                    // two or more it does not - one edit more leaves the plane standing in its half-state once more.
+                    var pen = new Adamantium.UI.Controls.DrawingBoard.PenTool();
+
+                    canvas.Tool = pen;
+                    pen.OnPressed(canvas, At(canvas, 90, 90));
+                    pen.OnMoved(canvas, At(canvas, 220, 170));
+                    pen.OnReleased(canvas, At(canvas, 220, 170));
+
+                    pen.OnPressed(canvas, At(canvas, 90, 170));
+                    pen.OnMoved(canvas, At(canvas, 220, 90));
+                    pen.OnReleased(canvas, At(canvas, 220, 90));
+                });
+
+                Step(() =>
+                {
+                    var both = new System.Collections.Generic.List<Adamantium.UI.Controls.DrawingBoard.ICanvasItem>();
+
+                    foreach (var item in canvas.ItemsHere())
+                    {
+                        if (ReferenceEquals(item, put) || item is Adamantium.UI.Controls.DrawingBoard.StrokeItem) both.Add(item);
+                    }
+
+                    canvas.SelectMany(both, false);
+                });
+
+                // WHAT THE OP STREAM WAS DOING ON EITHER SIDE OF THE GESTURE. A picture that stops being drawn while its
+                // control is in the tree, visible and the right size - and comes back on any full walk - is a picture
+                // whose place in the stream was taken, not a picture that was never recorded. The counters say whether
+                // a layer moved in the arena at that moment and how many slots had to be renumbered with it.
+                Step(() => System.IO.File.AppendAllText(beside + ".canvas.txt",
+                    "--- before gathering: " + Adamantium.UI.Rendering.LayerProbe.Dump() + Environment.NewLine));
+
+                Step(() =>
+                {
+                    canvas.GroupSelection();
+
+                    var told = new System.Text.StringBuilder("--- gathered a step at a time: ");
+
+                    void Seen(Adamantium.UI.Core.IUIComponent node)
+                    {
+                        if (node is Adamantium.UI.Controls.DrawingBoard.CanvasDrawLayer drawn)
+                            told.Append($"draw({drawn.Painted.Length}) ");
+                        if (node is Adamantium.UI.Controls.DrawingBoard.CanvasElementLayer host)
+                            told.Append($"host({host.VisualChildren.Count}) ");
+
+                        foreach (var child in node.VisualChildren) Seen(child);
+                    }
+
+                    Seen(canvas);
+
+                    told.Append($"| picture visible={put?.Element?.Visibility} size={put?.Element?.RenderSize}"
+                                + $" parent={(put?.Element as Adamantium.UI.Core.IUIComponent)?.VisualParent?.GetType().Name ?? "NONE"}");
+
+                    System.IO.File.AppendAllText(beside + ".canvas.txt", told + Environment.NewLine);
+                });
+
+                Step(() => System.IO.File.AppendAllText(beside + ".canvas.txt",
+                    "--- after gathering:  " + Adamantium.UI.Rendering.LayerProbe.Dump() + Environment.NewLine));
+
+                // ADAM_CANVAS_FACE=structure: turn the panel to the page that lists the plane, and open the group that
+                // was just made. Both are properties, not gestures - this harness touches no mouse.
+                if (Environment.GetEnvironmentVariable("ADAM_CANVAS_FACE") != "structure") return;
+
+                Step(() =>
+                {
+                    Adamantium.UI.Controls.DrawingBoard.CanvasInspector panel = null;
+
+                    void Look(Adamantium.UI.Core.IUIComponent node)
+                    {
+                        if (node is Adamantium.UI.Controls.DrawingBoard.CanvasInspector found) panel ??= found;
+
+                        foreach (var child in node.VisualChildren) Look(child);
+                    }
+
+                    Look(canvas);
+
+                    if (panel != null) panel.ShowsStructure = true;
+                });
+
+                Step(() =>
+                {
+                    var rows = new System.Collections.Generic.List<Adamantium.UI.Controls.TreeViewItem>();
+
+                    void Look(Adamantium.UI.Core.IUIComponent node)
+                    {
+                        if (node is Adamantium.UI.Controls.TreeViewItem row) rows.Add(row);
+
+                        foreach (var child in node.VisualChildren) Look(child);
+                    }
+
+                    Look(canvas);
+
+                    var said = new System.Text.StringBuilder($"--- the structure shows {rows.Count} rows: ");
+
+                    foreach (var row in rows)
+                    {
+                        said.Append($"[{(row.Header as Adamantium.UI.Controls.DrawingBoard.ICanvasItem)?.Title ?? "?"}"
+                                    + $"{(row.HasItems ? " +" : "")}] ");
+
+                        if (row.HasItems) row.IsExpanded = true;
+                    }
+
+                    System.IO.File.AppendAllText(beside + ".canvas.txt", said + Environment.NewLine);
+                });
+            })
+            { IsBackground = true, Name = "picture-steps" };
+
+            hand.Start();
+        }
+
+        // ADAM_CANVAS_SEEN=1: what is on the plane against what is actually being drawn - the scene, what the camera
+        // calls visible, and what each layer holds.
+        if (Environment.GetEnvironmentVariable("ADAM_CANVAS_SEEN") is "1" or "cycle" or "watch")
+        {
+            var eyes = new System.Threading.Thread(() =>
+            {
+                System.Threading.Thread.Sleep(
+                    Environment.GetEnvironmentVariable("ADAM_CANVAS_SETTLE") is { } warm ? int.Parse(warm) : 9000);
+
+                var beside = Environment.GetEnvironmentVariable("ADAM_PROBE_LOG") ?? "canvas";
+                var win = Adamantium.UI.UIApplication.Current?.MainWindow;
+                var canvas = win?.Content is Adamantium.UI.Core.IUIComponent root ? FindCanvas(root) : null;
+
+                if (canvas?.Scene == null) return;
+
+                // ADAM_CANVAS_SEEN=watch: a line every couple of seconds for as long as the stand is up, so the moment
+                // a drawing stops being drawn is in the file whatever the hand did to get there.
+                if (Environment.GetEnvironmentVariable("ADAM_CANVAS_SEEN") == "watch")
+                {
+                    var last = "";
+
+                    while (true)
+                    {
+                        var line = "";
+
+                        Adamantium.UI.Threading.Dispatcher.CurrentDispatcher?.Post(() =>
+                        {
+                            var seen = 0;
+                            var draws = 0;
+                            var hosts = 0;
+
+                            foreach (var _ in canvas.ItemsHere(canvas.VisibleWorld)) seen++;
+
+                            void Layers(Adamantium.UI.Core.IUIComponent node)
+                            {
+                                if (node is Adamantium.UI.Controls.DrawingBoard.CanvasDrawLayer drawn) draws += drawn.Painted.Length;
+                                if (node is Adamantium.UI.Controls.DrawingBoard.CanvasElementLayer host) hosts += host.VisualChildren.Count;
+
+                                foreach (var child in node.VisualChildren) Layers(child);
+                            }
+
+                            Layers(canvas);
+
+                            // ...and WHERE THE PANEL'S SECTIONS ARE, laid out: one reported flying to the window's own
+                            // corner while the rest stayed put, and the layout says they are all in place - so the
+                            // moment it happens, this line says which of the two is lying.
+                            var panel = new System.Text.StringBuilder();
+
+                            void Sections(Adamantium.UI.Core.IUIComponent node)
+                            {
+                                if (node is Adamantium.UI.Controls.PropertySection section
+                                    && section.Visibility != Adamantium.UI.Core.Visibility.Collapsed)
+                                {
+                                    var x = section.Bounds.X;
+                                    var y = section.Bounds.Y;
+
+                                    for (var up = ((Adamantium.UI.Core.IUIComponent)section).VisualParent;
+                                         up != null; up = up.VisualParent)
+                                    {
+                                        x += up.Bounds.X;
+                                        y += up.Bounds.Y;
+                                    }
+
+                                    panel.Append($" [{section.Header}@{x:0},{y:0}]");
+                                }
+
+                                foreach (var child in node.VisualChildren) Sections(child);
+                            }
+
+                            Sections(canvas);
+
+                            line = $"{DateTime.Now:HH:mm:ss} scale={canvas.Scale:0.####} offset={canvas.Offset}"
+                                   + $" visible={seen} draws={draws} hosts={hosts}"
+                                   + $" | sections{panel}"
+                                   + $" | {Adamantium.UI.Rendering.LayerProbe.Dump()}";
+                        });
+
+                        System.Threading.Thread.Sleep(2000);
+
+                        if (line.Length > 0 && line[9..] != last)
+                        {
+                            last = line[9..];
+                            System.IO.File.AppendAllText(beside + ".watch.txt", line + Environment.NewLine);
+                        }
+                    }
+                }
+
+                // ADAM_CANVAS_SEEN=cycle: in to the ceiling and back out, the way the wheel does it - the reported
+                // way a drawing stops being drawn.
+                if (Environment.GetEnvironmentVariable("ADAM_CANVAS_SEEN") == "cycle")
+                {
+                    var steps = 0;
+
+                    while (canvas.Scale < canvas.MaxScale - 1e-6 && steps++ < 40)
+                    {
+                        Adamantium.UI.Threading.Dispatcher.CurrentDispatcher?.Post(() => canvas.ZoomBy(2));
+                        System.Threading.Thread.Sleep(200);
+                    }
+
+                    System.Threading.Thread.Sleep(2000);
+                    System.IO.File.AppendAllText(beside + ".canvas.txt",
+                        $"--- at the ceiling: {canvas.Scale:0.###}x after {steps} steps" + Environment.NewLine);
+
+                    while (canvas.Scale > 1.0 + 1e-6 && steps-- > 0)
+                    {
+                        Adamantium.UI.Threading.Dispatcher.CurrentDispatcher?.Post(() => canvas.ZoomBy(0.5));
+                        System.Threading.Thread.Sleep(200);
+                    }
+
+                    System.Threading.Thread.Sleep(2500);
+
+                    // Back to where it started, said plainly - the easing overshoots either end and this is about what
+                    // is DRAWN at 1x, not about where the wheel leaves the camera.
+                    Adamantium.UI.Threading.Dispatcher.CurrentDispatcher?.Post(() =>
+                    {
+                        canvas.Scale = 1;
+                        canvas.CenterOn(Adamantium.Mathematics.Vector2.Zero);
+                    });
+
+                    System.Threading.Thread.Sleep(2500);
+                }
+
+                Adamantium.UI.Threading.Dispatcher.CurrentDispatcher?.Post(() =>
+                {
+                    var said = new System.Text.StringBuilder();
+                    var here = new System.Collections.Generic.List<Adamantium.UI.Controls.DrawingBoard.ICanvasItem>(canvas.ItemsHere());
+                    var seen = new System.Collections.Generic.List<Adamantium.UI.Controls.DrawingBoard.ICanvasItem>(
+                        canvas.ItemsHere(canvas.VisibleWorld));
+
+                    var all = 0;
+
+                    foreach (var _ in canvas.Scene.ItemsIn(new Adamantium.UI.Core.Rect(
+                        -1e9, -1e9, 2e9, 2e9)))
+                    {
+                        all++;
+                    }
+
+                    said.AppendLine($"--- scene={all} here={here.Count} visible={seen.Count}"
+                                    + $" camera={canvas.Scale:0.###}x offset={canvas.Offset} world={canvas.VisibleWorld}"
+                                    + $" size={canvas.RenderSize}");
+
+                    foreach (var item in here)
+                    {
+                        said.AppendLine($"    {item.Sort} {item.Title}: bounds={item.Bounds}"
+                                        + $" screen={canvas.WorldToScreen(new Adamantium.Mathematics.Vector2(item.Bounds.X, item.Bounds.Y))}"
+                                        + $" drawn={seen.Contains(item)}");
+                    }
+
+                    void Layers(Adamantium.UI.Core.IUIComponent node)
+                    {
+                        if (node is Adamantium.UI.Controls.DrawingBoard.CanvasDrawLayer drawn)
+                            said.AppendLine($"    layer draws {drawn.Painted.Length}");
+                        if (node is Adamantium.UI.Controls.DrawingBoard.CanvasElementLayer host)
+                            said.AppendLine($"    layer hosts {host.VisualChildren.Count}");
+
+                        foreach (var child in node.VisualChildren) Layers(child);
+                    }
+
+                    Layers(canvas);
+                    System.IO.File.AppendAllText(beside + ".canvas.txt", said.ToString());
+                });
+            })
+            { IsBackground = true, Name = "seen-probe" };
+
+            eyes.Start();
+        }
+
+        // ADAM_CANVAS_PAINT=1: draw a shape, select it, and recolour it THROUGH THE PANEL'S OWN ROW - the write a hand
+        // makes, on the live renderer. Reported: a colour picked for a shape changes nothing, while the same row on a
+        // control does.
+        if (Environment.GetEnvironmentVariable("ADAM_CANVAS_PAINT") is "1")
+        {
+            var brushHand = new System.Threading.Thread(() =>
+            {
+                System.Threading.Thread.Sleep(
+                    Environment.GetEnvironmentVariable("ADAM_CANVAS_SETTLE") is { } warm ? int.Parse(warm) : 9000);
+
+                var beside = Environment.GetEnvironmentVariable("ADAM_PROBE_LOG") ?? "canvas";
+                var win = Adamantium.UI.UIApplication.Current?.MainWindow;
+                var canvas = win?.Content is Adamantium.UI.Core.IUIComponent root ? FindCanvas(root) : null;
+
+                if (canvas?.Scene == null)
+                {
+                    System.IO.File.AppendAllText(beside + ".canvas.txt", "no canvas to paint on" + Environment.NewLine);
+                    return;
+                }
+
+                void Step(Action what)
+                {
+                    Adamantium.UI.Threading.Dispatcher.CurrentDispatcher?.Post(what);
+                    System.Threading.Thread.Sleep(900);
+                }
+
+                Adamantium.UI.Controls.DrawingBoard.ShapeItem drawn = null;
+
+                Step(() =>
+                {
+                    // ADAM_CANVAS_PAINT_ON=drawn: a shape made right now. Otherwise one that was ALREADY on the plane
+                    // when the page opened - a different thing entirely, since its brushes came from somewhere else.
+                    if (Environment.GetEnvironmentVariable("ADAM_CANVAS_PAINT_ON") == "drawn")
+                    {
+                        foreach (var known in canvas.Tools)
+                        {
+                            if (known is Adamantium.UI.Controls.DrawingBoard.ShapeTool shapes) canvas.Tool = shapes;
+                        }
+
+                        if (canvas.Tool is Adamantium.UI.Controls.DrawingBoard.ShapeTool tool)
+                        {
+                            tool.OnPressed(canvas, At(canvas, 120, 120));
+                            tool.OnMoved(canvas, At(canvas, 320, 260));
+                            tool.OnReleased(canvas, At(canvas, 320, 260));
+                        }
+
+                        foreach (var item in canvas.ItemsHere())
+                        {
+                            drawn = item as Adamantium.UI.Controls.DrawingBoard.ShapeItem ?? drawn;
+                        }
+                    }
+                    else
+                    {
+                        foreach (var item in canvas.ItemsHere())
+                        {
+                            drawn ??= item as Adamantium.UI.Controls.DrawingBoard.ShapeItem;
+                        }
+                    }
+
+                    // ADAM_CANVAS_PAINT_ON=many: several at once, which is what a rubber band leaves behind.
+                    if (Environment.GetEnvironmentVariable("ADAM_CANVAS_PAINT_ON") == "many")
+                    {
+                        var all = new System.Collections.Generic.List<Adamantium.UI.Controls.DrawingBoard.ICanvasItem>();
+
+                        foreach (var item in canvas.ItemsHere())
+                        {
+                            if (item is Adamantium.UI.Controls.DrawingBoard.ShapeItem) all.Add(item);
+                        }
+
+                        canvas.SelectMany(all, false);
+                        System.IO.File.AppendAllText(beside + ".canvas.txt",
+                            $"--- selected {all.Count} shapes at once" + Environment.NewLine);
+                        return;
+                    }
+
+                    if (drawn != null) canvas.Select(drawn, false);
+                });
+
+                Adamantium.UI.Controls.PropertyRow fill = null;
+                Adamantium.UI.Controls.PropertyRow stroke = null;
+
+                Step(() =>
+                {
+                    void Look(Adamantium.UI.Core.IUIComponent node)
+                    {
+                        if (node is Adamantium.UI.Controls.PropertyRow row
+                            && row.Definition is Adamantium.UI.Controls.SolidColorBrushProperty)
+                        {
+                            if (row.Definition.Header as string == "Fill") fill = row;
+                            if (row.Definition.Header as string == "Stroke") stroke = row;
+                        }
+
+                        foreach (var child in node.VisualChildren) Look(child);
+                    }
+
+                    Look(canvas);
+
+                    System.IO.File.AppendAllText(beside + ".canvas.txt",
+                        $"--- shape={drawn?.Shape.ToString() ?? "NONE"}"
+                        + $" fillRow={(fill == null ? "missing" : "found")} strokeRow={(stroke == null ? "missing" : "found")}"
+                        + $" grid={(canvas.Inspector == null ? "NOT WIRED" : "wired")}"
+                        + $" was fill={(drawn?.Fill as Adamantium.UI.Core.Media.SolidColorBrush)?.Color.ToString() ?? "none"}"
+                        + $" stroke={(drawn?.Stroke as Adamantium.UI.Core.Media.SolidColorBrush)?.Color.ToString() ?? "none"}"
+                        + Environment.NewLine);
+                });
+
+                // THROUGH THE SWATCH, which is what a hand touches: the row commits what its editor says, and that is
+                // a different half from writing the row itself.
+                Step(() =>
+                {
+                    Adamantium.UI.Controls.ColorPickerButton Swatch(Adamantium.UI.Core.IUIComponent node)
+                    {
+                        if (node is Adamantium.UI.Controls.ColorPickerButton picker) return picker;
+
+                        foreach (var child in node.VisualChildren)
+                        {
+                            if (Swatch(child) is { } found) return found;
+                        }
+
+                        return null;
+                    }
+
+                    var one = fill == null ? null : Swatch(fill);
+                    var two = stroke == null ? null : Swatch(stroke);
+
+                    System.IO.File.AppendAllText(beside + ".canvas.txt",
+                        $"--- swatches: fill={(one == null ? "missing" : one.SelectedColor.ToString())}"
+                        + $" stroke={(two == null ? "missing" : two.SelectedColor.ToString())}" + Environment.NewLine);
+
+                    // ADAM_CANVAS_PAINT_HOW=picker: through the FLYOUT, which is what a hand opens - the picker inside
+                    // it answers the swatch through a binding of its own, and that link is the last one untested.
+                    if (Environment.GetEnvironmentVariable("ADAM_CANVAS_PAINT_HOW") == "picker" && one != null)
+                    {
+                        one.IsOpen = true;
+                        System.Threading.Thread.Sleep(600);
+
+                        var popup = one.GetTemplateChild("PART_Popup") as Adamantium.UI.Controls.Popup;
+                        var picker = popup?.Child as Adamantium.UI.Core.IUIComponent;
+
+                        Adamantium.UI.Controls.ColorPicker Inside(Adamantium.UI.Core.IUIComponent node)
+                        {
+                            if (node is Adamantium.UI.Controls.ColorPicker found) return found;
+
+                            foreach (var child in node.VisualChildren)
+                            {
+                                if (Inside(child) is { } deeper) return deeper;
+                            }
+
+                            return null;
+                        }
+
+                        var wheel = picker as Adamantium.UI.Controls.ColorPicker ?? (picker == null ? null : Inside(picker));
+
+                        System.IO.File.AppendAllText(beside + ".canvas.txt",
+                            $"--- flyout: popup={(popup == null ? "missing" : "found")}"
+                            + $" picker={(wheel == null ? "missing" : wheel.SelectedColor.ToString())}" + Environment.NewLine);
+
+                        if (wheel != null) wheel.SelectedColor = Adamantium.Mathematics.Colors.Red;
+
+                        return;
+                    }
+
+                    if (one != null) one.SelectedColor = Adamantium.Mathematics.Colors.Red;
+                    if (two != null) two.SelectedColor = Adamantium.Mathematics.Colors.Lime;
+                });
+
+                Step(() =>
+                {
+                    var said = new System.Text.StringBuilder("--- every shape now: ");
+
+                    foreach (var item in canvas.ItemsHere())
+                    {
+                        if (item is not Adamantium.UI.Controls.DrawingBoard.ShapeItem one) continue;
+
+                        said.Append($"[{one.Shape} fill={(one.Fill as Adamantium.UI.Core.Media.SolidColorBrush)?.Color.ToString() ?? "none"}] ");
+                    }
+
+                    System.IO.File.AppendAllText(beside + ".canvas.txt", said + Environment.NewLine);
+                });
+
+                // ADAM_CANVAS_FACE=structure: turn the panel to the page that lists the plane.
+                Step(() =>
+                {
+                    if (Environment.GetEnvironmentVariable("ADAM_CANVAS_FACE") != "structure") return;
+
+                    void Look(Adamantium.UI.Core.IUIComponent node)
+                    {
+                        if (node is Adamantium.UI.Controls.DrawingBoard.CanvasInspector panel) panel.ShowsStructure = true;
+
+                        foreach (var child in node.VisualChildren) Look(child);
+                    }
+
+                    Look(canvas);
+                });
+
+                Step(() => System.IO.File.AppendAllText(beside + ".canvas.txt",
+                    $"--- after the write: fill={(drawn?.Fill as Adamantium.UI.Core.Media.SolidColorBrush)?.Color.ToString() ?? "none"}"
+                    + $" stroke={(drawn?.Stroke as Adamantium.UI.Core.Media.SolidColorBrush)?.Color.ToString() ?? "none"}"
+                    + $" shared={(drawn?.Fill as Adamantium.UI.Core.Media.Brush)?.IsShared}"
+                    + $" frozen={(drawn?.Fill as Adamantium.UI.Core.Media.Brush)?.IsFrozen}"
+                    + Environment.NewLine));
+            })
+            { IsBackground = true, Name = "paint-steps" };
+
+            brushHand.Start();
+        }
+
+        // ADAM_CANVAS_KEEP=set: move a panel and the camera and let the canvas write itself down - what a hand does
+        // before closing the application. ADAM_CANVAS_KEEP=show: say where everything came back, which is the question
+        // the whole feature is about and can only be asked on a SECOND run.
+        if (Environment.GetEnvironmentVariable("ADAM_CANVAS_KEEP") is "set" or "show" or "view")
+        {
+            var keeper = new System.Threading.Thread(() =>
+            {
+                System.Threading.Thread.Sleep(
+                    Environment.GetEnvironmentVariable("ADAM_CANVAS_SETTLE") is { } warm ? int.Parse(warm) : 9000);
+
+                var beside = Environment.GetEnvironmentVariable("ADAM_PROBE_LOG") ?? "canvas";
+                var win = Adamantium.UI.UIApplication.Current?.MainWindow;
+                var canvas = win?.Content is Adamantium.UI.Core.IUIComponent root ? FindCanvas(root) : null;
+
+                if (canvas == null) return;
+
+                Adamantium.UI.Controls.DrawingBoard.CanvasPane Pane(string name)
+                {
+                    foreach (var pane in canvas.Panes)
+                    {
+                        if (pane.Name == name) return pane;
+                    }
+
+                    return null;
+                }
+
+                // ADAM_CANVAS_KEEP=view: keep THIS view as the one Home goes back to - what the bookmark does.
+                if (Environment.GetEnvironmentVariable("ADAM_CANVAS_KEEP") == "view")
+                {
+                    Adamantium.UI.Threading.Dispatcher.CurrentDispatcher?.Post(() =>
+                    {
+                        canvas.Scale = 2;
+                        canvas.CenterOn(new Adamantium.Mathematics.Vector2(180, 60));
+                        canvas.RememberView();
+                    });
+
+                    System.Threading.Thread.Sleep(1200);
+                }
+
+                if (Environment.GetEnvironmentVariable("ADAM_CANVAS_KEEP") == "set")
+                {
+                    Adamantium.UI.Threading.Dispatcher.CurrentDispatcher?.Post(() =>
+                    {
+                        if (Pane("PART_Inspector") is { } panel)
+                        {
+                            panel.Placement = Adamantium.UI.Controls.DrawingBoard.CanvasPanePlacement.Free;
+                            panel.Anchor = new Adamantium.Mathematics.Vector2(0.15, 0.55);
+                            panel.Width = 360;
+                        }
+
+                        if (Pane("PART_MiniMap") is { } map) map.IsOpen = false;
+
+                        canvas.Scale = 3;
+                        canvas.CenterOn(new Adamantium.Mathematics.Vector2(240, -120));
+                        canvas.RememberLayout();
+                    });
+
+                    System.Threading.Thread.Sleep(1200);
+                }
+
+                Adamantium.UI.Threading.Dispatcher.CurrentDispatcher?.Post(() =>
+                {
+                    var panel = Pane("PART_Inspector");
+                    var map = Pane("PART_MiniMap");
+
+                    System.IO.File.AppendAllText(beside + ".canvas.txt",
+                        $"--- inspector at {panel?.Placement.ToString() ?? "?"} {panel?.Anchor}"
+                        + $" width={panel?.Width:0} bounds={panel?.Bounds}"
+                        + $" | map open={map?.IsOpen}"
+                        + $" | camera {canvas.Scale:0.###}x looking at {canvas.Looking}"
+                        + $" | tool={canvas.Tool?.GetType().Name ?? "none"}" + Environment.NewLine);
+                });
+            })
+            { IsBackground = true, Name = "keep-steps" };
+
+            keeper.Start();
+        }
+
+        // ADAM_CANVAS_ZOOM=<scale>: put the camera at that scale and write down where every hosted control ends up -
+        // its screen corner, the size it was laid out at, and the scale that reached it. What a control looks like at
+        // 8x is a question about those three numbers together.
+        if (Environment.GetEnvironmentVariable("ADAM_CANVAS_ZOOM") is { } zoom
+            && double.TryParse(zoom, System.Globalization.NumberStyles.Float,
+                System.Globalization.CultureInfo.InvariantCulture, out var asked))
+        {
+            var lens = new System.Threading.Thread(() =>
+            {
+                System.Threading.Thread.Sleep(
+                    Environment.GetEnvironmentVariable("ADAM_CANVAS_SETTLE") is { } warm ? int.Parse(warm) : 9000);
+
+                var beside = Environment.GetEnvironmentVariable("ADAM_PROBE_LOG") ?? "canvas";
+                var win = Adamantium.UI.UIApplication.Current?.MainWindow;
+                var canvas = win?.Content is Adamantium.UI.Core.IUIComponent root ? FindCanvas(root) : null;
+
+                if (canvas == null) return;
+
+                Adamantium.UI.Threading.Dispatcher.CurrentDispatcher?.Post(() => canvas.Scale = asked);
+                System.Threading.Thread.Sleep(1200);
+
+                // ADAM_CANVAS_MAKE=1: and then put one down with a tool, dragging out the same screen box whatever the
+                // camera is at - what a hand does, and the thing reported to come out wrong away from 1:1.
+                if (Environment.GetEnvironmentVariable("ADAM_CANVAS_MAKE") is "1" or "control" or "click")
+                {
+                    Adamantium.UI.Threading.Dispatcher.CurrentDispatcher?.Post(() =>
+                    {
+                        // ADAM_CANVAS_MAKE=control: one of the application's own controls instead of a texture - a
+                        // texture has no size of its own, so it cannot show what a control's floors do to the box.
+                        Adamantium.UI.Controls.DrawingBoard.ElementTool tool = null;
+
+                        if (Environment.GetEnvironmentVariable("ADAM_CANVAS_MAKE") is "control" or "click")
+                        {
+                            foreach (var known in canvas.Tools)
+                            {
+                                if (known is Adamantium.UI.Controls.DrawingBoard.ElementTool made
+                                    && known is not Adamantium.UI.Controls.DrawingBoard.TextureTool) tool = made;
+                            }
+                        }
+
+                        tool ??= new Adamantium.UI.Controls.DrawingBoard.TextureTool();
+
+                        canvas.Tool = tool;
+
+                        // A CLICK is the other way one is made - no drag at all, and the tool gives it the size it asks
+                        // for. ADAM_CANVAS_MAKE=click.
+                        if (Environment.GetEnvironmentVariable("ADAM_CANVAS_MAKE") == "click")
+                        {
+                            tool.OnPressed(canvas, OnScreen(canvas, 150, 150));
+                            tool.OnReleased(canvas, OnScreen(canvas, 150, 150));
+                            return;
+                        }
+
+                        tool.OnPressed(canvas, OnScreen(canvas, 150, 150));
+                        tool.OnMoved(canvas, OnScreen(canvas, 350, 290));
+                        tool.OnReleased(canvas, OnScreen(canvas, 350, 290));
+                    });
+
+                    System.Threading.Thread.Sleep(1200);
+                }
+
+                Adamantium.UI.Threading.Dispatcher.CurrentDispatcher?.Post(() =>
+                {
+                    var said = new System.Text.StringBuilder($"--- at {canvas.Scale}x, origin {canvas.Offset}:" + Environment.NewLine);
+
+                    foreach (var item in canvas.ItemsHere())
+                    {
+                        if (item is not Adamantium.UI.Controls.DrawingBoard.ElementItem carried) continue;
+                        if (carried.Element is not Adamantium.UI.Core.IUIComponent control) continue;
+
+                        var corner = canvas.WorldToScreen(new Adamantium.Mathematics.Vector2(carried.World.X, carried.World.Y));
+
+                        said.AppendLine($"  {carried.Title}: world={carried.World} wanted={corner}"
+                                        + $" at={control.Bounds.Location} size={control.RenderSize}"
+                                        + $" scale={(control.RenderTransform?.ScaleX ?? 1):0.###}"
+                                        + $" in {control.VisualParent?.GetType().Name ?? "NOWHERE"}#{control.VisualParent?.GetHashCode()}");
+                    }
+
+                    System.IO.File.AppendAllText(beside + ".canvas.txt", said.ToString());
+                });
+            })
+            { IsBackground = true, Name = "zoom-probe" };
+
+            lens.Start();
+        }
+
+        // ADAM_CANVAS_SVG=<file>: read a drawing onto the plane the way the button does, and say what came in. The
+        // import is a file dialog otherwise, which this harness cannot open.
+        if (Environment.GetEnvironmentVariable("ADAM_CANVAS_SVG") is { } drawing)
+        {
+            var reader = new System.Threading.Thread(() =>
+            {
+                System.Threading.Thread.Sleep(
+                    Environment.GetEnvironmentVariable("ADAM_CANVAS_SETTLE") is { } warm ? int.Parse(warm) : 9000);
+
+                var beside = Environment.GetEnvironmentVariable("ADAM_PROBE_LOG") ?? "canvas";
+                var win = Adamantium.UI.UIApplication.Current?.MainWindow;
+                var canvas = win?.Content is Adamantium.UI.Core.IUIComponent root ? FindCanvas(root) : null;
+
+                if (canvas?.Scene == null || !System.IO.File.Exists(drawing)) return;
+
+                Adamantium.UI.Threading.Dispatcher.CurrentDispatcher?.Post(() =>
+                {
+                    var made = Adamantium.UI.Controls.DrawingBoard.CanvasSvg.Load(
+                        System.IO.File.ReadAllText(drawing), out var skipped);
+
+                    canvas.Scene.Reset(Array.Empty<Adamantium.UI.Controls.DrawingBoard.ICanvasItem>());
+
+                    // ADAM_CANVAS_ONLY=<n>: put ONE of the drawing's paths down instead of all of them. A shape that
+                    // is right alone and wrong beside its neighbours is a fact about the batch, not about the shape.
+                    if (Environment.GetEnvironmentVariable("ADAM_CANVAS_ONLY") is { } single
+                        && int.TryParse(single, out var which))
+                    {
+                        var flat = new System.Collections.Generic.List<Adamantium.UI.Controls.DrawingBoard.ICanvasItem>();
+
+                        void Pick(Adamantium.UI.Controls.DrawingBoard.ICanvasItem item)
+                        {
+                            if (item is Adamantium.UI.Controls.DrawingBoard.GroupItem group)
+                            {
+                                foreach (var child in group.Children) Pick(child);
+                                return;
+                            }
+
+                            flat.Add(item);
+                        }
+
+                        foreach (var item in made) Pick(item);
+
+                        made = new[] { flat[Math.Clamp(which, 0, flat.Count - 1)] };
+                    }
+
+                    foreach (var item in made) canvas.Scene.Add(item);
+
+                    canvas.SelectMany(made, false);
+                    canvas.FitSelection();
+
+                    var said = new System.Text.StringBuilder($"--- read {made.Count} things, skipped {skipped}");
+
+                    void Look(Adamantium.UI.Controls.DrawingBoard.ICanvasItem item)
+                    {
+                        if (item is Adamantium.UI.Controls.DrawingBoard.GroupItem group)
+                        {
+                            foreach (var child in group.Children) Look(child);
+                            return;
+                        }
+
+                        if (item is Adamantium.UI.Controls.DrawingBoard.PathItem path)
+                            said.Append($" | path rule={path.FillRule} box={path.World}");
+                    }
+
+                    foreach (var item in made) Look(item);
+
+                    System.IO.File.AppendAllText(beside + ".canvas.txt", said + Environment.NewLine);
+                });
+            })
+            { IsBackground = true, Name = "svg-read" };
+
+            reader.Start();
+        }
+
+        // ADAM_CANVAS_SELECT=<n>: select the nth thing on the canvas, counting from the back, and write what the canvas
+        // holds - in order, with the number each item carries - beside the screenshot.
+        // The panel's second page, the one that shows what is SELECTED, cannot be reached from here any other way: a
+        // selection is made with a mouse, and this harness does not touch one. So a shot taken without it shows the
+        // first page only, and every question about a row on the second page is unanswerable. Its own thread rather
+        // than a step of the frame probe, because it is about what is on the plane and not about what a frame costs -
+        // and the probe measures for twenty seconds before it would get here.
+        if (Environment.GetEnvironmentVariable("ADAM_CANVAS_SELECT") is { } which)
+        {
+            var picker = new System.Threading.Thread(() =>
+            {
+                // Long enough for the tab to have built. The canvas fills its scene as the page comes up, and asking a
+                // canvas with nothing on it yet which thing is third gets a truthful "there is no third thing".
+                System.Threading.Thread.Sleep(
+                    Environment.GetEnvironmentVariable("ADAM_CANVAS_SETTLE") is { } warm ? int.Parse(warm) : 8000);
+
+                var beside = Environment.GetEnvironmentVariable("ADAM_PROBE_LOG") ?? "canvas";
+                var win = Adamantium.UI.UIApplication.Current?.MainWindow;
+                var canvas = win?.Content is Adamantium.UI.Core.IUIComponent root ? FindCanvas(root) : null;
+
+                if (canvas?.Scene == null)
+                {
+                    System.IO.File.WriteAllText(beside + ".canvas.txt",
+                        "no canvas on this tab - is the Infinite canvas tab open?" + Environment.NewLine);
+                    return;
+                }
+
+                var at = int.TryParse(which, out var parsed) ? parsed : 0;
+
+                Adamantium.UI.Threading.Dispatcher.CurrentDispatcher?.Post(() =>
+                {
+                    var here = new System.Collections.Generic.List<Adamantium.UI.Controls.DrawingBoard.ICanvasItem>();
+
+                    foreach (var item in canvas.ItemsHere()) here.Add(item);
+
+                    if (here.Count == 0) return;
+
+                    var picked = here[Math.Clamp(at, 0, here.Count - 1)];
+
+                    canvas.Select(picked, false);
+
+                    // ADAM_CANVAS_MOVE=<x>,<y>: and shove it that far across the world first. What a question about
+                    // paint order needs is two things standing in the SAME place, and a page laid out to be readable
+                    // has nothing overlapping anything.
+                    if (Environment.GetEnvironmentVariable("ADAM_CANVAS_MOVE")?.Split(',') is { Length: 2 } far
+                        && double.TryParse(far[0], out var dx) && double.TryParse(far[1], out var dy))
+                    {
+                        picked.Move(new Adamantium.Mathematics.Vector2(dx, dy));
+                        canvas.Scene.Touch();
+                    }
+
+                    // ADAM_CANVAS_PICTURE is taken A STEP AT A TIME, on its own thread - see Picture below.
+
+                    // ADAM_CANVAS_GROUP=1: gather everything on the plane into one group, the way the bar's button
+                    // does. What a picture does when it is gathered up cannot be answered any other way from here: the
+                    // gesture is a rubber band and two clicks, and this harness touches no mouse.
+                    if (Environment.GetEnvironmentVariable("ADAM_CANVAS_GROUP") == "1")
+                    {
+                        // WHAT IS THERE NOW, not what was there when this thread started: the steps above put things on
+                        // the plane, and "select everything" means everything - which is the gesture the picture is
+                        // reported to vanish from.
+                        var all = new System.Collections.Generic.List<Adamantium.UI.Controls.DrawingBoard.ICanvasItem>();
+
+                        foreach (var item in canvas.ItemsHere()) all.Add(item);
+
+                        canvas.SelectMany(all, false);
+                        canvas.GroupSelection();
+
+                        // RIGHT HERE, in the same breath as the gesture. A picture that comes back when anything else
+                        // is done to the plane is a picture the LAYERS were never told about - and a reading taken a
+                        // moment later is a reading of whatever fixed it.
+                        var straight = new System.Text.StringBuilder("--- right after grouping: ");
+
+                        void Layers(Adamantium.UI.Core.IUIComponent node)
+                        {
+                            if (node is Adamantium.UI.Controls.DrawingBoard.CanvasDrawLayer drawn)
+                                straight.Append($"draw({drawn.Painted.Length}) ");
+                            if (node is Adamantium.UI.Controls.DrawingBoard.CanvasElementLayer host)
+                                straight.Append($"host({host.VisualChildren.Count}) ");
+
+                            foreach (var child in node.VisualChildren) Layers(child);
+                        }
+
+                        Layers(canvas);
+
+                        // ...AND WHERE EVERY HOSTED THING STANDS. A control that is not in a layer is not on the plane
+                        // at all, and one that is in a layer but not drawn is a different defect entirely - the two
+                        // read the same from the outside, so both are written down.
+                        foreach (var item in canvas.ItemsHere())
+                        {
+                            if (item is not Adamantium.UI.Controls.DrawingBoard.GroupItem made) continue;
+
+                            void Held(Adamantium.UI.Controls.DrawingBoard.ICanvasItem thing)
+                            {
+                                if (thing is Adamantium.UI.Controls.DrawingBoard.GroupItem nested)
+                                {
+                                    foreach (var child in nested.Children) Held(child);
+                                    return;
+                                }
+
+                                if (thing is not Adamantium.UI.Controls.DrawingBoard.ElementItem carried) return;
+
+                                var control = carried.Element;
+
+                                straight.Append(
+                                    $"| {control?.GetType().Name} parent={(control as Adamantium.UI.Core.IUIComponent)?.VisualParent?.GetType().Name ?? "NONE"} "
+                                    + $"visible={control?.Visibility} size={(control as Adamantium.UI.Core.IUIComponent)?.RenderSize} ");
+                            }
+
+                            foreach (var child in made.Children) Held(child);
+                        }
+
+                        System.IO.File.AppendAllText(beside + ".canvas.txt", straight + Environment.NewLine);
+                    }
+
+                    // ADAM_CANVAS_ORDER=<n>: and then send it to that place, the way the panel does - write the number
+                    // on the item and tell the canvas an edit happened. This is the whole write path a typed number
+                    // takes, so a shot after it shows what a person would see having typed one.
+                    if (Environment.GetEnvironmentVariable("ADAM_CANVAS_ORDER") is { } sent && int.TryParse(sent, out var place))
+                    {
+                        var was = picked.Order;
+
+                        picked.Order = place;
+                        canvas.SettleOrder();
+
+                        // ADAM_CANVAS_REDRAW=1: and then ask for the whole subtree to be recorded again. If the picture
+                        // is right only WITH this, what moved is the tree and what stayed behind is the record of it -
+                        // which says the defect is in the patch and not in the order.
+                        if (Environment.GetEnvironmentVariable("ADAM_CANVAS_REDRAW") == "1") canvas.InvalidateRender(true);
+
+                        System.IO.File.AppendAllText(beside + ".canvas.txt",
+                            $"asked {was} -> {place}, ended at {picked.Order}, selection holds {canvas.Selection.Count}"
+                            + Environment.NewLine);
+                    }
+                });
+
+                // WHAT THE PLANE HOLDS, twice: once now and once after it has had a moment. A page that fills its scene
+                // in stages would otherwise be read halfway through and the numbers blamed on whoever wrote them.
+                for (var pass = 0; pass < 2; pass++)
+                {
+                    System.Threading.Thread.Sleep(pass == 0 ? 400 : 3000);
+
+                    var said = new System.Text.StringBuilder();
+
+                    Adamantium.UI.Threading.Dispatcher.CurrentDispatcher?.Post(() =>
+                    {
+                        said.AppendLine($"--- the whole scene, {(canvas.Scene as Adamantium.UI.Controls.DrawingBoard.CanvasScene)?.Items.Count} of it");
+
+                        // THE STACK ITSELF, in the order it is drawn - which is the half of the question the scene
+                        // cannot answer. A scene put in order and a stack that did not follow look identical from here
+                        // unless both are written down side by side.
+                        var layers = new System.Collections.Generic.List<string>();
+
+                        void Walk(Adamantium.UI.Core.IUIComponent node)
+                        {
+                            if (node is Adamantium.UI.Controls.DrawingBoard.CanvasDrawLayer drawn)
+                                layers.Add($"draw({drawn.Painted.Length})");
+                            if (node is Adamantium.UI.Controls.DrawingBoard.CanvasElementLayer host)
+                                layers.Add($"host({host.VisualChildren.Count})");
+
+                            foreach (var child in node.VisualChildren) Walk(child);
+                        }
+
+                        Walk(canvas);
+                        said.AppendLine("--- the stack: " + string.Join(" | ", layers));
+
+                        if (canvas.Scene is Adamantium.UI.Controls.DrawingBoard.CanvasScene scene)
+                        {
+                            foreach (var item in scene.Items)
+                            {
+                                var mine = canvas.IsSelected(item) ? " <- selected" : "";
+
+                                said.AppendLine($"{item.Order}\t{item.GetType().Name}{mine}");
+                            }
+                        }
+
+                        System.IO.File.AppendAllText(beside + ".canvas.txt", said.ToString());
+                    });
+                }
+            })
+            { IsBackground = true, Name = "canvas-select" };
+
+            picker.Start();
+        }
+
         if (Environment.GetEnvironmentVariable("ADAM_PROBE_LOG") is { } log)
         {
             var t = new System.Threading.Thread(() =>
@@ -1003,6 +2008,54 @@ public class Program
         {
             var node = stack.Pop();
             if (node is Adamantium.UI.Controls.Primitives.ButtonBase b && Equals(b.Content, content)) return b;
+            foreach (var child in node.VisualChildren) stack.Push(child);
+        }
+
+        return null;
+    }
+
+    // A PRESS AT A PLACE IN THE WORLD, for a probe that drives a tool without touching a mouse.
+    // A point the way a HAND gives one: screen pixels, turned into world by the camera. At() below takes world
+    // coordinates, which says nothing about what a gesture does at 8x.
+    private static Adamantium.UI.Controls.DrawingBoard.CanvasPointerEventArgs OnScreen(
+        Adamantium.UI.Controls.DrawingBoard.InfiniteCanvas canvas, double x, double y)
+    {
+        var screen = new Adamantium.Mathematics.Vector2(x, y);
+        var world = canvas.ScreenToWorld(screen);
+
+        return new Adamantium.UI.Controls.DrawingBoard.CanvasPointerEventArgs
+        {
+            World = world,
+            Pointer = world,
+            Screen = screen,
+            Button = Adamantium.UI.Core.Input.MouseButtons.Left,
+            ClickCount = 1
+        };
+    }
+
+    private static Adamantium.UI.Controls.DrawingBoard.CanvasPointerEventArgs At(
+        Adamantium.UI.Controls.DrawingBoard.InfiniteCanvas canvas, double x, double y)
+    {
+        var world = new Adamantium.Mathematics.Vector2(x, y);
+
+        return new Adamantium.UI.Controls.DrawingBoard.CanvasPointerEventArgs
+        {
+            World = world,
+            Pointer = world,
+            Screen = canvas.WorldToScreen(world),
+            Button = Adamantium.UI.Core.Input.MouseButtons.Left,
+            ClickCount = 1
+        };
+    }
+
+    private static Adamantium.UI.Controls.DrawingBoard.InfiniteCanvas FindCanvas(Adamantium.UI.Core.IUIComponent root)
+    {
+        var stack = new System.Collections.Generic.Stack<Adamantium.UI.Core.IUIComponent>();
+        stack.Push(root);
+        while (stack.Count > 0)
+        {
+            var node = stack.Pop();
+            if (node is Adamantium.UI.Controls.DrawingBoard.InfiniteCanvas canvas) return canvas;
             foreach (var child in node.VisualChildren) stack.Push(child);
         }
 

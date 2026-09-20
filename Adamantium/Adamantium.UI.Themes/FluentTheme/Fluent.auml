@@ -23,6 +23,10 @@
     <!-- FIRST, so any theme can still override a key of its own: the canvas's pictures belong to the canvas and not to
          this theme, so they live outside all three. -->
     <ResourceLink Source="{x:Type shared:CanvasIcons}"/>
+    <!-- ...and what its inspector SHOWS, which is content and not a look: the list of what a canvas can hold belongs to
+         the canvas and changes when the canvas gains a kind, not when a theme changes its mind. A theme wanting a
+         different panel declares these keys of its own. -->
+    <ResourceLink Source="{x:Type shared:CanvasInspectorContent}"/>
     <ResourceLink Source="{x:Type fluent:Icons}"/>
     <ResourceLink Source="{x:Type fluent:Metrics}"/>
     <ResourceLink Source="{x:Type fluent:Materials}"/>

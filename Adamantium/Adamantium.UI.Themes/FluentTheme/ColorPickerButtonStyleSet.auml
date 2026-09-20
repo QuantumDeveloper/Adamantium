@@ -21,8 +21,14 @@
                                 BorderBrush="{ResourceReference ControlStrokeColorDefault}"
                                 BorderThickness="1"
                                 Padding="{TemplateBinding Padding}">
-                            <Border Background="{TemplateBinding SelectedBrush}"
-                                    CornerRadius="6"/>
+                            <Grid>
+                                <Border x:Name="PART_Swatch" Background="{TemplateBinding SelectedBrush}"
+                                        CornerRadius="6"/>
+                                <!-- No one colour to show: a swatch painted anyway would be one none of them has. -->
+                                <TextBlock x:Name="PART_Mixed" Text="—" Visibility="Collapsed"
+                                           HorizontalAlignment="Center" VerticalAlignment="Center"
+                                           Foreground="{ResourceReference TextFillColorSecondary}"/>
+                            </Grid>
                         </Border>
 
                         <Popup x:Name="PART_Popup"
@@ -51,6 +57,10 @@
     <Style Selector="ColorPickerButton">
         <PropertyTrigger Property="IsMouseOver" Value="true">
             <Setter TargetName="PART_Header" Property="Background" Value="{ResourceReference ControlFillColorSecondary}"/>
+        </PropertyTrigger>
+        <PropertyTrigger Property="IsIndeterminate" Value="true">
+            <Setter TargetName="PART_Swatch" Property="Background" Value="Transparent"/>
+            <Setter TargetName="PART_Mixed" Property="Visibility" Value="Visible"/>
         </PropertyTrigger>
     </Style>
 

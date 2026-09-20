@@ -123,11 +123,53 @@ public partial class InfiniteCanvasViewModel : TabPageViewModel
 
         // Opens on SELECT: the one tool that does not put anything down where the first press happens to land.
         Tool = SelectTool;
+
+        // ...unless the last run left something else in hand. LAST, so that what is read back is not overwritten by
+        // the line above.
+        Layout = Read();
+    }
+
+    /// <summary>HOW THE CANVAS WAS LEFT - panels, camera, tool - as the canvas itself writes it down. The application
+    /// decides where that text lives; this one keeps it beside the user's own settings.</summary>
+    [Bindable] private string _layout;
+
+    private static string Kept => System.IO.Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+        "Adamantium", "canvas-layout.json");
+
+    private static string Read()
+    {
+        try
+        {
+            return System.IO.File.Exists(Kept) ? System.IO.File.ReadAllText(Kept) : null;
+        }
+        catch (System.IO.IOException)
+        {
+            return null;
+        }
+    }
+
+    partial void OnLayoutChanged(string value)
+    {
+        if (string.IsNullOrEmpty(value)) return;
+
+        // A setting nobody asked for must never be what stops the application: a profile on a drive that has gone
+        // away is a panel in the wrong place, and nothing worse than that.
+        try
+        {
+            System.IO.Directory.CreateDirectory(System.IO.Path.GetDirectoryName(Kept));
+            System.IO.File.WriteAllText(Kept, value);
+        }
+        catch (System.IO.IOException)
+        {
+        }
+        catch (UnauthorizedAccessException)
+        {
+        }
     }
 
     private void OnSceneChanged(object sender, System.EventArgs e)
     {
-        RaisePropertyChanged(nameof(Drawn));
         RefreshStructure();
     }
 
@@ -394,7 +436,7 @@ public partial class InfiniteCanvasViewModel : TabPageViewModel
 
     /// <summary>How far in the camera may go. A practical limit and not a technical one - see the canvas's own note on
     /// MaxScale - so it belongs in the panel where the rest of the surface is set.</summary>
-    [Bindable] private double _maxZoom = 1024;
+    [Bindable] private double _maxZoom = 65536;
 
     [Bindable] private Color _snapColor = Colors.DodgerBlue;
 
@@ -407,30 +449,6 @@ public partial class InfiniteCanvasViewModel : TabPageViewModel
     }
 
     [Bindable] private double _snapMarkSize = 9;
-
-    /// <summary>How much is on the canvas, and what that costs to look at. The point of the scene living out here is
-    /// that this is the application's business to answer.</summary>
-    public string Drawn => Scene.Items.Count switch
-    {
-        0 => "Nothing drawn yet - pick a tool and drag",
-        1 => "1 item",
-        var many => $"{many} items"
-    };
-
-    /// <summary>WHAT is selected, by name.
-    /// <para>Two things that look alike on screen can be different kinds and behave differently - a straight ink stroke
-    /// and a line are the same picture, and one is reshaped by a box while the other is reshaped by its ends. Without
-    /// this the only way to tell them apart is to try a gesture and see, which is how an afternoon goes to arguing
-    /// about which of them is in front of you.</para></summary>
-    public string Chosen
-    {
-        get
-        {
-            if (_selection is not { Count: > 0 } chosen) return string.Empty;
-
-            return chosen.Count > 1 ? $"{chosen.Count} selected" : "Selected: " + chosen[0].Title;
-        }
-    }
 
     /// <summary>Whether ONE object is worth a question before it goes. A switch, because with undo in place being asked
     /// every time is noise - and which of the two a drawing wants is not knowable in advance. Clearing the WHOLE scene
@@ -460,7 +478,6 @@ public partial class InfiniteCanvasViewModel : TabPageViewModel
         // Through the HISTORY: clearing a drawing is the one action most worth being able to take back.
         History.Record(Scene, "Clear", Scene.Clear);
         Selection = System.Array.Empty<ICanvasItem>();
-        RaisePropertyChanged(nameof(Drawn));
     }
 
     [Bindable] private CanvasGridStyle _gridStyle = CanvasGridStyle.Dots;
@@ -468,11 +485,6 @@ public partial class InfiniteCanvasViewModel : TabPageViewModel
     [Bindable] private double _scale = 1;
 
     [Bindable] private Vector2 _offset;
-
-    /// <summary>What the camera is, in words. An edgeless plane has no position to read off it, so the numbers are the
-    /// only way to see that panning a long way out costs nothing and loses nothing.</summary>
-    public string Camera => string.Format(System.Globalization.CultureInfo.InvariantCulture,
-        "scale {0:0.###}x     world origin at ({1:0}, {2:0}) px on screen", _scale, _offset.X, _offset.Y);
 
     /// <summary>The zoom for the view bar - a MULTIPLIER from one, not a percentage.
     /// <para>Everything else about the camera is stated that way: the limits are 0.01 and 1024, the readout under the
@@ -498,7 +510,6 @@ public partial class InfiniteCanvasViewModel : TabPageViewModel
         RaisePropertyChanged(nameof(FrameSection));
         RaisePropertyChanged(nameof(NodeSection));
         RaisePropertyChanged(nameof(HasPlainLabel));
-        RaisePropertyChanged(nameof(Chosen));
         RaisePropertyChanged(nameof(IsNurbs));
         RaisePropertyChanged(nameof(IsBezier));
         RaisePropertyChanged(nameof(HasCorners));
@@ -890,7 +901,9 @@ public partial class InfiniteCanvasViewModel : TabPageViewModel
             Title = "Save the graph",
             FileName = System.IO.Path.GetFileName(GraphPath),
             DefaultExtension = "json",
-            FileTypes = GraphFiles
+            FileTypes = GraphFiles,
+            Key = "sandbox.graph.save",
+            Owner = canvas.GetWindow()?.Handle ?? IntPtr.Zero
         }));
 
         if (path == null) return;
@@ -915,7 +928,9 @@ public partial class InfiniteCanvasViewModel : TabPageViewModel
         var path = Asked(FileDialog.Open(new OpenFileRequest
         {
             Title = "Open a graph",
-            FileTypes = GraphFiles
+            FileTypes = GraphFiles,
+            Key = "sandbox.graph.open",
+            Owner = canvas.GetWindow()?.Handle ?? IntPtr.Zero
         }));
 
         if (path == null) return;
@@ -1084,11 +1099,5 @@ public partial class InfiniteCanvasViewModel : TabPageViewModel
         return Visibility.Collapsed;
     }
 
-    partial void OnScaleChanged(double value)
-    {
-        RaisePropertyChanged(nameof(Camera));
-        RaisePropertyChanged(nameof(ZoomText));
-    }
-
-    partial void OnOffsetChanged(Vector2 value) => RaisePropertyChanged(nameof(Camera));
+    partial void OnScaleChanged(double value) => RaisePropertyChanged(nameof(ZoomText));
 }

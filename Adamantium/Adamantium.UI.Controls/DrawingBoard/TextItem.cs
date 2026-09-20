@@ -109,6 +109,10 @@ public class TextItem : ICanvasItem
         ? "Text"
         : Text.Length <= 24 ? Text : Text[..24] + "...";
 
+
+    /// <summary>Where it stands in paint order - stamped by the scene. See ICanvasItem.Order.</summary>
+    public int Order { get; set; }
+
     public Rect Bounds
     {
         get
@@ -131,7 +135,9 @@ public class TextItem : ICanvasItem
         var was = MeasureAt(FontSize);
         if (was.Height <= 0) return;
 
-        FontSize = Math.Max(0.01, FontSize * world.Height / was.Height);
+        // Only away from zero: a floor in world units is a floor on the ZOOM - typed at 1000x the text is a hundredth
+        // of a unit tall, and 0.01 stopped it a third of the way down.
+        FontSize = Math.Max(1e-6, FontSize * world.Height / was.Height);
         Origin = new Vector2(world.X, world.Y);
     }
 
@@ -170,17 +176,24 @@ public class TextItem : ICanvasItem
             size, _draw, Brush, Brushes.Transparent, Brushes.Transparent);
     }
 
-    // What the text COVERS at a given size, worked out on the measuring layout - never on the one being drawn.
+    // Shaped once at a size the text stack can answer for, then scaled: a layout answers in whole pixels and never in
+    // less than one, so a world size of 0.014 measured one whole unit square - a frame the size of the sky round a word.
+    private const double MeasuringSize = 64;
+
     private Size MeasureAt(double fontSize)
     {
         if (!EnsureFont()) return default;
-        if (_shapedText == Text && _shapedSize.Equals(fontSize)) return _measured;
 
-        _measured = Shape(_measure, fontSize);
-        _shapedText = Text;
-        _shapedSize = fontSize;
+        if (_shapedText != Text || Double.IsNaN(_shapedSize))
+        {
+            _measured = Shape(_measure, MeasuringSize);
+            _shapedText = Text;
+            _shapedSize = MeasuringSize;
+        }
 
-        return _measured;
+        var times = fontSize / MeasuringSize;
+
+        return new Size(_measured.Width * times, _measured.Height * times);
     }
 
     // ...and the layout that is actually handed to the drawing, shaped at the size it will appear on screen.

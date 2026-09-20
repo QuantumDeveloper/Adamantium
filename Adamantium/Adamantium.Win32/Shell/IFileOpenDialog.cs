@@ -81,4 +81,16 @@ public interface IFileOpenDialog
     /// <summary>Appended when the user types a name with no extension. Without the dot.</summary>
     [PreserveSig]
     int SetDefaultExtension([MarshalAs(UnmanagedType.LPWStr)] string extension);
+
+    /// <summary>Closes a dialog that is showing. Not called here, and present because the slot is: everything after it
+    /// would sit at the wrong offset without it.</summary>
+    [PreserveSig]
+    int Close(int result);
+
+    /// <summary>WHICH DIALOG THIS IS, as far as the shell's memory goes. Given one, the size, the position and the last
+    /// folder are remembered under it and come back the next time - separately for each purpose, so choosing a picture
+    /// does not reopen where a drawing was last saved. Without it every dialog in the application shares one state, and
+    /// whatever shape the last one was dragged into is the shape the next one gets.</summary>
+    [PreserveSig]
+    int SetClientGuid(ref Guid guid);
 }

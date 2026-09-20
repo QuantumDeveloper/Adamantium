@@ -214,14 +214,16 @@ public class TreeViewItem : ItemsControl, IHeaderedItemsControl, ISpringLoadable
         }
 
         e.Handled = true;
-        // Double-click a branch toggles its expansion (the first click already selected on ClickCount==1). A leaf does
-        // nothing. The owner TreeView's ExpandOnDoubleClick (true by default) gates it, and it owns the flat-list splice.
+        // Double-click a branch toggles its expansion (the first click already selected on ClickCount==1). The owner
+        // TreeView's ExpandOnDoubleClick (true by default) gates it, and it owns the flat-list splice. A LEAF - and a
+        // branch that has folding switched off - has nothing to open, so the gesture is handed to the tree as an
+        // activation instead of being dropped: see TreeView.ItemActivatedCommand.
         if (e.ClickCount >= 2)
         {
-            if (HasItems && (FindOwnerTreeView()?.ExpandOnDoubleClick ?? true))
-            {
-                FindOwnerTreeView()?.ToggleRow(this);
-            }
+            var tree = FindOwnerTreeView();
+
+            if (HasItems && (tree?.ExpandOnDoubleClick ?? true)) tree?.ToggleRow(this);
+            else tree?.Activate();
 
             return;
         }

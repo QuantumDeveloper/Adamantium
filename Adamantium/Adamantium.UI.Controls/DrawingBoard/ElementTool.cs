@@ -71,7 +71,7 @@ public class ElementTool : ICanvasTool
         if (_box == null) return;
 
         _box = Between(_from, e.World);
-        canvas.InvalidateRender(false);
+        canvas.Repaint();
         e.Handled = true;
     }
 
@@ -86,7 +86,7 @@ public class ElementTool : ICanvasTool
         var element = _make();
         if (element == null)
         {
-            canvas.InvalidateRender(false);
+            canvas.Repaint();
             e.Handled = true;
             return;
         }
@@ -98,17 +98,13 @@ public class ElementTool : ICanvasTool
         var least = canvas.ScreenToWorldLength(3);
         if (box.Width < least || box.Height < least)
         {
-            // In SCREEN pixels for an ordinary control - a button dropped at 1:1 and one dropped zoomed right out
-            // should look the same size when you are looking at them, and "did not move" is a fact about the hand.
+            // IN WORLD UNITS, whatever the camera is at. Taken in screen pixels instead, the same control came out
+            // nearly three times as large in the world when it was put down zoomed out - while what is INSIDE it, the
+            // box and its label, stayed the size it always is. That is the checkbox adrift in the top-left corner of a
+            // frame far bigger than itself, and it is why one put down away from 1:1 never looked right again.
             //
-            // In WORLD units for one sized by its own CONTENT. Its width is a floor its content sets, and a floor is a
-            // world measurement: scaled by the camera as well, the same node came out a third as wide when made zoomed
-            // in and three times as wide when made zoomed out - the same node, different sizes, depending on nothing
-            // but when it was made.
-            box = item.SizeFollowsContent
-                ? new Rect(_from.X, _from.Y, Natural.Width, Natural.Height)
-                : new Rect(_from.X, _from.Y,
-                    canvas.ScreenToWorldLength(Natural.Width), canvas.ScreenToWorldLength(Natural.Height));
+            // It does mean a control put down zoomed out is small on screen - like everything else on the plane.
+            box = new Rect(_from.X, _from.Y, Natural.Width, Natural.Height);
 
             item.World = box;
         }
@@ -116,7 +112,7 @@ public class ElementTool : ICanvasTool
         canvas.Scene?.Add(item);
         canvas.Select(item, false);
 
-        canvas.InvalidateRender(false);
+        canvas.Repaint();
         e.Handled = true;
     }
 
@@ -135,7 +131,7 @@ public class ElementTool : ICanvasTool
 
         _box = null;
         canvas.ReleaseMouseCapture();
-        canvas.InvalidateRender(false);
+        canvas.Repaint();
     }
 
     private static Rect Between(Vector2 from, Vector2 to) =>

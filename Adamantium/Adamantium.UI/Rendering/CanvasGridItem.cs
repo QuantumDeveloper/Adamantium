@@ -20,15 +20,20 @@ public struct CanvasGridItem
     /// <summary>.x transform-table slot; .y marks (1 dots, 2 lines); .z opacity slot, or -1; .w mark size in logical px.</summary>
     public Vector4F Params;
 
-    /// <summary>.xy where the world's ORIGIN sits on screen, in the element's own logical pixels; .z screen pixels per
-    /// world unit; .w spare.</summary>
+    /// <summary>.xy the lattice's PHASE - where the grid stands within ONE cell, in the element's own logical pixels;
+    /// .z screen pixels per world unit; .w spare.
+    /// <para>NEVER how far the camera has travelled. That number grows without bound and a float32 stops resolving a
+    /// pixel long before a plane with no edges runs out: the dots ran into lines and a pan stepped the lattice instead
+    /// of sliding it. The grid repeats every cell, so a phase says all of it and stays small.</para></summary>
     public Vector4F Camera;
 
     /// <summary>.x the step to draw (world units, ALREADY coarsened); .y the coarsening the accent level is above it;
     /// .z 1 / the pitch a mark must keep on screen, as a RECIPROCAL - the shader must not divide; .w spare.</summary>
     public Vector4F Step;
 
-    /// <summary>.x the ancestor's rounded-clip slot, or -1; .yzw spare.</summary>
+    /// <summary>.x the ancestor's rounded-clip slot, or -1; .yz where the world's ORIGIN sits, penned in to the
+    /// element's reach - the AXES' own place, which a phase cannot say because every cell looks like every other;
+    /// .w spare.</summary>
     public Vector4F Clip;
 
     /// <summary>The GROUND, straight RGBA. Carried by the grid because the grid is flushed first of its clip group -

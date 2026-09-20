@@ -612,7 +612,7 @@ public partial class RenderCache
         //    few rows later) re-inserts a ready group instead of rebuilding buffers.
         foreach (var component in packet.Undrawn)
         {
-            if (_groupById.TryGetValue(component.RenderId, out var hidden)) RemoveFromOrder(hidden);
+            if (_groupById.TryGetValue(component.RenderId, out var hidden)) RemoveFromOrder(hidden, "undrawn");
             _applySnap.Remove(component);
         }
 
@@ -694,6 +694,10 @@ public partial class RenderCache
         foreach (var group in _pendingInserts)
         {
             group.InOrder = true;
+
+            LayerProbe.Say($"back in the order: {Named(group)} unrecorded={group.Unrecorded} runs={group.Runs.Count}"
+                           + $" units={group.Units.Count}");
+
             if (!group.Unrecorded) continue;
 
             // It is BACK, and what it drew is not. While it was out of the order its instances were blanked and its
@@ -721,10 +725,13 @@ public partial class RenderCache
     private readonly HashSet<ControlGroup> _orderBatch = new();
     private bool _batchOrderRemovals;
 
-    private void RemoveFromOrder(ControlGroup group)
+    private void RemoveFromOrder(ControlGroup group, string why = null)
     {
         if (!group.InOrder) return;
         group.InOrder = false;
+
+        if (why != null) LayerProbe.Say($"out of the order ({why}): {Named(group)} tag={group.Tag} units={group.Units.Count}");
+
         if (_batchOrderRemovals) _orderBatch.Add(group);
         else _groups.Remove(group);
         _leftTheOrder.Add(group);   // its instances are still in the arena - see BlankOrphanInstances
@@ -744,7 +751,7 @@ public partial class RenderCache
     // draw it twice.
     private void QueueInsert(ControlGroup group)
     {
-        RemoveFromOrder(group);   // no-op when it is not in the order (new, or hidden)
+        RemoveFromOrder(group, "requeue");   // no-op when it is not in the order (new, or hidden)
         if (_pendingSet.Add(group)) _pendingInserts.Add(group);
     }
 

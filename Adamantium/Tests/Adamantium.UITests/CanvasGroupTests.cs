@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using Adamantium.Mathematics;
 using Adamantium.UI.Controls;
 using Adamantium.UI.Controls.DrawingBoard;
@@ -181,5 +182,120 @@ public class CanvasGroupTests
         canvas.DeleteSelection();
 
         Assert.That(scene.Items, Is.Empty);
+    }
+
+    // NOBODY EVER SEES THE PLANE HOLDING A GROUP AND ITS CONTENTS AT ONCE. The scene tells its listeners after every
+    // edit and the canvas redraws on the spot, so a half-finished gathering is not a private moment: walked then, a
+    // picture is met twice - once on its own and once inside the group - and is made a child of the same layer twice.
+    // That is the picture that went dark on gathering and came back when the camera moved.
+    [Test]
+    public void GatheringIsNeverSeenHalfDone()
+    {
+        var canvas = Sized();
+        var scene = new CanvasScene();
+        var picture = new ElementItem(new Image { Width = 20, Height = 20 }, new Rect(0, 0, 20, 20));
+        var first = Box(0, 0);
+        var second = Box(4, 0);
+
+        scene.Add(picture);
+        scene.Add(first);
+        scene.Add(second);
+        canvas.Scene = scene;
+        canvas.SelectMany([picture, first, second], false);
+
+        var doubled = new List<string>();
+
+        scene.Changed += (_, _) =>
+        {
+            var loose = new HashSet<ICanvasItem>(scene.Items);
+
+            foreach (var item in scene.Items)
+            {
+                if (item is not GroupItem group) continue;
+
+                foreach (var child in group.Children)
+                {
+                    if (loose.Contains(child)) doubled.Add(child.Title);
+                }
+            }
+        };
+
+        canvas.GroupSelection();
+
+        Assert.That(doubled, Is.Empty, $"the plane was shown holding its own contents twice: {string.Join(", ", doubled)}");
+    }
+
+    // WHAT A GROUP SHOWS UNDER ITSELF in the panel that lists the plane - TOPMOST FIRST, the way that list is read one
+    // level up. Gathered up, a picture and the stroke over it left a flat list entirely and "Group (2)" stood where the
+    // two of them had been, which reads as though the plane had lost them.
+    [Test]
+    public void AGroupOffersWhatIsInItTopmostFirst()
+    {
+        var canvas = Sized();
+        var scene = new CanvasScene();
+        var under = Box(0, 0);
+        var over = Box(4, 0);
+
+        scene.Add(under);
+        scene.Add(over);
+        canvas.Scene = scene;
+        canvas.SelectMany([under, over], false);
+
+        var group = canvas.GroupSelection();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(group.Children, Is.EqualTo(new ICanvasItem[] { under, over }), "paint order is what a group IS");
+            Assert.That(group.Inside, Is.EqualTo(new ICanvasItem[] { over, under }), "the panel reads a group upside down");
+        });
+    }
+
+    // ...and it keeps up with what is actually in it: a child taken out of a group must leave the panel with it.
+    [Test]
+    public void WhatAGroupShowsFollowsWhatIsLeftInIt()
+    {
+        var canvas = Sized();
+        var scene = new CanvasScene();
+        var under = Box(0, 0);
+        var over = Box(4, 0);
+
+        scene.Add(under);
+        scene.Add(over);
+        canvas.Scene = scene;
+        canvas.SelectMany([under, over], false);
+
+        var group = canvas.GroupSelection();
+
+        Assert.That(group.Inside, Has.Count.EqualTo(2));
+
+        canvas.Select(over, false);
+        canvas.DeleteSelection();
+
+        Assert.That(group.Inside, Is.EqualTo(new ICanvasItem[] { under }), "the panel is still showing what was deleted");
+    }
+
+    // BY THE ROUTE A TREE ACTUALLY TAKES. The panel resolves each row's children by NAME off the node itself, so what
+    // makes a stroke a leaf is that a stroke has no such property at all - which no assertion about a group can show.
+    [Test]
+    public void OnlyAGroupAnswersATreeAboutWhatIsInIt()
+    {
+        var canvas = Sized();
+        var scene = new CanvasScene();
+        var under = Box(0, 0);
+        var over = Box(4, 0);
+
+        scene.Add(under);
+        scene.Add(over);
+        canvas.Scene = scene;
+        canvas.SelectMany([under, over], false);
+
+        var group = canvas.GroupSelection();
+        var children = TreeChildResolver.ForPath("Inside");
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(children(group), Is.EqualTo(new ICanvasItem[] { over, under }), "a tree cannot open the group");
+            Assert.That(children(under), Is.Null, "a plain item answered as though it held things");
+        });
     }
 }

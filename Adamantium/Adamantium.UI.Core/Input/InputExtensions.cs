@@ -74,10 +74,22 @@ public static class InputExtensions
 
    private static void Collect(IUIComponent element, Vector2 p, List<IInputComponent> result, bool boundsOnly = false)
    {
-      if (element.Visibility != Visibility.Visible
-          || !element.IsEnabled
-          || !element.IsHitTestVisible)
+      if (element.Visibility != Visibility.Visible || !element.IsHitTestVisible)
          return;
+
+      // A DISABLED ELEMENT STILL TAKES THE PRESS - it just does nothing with it. Skipped entirely, it became a hole:
+      // the press went through to whatever was behind, so a greyed button on a row folded the row, and turning a
+      // control off silently changed what the thing under it does. Every control that can be disabled already refuses
+      // the press by itself (see ButtonBase), so being a target costs nothing and being transparent costs correctness.
+      //
+      // Its CHILDREN are not walked: they are disabled with it, and one of them answering would be the same hole one
+      // level down.
+      if (!element.IsEnabled)
+      {
+         if (element is IInputComponent off && element.ClipRectangle.Contains(p)) result.Add(off);
+
+         return;
+      }
 
       // A RENDER TRANSFORM moves what you SEE, so it has to move what you can HIT. Undone here, before anything is
       // compared with anything: the point arrives in the parent's space, and the element's box, its children and its

@@ -28,6 +28,17 @@ public class ColorPickerButton : Control
     public static readonly AdamantiumProperty IsOpenProperty = AdamantiumProperty.Register(nameof(IsOpen),
         typeof(bool), typeof(ColorPickerButton), new PropertyMetadata(false, OnIsOpenChanged));
 
+    /// <summary>NO ONE COLOUR TO SHOW - the things this stands for hold different ones. The swatch says so instead of
+    /// painting a colour none of them has, and picking one puts that colour on all of them.</summary>
+    public static readonly AdamantiumProperty IsIndeterminateProperty = AdamantiumProperty.Register(
+        nameof(IsIndeterminate), typeof(bool), typeof(ColorPickerButton), new PropertyMetadata(false));
+
+    public bool IsIndeterminate
+    {
+        get => GetValue<bool>(IsIndeterminateProperty);
+        set => SetValue(IsIndeterminateProperty, value);
+    }
+
     private readonly SolidColorBrush _swatchBrush = new(Colors.White);   // field init runs BEFORE the base ctor's callbacks
     private Popup _popup;
 
@@ -97,7 +108,13 @@ public class ColorPickerButton : Control
 
     private static void OnSelectedColorChanged(AdamantiumComponent a, AdamantiumPropertyChangedEventArgs e)
     {
-        if (a is ColorPickerButton b) b._swatchBrush.Color = (Color)e.NewValue;
+        if (a is not ColorPickerButton b) return;
+
+        b._swatchBrush.Color = (Color)e.NewValue;
+
+        // A colour was chosen, so there is one to show - whoever is standing for several things has just been told to
+        // put this on all of them.
+        b.IsIndeterminate = false;
     }
 
     private static void OnIsOpenChanged(AdamantiumComponent a, AdamantiumPropertyChangedEventArgs e)

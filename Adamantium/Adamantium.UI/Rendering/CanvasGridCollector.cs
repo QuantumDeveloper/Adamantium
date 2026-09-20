@@ -64,7 +64,8 @@ internal sealed class CanvasGridCollector : SdfBatchCollector<CanvasGridItem>
         if (Count + 1 > GpuCapacity) return false;
         if (!BakeItem(p, world, opacity, transformSlot, fadeSlot, out var item)) return false;
 
-        item.Clip = new Vector4F(clipSlot, 0, 0, 0);
+        // The SLOT only: .yz carry where the axes are, and stamping the whole vector took them away with it.
+        item.Clip = new Vector4F(clipSlot, item.Clip.Y, item.Clip.Z, 0);
         Items[Count++] = item;
         MarkPending(scissor, logicalBounds);
         return true;
@@ -91,7 +92,22 @@ internal sealed class CanvasGridCollector : SdfBatchCollector<CanvasGridItem>
             (float)(dest.Width * sx), (float)(dest.Height * sy));
 
         item.Params = new Vector4F(transformSlot, (float)grid.Marks, fadeSlot, (float)Math.Max(grid.MarkSize, 0.5));
-        item.Camera = new Vector4F((float)grid.Offset.X, (float)grid.Offset.Y, (float)Math.Max(grid.Scale, 1e-6), 0);
+
+        // THE CAMERA NEVER LEAVES THE ORIGIN, and what the grid is given is a PHASE - never how far anybody has
+        // travelled. Handing over "where the world's origin sits on screen" put a number that grows without bound into
+        // a float32: a million pixels out, the gap between one float and the next is a quarter of a pixel, sixteen
+        // million out it is two - so neighbouring fragments resolved to the SAME world point. Dots smeared into lines,
+        // and a pan stepped the lattice instead of sliding it. Nothing is wrong with the arithmetic that got us there:
+        // it is all double, and it stays exact. It is the handover that cannot carry the number.
+        //
+        // The grid is PERIODIC, so it does not want that number: everything it draws repeats every coarse cell, and
+        // reducing the offset by whole cells - IN DOUBLE, where it is still exact - leaves the picture identical and
+        // hands the shader a value that never exceeds one cell.
+        var scale = Math.Max(grid.Scale, 1e-6);
+        var period = Math.Max(grid.Spacing, 1e-6) * Math.Max(grid.Coarsening, 2) * scale;
+
+        item.Camera = new Vector4F((float)Phase(grid.Offset.X, period), (float)Phase(grid.Offset.Y, period),
+            (float)scale, 0);
         // The pitch as a RECIPROCAL: the shader must not divide - adding a division to it is what stopped the driver
         // creating the pass at all - so the one division happens here, once per bake.
         item.Step = new Vector4F((float)Math.Max(grid.Spacing, 1e-6), (float)Math.Max(grid.Coarsening, 2),
@@ -102,10 +118,29 @@ internal sealed class CanvasGridCollector : SdfBatchCollector<CanvasGridItem>
         item.GridColor = Straight(grid.Color, alpha);
         item.AxisColor = Straight(grid.AxisColor, alpha);
 
-        // -1, never 0: zero is a valid clip slot belonging to somebody else. Stamped by TryAdd/TryStage.
-        item.Clip = new Vector4F(-1, 0, 0, 0);
+        // THE AXES are the one thing that does want to know where the origin is - they ARE the origin - and they are
+        // the reason the offset cannot simply be dropped. Kept, but PENNED IN: past the element there is no fragment
+        // for an axis to cover, so a value beyond it says everything a larger one would and stays exact in a float.
+        // Far from home the axes are off screen, which is the truth; near home the number is small and untouched.
+        var reach = Math.Abs(dest.Width) + Math.Abs(dest.Height) + 64;
+
+        // -1, never 0: zero is a valid clip slot belonging to somebody else. Stamped by TryAdd/TryStage, which keep
+        // the axis in place.
+        item.Clip = new Vector4F(-1, (float)Penned(grid.Offset.X, reach), (float)Penned(grid.Offset.Y, reach), 0);
         return true;
     }
+
+    // Where the lattice stands within ONE cell. The grid repeats every cell, so this is the whole of what the shader
+    // needs; taken in double, where the distance travelled is still exact.
+    private static double Phase(double offset, double period)
+    {
+        var wrapped = offset - Math.Floor(offset / period) * period;
+
+        return Double.IsFinite(wrapped) ? wrapped : 0;
+    }
+
+    private static double Penned(double offset, double reach) =>
+        Double.IsFinite(offset) ? Math.Clamp(offset, -reach, reach) : 0;
 
     /// <summary>Bake one unit into the patch stage - see BatchArena.</summary>
     public override bool TryStage(IRenderUnit unit, Matrix4x4F world, int transformSlot, int ownerTag, int clipSlot = -1)
@@ -113,7 +148,8 @@ internal sealed class CanvasGridCollector : SdfBatchCollector<CanvasGridItem>
         if (unit is not RenderUnits.RectangleRenderUnit u || !CanBatch(u.RectPayload)) return false;
         if (!BakeItem(u.RectPayload, world, u.FillOpacity, transformSlot, unit.FadeSlot, out var item)) return false;
 
-        item.Clip = new Vector4F(clipSlot, 0, 0, 0);
+        // The SLOT only: .yz carry where the axes are, and stamping the whole vector took them away with it.
+        item.Clip = new Vector4F(clipSlot, item.Clip.Y, item.Clip.Z, 0);
         Stage.Add(item);
         return true;
     }

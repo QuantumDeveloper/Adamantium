@@ -378,7 +378,11 @@ public partial class DataGridViewModel : TabPageViewModel
             Title = "Export the table",
             FileName = name,
             DefaultExtension = extension,
-            FileTypes = new[] { type }
+            FileTypes = new[] { type },
+
+            // Its own memory: a table is exported to a different place than a drawing is, and the two should not be
+            // dragging each other's folder and size about.
+            Key = "sandbox.table.export"
         });
 
         if (path == null) ExportStatus = "Cancelled";

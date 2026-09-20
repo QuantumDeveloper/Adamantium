@@ -230,6 +230,16 @@ public class ShapeItem : ICanvasItem, ICanvasTransformed, ICanvasPoints
         set => World = new Rect(World.X, World.Y, World.Width, Math.Max(1e-9, value));
     }
 
+    /// <summary>Where it stands in paint order - stamped by the scene. See ICanvasItem.Order.</summary>
+    public int Order { get; set; }
+
+    /// <summary>WHAT THIS IS: the shape, not the class - "Rectangle", "Ellipse", "Polygon", "Arrow", "Line".
+    /// <para>A panel asking what a thing is means the shape: corners belong to a rectangle, a side count to a polygon,
+    /// heads to an arrow, and one name covering all five would answer none of them. See
+    /// <see cref="ICanvasItem.Sort"/>; the class name still matches every shape, which is where what they share
+    /// lives.</para></summary>
+    public string Sort => Shape.ToString();
+
     /// <summary>The box it occupies - the box itself, outline included, because the outline is drawn INSIDE it.
     /// <para>It used to be the box grown by half the thickness, on the reasoning that a pen straddles the path it
     /// follows. True of a pen and wrong for a shape somebody sized: making the outline thicker then made the shape
@@ -240,6 +250,7 @@ public class ShapeItem : ICanvasItem, ICanvasTransformed, ICanvasPoints
     /// past its ends, so the box is nothing like what is drawn, and a frame taken from it is drawn inside the shape it
     /// is supposed to be around.</para></summary>
     public Rect Bounds => IsRun ? Reach() : World;
+
 
     // What a line or an arrow actually COVERS, in world units: the two ends, each widened by half the stroke, plus the
     // corners of whichever heads it wears. Taken from the same numbers the heads are DRAWN from rather than from a
@@ -747,6 +758,28 @@ public class ShapeItem : ICanvasItem, ICanvasTransformed, ICanvasPoints
         var cy = box.Y + box.Height / 2 - ry * (minY + maxY) / 2;
 
         return new Rect(cx - rx, cy - ry, rx * 2, ry * 2);
+    }
+
+    /// <summary>A POLYGON's corners, in world units - where they actually are, which is on the ellipse the shape is
+    /// fitted into rather than on the one its box holds. Empty for every other shape: a rectangle and an ellipse are
+    /// said by their box and have no corner list to give.
+    /// <para>Here rather than worked out by whoever needs it: the fitting is a rule with a reason behind it, and a
+    /// second statement of it somewhere else is a second rule that drifts. Written out to a file, this is what makes a
+    /// hexagon land in a stranger's viewer exactly where it sits here.</para></summary>
+    public IReadOnlyList<Vector2> Outline
+    {
+        get
+        {
+            if (Shape != CanvasShape.Polygon) return Array.Empty<Vector2>();
+
+            var sides = Sides;
+            var fitted = Fit(World, sides);
+            var corners = new Vector2[sides];
+
+            for (var i = 0; i < sides; i++) corners[i] = Vertex(fitted, sides, i);
+
+            return corners;
+        }
     }
 
     private static Vector2 Vertex(Rect fitted, int sides, int index)
