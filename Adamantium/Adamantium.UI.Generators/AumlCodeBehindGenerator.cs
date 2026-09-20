@@ -14,8 +14,7 @@ namespace Adamantium.UI.Generators
     {
         public void Initialize(IncrementalGeneratorInitializationContext context)
         {
-            // Only the two properties this generator reads. The options PROVIDER is a fresh object per run, so combining
-            // with it would invalidate everything; two strings compare by value and hold still.
+            // Two strings, not the provider: the provider is a fresh object per run and would invalidate everything.
             var buildProperties = context.AnalyzerConfigOptionsProvider.Select((options, _) =>
             {
                 options.GlobalOptions.TryGetValue("build_property.RootNamespace", out var rootNamespace);
@@ -23,10 +22,8 @@ namespace Adamantium.UI.Generators
                 return (RootNamespace: rootNamespace, ProjectDir: projectDir);
             });
 
-            // PARSING IS ITS OWN STEP, and a per-file one. It depends on the file's text and nothing else, so Roslyn
-            // caches each document separately: editing one .auml reparses that file, and editing C# reparses none.
-            // It used to sit inside the output below, which carries the Compilation - and the compilation is a new
-            // object whenever any code changes, so every run reparsed all of the markup. That is where the minute went.
+            // Parsing is its own PER-FILE step, so Roslyn caches each document: it used to sit inside the output below,
+            // which carries the Compilation, and every code edit reparsed all 2 MB of markup.
             var parsedFiles = context.AdditionalTextsProvider
                 .Where(file => file.Path.EndsWith(".xml") || file.Path.EndsWith(".auml"))
                 .Select((text, cancellationToken) => (
@@ -57,8 +54,7 @@ namespace Adamantium.UI.Generators
 
                 var metadata = new List<AumlDocument>();
 
-                // Phase 1 - report what parsing found, and take a COPY of each document to work on. The parsed one is
-                // the cache's, and the transform below resolves types by writing back into the tree.
+                // Phase 1 - report what parsing found, and work on a COPY: the parsed document belongs to the cache.
                 foreach (var file in parsed)
                 {
                     var diagnostics = new RoslynDiagnosticSink(spc);
@@ -153,12 +149,12 @@ namespace Adamantium.UI.Generators
             });
         }
         
-        /// <summary>The name the parse step is tracked under, so a test can see whether it was served from cache -
-        /// which a build cannot show, the cache living in the driver and every csc run building a fresh one.</summary>
+        /// <summary>What the parse step is tracked under, so a test can see whether it came from cache - which a
+        /// build cannot show, every csc run building a fresh driver.</summary>
         internal const string ParseStepName = "AumlParse";
 
-        // The whole of the per-file work: it takes text and two strings, and touches nothing else. Anything that needs
-        // the compilation belongs in the output step, not here, or this stops being cacheable.
+        // Text and two strings, nothing else: anything needing the compilation belongs in the output step, or this
+        // stops being cacheable.
         private static ParsedAumlFile ParseDocument(string path, string content, string rootNamespace, string projectDir)
         {
             var document = AumlParser.Parse(content);
