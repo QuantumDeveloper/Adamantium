@@ -9,7 +9,7 @@ if (args.Contains("--demo"))
     var bin = FindDefaultBinDir();
     if (bin is null)
     {
-        Console.Error.WriteLine("[auml] playground bin not found; build Adamantium.UI.Sandbox first");
+        Console.Error.WriteLine("[auml] playground bin not found; build the solution first");
         return 1;
     }
     RunDemo(new CompletionEngine(AumlWorkspace.BuildFromBin(bin)));
@@ -54,7 +54,7 @@ static void RunDemo(CompletionEngine engine)
 
 static string? FindDefaultBinDir()
 {
-    var root = @"c:\AdamantiumEngine\Adamantium\output\Adamantium.UI.Sandbox\bin";
+    var root = @"c:\AdamantiumEngine\Adamantium\Adamantium\artifacts\bin";
     if (!Directory.Exists(root)) return null;
     return Directory.EnumerateDirectories(root, "net*", SearchOption.AllDirectories)
         .Where(d => File.Exists(Path.Combine(d, "Adamantium.UI.dll")))

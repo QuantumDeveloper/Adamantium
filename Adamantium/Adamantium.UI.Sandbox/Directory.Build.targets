@@ -1,8 +1,0 @@
-<Project>
-  <PropertyGroup>
-      <!--<AssignTargetPathsDependsOn>
-         $(AssignTargetPathsDependsOn);
-      </AssignTargetPathsDependsOn>-->
-  </PropertyGroup>
-  
-</Project>
