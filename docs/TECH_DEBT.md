@@ -30,16 +30,6 @@ _Только открытое. Закрытое отсюда удаляется
   `Children`, а не гасятся (`DataGridRow.DropGroupTotal`), — но пулу ячеек достаётся то же самое, просто реже.
   Мерить СНИМКОМ ОКНА: зонд по разметке говорит «всё хорошо».
 
-- **[P2] Рефлексия SPIR-V не разбирает МАССИВЫ в constant buffer.** Член вида `float4x4 instanceWorld[64]` приходит из
-  `SpirvReflection.cs` (репозиторий `AdamantiumVulkan`, строки ~150-200) как `Class=Struct, RowCount=1, ColumnCount=1,
-  ElementCount=1, Size=4096`: `compiler.GetTypeHandle(memberType)` для члена-массива отдаёт свойства РОДИТЕЛЬСКОГО
-  блока, а не элемента. Замер (2026-09-20, дамп `Effect.Parameters` на `BasicEffect`): одиночный `wvp` —
-  `MatrixColumns 4x4 count=1`, массив рядом — `Struct 1x1 count=1`. Последствие: `EffectParameter.CopyMatrix` не
-  подключается и `SetValue(Matrix4x4F[])` падал на null-делегате (обойдено прямой записью там же — она байт в байт
-  совпадает с `CopyMatrixDirect`, потому что в этих буферах матрицы column-major). Чинить в рефлексии: тогда
-  `ElementCount` станет настоящим и появится проверка на переполнение таблицы инстансов. Цена — правка соседнего
-  репозитория плюс подъём версии пакета `Adamantium.Vulkan.Spirv` (сейчас 1.0.7) в двух csproj.
-
 - **[P2] Кисть на многоугольнике держится ТОЛЬКО на батчах.** Градиент, паттерн/шум и текстура рисуются на
   `RegularPolygon` через SDF-проходы (`GradientRectCollector`/`PatternRectCollector`/`TexRectCollector`, ветка формы
   2 в `BrushShapeDistance`). Но если батч ОТКАЖЕТ — повёрнутый или скошенный мир, переполнение буфера инстансов —
