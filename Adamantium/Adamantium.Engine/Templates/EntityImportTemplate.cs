@@ -9,7 +9,7 @@ using Adamantium.Graphics;
 using Adamantium.Graphics.Core.Content;
 using Adamantium.Graphics.Core.Models;
 using Adamantium.Mathematics;
-using Adamantium.Win32;
+using Serilog;
 
 namespace Adamantium.Engine.Templates;
 
@@ -129,7 +129,7 @@ public class EntityImportTemplate : IEntityTemplate
         }
         catch (Exception exception)
         {
-            MessageBox.Show(exception.Message + exception.StackTrace);
+            Log.Logger.Error(exception, "Building an entity from imported model data failed");
         }
         return null;
     }

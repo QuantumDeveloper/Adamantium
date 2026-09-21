@@ -20,7 +20,7 @@ using Adamantium.Imaging;
 using Adamantium.UI;
 using Adamantium.UI.Core;
 using Adamantium.UI.Services;
-using Adamantium.Win32;
+using Serilog;
 
 namespace Adamantium.Game;
 
@@ -499,7 +499,9 @@ public class Game : PropertyChangedBase, IGame
         }
         catch (Exception exception)
         {
-            MessageBox.Show(exception.ToString());
+            // Reaching here means the loop is over - this is the game thread's outermost frame - so this is the only
+            // record that it stopped at all, let alone why.
+            Log.Logger.Fatal(exception, "Game loop stopped");
         }
     }
         

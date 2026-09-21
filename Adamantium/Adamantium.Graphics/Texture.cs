@@ -5,7 +5,6 @@ using System.Runtime.InteropServices;
 using Adamantium.Graphics.Core;
 using Adamantium.Graphics.Core.Extensions;
 using Adamantium.Imaging;
-using Adamantium.Win32;
 using Adamantium.Vulkan.Core;
 using VulkanImage = Adamantium.Vulkan.Core.Image;
 using Image = Adamantium.Imaging.Image;
@@ -541,16 +540,9 @@ public unsafe class Texture : GraphicsResource, ITexture
     public static Texture Load(GraphicsDevice device, Stream stream, ImageUsageFlagBits usage = ImageUsageFlagBits.SampledBit, ImageLayout initialLayout = ImageLayout.ShaderReadOnlyOptimal)
     {
         var image = BitmapLoader.Load(stream);
-        try
-        {
-            return new Texture(device, image, usage, initialLayout);
-        }
-        catch (Exception exception)
-        {
-            MessageBox.Show(exception.Message + exception.StackTrace + exception.TargetSite);
-        }
-
-        throw new InvalidOperationException("Dimension not supported");
+        // No catch: the one here swallowed whatever went wrong and threw "Dimension not supported" in its place, so
+        // every failure of this call arrived as the same wrong answer.
+        return new Texture(device, image, usage, initialLayout);
     }
 
     /// <summary>

@@ -10,7 +10,7 @@ using Adamantium.FX;
 using Adamantium.Graphics.Core.EffectsFramework;
 using Adamantium.Graphics.Core.Vertices;
 using Adamantium.Mathematics;
-using Adamantium.Win32;
+using Serilog;
 
 namespace Adamantium.Engine.EntityServices;
 
@@ -61,7 +61,7 @@ public class ForwardRenderingProcessor : RenderingProcessor
         }
         catch (Exception exception)
         {
-            MessageBox.Show(exception.Message + exception.StackTrace);
+            Log.Logger.Error(exception, "Draw failed for entity {Entity}", entity.Name);
         }
     }
 
@@ -165,7 +165,7 @@ public class ForwardRenderingProcessor : RenderingProcessor
             }
             catch (Exception exception)
             {
-                MessageBox.Show(exception.Message + exception.StackTrace);
+                Log.Logger.Error(exception, "Draw failed for tool {Tool}", tool.Name);
             }
         }
 //            BasicEffect.Techniques["MeshVertex"].Passes["NoLight"].UnApply(true);
@@ -195,7 +195,7 @@ public class ForwardRenderingProcessor : RenderingProcessor
             }
             catch (Exception exception)
             {
-                MessageBox.Show(exception.Message + exception.StackTrace);
+                Log.Logger.Error(exception, "Draw failed for tool {Tool}", tool.Name);
             }
         }
 //            BasicEffect.Techniques["MeshVertex"].Passes["NoLight"].UnApply(true);
@@ -215,7 +215,7 @@ public class ForwardRenderingProcessor : RenderingProcessor
             }
             catch (Exception exception)
             {
-                MessageBox.Show(exception.Message + exception.StackTrace);
+                Log.Logger.Error(exception, "HUD draw failed for tool {Tool}", tool.Name);
             }
         }
     }

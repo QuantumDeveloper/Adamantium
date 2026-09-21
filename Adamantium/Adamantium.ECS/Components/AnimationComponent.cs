@@ -2,10 +2,9 @@
 using System.Collections.Generic;
 using System.Linq;
 using Adamantium.Core;
-using Adamantium.ECS.Components;
 using Adamantium.Graphics.Core.Models;
 using Adamantium.Mathematics;
-using Adamantium.Win32;
+using Serilog;
 
 namespace Adamantium.ECS.Components
 {
@@ -213,7 +212,7 @@ namespace Adamantium.ECS.Components
                 }
                 catch (Exception exception)
                 {
-                    MessageBox.Show(exception.Message + exception.StackTrace);
+                    Log.Logger.Error(exception, "Animation frame interpolation failed");
                 }
             }
         }

@@ -1,10 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
 using Adamantium.Core;
-using Adamantium.ECS.Components;
 using Adamantium.Graphics.Core.Models;
 using Adamantium.Mathematics;
-using Adamantium.Win32;
+using Serilog;
 
 namespace Adamantium.ECS.Components
 {
@@ -89,7 +88,7 @@ namespace Adamantium.ECS.Components
             }
             catch (Exception exception)
             {
-               MessageBox.Show(exception.Message + exception.StackTrace + exception.TargetSite);
+               Log.Logger.Error(exception, "Joint matrix composition failed for controller {Controller}", ControllerId);
             }
          }
       }

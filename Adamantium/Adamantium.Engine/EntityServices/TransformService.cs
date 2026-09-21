@@ -1,12 +1,11 @@
 ﻿using System;
 using Adamantium.Core;
 using Adamantium.Engine.Managers;
-using Adamantium.Engine.Services;
 using Adamantium.ECS;
 using Adamantium.ECS.Components;
 using Adamantium.ECS.Components.Extensions;
 using Adamantium.Mathematics;
-using Adamantium.Win32;
+using Serilog;
 
 namespace Adamantium.Engine.EntityServices;
 
@@ -47,9 +46,9 @@ public class TransformService : EntityService
             tools.Update(entities, cameraManager, lightManager);
             lightManager.Update();
         }
-        catch (Exception e)
+        catch (Exception ex)
         {
-            MessageBox.Show(e.Message + e.StackTrace);
+            Log.Logger.Error(ex, "Transform update failed");
         }
     }
         

@@ -10,7 +10,7 @@ using Adamantium.Game;
 using Adamantium.Game.Core;
 using Adamantium.Game.Core.Input;
 using Adamantium.Mathematics;
-using Adamantium.Win32;
+using Serilog;
 using Adamantium.Vulkan.Core;
 
 namespace Adamantium.Engine.EntityServices;
@@ -282,7 +282,7 @@ public class ForwardRenderingService : RenderingService
             }
             catch (Exception exception)
             {
-                MessageBox.Show(exception.Message + exception.StackTrace);
+                Log.Logger.Error(exception, "Solid wireframe pass failed");
             }
         }
         BasicEffect.Techniques["MeshVertex"].Passes["DirectionalLight"].UnApply(true);
