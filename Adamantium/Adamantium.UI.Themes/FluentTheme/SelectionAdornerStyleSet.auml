@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<StyleSet xmlns="http://adamantium/ui"
+          xmlns:x="http://adamantium/ui/xaml/extensions">
+
+    <!-- Designer SELECTION frame: an accent outline plus a small square handle tucked into each corner. The adorner stage
+         sizes it to the selected element's bounds; restyle it here. -->
+    <Style Selector="SelectionAdorner">
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="SelectionAdorner">
+                    <Grid>
+                        <Border BorderThickness="2" CornerRadius="2"
+                                         BorderBrush="{ThemeResource AccentFillColorDefault}"/>
+                        <Border Width="6" Height="6" Background="{ThemeResource AccentFillColorDefault}"
+                                         HorizontalAlignment="Left" VerticalAlignment="Top"/>
+                        <Border Width="6" Height="6" Background="{ThemeResource AccentFillColorDefault}"
+                                         HorizontalAlignment="Right" VerticalAlignment="Top"/>
+                        <Border Width="6" Height="6" Background="{ThemeResource AccentFillColorDefault}"
+                                         HorizontalAlignment="Left" VerticalAlignment="Bottom"/>
+                        <Border Width="6" Height="6" Background="{ThemeResource AccentFillColorDefault}"
+                                         HorizontalAlignment="Right" VerticalAlignment="Bottom"/>
+                    </Grid>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+</StyleSet>

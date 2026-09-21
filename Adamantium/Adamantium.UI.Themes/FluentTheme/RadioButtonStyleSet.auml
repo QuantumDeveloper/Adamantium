@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="utf-8"?>
+<StyleSet xmlns="http://adamantium/ui"
+          xmlns:x="http://adamantium/ui/xaml/extensions">
+
+    <!-- A ring with a centre dot, then the content label. The ring fills with the accent + the dot fades in when
+         checked. Per the small-styles convention each concern is its own <Style Selector="RadioButton">. -->
+
+    <!-- Base brushes on the control, bound onto the ring with {TemplateBinding} so the IsChecked trigger can repaint it
+         (a {ResourceReference} straight on the part would bake at Local priority and block the trigger). -->
+    <Style Selector="RadioButton" BasedOn="ToggleButton">
+        <Setter Property="Foreground" Value="{ObservableResource TextFillColorPrimary}"/>
+        <Setter Property="Background" Value="{ResourceReference ControlFillColorDefault}"/>
+        <Setter Property="BorderBrush" Value="{ResourceReference ControlStrokeColorDefault}"/>
+        <Setter Property="FontSize" Value="{ResourceReference FontSizeBody}"/>
+        <Setter Property="VerticalContentAlignment" Value="Center"/>
+    </Style>
+
+    <Style Selector="RadioButton">
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="RadioButton">
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <Grid Width="20" 
+                                       Height="20" 
+                                       VerticalAlignment="Center">
+                            <Ellipse x:Name="OuterRing"
+                                              Fill="{TemplateBinding Background}"
+                                              Stroke="{TemplateBinding BorderBrush}"
+                                              StrokeThickness="1"/>
+                            <Ellipse x:Name="Dot"
+                                              Width="10"
+                                              Height="10"
+                                              Fill="{ThemeResource AccentForegroundColor}"
+                                              Opacity="0"
+                                              HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"/>
+                        </Grid>
+                        <ContentPresenter x:Name="PART_ContentPresenter"
+                                                   Content="{TemplateBinding Content}"
+                                                   ContentTemplate="{TemplateBinding ContentTemplate}"
+                                                   Foreground="{TemplateBinding Foreground}"
+                                                   FontSize="{TemplateBinding FontSize}"
+                                                   VerticalAlignment="Center"
+                                                   Margin="8 0 0 0"/>
+                    </StackPanel>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style Selector="RadioButton">
+        <PropertyTrigger Property="IsMouseOver" Value="true">
+            <Setter TargetName="OuterRing" Property="Fill" Value="{ResourceReference ControlFillColorSecondary}"/>
+        </PropertyTrigger>
+        <PropertyTrigger Property="IsChecked" Value="true">
+            <Setter TargetName="OuterRing" Property="Fill" Value="{ThemeResource AccentFillColorDefault}"/>
+            <Setter TargetName="OuterRing" Property="Stroke" Value="{ThemeResource AccentFillColorDefault}"/>
+            <Setter TargetName="Dot" Property="Opacity" Value="1"/>
+            <!-- Un-inherit the ToggleButton accent-label; a radio label sits on the normal background. -->
+            <Setter TargetName="PART_ContentPresenter" Property="Foreground" Value="{ResourceReference TextFillColorPrimary}"/>
+        </PropertyTrigger>
+        <PropertyTrigger Property="IsEnabled" Value="false">
+            <Setter TargetName="OuterRing" Property="Fill" Value="{ResourceReference ControlFillColorDisabled}"/>
+            <Setter TargetName="PART_ContentPresenter" Property="Foreground"
+                    Value="{ResourceReference TextFillColorDisabled}"/>
+        </PropertyTrigger>
+    </Style>
+
+    <!-- The same control wearing the toggle button's clothes: `<RadioButton Classes="Toggle"/>`. See the macOS set for
+         why a row that is one choice wants this rather than ToggleButtons. Last in the file: at equal type specificity
+         document order decides, so it must follow the plain RadioButton styles it replaces. -->
+    <Style Selector="RadioButton.Toggle" BasedOn="ToggleButton"/>
+
+    <!-- A PAGE NUMBER in a pager's row: the toggle look, sized to the line's cell. NO PADDING - the control padding is a
+         text inset, symmetric across but not down, and it made the button's width a function of its LABEL, so "1" and
+         "146" came out different widths and every button beside them shifted as the reader paged. Zero inset plus a
+         floor leaves the number centred in a cell that only grows once a number is genuinely wider than it.
+         The alignment is said outright because a plain RadioButton is a dot with a label BESIDE it: its content is
+         left-aligned, and centring arrives only through the toggle look this is based on. -->
+    <Style Selector="RadioButton.PagerPage" BasedOn="ToggleButton"/>
+
+    <Style Selector="RadioButton.PagerPage">
+        <Setter Property="Padding" Value="0"/>
+        <Setter Property="MinWidth" Value="{ResourceReference PagerButtonMinWidth}"/>
+        <Setter Property="Height" Value="{ResourceReference PagerButtonHeight}"/>
+        <Setter Property="HorizontalContentAlignment" Value="Center"/>
+        <Setter Property="VerticalContentAlignment" Value="Center"/>
+        <Setter Property="VerticalAlignment" Value="Center"/>
+    </Style>
+
+</StyleSet>

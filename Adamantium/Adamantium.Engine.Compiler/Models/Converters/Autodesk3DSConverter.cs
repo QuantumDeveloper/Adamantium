@@ -2,9 +2,9 @@
 using System.IO;
 using Adamantium.Engine.Compiler.Converter.Configs;
 using Adamantium.Engine.Compiler.Converter.Containers;
-using Adamantium.Engine.Compiler.Converter.ConversionUtils;
 using Adamantium.Engine.Compiler.Converter.Parsers;
-using Adamantium.Engine.Core.Models;
+using Adamantium.Engine.Compiler.Models.ConversionUtils;
+using Adamantium.Graphics.Core.Models;
 
 namespace Adamantium.Engine.Compiler.Converter.Converters
 {
@@ -14,16 +14,18 @@ namespace Adamantium.Engine.Compiler.Converter.Converters
       {
       }
 
-      private Autodesk3DSConversionExecutor executor;
-
       protected override void Convert()
       {
          Parser = new Autodesk3DSFileParser(FilePath);
-         executor = new Autodesk3DSConversionExecutor(Config, UpAxis.Z_UP);
-         var data =  (Autodesk3DsDataContainer)Parser.ParseDataAsync(Config).Result;
+         var data =  (Autodesk3DsDataContainer)Parser.ParseData(Config);
+
+         // The parser builds its own SceneData, so taking it wholesale dropped the name the base class had put on
+         // the container - and the cooked artifact came out nameless.
          SceneDataContainer = data.Data;
+         SceneDataContainer.Name = FileName;
 
          UpdateImagePathes();
+         UnsupportedFeatures.AddRange(data.UnsupportedFeatures);
       }
 
       private void UpdateImagePathes()

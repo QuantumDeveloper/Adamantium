@@ -1,6 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Text;
 
 namespace Adamantium.Core
 {
@@ -30,12 +28,6 @@ namespace Adamantium.Core
         public int RowPitch;
         public int SlicePitch;
 
-        public bool IsEmpty
-        {
-            get
-            {
-                return DataPointer == IntPtr.Zero && RowPitch == 0 && SlicePitch == 0;
-            }
-        }
+        public bool IsEmpty => DataPointer == IntPtr.Zero && RowPitch == 0 && SlicePitch == 0;
     }
 }

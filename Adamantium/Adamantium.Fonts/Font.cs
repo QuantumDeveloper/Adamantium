@@ -7,23 +7,20 @@ using Adamantium.Fonts.Tables.CFF;
 
 namespace Adamantium.Fonts
 {
-    internal class Font : IFont
+    public class Font : IFont
     {
         private List<Glyph> glyphs;
         private List<UInt32> unicodes;
-
         private Dictionary<string, Glyph> nameToGlyph;
         private Dictionary<UInt32, Glyph> unicodeToGlyph;
-
         private Dictionary<string, List<Feature>> featuresMap;
-
-        internal TypeFace TypeFace { get; }
+        internal Typeface Typeface { get; }
         internal VariationStore VariationData { get; set; }
         internal List<InstanceRecord> InstanceData { get; set; }
 
-        public Font(TypeFace typeFace)
+        public Font(Typeface typeface)
         {
-            TypeFace = typeFace;
+            Typeface = typeface;
             glyphs = new List<Glyph>();
             unicodes = new List<uint>();
 
@@ -81,15 +78,18 @@ namespace Adamantium.Fonts
         public string WwsSubfamilyName { get; internal set; }
         public string LightBackgroundPalette { get; internal set; }
         public string DarkBackgroundPalette { get; internal set; }
-        
-        // ------
-        
-        public FeatureService FeatureService { get; }
 
+        // ------
+        public FeatureService FeatureService { get; }
         public uint GlyphCount => (uint)glyphs.Count;
         public ushort UnitsPerEm { get; internal set; }
-
         public Int16 Ascender { get; internal set; }
+        public Int16 Descender { get; internal set; }
+        public Int16 CapsHeight { get; internal set; }
+        
+        public short LineGap { get; internal set; }
+        
+        public Int16 Baseline { get; internal set; }
 
         /// <summary>
         /// smallest readable size in pixels
@@ -99,18 +99,15 @@ namespace Adamantium.Fonts
         /// <summary>
         /// space between lines
         /// </summary>
-        public Int32 LineSpace { get; internal set; }
+        public Double LineSpacingMultiplier { get; internal set; }
 
         public DateTime Created { get; internal set; }
 
         public DateTime Modified { get; internal set; }
 
         public IReadOnlyCollection<Glyph> Glyphs => glyphs.AsReadOnly();
-
         public IReadOnlyCollection<uint> Unicodes => unicodes.AsReadOnly();
-
         public GlyphLayoutData NotDefLayoutData { get; }
-
         internal KerningSubtable[] KerningData { get; set; }
 
         internal void SetGlyphs(IEnumerable<Glyph> inputGlyphs)
@@ -153,12 +150,12 @@ namespace Adamantium.Fonts
             unicodes.Clear();
             unicodeToGlyph.Clear();
 
-            foreach (var (key, value) in glyphMapping)
+            foreach (var kvp in glyphMapping)
             {
-                unicodes.AddRange(value);
-                foreach (var unicode in value)
+                unicodes.AddRange(kvp.Value);
+                foreach (var unicode in kvp.Value)
                 {
-                    if (TypeFace.GetGlyphByIndex(key, out var glyph))
+                    if (Typeface.GetGlyphByIndex(kvp.Key, out var glyph))
                     {
                         unicodeToGlyph[unicode] = glyph;
                     }
@@ -166,23 +163,44 @@ namespace Adamantium.Fonts
             }
         }
         
-        public Glyph[] TranslateIntoGlyphs(string input)
+        public IReadOnlyList<Glyph> TranslateIntoGlyphs(string input)
         {
             var translatedGlyphs = new List<Glyph>();
             foreach (var character in input)
             {
                 var glyph = GetGlyphByCharacter(character);
+                if (glyph == null)
+                {
+                    Typeface.GetGlyphByIndex(0U, out glyph);
+                }
+                // ONCE per character, not once per translation. The glyph comes out of the font's own map - it is SHARED
+                // and lives as long as the font - so this list did too: every measure of every string appended another
+                // copy of the same character to it, for the lifetime of the process. Measuring "Hello" a million times
+                // left a million 'l's on one glyph. That is both the heap that never comes back and the ~117KB a single
+                // text measure allocated (the list re-doubling its backing array, the old one becoming garbage).
+                // Every consumer reads RelatedCharacters.FirstOrDefault() - one representative character for the glyph's
+                // texture - so a character already recorded adds nothing at all.
+                if (!glyph.RelatedCharacters.Contains(character))
+                {
+                    // Locked only on the rare first sight of a character: text is laid out from the layout thread AND
+                    // from parallel arrange, and an unguarded Add on a shared List is a torn list, not a wrong number.
+                    lock (glyph.RelatedCharacters)
+                    {
+                        if (!glyph.RelatedCharacters.Contains(character)) glyph.RelatedCharacters.Add(character);
+                    }
+                }
+
                 translatedGlyphs.Add(glyph);
             }
 
-            return translatedGlyphs.ToArray();
+            return translatedGlyphs;
         }
 
         public Glyph GetGlyphByIndex(uint index)
         {
             if (index >= glyphs.Count)
             {
-                TypeFace.GetGlyphByIndex(0, out var glyph);
+                Typeface.GetGlyphByIndex(0, out var glyph);
                 return glyph;
             }
             

@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="utf-8"?>
+<StyleSet xmlns="http://adamantium/ui"
+          xmlns:x="http://adamantium/ui/xaml/extensions">
+
+    <!-- The macOS progress bar. Same two parts as Fluent's - a track with a left-anchored indicator the control sizes -
+         and the differences are the ones that run through this whole theme rather than anything about progress:
+
+         THE TRACK IS THE SHARED UNSET GROOVE, the one the switch and the sliders use. A bar half full is the same
+         statement a slider makes, and the empty half has to be the same material or the window has two kinds of
+         "nothing here yet". It is also the only fill in the palette that is actually visible against the window - a
+         ControlFill is a few per cent of white and the empty half simply would not be there.
+
+         AND IT IS THINNER. 4, the rail's thickness, against Fluent's 6: on a Mac a progress bar and a slider's track
+         are the same line, one with a handle on it and one without. -->
+
+    <Style Selector="ProgressBar">
+        <Setter Property="MinWidth" Value="{ResourceReference ControlMinWidth}"/>
+        <Setter Property="MinHeight" Value="{ResourceReference SliderTrackThickness}"/>
+    </Style>
+
+    <Style Selector="ProgressBar">
+        <Setter Property="Template">
+            <Setter.Value>
+                <!-- Track and fill are SIBLINGS, not parent and child: a decorator shrinks to its child, so a zero-wide
+                     fill nested in the track would collapse the whole bar. The fill overlays the track from the left and
+                     the control sets its Width to the filled fraction. -->
+                <ControlTemplate TargetType="ProgressBar">
+                    <Grid>
+                        <Border x:Name="PART_Track"
+                                Height="{ResourceReference SliderTrackThickness}" CornerRadius="2"
+                                Background="{ResourceReference SelectionControlFillColorOff}"
+                                VerticalAlignment="Center"/>
+                        <Border x:Name="PART_Indicator"
+                                Height="{ResourceReference SliderTrackThickness}" CornerRadius="2"
+                                Background="{ThemeResource AccentFillColorDefault}"
+                                HorizontalAlignment="Left"
+                                VerticalAlignment="Center"
+                                Width="0"/>
+                    </Grid>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- Vertical: flip both parts. Height="Auto" (the parser maps it to NaN) clears the fixed thickness so a stretched
+         track spans the full height; the fill grows from the BOTTOM, and the control drives its Height as it drives the
+         Width of a horizontal one. -->
+    <Style Selector="ProgressBar">
+        <PropertyTrigger Property="Orientation" Value="Vertical">
+            <Setter TargetName="PART_Track" Property="Width" Value="{ResourceReference SliderTrackThickness}"/>
+            <Setter TargetName="PART_Track" Property="Height" Value="Auto"/>
+            <Setter TargetName="PART_Track" Property="HorizontalAlignment" Value="Center"/>
+            <Setter TargetName="PART_Track" Property="VerticalAlignment" Value="Stretch"/>
+            <Setter TargetName="PART_Indicator" Property="Width" Value="{ResourceReference SliderTrackThickness}"/>
+            <Setter TargetName="PART_Indicator" Property="Height" Value="0"/>
+            <Setter TargetName="PART_Indicator" Property="HorizontalAlignment" Value="Center"/>
+            <Setter TargetName="PART_Indicator" Property="VerticalAlignment" Value="Bottom"/>
+        </PropertyTrigger>
+    </Style>
+
+</StyleSet>

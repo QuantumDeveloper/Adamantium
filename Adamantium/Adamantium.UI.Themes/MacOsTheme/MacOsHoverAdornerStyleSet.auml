@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<StyleSet xmlns="http://adamantium/ui"
+          xmlns:x="http://adamantium/ui/xaml/extensions">
+
+    <!-- Same hairline as the selection frame; what tells them apart is that selection adds handles. -->
+    <Style Selector="HoverAdorner">
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="HoverAdorner">
+                    <Border BorderThickness="{ResourceReference StrokeControl}"
+                            CornerRadius="{ResourceReference CornerRadiusDefault}"
+                            BorderBrush="{ThemeResource AccentFillColorDefault}"/>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+</StyleSet>

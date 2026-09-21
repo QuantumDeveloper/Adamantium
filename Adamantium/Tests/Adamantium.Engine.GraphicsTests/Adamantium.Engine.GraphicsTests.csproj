@@ -1,31 +1,88 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net6.0</TargetFramework>
+    <TargetFramework>net10.0</TargetFramework>
     <Platforms>x64</Platforms>
     <Configurations>Debug;Release</Configurations>
-    <LangVersion>latestmajor</LangVersion>
+    <LangVersion>latest</LangVersion>
   </PropertyGroup>
 
   <ItemGroup>
     <None Remove="EffectsData\UIEffect.fx" />
+    <None Remove="EffectsData\ComputeSmoke.fx" />
+    <None Remove="EffectsData\StrokeExpand.fx" />
+    <None Remove="EffectsData\StrokeDraw.fx" />
+    <None Remove="EffectsData\AtomicAppend.fx" />
+    <None Remove="EffectsData\IndirectDraw.fx" />
+    <None Remove="EffectsData\DashCut.fx" />
+    <None Remove="EffectsData\FontEffect.fx" />
   </ItemGroup>
 
   <ItemGroup>
+    <!-- THE REAL UI SHADERS, linked rather than copied: whether this driver will create a pass at all is a question
+         only a device can answer, and it has to be asked of the file the application actually ships. A copy here would
+         answer for whatever it was a copy of the day it was made.
+
+         Which is not a hypothetical. The arrow pass took an access violation inside vkCreateShadersEXT - the driver's
+         shader-object compiler giving up on control flow in a fragment stage - and the first anyone knew of it was the
+         application dying on the first arrow drawn. -->
+    <Content Include="..\..\Adamantium.UI.FX\*.fx" LinkBase="EffectsData\UIFX">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <!-- FLAT, beside the .fx files rather than in an Includes folder of their own. Handed no list of includes the
+         compiler scans the shader's OWN directory and no deeper, while the resolver matches a request by file name
+         alone - so "Includes/ShapeMath.fxh" is found next door, and is not found one directory down. -->
+    <Content Include="..\..\Adamantium.UI.FX\Includes\*.fxh" LinkBase="EffectsData\UIFX">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
     <Content Include="EffectsData\UIEffect.fx">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <!-- Test-only effect fixtures (compute smoke + the GPU stroke expander/draw). They live here, NOT in the working
+         Adamantium.FX project, so the engine isn't cluttered with test shaders and the generator doesn't emit phantom
+         duplicate classes. Compiled at runtime via Effect.CompileFromFile from EffectsData. -->
+    <Content Include="EffectsData\ComputeSmoke.fx">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="EffectsData\StrokeExpand.fx">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="EffectsData\StrokeDraw.fx">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="EffectsData\AtomicAppend.fx">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="EffectsData\IndirectDraw.fx">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="EffectsData\DashCut.fx">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <!-- EffectLoadingTest compiles this one; it was the only fixture here without a copy rule, so it never reached the
+         output and the test failed with FileNotFoundException rather than anything to do with effects. -->
+    <Content Include="EffectsData\FontEffect.fx">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <!-- The REAL production stroke shader, linked (not copied) so the dash/trim tests compile the actual StrokeDashCutCS
+         + EmitJoin - no drift from a hand-kept prototype. Runtime-compiled via Effect.CompileFromFile only; the FX
+         generator never sees it here (this project doesn't run the generator), so no phantom duplicate class. -->
+    <Content Include="..\..\Adamantium.UI.FX\StrokeEffect.fx">
+      <Link>EffectsData\StrokeEffect.fx</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
   </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="16.11.0" />
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
     <PackageReference Include="NUnit" Version="3.13.2" />
     <PackageReference Include="NUnit3TestAdapter" Version="4.0.0" />
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\Adamantium.Engine.Core\Adamantium.Engine.Core.csproj" />
-    <ProjectReference Include="..\..\Adamantium.Engine.Graphics\Adamantium.Engine.Graphics.csproj" />
+    <ProjectReference Include="..\..\Adamantium.Graphics.Core\Adamantium.Graphics.Core.csproj" />
+    <ProjectReference Include="..\..\Adamantium.Graphics\Adamantium.Graphics.csproj" />
     <ProjectReference Include="..\..\Adamantium.Imaging\Adamantium.Imaging.csproj" />
   </ItemGroup>
 

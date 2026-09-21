@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="utf-8"?>
+<StyleSet xmlns="http://adamantium/ui"
+          xmlns:x="http://adamantium/ui/xaml/extensions">
+
+    <!-- A button that stays lit while checked. Same chrome as Button; the extra concern is one IsChecked trigger that
+         paints the accent. Per the small-styles convention each concern is its own <Style Selector="ToggleButton">. -->
+
+    <Style Selector="ToggleButton">
+        <Setter Property="Background" Value="{ResourceReference ControlFillColorDefault}"/>
+        <Setter Property="BorderBrush" Value="{ResourceReference ControlStrokeColorDefault}"/>
+        <Setter Property="Foreground" Value="{ObservableResource TextFillColorPrimary}"/>
+        <Setter Property="BackgroundPointerOver" Value="{ResourceReference ControlFillColorSecondary}"/>
+        <Setter Property="BackgroundPressed" Value="{ResourceReference ControlFillColorTertiary}"/>
+        <Setter Property="BackgroundDisabled" Value="{ResourceReference ControlFillColorDisabled}"/>
+        <Setter Property="ForegroundPressed" Value="{ResourceReference TextFillColorSecondary}"/>
+        <Setter Property="ForegroundDisabled" Value="{ResourceReference TextFillColorDisabled}"/>
+        <!-- The CHECKED look, as brushes rather than as values written into the trigger. A toggle standing on a colour
+             somebody else chose - the fold on a graph node, sitting on the node's own accent strip - overrides these
+             and is left alone; a trigger that named the accent itself gave it nothing to override. -->
+        <Setter Property="BackgroundChecked" Value="{ThemeResource AccentFillColorDefault}"/>
+        <Setter Property="BorderBrushChecked" Value="{ThemeResource AccentFillColorDefault}"/>
+        <Setter Property="ForegroundChecked" Value="{ThemeResource AccentForegroundColor}"/>
+        <Setter Property="BackgroundCheckedPointerOver" Value="{ThemeResource AccentFillColorSecondary}"/>
+        <Setter Property="BorderThickness" Value="{ResourceReference StrokeControl}"/>
+        <Setter Property="CornerRadius" Value="{ResourceReference CornerRadiusDefault}"/>
+        <Setter Property="Padding" Value="{ResourceReference PaddingControl}"/>
+        <Setter Property="MinHeight" Value="{ResourceReference ControlHeight}"/>
+        <Setter Property="FontSize" Value="{ResourceReference FontSizeBody}"/>
+        <Setter Property="HorizontalContentAlignment" Value="Center"/>
+        <Setter Property="VerticalContentAlignment" Value="Center"/>
+    </Style>
+
+    <Style Selector="ToggleButton">
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ToggleButton">
+                    <Grid>
+                        <Border x:Name="InnerBorder"
+                                CornerRadius="{TemplateBinding CornerRadius}"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter
+                                    x:Name="PART_ContentPresenter"
+                                    HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                    VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
+                                    Foreground="{TemplateBinding Foreground}"
+                                    FontSize="{TemplateBinding FontSize}"
+                                    Content="{TemplateBinding Content}"
+                                    ContentTemplate="{TemplateBinding ContentTemplate}"
+                                    ContentTemplateSelector="{TemplateBinding ContentTemplateSelector}"/>
+                        </Border>
+                        <!-- No focus ring here - the application has ONE, drawn by the FocusAdorner. See ButtonStyleSet. -->
+                    </Grid>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style Selector="ToggleButton">
+        <PropertyTrigger Property="IsMouseOver" Value="true">
+            <Setter TargetName="InnerBorder" Property="Background" Value="{TemplateBinding BackgroundPointerOver}"/>
+        </PropertyTrigger>
+        <PropertyTrigger Property="IsChecked" Value="true">
+            <Setter TargetName="InnerBorder" Property="Background" Value="{TemplateBinding BackgroundChecked}"/>
+            <Setter TargetName="InnerBorder" Property="BorderBrush" Value="{TemplateBinding BorderBrushChecked}"/>
+            <Setter TargetName="PART_ContentPresenter" Property="Foreground" Value="{TemplateBinding ForegroundChecked}"/>
+        </PropertyTrigger>
+        <!-- Checked + hover: dim the accent a notch (Fluent's checked PointerOver). Declared after IsChecked so it lands
+             ON TOP of the trigger value stack while active - without it, the plain IsMouseOver trigger above painted the
+             neutral pointer-over fill over the accent, leaving a checked toggle a blank box with only its accent border
+             (glaring on the light theme, where the neutral fill is near-white and the accent foreground vanished). -->
+        <MultiTrigger>
+            <MultiTrigger.Conditions>
+                <Condition Property="IsChecked" Value="true"/>
+                <Condition Property="IsMouseOver" Value="true"/>
+            </MultiTrigger.Conditions>
+            <Setter TargetName="InnerBorder" Property="Background" Value="{TemplateBinding BackgroundCheckedPointerOver}"/>
+            <Setter TargetName="InnerBorder" Property="BorderBrush" Value="{TemplateBinding BackgroundCheckedPointerOver}"/>
+        </MultiTrigger>
+        <PropertyTrigger Property="IsPressed" Value="true">
+            <Setter TargetName="InnerBorder" Property="Background" Value="{TemplateBinding BackgroundPressed}"/>
+        </PropertyTrigger>
+        <PropertyTrigger Property="IsEnabled" Value="false">
+            <Setter TargetName="InnerBorder" Property="Background" Value="{TemplateBinding BackgroundDisabled}"/>
+            <Setter TargetName="PART_ContentPresenter" Property="Foreground" Value="{TemplateBinding ForegroundDisabled}"/>
+        </PropertyTrigger>
+    </Style>
+
+</StyleSet>

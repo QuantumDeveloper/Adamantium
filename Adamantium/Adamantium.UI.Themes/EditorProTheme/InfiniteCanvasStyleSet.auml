@@ -1,0 +1,808 @@
+<?xml version="1.0" encoding="utf-8"?>
+<StyleSet xmlns="http://adamantium/ui"
+          xmlns:x="http://adamantium/ui/xaml/extensions">
+
+    <!-- An editor's canvas: a darker ground than the panels around it, so the drawing surface reads as the thing being
+         worked on. No template - the control draws its own ground, grid and axes; see Fluent's set. -->
+    <Style Selector="InfiniteCanvas">
+        <Setter Property="Background" Value="{ObservableResource SolidBackgroundFillColorBase}"/>
+        <Setter Property="GridBrush" Value="{ObservableResource CanvasGridColor}"/>
+        <Setter Property="AxisBrush" Value="{ObservableResource CanvasAxisColor}"/>
+        <Setter Property="GridThickness" Value="1"/>
+        <Setter Property="GridDotSize" Value="2"/>
+        <Setter Property="SnapMarkBrush" Value="{ThemeResource AccentFillColorDefault}"/>
+
+        <!-- Selection and page - see Fluent's set. Smaller grips, like everything in this theme. -->
+        <Setter Property="SelectionBrush" Value="{ThemeResource AccentFillColorDefault}"/>
+        <Setter Property="HandleBrush" Value="{ObservableResource SolidBackgroundFillColorBase}"/>
+        <Setter Property="RubberBandBrush" Value="{ObservableResource CanvasBandColor}"/>
+        <Setter Property="HandleSize" Value="8"/>
+
+        <!-- The overlay layer and its grip - see Fluent's set. Tighter margin, like everything in this theme. -->
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="InfiniteCanvas">
+                    <Grid>
+                        <!-- What is on the plane, in the plane's own order - see Fluent's set: the canvas fills this
+                             itself, a layer per run of neighbours of the same sort. -->
+                        <Grid x:Name="PART_Layers"/>
+
+                        <!-- The glass: what a gesture is making, over everything. -->
+                        <CanvasFrontLayer x:Name="PART_Front"/>
+
+                        <StackPanel x:Name="PART_OverlayRoot" Orientation="Vertical" Margin="8">
+                            <Button x:Name="PART_OverlayGrip" Width="28" Height="22"
+                                    MinWidth="0" MinHeight="0" Padding="0"
+                                    HorizontalAlignment="Left" MarginBottom="5"
+                                    ToolTip="Drag to move the panel, click to fold it away">
+                                <Image Source="{ObservableResource GripIcon}" Width="11" Height="11"/>
+                            </Button>
+                            <ContentPresenter x:Name="PART_Overlay"/>
+                        </StackPanel>
+
+                        <!-- The panes, above everything, and the canvas's OWN among them - see Fluent's set. Tighter
+                             inset, like everything here. -->
+                        <CanvasChromeLayer x:Name="PART_Chrome" PaneInset="8" PaneGap="6">
+                            <!-- The selection bar FIRST, because this list is paint order - see Fluent's set. -->
+                            <CanvasPane x:Name="PART_SelectionBar" Placement="Selection" Kind="Bar">
+                                <CanvasSelectionBar/>
+                            </CanvasPane>
+
+                            <CanvasPane x:Name="PART_ToolRail" Placement="TopLeft" Kind="Rail" CanDrag="True"/>
+
+                            <CanvasPane x:Name="PART_MiniMap" Placement="BottomLeft" Kind="Sheet" Header="Map"
+                                        CanDrag="True">
+                                <CanvasMiniMap Width="170" Height="108" MinWidth="0" MinHeight="0"/>
+                            </CanvasPane>
+
+                            <CanvasPane x:Name="PART_Inspector" Placement="TopRight" Kind="Sheet"
+                                        CanResize="True" Width="320" MinResizeWidth="190">
+                                <CanvasInspector/>
+                            </CanvasPane>
+
+                            <CanvasPane x:Name="PART_NodePalette" Placement="Free" Kind="Sheet" Header="Add a node"
+                                        CanDrag="True" Width="190"
+                                        IsNeeded="{TemplateBinding IsPaletteOpen}">
+                                <CanvasNodePalette/>
+                            </CanvasPane>
+
+                            <CanvasPane x:Name="PART_ViewBar" Placement="BottomCenter" Kind="Bar"
+                                        IsDocked="True" MinWidth="232">
+                                <CanvasViewBar/>
+                            </CanvasPane>
+                        </CanvasChromeLayer>
+                    </Grid>
+
+                    <!-- IsWanted and not Visibility - see Fluent's set. -->
+                    <ControlTemplate.Triggers>
+                        <PropertyTrigger Property="ShowsToolRail" Value="false">
+                            <Setter TargetName="PART_ToolRail" Property="IsWanted" Value="false"/>
+                        </PropertyTrigger>
+                        <PropertyTrigger Property="ShowsMiniMap" Value="false">
+                            <Setter TargetName="PART_MiniMap" Property="IsWanted" Value="false"/>
+                        </PropertyTrigger>
+                        <PropertyTrigger Property="ShowsInspector" Value="false">
+                            <Setter TargetName="PART_Inspector" Property="IsWanted" Value="false"/>
+                        </PropertyTrigger>
+                        <PropertyTrigger Property="ShowsNodePalette" Value="false">
+                            <Setter TargetName="PART_NodePalette" Property="IsWanted" Value="false"/>
+                        </PropertyTrigger>
+                        <PropertyTrigger Property="ShowsSelectionBar" Value="false">
+                            <Setter TargetName="PART_SelectionBar" Property="IsWanted" Value="false"/>
+                        </PropertyTrigger>
+                        <PropertyTrigger Property="ShowsViewBar" Value="false">
+                            <Setter TargetName="PART_ViewBar" Property="IsWanted" Value="false"/>
+                        </PropertyTrigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+
+    <!-- One panel of an InfiniteCanvas's chrome - see Fluent's set for what the parts are and why the grip travels with
+         the body. Tighter and squarer, like every panel in this theme. -->
+    <Style Selector="CanvasPane">
+        <Setter Property="Background" Value="{ObservableResource SolidBackgroundFillColorSecondary}"/>
+        <Setter Property="BorderBrush" Value="{ObservableResource ControlStrokeColorDefault}"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="CornerRadius" Value="4"/>
+        <Setter Property="Padding" Value="8"/>
+        <Setter Property="Foreground" Value="{ObservableResource TextFillColorPrimary}"/>
+
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="CanvasPane">
+                    <!-- Dock and not a stack - see Fluent's set for why a wrapping rail needs to be told its height. -->
+                    <DockPanel LastChildFill="True">
+                        <!-- The edge that widens the panel, and FIRST - see Fluent's set for why the order matters. -->
+                        <!-- ONE ON EITHER SIDE, each pulling its own way - see Fluent's set. -->
+                        <Border x:Name="PART_SizerLeft" DockPanel.Dock="Left" Width="8" Visibility="Collapsed"
+                                Background="Transparent" Cursor="SizeEWE"
+                                ToolTip="Drag to set how wide the panel is">
+                            <!-- A SHORT GRIP IN THE MIDDLE - see Fluent's set. -->
+                            <Grid Height="56" VerticalAlignment="Center">
+                                <Border Width="1" HorizontalAlignment="Center"
+                                        Background="{ObservableResource ControlStrokeColorDefault}"/>
+                                <StackPanel Orientation="Vertical" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                    <Border Width="3" Height="3" CornerRadius="1.5"
+                                            Background="{ObservableResource TextFillColorSecondary}"/>
+                                    <Border Width="3" Height="3" CornerRadius="1.5" MarginTop="3"
+                                            Background="{ObservableResource TextFillColorSecondary}"/>
+                                    <Border Width="3" Height="3" CornerRadius="1.5" MarginTop="3"
+                                            Background="{ObservableResource TextFillColorSecondary}"/>
+                                </StackPanel>
+                            </Grid>
+                        </Border>
+
+                        <Border x:Name="PART_SizerRight" DockPanel.Dock="Right" Width="8" Visibility="Collapsed"
+                                Background="Transparent" Cursor="SizeEWE"
+                                ToolTip="Drag to set how wide the panel is">
+                            <Grid Height="56" VerticalAlignment="Center">
+                                <Border Width="1" HorizontalAlignment="Center"
+                                        Background="{ObservableResource ControlStrokeColorDefault}"/>
+                                <StackPanel Orientation="Vertical" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                    <Border Width="3" Height="3" CornerRadius="1.5"
+                                            Background="{ObservableResource TextFillColorSecondary}"/>
+                                    <Border Width="3" Height="3" CornerRadius="1.5" MarginTop="3"
+                                            Background="{ObservableResource TextFillColorSecondary}"/>
+                                    <Border Width="3" Height="3" CornerRadius="1.5" MarginTop="3"
+                                            Background="{ObservableResource TextFillColorSecondary}"/>
+                                </StackPanel>
+                            </Grid>
+                        </Border>
+
+                        <!-- The handles in a row of their own, collapsed whole - see Fluent's set. -->
+                        <StackPanel x:Name="PART_Handles" Orientation="Horizontal" DockPanel.Dock="Top"
+                                    HorizontalAlignment="Left" MarginBottom="4">
+                            <Button x:Name="PART_Grip" Width="28" Height="22"
+                                    MinWidth="0" MinHeight="0" Padding="0"
+                                    ToolTip="Drag to move the panel, click to fold it away">
+                                <Image Source="{ObservableResource GripIcon}" Width="11" Height="11"/>
+                            </Button>
+                            <ToggleButton x:Name="PART_Snap" Width="28" Height="22" MarginLeft="3"
+                                          MinWidth="0" MinHeight="0" Padding="0"
+                                          ToolTip="Stick to an edge when dropped near one">
+                                <Image Source="{ObservableResource PaneSnapIcon}" Width="11" Height="11"/>
+                            </ToggleButton>
+                            <Button x:Name="PART_Turn" Width="28" Height="22" MarginLeft="3"
+                                    MinWidth="0" MinHeight="0" Padding="0" Visibility="Collapsed"
+                                    ToolTip="Lay the tools out in a row or in a column">
+                                <Image Source="{ObservableResource PaneTurnIcon}" Width="11" Height="11"/>
+                            </Button>
+                        </StackPanel>
+
+                        <Border x:Name="PART_Body"
+                                VerticalAlignment="Top"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="{TemplateBinding CornerRadius}"
+                                Padding="{TemplateBinding Padding}">
+                            <DockPanel LastChildFill="True">
+                                <!-- Coloured outright - see Fluent's set. -->
+                                <ContentPresenter x:Name="PART_Header" DockPanel.Dock="Top"
+                                                  Content="{TemplateBinding Header}"
+                                                  FontSize="11"
+                                                  Foreground="{ObservableResource TextFillColorSecondary}"
+                                                  MarginBottom="4"/>
+                                <ContentPresenter x:Name="PART_ContentPresenter" DockPanel.Dock="Top"
+                                                  HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                                  VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
+                                                  Content="{TemplateBinding Content}"
+                                                  ContentTemplate="{TemplateBinding ContentTemplate}"/>
+                                <!-- The tool rail, filled by the canvas - see Fluent's set. Smaller buttons, like
+                                     everything in this theme. -->
+                                <CanvasToolRail x:Name="PART_Rail" Visibility="Collapsed"
+                                                Canvas="{TemplateBinding Canvas}"
+                                                Orientation="{TemplateBinding Orientation}"
+                                                ButtonWidth="28" ButtonHeight="24" IconSize="12" ButtonGap="3"/>
+                            </DockPanel>
+                        </Border>
+                    </DockPanel>
+
+                    <ControlTemplate.Triggers>
+                        <PropertyTrigger Property="IsOpen" Value="false">
+                            <Setter TargetName="PART_Body" Property="Visibility" Value="Collapsed"/>
+                        </PropertyTrigger>
+
+                        <PropertyTrigger Property="Kind" Value="Bar">
+                            <Setter TargetName="PART_Handles" Property="Visibility" Value="Collapsed"/>
+                            <Setter TargetName="PART_Body" Property="Padding" Value="3"/>
+                        </PropertyTrigger>
+
+                        <!-- No plate around a rail, and handles that run the way the tools do - see Fluent's set. -->
+                        <PropertyTrigger Property="Kind" Value="Rail">
+                            <Setter TargetName="PART_Body" Property="Background" Value="Transparent"/>
+                            <Setter TargetName="PART_Body" Property="BorderThickness" Value="0"/>
+                            <Setter TargetName="PART_Body" Property="Padding" Value="0"/>
+                            <Setter TargetName="PART_Rail" Property="Visibility" Value="Visible"/>
+                            <Setter TargetName="PART_ContentPresenter" Property="Visibility" Value="Collapsed"/>
+                            <Setter TargetName="PART_Turn" Property="Visibility" Value="Visible"/>
+                        </PropertyTrigger>
+
+                        <MultiTrigger>
+                            <MultiTrigger.Conditions>
+                                <Condition Property="Kind" Value="Rail"/>
+                                <Condition Property="Orientation" Value="Vertical"/>
+                            </MultiTrigger.Conditions>
+                            <Setter TargetName="PART_Handles" Property="Orientation" Value="Vertical"/>
+                            <!-- Per SIDE - see Fluent's set: MarginLeft overrides Margin.Left, so Margin alone leaves
+                                 the template's indent standing. -->
+                            <Setter TargetName="PART_Snap" Property="MarginLeft" Value="0"/>
+                            <Setter TargetName="PART_Snap" Property="MarginTop" Value="3"/>
+                            <Setter TargetName="PART_Turn" Property="MarginLeft" Value="0"/>
+                            <Setter TargetName="PART_Turn" Property="MarginTop" Value="3"/>
+                        </MultiTrigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+
+    <!-- The MAP - see Fluent's set. -->
+    <Style Selector="CanvasMiniMap">
+        <Setter Property="ItemBrush" Value="{ObservableResource TextFillColorSecondary}"/>
+        <Setter Property="ViewBrush" Value="{ThemeResource AccentFillColorDefault}"/>
+    </Style>
+
+    <Style Selector="CanvasInspector">
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="CanvasInspector">
+                    <DockPanel LastChildFill="True">
+                        <!-- The panel NAMES itself with what it is about - and says nothing when one thing is selected,
+                             since the sections below already say what that thing is. It is a selection of SEVERAL that
+                             needs a word, because then no section can name them. -->
+                        <TextBlock DockPanel.Dock="Top" Text="{TemplateBinding Header}"
+                                   FontSize="12" MarginBottom="6"
+                                   Foreground="{ObservableResource TextFillColorSecondary}"/>
+
+                        <!-- WHICH FACE, and the only thing here the user chooses outright - properties follow what is
+                             selected, the list does not follow anything. RADIOS and not toggles: one of them is always
+                             on, and a radio is the control that cannot be clicked into a state where neither is.
+                             TWO CHOICES IN ONE ROW, told apart by a rule: what the canvas is being used AS, and which
+                             face is showing. Pictograms, because four buttons with words took two rows of a panel
+                             whose whole job is the rows below them. -->
+                        <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" MarginBottom="8">
+                            <RadioButton Classes="Toggle" GroupName="CanvasMode"
+                                         Width="28" Height="24" MinWidth="0" MinHeight="0" Padding="0"
+                                         ToolTip="Drawing - ink, shapes and text"
+                                         IsChecked="{TemplateBinding IsDrawing, Mode=TwoWay}">
+                                <Image Source="{ObservableResource ToolPenIcon}" Width="13" Height="13"/>
+                            </RadioButton>
+                            <RadioButton Classes="Toggle" GroupName="CanvasMode" MarginLeft="4"
+                                         Width="28" Height="24" MinWidth="0" MinHeight="0" Padding="0"
+                                         ToolTip="Graph - nodes and the wires between them"
+                                         IsChecked="{TemplateBinding IsGraph, Mode=TwoWay}">
+                                <Image Source="{ObservableResource ToolNodeIcon}" Width="13" Height="13"/>
+                            </RadioButton>
+
+                            <Separator Orientation="Vertical" MarginLeft="6" MarginRight="6"/>
+
+                            <RadioButton Classes="Toggle" GroupName="CanvasInspectorFace"
+                                         Width="28" Height="24" MinWidth="0" MinHeight="0" Padding="0"
+                                         ToolTip="Properties of what is selected"
+                                         IsChecked="{TemplateBinding ShowsProperties, Mode=TwoWay}">
+                                <Image Source="{ObservableResource FaceInspectorIcon}" Width="13" Height="13"/>
+                            </RadioButton>
+                            <RadioButton Classes="Toggle" GroupName="CanvasInspectorFace" MarginLeft="4"
+                                         Width="28" Height="24" MinWidth="0" MinHeight="0" Padding="0"
+                                         ToolTip="Everything on the plane, topmost first"
+                                         IsChecked="{TemplateBinding ShowsStructure, Mode=TwoWay}">
+                                <Image Source="{ObservableResource FaceStructureIcon}" Width="13" Height="13"/>
+                            </RadioButton>
+                        </StackPanel>
+
+                        <!-- ONE ROW OF ACTIONS ON THE WHOLE WORK - see Fluent's set for why these are pictures, why the
+                             row wraps, and why everything but the bin belongs to a graph alone. -->
+                        <WrapPanel DockPanel.Dock="Bottom" Orientation="Horizontal" MarginTop="8">
+                            <Button Width="22" Height="22" MinWidth="0" MinHeight="0" Padding="0" MarginRight="6"
+                                    Visibility="{TemplateBinding GraphActions}"
+                                    ToolTip="Draw a comment frame round what is selected"
+                                    Command="{Ancestor CanvasInspector, Canvas.FrameCommand}">
+                                <Image Source="{ObservableResource FrameIcon}" Width="12" Height="12"/>
+                            </Button>
+
+                            <Button Width="22" Height="22" MinWidth="0" MinHeight="0" Padding="0" MarginRight="2"
+                                    Visibility="{TemplateBinding GraphActions}"
+                                    ToolTip="Line the left edges up"
+                                    Command="{Ancestor CanvasInspector, Canvas.AlignCommand}" CommandParameter="Left">
+                                <Image Source="{ObservableResource AlignLeftIcon}" Width="12" Height="12"/>
+                            </Button>
+                            <Button Width="22" Height="22" MinWidth="0" MinHeight="0" Padding="0" MarginRight="2"
+                                    Visibility="{TemplateBinding GraphActions}"
+                                    ToolTip="Line the middles up"
+                                    Command="{Ancestor CanvasInspector, Canvas.AlignCommand}"
+                                    CommandParameter="HorizontalCenter">
+                                <Image Source="{ObservableResource AlignMiddleIcon}" Width="12" Height="12"/>
+                            </Button>
+                            <Button Width="22" Height="22" MinWidth="0" MinHeight="0" Padding="0" MarginRight="2"
+                                    Visibility="{TemplateBinding GraphActions}"
+                                    ToolTip="Line the right edges up"
+                                    Command="{Ancestor CanvasInspector, Canvas.AlignCommand}" CommandParameter="Right">
+                                <Image Source="{ObservableResource AlignRightIcon}" Width="12" Height="12"/>
+                            </Button>
+                            <Button Width="22" Height="22" MinWidth="0" MinHeight="0" Padding="0" MarginRight="6"
+                                    Visibility="{TemplateBinding GraphActions}"
+                                    ToolTip="Line the top edges up"
+                                    Command="{Ancestor CanvasInspector, Canvas.AlignCommand}" CommandParameter="Top">
+                                <Image Source="{ObservableResource AlignTopIcon}" Width="12" Height="12"/>
+                            </Button>
+
+                            <Button Width="22" Height="22" MinWidth="0" MinHeight="0" Padding="0" MarginRight="2"
+                                    Visibility="{TemplateBinding GraphActions}"
+                                    ToolTip="Equal gaps down a column"
+                                    Command="{Ancestor CanvasInspector, Canvas.SpreadCommand}"
+                                    CommandParameter="Vertical">
+                                <Image Source="{ObservableResource SpreadRowsIcon}" Width="12" Height="12"/>
+                            </Button>
+                            <Button Width="22" Height="22" MinWidth="0" MinHeight="0" Padding="0" MarginRight="6"
+                                    Visibility="{TemplateBinding GraphActions}"
+                                    ToolTip="Equal gaps across a row"
+                                    Command="{Ancestor CanvasInspector, Canvas.SpreadCommand}"
+                                    CommandParameter="Horizontal">
+                                <Image Source="{ObservableResource SpreadColumnsIcon}" Width="12" Height="12"/>
+                            </Button>
+
+                            <Button Width="22" Height="22" MinWidth="0" MinHeight="0" Padding="0" MarginRight="6"
+                                    Visibility="{TemplateBinding GraphActions}"
+                                    ToolTip="Bring the work into view - the F key does this too"
+                                    Command="{Ancestor CanvasInspector, Canvas.FitViewCommand}">
+                                <Image Source="{ObservableResource FitIcon}" Width="12" Height="12"/>
+                            </Button>
+
+                            <!-- THE DRAWING's own pair - see Fluent's set: SVG out and in, because a drawing is the
+                                 half of a canvas other people's tools have a claim on. -->
+                            <Button Width="22" Height="22" MinWidth="0" MinHeight="0" Padding="0" MarginRight="2"
+                                    Visibility="{TemplateBinding DrawingActions}"
+                                    ToolTip="Export the drawing as SVG"
+                                    Command="{Ancestor CanvasInspector, Canvas.ExportSvgCommand}">
+                                <Image Source="{ObservableResource SaveIcon}" Width="12" Height="12"/>
+                            </Button>
+                            <Button Width="22" Height="22" MinWidth="0" MinHeight="0" Padding="0" MarginRight="6"
+                                    Visibility="{TemplateBinding DrawingActions}"
+                                    ToolTip="Open an SVG drawing"
+                                    Command="{Ancestor CanvasInspector, Canvas.ImportSvgCommand}">
+                                <Image Source="{ObservableResource OpenIcon}" Width="12" Height="12"/>
+                            </Button>
+
+                            <Button Width="22" Height="22" MinWidth="0" MinHeight="0" Padding="0"
+                                    ToolTip="Clear the canvas"
+                                    Command="{Ancestor CanvasInspector, Canvas.ClearCommand}">
+                                <Image Source="{ObservableResource BinIcon}" Width="12" Height="12"/>
+                            </Button>
+                        </WrapPanel>
+
+                        <Grid>
+                            <!-- The FIRST face: the tool in hand and the surface under it. It SCROLLS rather than being
+                                 trimmed: a panel that runs off the bottom is one whose last row cannot be reached.
+                                 A MAX height and not a height - a stated one is claimed whether or not there is
+                                 anything to put in it, and a short face then leaves a tall empty strip. -->
+                            <ScrollViewer MaxHeight="300" Visibility="{TemplateBinding ToolFace}"
+                                          VerticalScrollBarVisibility="Hidden"
+                                          HorizontalScrollBarVisibility="Disabled">
+                                <!-- NO LINES WRITTEN HERE - see Fluent's set: what a tool is set by is CONTENT, and it
+                                     comes from a resource the panel looks up. -->
+                                <PropertyGrid x:Name="PART_Tool"
+                                              SelectedObject="{TemplateBinding Canvas}"
+                                              NameColumnWidth="92" ShowSearch="False"
+                                              ResetButton="{Ancestor CanvasInspector, Canvas.ResetButton}"/>
+                            </ScrollViewer>
+
+                            <!-- The SECOND face. ONE BINDING per row and the grid does the rest: a line written here
+                                 becomes a step in the canvas's memory by itself, and the canvas - which listens to that
+                                 memory - draws the plane again. Items on a canvas are DATA and say nothing when they
+                                 are written to, which is what lets a drawing hold tens of thousands of them; this is
+                                 what closes that gap with no bookkeeping anywhere else.
+                                 STEPPERS ON EVERY NUMBER - see Fluent's set: one panel that nudges a number on a node
+                                 and refuses to on a shape is worse than a slightly narrower field. -->
+                            <PropertyGrid x:Name="PART_Selected"
+                                          Visibility="{TemplateBinding SelectionFace}"
+                                          SelectedObjects="{TemplateBinding Selection}"
+                                          NameColumnWidth="92" ShowSearch="False"
+                                          ResetButton="{Ancestor CanvasInspector, Canvas.ResetButton}"/>
+
+                            <!-- The THIRD face: what is on the plane, topmost first - the same order the drawing is
+                                 stacked in, so "bring to front" needs no explaining. Clicking a row selects it on the
+                                 plane, because there is one selection and not two; a DOUBLE click takes the camera to
+                                 it, which is the only way to find something left far outside the viewport. -->
+                            <!-- A TREE and not a list - see Fluent's set: a group holds things, and a flat list says
+                                 the plane lost them. -->
+                            <!-- HOW MUCH IS ON THE PLANE - see Fluent's set: the list is where that is asked. -->
+                            <DockPanel Visibility="{TemplateBinding StructureFace}" LastChildFill="True">
+                                <TextBlock DockPanel.Dock="Top" Text="{TemplateBinding Counted}" MarginBottom="6"
+                                           Foreground="{ObservableResource TextFillColorSecondary}"/>
+                                <TreeView MaxHeight="300" MinWidth="0"
+                                          ItemsSource="{TemplateBinding Structure}"
+                                          SelectedItem="{TemplateBinding Listed, Mode=TwoWay}"
+                                          ItemActivatedCommand="{Ancestor CanvasInspector, Canvas.ZoomToCommand}">
+                                    <TreeView.ItemTemplate>
+                                        <HierarchicalDataTemplate ItemsSource="{Binding Inside}">
+                                            <TextBlock Text="{Binding Title}" TextTrimming="CharEllipses"/>
+                                        </HierarchicalDataTemplate>
+                                    </TreeView.ItemTemplate>
+                                </TreeView>
+                            </DockPanel>
+                        </Grid>
+                    </DockPanel>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- The NODE PALETTE - see Fluent's set for why it is sections and why one template draws both levels. -->
+    <Style Selector="CanvasNodePalette">
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="CanvasNodePalette">
+                    <StackPanel Orientation="Vertical">
+                        <Grid MarginBottom="5">
+                            <TextBox Text="{TemplateBinding Search, Mode=TwoWay}"
+                                     Padding="5 0 22 0"
+                                     ToolTip="Narrow the list"/>
+                            <Button x:Name="PART_Clear" Width="16" Height="16" MinWidth="0" MinHeight="0"
+                                    Padding="0" MarginRight="4" Visibility="Collapsed"
+                                    HorizontalAlignment="Right" VerticalAlignment="Center"
+                                    Command="{Ancestor CanvasNodePalette, ClearSearchCommand}"
+                                    ToolTip="Clear the search">
+                                <Image Source="{ResourceReference CloseIcon}" Width="7" Height="7"
+                                       HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </Button>
+                        </Grid>
+
+                        <TreeView MaxHeight="200" MinWidth="0" ItemsSource="{TemplateBinding Groups}"
+                                  SelectedItem="{Ancestor CanvasNodePalette, PickedKind, Mode=TwoWay}">
+                            <TreeView.ItemContainerStyle>
+                                <Style Selector="TreeViewItem">
+                                    <Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}"/>
+                                </Style>
+                            </TreeView.ItemContainerStyle>
+                            <TreeView.ItemTemplate>
+                                <HierarchicalDataTemplate ItemsSource="{Binding Kinds}">
+                                    <TextBlock Text="{Binding Title}" VerticalAlignment="Center"/>
+                                </HierarchicalDataTemplate>
+                            </TreeView.ItemTemplate>
+                        </TreeView>
+
+                        <StackPanel Orientation="Horizontal" MarginTop="5" HorizontalAlignment="Right">
+                            <Button Content="Cancel" Height="24" MinWidth="0" Padding="8,0"
+                                    Command="{Ancestor CanvasNodePalette, CloseCommand}"/>
+                        </StackPanel>
+                    </StackPanel>
+
+                    <ControlTemplate.Triggers>
+                        <PropertyTrigger Property="HasSearch" Value="true">
+                            <Setter TargetName="PART_Clear" Property="Visibility" Value="Visible"/>
+                        </PropertyTrigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- The SELECTION BAR - see Fluent's set for what is on it and why it is pictures. Tighter, like everything in
+         this theme. -->
+    <Style Selector="CanvasSelectionBar">
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="CanvasSelectionBar">
+                    <StackPanel Orientation="Horizontal">
+                        <!-- NO COLOUR HERE - see Fluent's set: a colour is set in the panel, where it is said as the
+                             three things it actually is. -->
+                        <Button x:Name="PART_Front" Width="24" Height="22" MinWidth="0" MinHeight="0"
+                                MarginRight="3" Padding="0"
+                                ToolTip="Bring to the front of paint order"
+                                Command="{Ancestor CanvasSelectionBar, Canvas.BringToFrontCommand}">
+                            <Image Source="{ObservableResource BringToFrontIcon}" Width="12" Height="12"/>
+                        </Button>
+                        <Button x:Name="PART_Back" Width="24" Height="22" MinWidth="0" MinHeight="0"
+                                MarginRight="3" Padding="0"
+                                ToolTip="Send to the back"
+                                Command="{Ancestor CanvasSelectionBar, Canvas.SendToBackCommand}">
+                            <Image Source="{ObservableResource SendToBackIcon}" Width="12" Height="12"/>
+                        </Button>
+
+                        <!-- ONE PLACE AT A TIME - see Fluent's set: the ends are not where arranging happens. -->
+                        <Button x:Name="PART_Forward" Width="24" Height="22" MinWidth="0" MinHeight="0"
+                                MarginRight="3" Padding="0"
+                                ToolTip="Bring over the thing in front of it"
+                                Command="{Ancestor CanvasSelectionBar, Canvas.BringForwardCommand}">
+                            <Image Source="{ObservableResource BringForwardIcon}" Width="12" Height="12"/>
+                        </Button>
+                        <Button x:Name="PART_Backward" Width="24" Height="22" MinWidth="0" MinHeight="0"
+                                MarginRight="3" Padding="0"
+                                ToolTip="Send under the thing behind it"
+                                Command="{Ancestor CanvasSelectionBar, Canvas.SendBackwardCommand}">
+                            <Image Source="{ObservableResource SendBackwardIcon}" Width="12" Height="12"/>
+                        </Button>
+                        <Button x:Name="PART_Group" Width="24" Height="22" MinWidth="0" MinHeight="0"
+                                MarginRight="3" Padding="0"
+                                ToolTip="Make one thing of it (Ctrl+G)"
+                                Command="{Ancestor CanvasSelectionBar, Canvas.GroupCommand}">
+                            <Image Source="{ObservableResource GroupIcon}" Width="12" Height="12"/>
+                        </Button>
+                        <Button x:Name="PART_Ungroup" Width="24" Height="22" MinWidth="0" MinHeight="0"
+                                MarginRight="3" Padding="0"
+                                ToolTip="Break it open again (Ctrl+Shift+G)"
+                                Command="{Ancestor CanvasSelectionBar, Canvas.UngroupCommand}">
+                            <Image Source="{ObservableResource UngroupIcon}" Width="12" Height="12"/>
+                        </Button>
+                        <Button Width="24" Height="22" MinWidth="0" MinHeight="0" Padding="0"
+                                ToolTip="Take it away"
+                                Command="{Ancestor CanvasSelectionBar, Canvas.DeleteCommand}">
+                            <Image Source="{ObservableResource BinIcon}" Width="12" Height="12"/>
+                        </Button>
+                    </StackPanel>
+
+                    <ControlTemplate.Triggers>
+                        <PropertyTrigger Property="IsDrawing" Value="false">
+                            <Setter TargetName="PART_Front" Property="Visibility" Value="Collapsed"/>
+                            <Setter TargetName="PART_Back" Property="Visibility" Value="Collapsed"/>
+                            <Setter TargetName="PART_Group" Property="Visibility" Value="Collapsed"/>
+                            <Setter TargetName="PART_Ungroup" Property="Visibility" Value="Collapsed"/>
+                        </PropertyTrigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- The VIEW BAR - see Fluent's set for what is on it and why undo lives here. Tighter, like every strip in this
+         theme: an editor's bottom edge carries several of these and each one is read at a glance. -->
+    <Style Selector="CanvasViewBar">
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="CanvasViewBar">
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                        <Button Width="26" Height="24" MinWidth="0" Padding="0" MarginRight="4"
+                                Command="{Ancestor CanvasViewBar, Canvas.UndoCommand}"
+                                ToolTip="Undo (Ctrl+Z)">
+                            <Image Source="{ObservableResource UndoIcon}" Width="12" Height="12"/>
+                        </Button>
+                        <Button Width="26" Height="24" MinWidth="0" Padding="0" MarginRight="8"
+                                Command="{Ancestor CanvasViewBar, Canvas.RedoCommand}"
+                                ToolTip="Redo (Ctrl+Y)">
+                            <Image Source="{ObservableResource RedoIcon}" Width="12" Height="12"/>
+                        </Button>
+
+                        <Button Content="-" Width="26" Height="24" MinWidth="0" Padding="0"
+                                Command="{Ancestor CanvasViewBar, Canvas.ZoomOutCommand}"
+                                ToolTip="Zoom out"/>
+                        <TextBlock Text="{TemplateBinding ZoomText}" MinWidth="50" MarginLeft="4" MarginRight="4"
+                                   VerticalAlignment="Center"
+                                   HorizontalTextAlignment="Center" VerticalTextAlignment="Center"/>
+                        <Button Content="+" Width="26" Height="24" MinWidth="0" Padding="0"
+                                Command="{Ancestor CanvasViewBar, Canvas.ZoomInCommand}"
+                                ToolTip="Zoom in"/>
+                        <Button Width="26" Height="24" MinWidth="0" Padding="0" MarginLeft="6"
+                                Command="{Ancestor CanvasViewBar, Canvas.HomeCommand}"
+                                ToolTip="Back to the view kept beside this button">
+                            <Image Source="{ObservableResource HomeIcon}" Width="11" Height="11"/>
+                        </Button>
+                        <!-- WHICH VIEW HOME MEANS - see Fluent's set. -->
+                        <Button Width="26" Height="24" MinWidth="0" Padding="0" MarginLeft="4"
+                                Command="{Ancestor CanvasViewBar, Canvas.RememberViewCommand}"
+                                ToolTip="Keep this view as the one Home goes back to">
+                            <Image Source="{ObservableResource KeepViewIcon}" Width="11" Height="11"/>
+                        </Button>
+                        <!-- Offered only where it does something - see Fluent's set. -->
+                        <Button Width="26" Height="24" MinWidth="0" Padding="0" MarginLeft="4"
+                                Visibility="{Ancestor CanvasViewBar, Canvas.KeepsHomeFace}"
+                                Command="{Ancestor CanvasViewBar, Canvas.ForgetViewCommand}"
+                                ToolTip="Give up the kept view - Home goes back to the origin at one to one">
+                            <Image Source="{ObservableResource ForgetViewIcon}" Width="11" Height="11"/>
+                        </Button>
+                    </StackPanel>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- A NODE of a graph - see Fluent's set for what the parts are and why the palette is the theme's rather than the
+         editor's. Squarer and tighter, like everything in this theme: a graph here is read as a diagram of a program,
+         and a program's boxes do not need to be soft. -->
+    <Style Selector="CanvasNode">
+        <Setter Property="Background" Value="{ObservableResource SolidBackgroundFillColorSecondary}"/>
+        <Setter Property="BorderBrush" Value="{ObservableResource ControlStrokeColorDefault}"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="CornerRadius" Value="3"/>
+        <Setter Property="Foreground" Value="{ObservableResource TextFillColorPrimary}"/>
+        <Setter Property="Accent" Value="{ThemeResource AccentFillColorDefault}"/>
+        <Setter Property="PinColor" Value="{ThemeResource AccentFillColorDefault}"/>
+        <Setter Property="MinWidth" Value="0"/>
+        <Setter Property="MinHeight" Value="0"/>
+        <Setter Property="FontSize" Value="{ResourceReference FontSizeBody}"/>
+
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="CanvasNode">
+                    <Border x:Name="PART_Body" Margin="6,0,6,0"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="{TemplateBinding CornerRadius}">
+                            <StackPanel Orientation="Vertical">
+                                <!-- The strip, and the two stubs a FOLDED node's wires come to, laid OVER it rather
+                                     than in it: nothing may take width from this row, or the switch that opens the
+                                     node again slides out from under the click that closed it. -->
+                                <Grid>
+                                    <Border x:Name="PART_Header"
+                                            Background="{TemplateBinding Accent}"
+                                            CornerRadius="2,2,0,0"
+                                            Padding="8,3">
+                                        <!-- The FOLD sits in the strip, because the strip is all that is left when the
+                                             node is folded - a switch anywhere else would be one you cannot reach to
+                                             undo. A toggle and not a button: it shows the state as well as changing it. -->
+                                        <DockPanel LastChildFill="True">
+                                            <ToggleButton x:Name="PART_Fold" DockPanel.Dock="Right"
+                                                          Width="16" Height="16" MinWidth="0" MinHeight="0" Padding="0"
+                                                          MarginLeft="6" VerticalAlignment="Center"
+                                                          Background="Transparent" BorderThickness="0"
+                                                          ToolTip="Fold the node down to its title"
+                                                          IsChecked="{TemplateBinding IsCollapsed, Mode=TwoWay}"
+                                                          BackgroundChecked="Transparent"
+                                                          BorderBrushChecked="Transparent"
+                                                          BackgroundCheckedPointerOver="Transparent"
+                                                          BackgroundCheckedPressed="Transparent"
+                                                          ForegroundChecked="{ThemeResource AccentForegroundColor}">
+                                                <!-- Drawn HERE and not taken from the icon set: it sits on the accent
+                                                     strip and so must wear the accent's own foreground, which is a
+                                                     ThemeResource - and a DrawingImage cannot carry one. -->
+                                                <Path Data="M0,0 L3,3 L6,0"
+                                                      Stroke="{ThemeResource AccentForegroundColor}"
+                                                      StrokeThickness="1.3" StrokeLineJoin="Round"
+                                                      HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                            </ToggleButton>
+
+                                            <ContentPresenter Content="{TemplateBinding Title}"
+                                                              FontSize="{TemplateBinding FontSize}"
+                                                              Foreground="{ThemeResource AccentForegroundColor}"
+                                                              VerticalAlignment="Center"/>
+                                        </DockPanel>
+                                    </Border>
+
+                                    <!-- ONE STUB A SIDE, and every wire of that side comes to it. A folded node is a
+                                         summary: a row of discs says no more than one does and stops it being a title
+                                         strip at all. Shown and hidden by the node itself - whether a stub belongs
+                                         depends on there being sockets on that side, which a trigger cannot ask. -->
+                                    <CanvasNodeSocket x:Name="PART_FoldedIn" Width="10" Height="10" CornerRadius="5"
+                                                      HorizontalAlignment="Left" VerticalAlignment="Center"
+                                                      MarginLeft="-5" Visibility="Collapsed"
+                                                      Background="{ObservableResource SolidBackgroundFillColorSecondary}"
+                                                      BorderBrush="{TemplateBinding PinColor}"
+                                                      BorderThickness="2"/>
+
+                                    <CanvasNodeSocket x:Name="PART_FoldedOut" Width="10" Height="10" CornerRadius="5"
+                                                      HorizontalAlignment="Right" VerticalAlignment="Center"
+                                                      MarginRight="-5" Visibility="Collapsed"
+                                                      Background="{ObservableResource SolidBackgroundFillColorSecondary}"
+                                                      BorderBrush="{TemplateBinding PinColor}"
+                                                      BorderThickness="2"/>
+                                </Grid>
+
+                                <Grid x:Name="PART_Rows" ColumnDefinitions="Auto,*,Auto" Margin="0,6,0,8" MinWidth="112">
+                                    <!-- WHAT IS IN THE NODE, between the two columns of sockets - see Fluent's set. -->
+                                    <ContentPresenter Grid.Column="1" x:Name="PART_ContentPresenter"
+                                                      Content="{TemplateBinding Content}"
+                                                      ContentTemplate="{TemplateBinding ContentTemplate}"
+                                                      ContentTemplateSelector="{TemplateBinding ContentTemplateSelector}"
+                                                      Margin="8,0,8,0"
+                                                      HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                                      VerticalAlignment="{TemplateBinding VerticalContentAlignment}"/>
+
+                                    <ItemsControl Grid.Column="0" ItemsSource="{TemplateBinding InputPins}">
+                                        <!-- Its OWN template: the stock one wraps the items in a ScrollViewer, and a scroller takes every pixel it is
+                                             offered - which made a node as tall as whatever it was measured against instead of as tall as its pins. -->
+                                        <ItemsControl.Template>
+                                            <ControlTemplate TargetType="ItemsControl">
+                                                <ItemsPresenter x:Name="PART_ItemsPresenter"/>
+                                            </ControlTemplate>
+                                        </ItemsControl.Template>
+                                        <ItemsControl.ItemsPanel>
+                                            <ItemsPanelTemplate>
+                                                <StackPanel Orientation="Vertical" IsVirtualizing="False"/>
+                                            </ItemsPanelTemplate>
+                                        </ItemsControl.ItemsPanel>
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <StackPanel Orientation="Horizontal" MarginBottom="3">
+                                                    <!-- A CIRCLE even though this theme squares off everything else: a
+                                                         socket is not a box but the end of a wire, and every graph
+                                                         editor draws it round for that reason. Hollow while nothing is
+                                                         docked - see Fluent's set for how the two rings work. -->
+                                                    <CanvasNodeSocket Width="10" Height="10" CornerRadius="5" MarginLeft="-5"
+                                                            VerticalAlignment="Center"
+                                                            Background="{ObservableResource SolidBackgroundFillColorSecondary}"
+                                                            BorderBrush="{Binding Color}"
+                                                            BorderThickness="2">
+                                                        <!-- Tucked half a pixel under the ring - see Fluent's set for
+                                                             the hairline this keeps out. -->
+                                                        <Border CornerRadius="3.5" Margin="-0.5"
+                                                                Background="{Binding Fill}"/>
+                                                    </CanvasNodeSocket>
+                                                    <TextBlock Text="{Binding Name}" MarginLeft="6"
+                                                               VerticalAlignment="Center"
+                                                               VerticalTextAlignment="Center"
+                                                               Foreground="{ObservableResource TextFillColorSecondary}"/>
+
+                                                    <!-- THE GRIP, and only the grip, moves a socket: the pin itself is
+                                                         where a wire is pulled from, and one target cannot mean two
+                                                         things. The transparent box round the dots is what makes the
+                                                         gaps between them press too. -->
+                                                    <Border CanvasNode.IsSocketGrip="True" Background="Transparent"
+                                                            Width="12" Height="14" MinWidth="0" MinHeight="0"
+                                                            MarginLeft="6" VerticalAlignment="Center" Cursor="SizeAll"
+                                                            ToolTipService.ToolTip="Drag to move this socket">
+                                                        <Path Fill="{ObservableResource TextFillColorTertiary}"
+                                                              HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                              Data="M0,0 L2,0 L2,2 L0,2 Z M4,0 L6,0 L6,2 L4,2 Z M0,4 L2,4 L2,6 L0,6 Z M4,4 L6,4 L6,6 L4,6 Z M0,8 L2,8 L2,10 L0,10 Z M4,8 L6,8 L6,10 L4,10 Z"/>
+                                                    </Border>
+                                                </StackPanel>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+
+                                    <ItemsControl Grid.Column="2" ItemsSource="{TemplateBinding OutputPins}">
+                                        <!-- Its OWN template: the stock one wraps the items in a ScrollViewer, and a scroller takes every pixel it is
+                                             offered - which made a node as tall as whatever it was measured against instead of as tall as its pins. -->
+                                        <ItemsControl.Template>
+                                            <ControlTemplate TargetType="ItemsControl">
+                                                <ItemsPresenter x:Name="PART_ItemsPresenter"/>
+                                            </ControlTemplate>
+                                        </ItemsControl.Template>
+                                        <ItemsControl.ItemsPanel>
+                                            <ItemsPanelTemplate>
+                                                <StackPanel Orientation="Vertical" IsVirtualizing="False"/>
+                                            </ItemsPanelTemplate>
+                                        </ItemsControl.ItemsPanel>
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <StackPanel Orientation="Horizontal" MarginBottom="3"
+                                                            HorizontalAlignment="Right">
+                                                    <!-- On THIS side the grip stands first, for the same reason the pin
+                                                         stands last: each is nearest the edge it belongs to. -->
+                                                    <Border CanvasNode.IsSocketGrip="True" Background="Transparent"
+                                                            Width="12" Height="14" MinWidth="0" MinHeight="0"
+                                                            MarginRight="6" VerticalAlignment="Center" Cursor="SizeAll"
+                                                            ToolTipService.ToolTip="Drag to move this socket">
+                                                        <Path Fill="{ObservableResource TextFillColorTertiary}"
+                                                              HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                              Data="M0,0 L2,0 L2,2 L0,2 Z M4,0 L6,0 L6,2 L4,2 Z M0,4 L2,4 L2,6 L0,6 Z M4,4 L6,4 L6,6 L4,6 Z M0,8 L2,8 L2,10 L0,10 Z M4,8 L6,8 L6,10 L4,10 Z"/>
+                                                    </Border>
+                                                    <TextBlock Text="{Binding Name}" MarginRight="6"
+                                                               VerticalAlignment="Center"
+                                                               VerticalTextAlignment="Center"
+                                                               Foreground="{ObservableResource TextFillColorSecondary}"/>
+                                                    <CanvasNodeSocket Width="10" Height="10" CornerRadius="5" MarginRight="-5"
+                                                            VerticalAlignment="Center"
+                                                            Background="{ObservableResource SolidBackgroundFillColorSecondary}"
+                                                            BorderBrush="{Binding Color}"
+                                                            BorderThickness="2">
+                                                        <!-- Tucked half a pixel under the ring - see Fluent's set for
+                                                             the hairline this keeps out. -->
+                                                        <Border CornerRadius="3.5" Margin="-0.5"
+                                                                Background="{Binding Fill}"/>
+                                                    </CanvasNodeSocket>
+                                                </StackPanel>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </Grid>
+                            </StackPanel>
+                        </Border>
+
+                    <ControlTemplate.Triggers>
+                        <!-- FOLDED: the strip is the whole node - see Fluent's set. -->
+                        <PropertyTrigger Property="IsCollapsed" Value="true">
+                            <Setter TargetName="PART_Rows" Property="Visibility" Value="Collapsed"/>
+                            <Setter TargetName="PART_Header" Property="CornerRadius" Value="2"/>
+                        </PropertyTrigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+</StyleSet>

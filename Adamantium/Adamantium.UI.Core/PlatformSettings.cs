@@ -1,0 +1,100 @@
+using Adamantium.Mathematics;
+using Adamantium.UI.Core.Input;
+
+namespace Adamantium.UI.Core;
+
+/// <summary>Input settings the USER configured in the OS. Honouring them is what keeps the app feeling native, so they
+/// are queried from the platform rather than guessed.</summary>
+public static class PlatformSettings
+{
+   /// <summary>The platform that answers these, registered once at startup; null falls back to the defaults below.</summary>
+   public static INativePlatformSettings Platform { get; set; }
+
+   /// <summary>Longest gap between two clicks that still counts as a double-click, in milliseconds. 500 is the default
+   /// every desktop OS ships with, and what we use until a platform says otherwise.</summary>
+   public static UInt32 DoubleClickTime => Platform?.DoubleClickTime ?? 500;
+
+   /// <summary>How far apart two clicks may land, PER AXIS, and still be one double-click. 4x4 is the desktop default.
+   /// A platform reporting zero falls back to it: zero would mean no two clicks ever count as a double one.</summary>
+   public static Size DoubleClickSize =>
+      Platform?.DoubleClickSize is { Width: > 0, Height: > 0 } size ? size : new Size(4, 4);
+
+   /// <summary>How far the pointer must travel, PER AXIS, before a press becomes a drag - the user's own setting, so a
+   /// shaky hand or a high-DPI mouse doesn't turn every click into a drag. 4x4 is the desktop default.</summary>
+   public static Size DragThreshold => Platform?.DragThreshold ?? new Size(4, 4);
+
+   /// <summary>How long the pointer must rest before it counts as a HOVER, in milliseconds - the user's dwell
+   /// preference, and the pace for every "hold still and it opens" gesture. 400 is the desktop default; a platform
+   /// reporting 0 (or none registered) falls back to it.</summary>
+   public static UInt32 HoverTime => Platform?.HoverTime is { } time and > 0 ? time : 400;
+
+   /// <summary>Every monitor as one rectangle, in PHYSICAL pixels, or an empty one when the platform does not say.
+   /// Used to check that a remembered window position still exists - see <see cref="IsOnScreen"/>.</summary>
+   public static Rect VirtualScreen => Platform?.VirtualScreen ?? default;
+
+   /// <summary>Whether enough of a remembered rectangle still falls on a monitor for a window there to be reachable.
+   /// A layout saved with a panel on a second screen is loaded on a machine that no longer has one, and a window put
+   /// back at those coordinates is a window nobody can get to - not even to close it.
+   /// <para>"Enough" is its top-left corner plus a grabbable strip: a window is usable as long as some of its caption
+   /// is on a screen, and demanding the whole rectangle would reject a window the user themselves left half off the
+   /// edge. With no platform answer everything passes, which is what happened before the question was asked.</para></summary>
+   public static bool IsOnScreen(Rect bounds)
+   {
+      var screen = VirtualScreen;
+      if (screen.Width <= 0 || screen.Height <= 0) return true;
+
+      const double grabbable = 48;
+      return bounds.X + bounds.Width - grabbable > screen.X
+             && bounds.X + grabbable < screen.X + screen.Width
+             && bounds.Y + grabbable < screen.Y + screen.Height
+             && bounds.Y + bounds.Height > screen.Y;
+   }
+
+   /// <summary>True once the pointer has moved far enough from where it was pressed for the gesture to be a DRAG. The
+   /// delta is the one a control measured IN ITS OWN SPACE, so the element it was measured in comes with it - that is
+   /// what turns those units into the physical pixels the OS states its threshold in. Per-axis, not radial: that is
+   /// what the OS setting means, and what every other application on the desktop does with it.
+   /// <para>The element is not optional, and that is the point. The threshold is a statement about how far a HAND moved,
+   /// and a delta in an element's own space is that same distance only at 100% zoom on a 100% display. Comparing the two
+   /// directly - which this used to do - silently scaled the user's setting by everything in between: at 150% a 4px
+   /// threshold took 6 physical px of travel to cross, and inside a 2x ZoomBox on that display, 12. The other way round
+   /// under reduction, where a zoomed-OUT subtree turned clicks into drags.</para></summary>
+   public static bool ExceedsDragThreshold(Vector2 delta, IUIComponent measuredIn)
+      => ExceedsDragThreshold(delta, PhysicalPerUnit(measuredIn));
+
+   /// <summary>The same question for a distance measured on the DESKTOP - between two cursor positions, say. Both sides
+   /// are physical here, so this one needs nothing to convert with.</summary>
+   public static bool ExceedsDragThreshold(PixelPoint delta)
+      => ExceedsDragThreshold(new Vector2(delta.X, delta.Y), Vector2.One);
+
+   // Where the comparison is actually made, with both sides in PHYSICAL pixels. Internal so the arithmetic can be
+   // tested without standing up a window to carry a DPI scale.
+   internal static bool ExceedsDragThreshold(Vector2 delta, Vector2 physicalPerUnit)
+   {
+      var threshold = DragThreshold;
+      return Math.Abs(delta.X * physicalPerUnit.X) > threshold.Width
+             || Math.Abs(delta.Y * physicalPerUnit.Y) > threshold.Height;
+   }
+
+   /// <summary>How many PHYSICAL pixels one unit of <paramref name="element"/>'s own space is worth: everything scaling
+   /// between it and its window (a ZoomBox, a designer zoom) times the window's DPI scale. 1,1 for an element in no
+   /// window, which is the honest answer when there is no screen to measure against.
+   /// <para>Deliberately NOT <see cref="DevicePixels"/>'s walk, which refuses anything but a plain offset: it is placing
+   /// geometry on the pixel grid, and a scaled subtree has no fixed pixel to place it on. A scaled subtree is exactly
+   /// the case this one has to answer for.</para></summary>
+   public static Vector2 PhysicalPerUnit(IUIComponent element)
+   {
+      if (element?.RootVisual is not IWindow window) return Vector2.One;
+
+      var dpi = window.DpiScale;
+      if (dpi.X <= 0 || dpi.Y <= 0) dpi = Vector2.One;
+
+      var world = element.WorldTransform;
+      var x = Math.Abs(world.M11);
+      var y = Math.Abs(world.M22);
+
+      return new Vector2(
+         (float)((x > 0 ? x : 1) * dpi.X),
+         (float)((y > 0 ? y : 1) * dpi.Y));
+   }
+}

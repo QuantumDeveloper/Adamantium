@@ -8,19 +8,28 @@
 
         <Configurations>Debug;Release</Configurations>
 
-        <LangVersion>latestmajor</LangVersion>
+        <LangVersion>latest</LangVersion>
 
-        <TargetFramework>net6.0</TargetFramework>
+        <TargetFramework>net10.0</TargetFramework>
+    </PropertyGroup>
+
+    <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|x64' ">
+      <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    </PropertyGroup>
+
+    <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|x64' ">
+      <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     </PropertyGroup>
 
     <ItemGroup>
         <PackageReference Include="NUnit" Version="3.13.2" />
         <PackageReference Include="NUnit3TestAdapter" Version="4.0.0" />
         <PackageReference Include="Microsoft.NET.Test.Sdk" Version="16.11.0" />
+        <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
     </ItemGroup>
 
     <ItemGroup>
-      <ProjectReference Include="..\..\Adamantium.Engine.Core\Adamantium.Engine.Core.csproj" />
+      <ProjectReference Include="..\..\Adamantium.Graphics.Core\Adamantium.Graphics.Core.csproj" />
     </ItemGroup>
 
 </Project>

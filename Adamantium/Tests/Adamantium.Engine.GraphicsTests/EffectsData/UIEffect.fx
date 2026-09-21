@@ -30,7 +30,7 @@ cbuffer PerlinParams : register(b0)
 
 struct VertexInputType
 {
-	float4 position : SV_POSITION;
+	float4 position : POSITION;
 	float4 color: COLOR;
 };
 
@@ -42,7 +42,7 @@ struct PixelInputType
 
 struct TexturedVertexInputType
 {
-	float4 position : SV_POSITION;
+	float4 position : POSITION;
 	float2 texcoord: TEXCOORD;
 };
 
@@ -117,13 +117,12 @@ float4 TexturedPixelShader(TexturedPixelInputType input) : SV_TARGET
 }
 
 
-technique10 Render
+technique Render
 {
 	
 
 	pass Textured
 	{
-		Profile = 5.1;
 		SetVertexShader(CompileShader(vs_4_0, TexturedVertexShader()));
 		SetPixelShader(CompileShader(ps_4_0, TexturedPixelShader()));
 	}

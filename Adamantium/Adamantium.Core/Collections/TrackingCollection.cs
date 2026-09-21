@@ -1,3 +1,4 @@
+using System;
 ﻿using System.Collections;
 using System.Collections.Generic;
 using System.Collections.Specialized;
@@ -30,7 +31,7 @@ namespace Adamantium.Core.Collections
         /// </summary>
         /// <param name="items">The items that were added.</param>
         /// <param name="index">The starting index.</param>
-        private void NotifyAdd(IList items, int index)
+        protected void NotifyAdd(IList items, int index)
         {
             if (CollectionChanged != null)
             {
@@ -72,12 +73,12 @@ namespace Adamantium.Core.Collections
         /// </summary>
         /// <param name="items">The items that were removed.</param>
         /// <param name="index">The starting index.</param>
-        private void NotifyRemove(IList items, int index)
+        protected void NotifyRemove(IList items, int index)
         {
             if (CollectionChanged != null)
             {
                 var e = new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Remove, items, index);
-                CollectionChanged(this, e);
+                CollectionChanged.Invoke(this, e);
             }
 
             NotifyCountChanged();
@@ -86,7 +87,7 @@ namespace Adamantium.Core.Collections
         /// <summary>
         /// Raises the <see cref="CollectionChanged"/> event with a reset action.
         /// </summary>
-        private void NotifyReset()
+        protected void NotifyReset()
         {
             if (CollectionChanged != null)
             {
@@ -98,6 +99,11 @@ namespace Adamantium.Core.Collections
             NotifyCountChanged();
         }
 
+        protected void NotifyCollectionChanged(NotifyCollectionChangedAction action, IList items)
+        {
+            var e = new NotifyCollectionChangedEventArgs(action, items);
+            CollectionChanged?.Invoke(this, e);
+        }
 
         protected override void OnInsert(int index, T item)
         {
@@ -114,9 +120,38 @@ namespace Adamantium.Core.Collections
             NotifyReplace(oldItem, newItem, index);
         }
 
-        protected override void OnClear()
+        // A MOVE and not a remove plus an add: the item never leaves, so the count does not change and nothing
+        // downstream has to unwind the item's state and build it again.
+        protected override void OnMove(int from, int to, T item)
         {
-            NotifyReset();
+            CollectionChanged?.Invoke(this,
+                new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Move, item, to, from));
+        }
+
+        private List<T> _clearing;   // the items a Clear() is about to drop - kept only while it is being reported
+
+        // A Clear() IS a bulk removal, so it is reported as a Remove, with the items: a downstream mirror needs to know WHAT
+        // left to unwind its per-item state (a visual child's parent link, a logical child's Parent), and an itemless Reset
+        // cannot convey that. They must be captured HERE, before the array is wiped - by the time the clear is done they are
+        // gone.
+        //
+        // And captured ONLY when somebody is listening: with no subscriber there is nothing to report, and a Clear() of an
+        // unobserved collection must not allocate a thing. With one, the copy is not extra - the event carries the list.
+        protected override void OnClearing(ArraySegment<T> items)
+        {
+            if (CollectionChanged == null || items.Count == 0) return;
+
+            _clearing = new List<T>(items.Count);
+            foreach (var item in items) _clearing.Add(item);
+        }
+
+        protected override void OnCleared()
+        {
+            if (_clearing == null) return;
+
+            var removed = _clearing;
+            _clearing = null;
+            NotifyRemove(removed, 0);
         }
     }
 }

@@ -1,0 +1,11 @@
+<View xmlns="http://adamantium/ui">
+    <StackPanel Margin="16">
+        <TextBlock Text="Details" FontSize="20" Margin="0,0,0,8"/>
+        <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
+            <TextBlock Text="Item id: " VerticalAlignment="Center"/>
+            <TextBlock Text="{Binding Id}" FontSize="16" VerticalAlignment="Center"/>
+        </StackPanel>
+        <ToggleSwitch Content="Unsaved changes (blocks leaving this page)"
+                      IsChecked="{Binding HasUnsavedChanges, Mode=TwoWay}"/>
+    </StackPanel>
+</View>

@@ -1,0 +1,37 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <OutputType>Exe</OutputType>
+        <TargetFramework>net10.0</TargetFramework>
+        <Platforms>x64</Platforms>
+        <Configurations>Debug;Release</Configurations>
+        <LangVersion>latest</LangVersion>
+        <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+        <Nullable>disable</Nullable>
+        <ImplicitUsings>enable</ImplicitUsings>
+
+        <!-- Build into a PRIVATE folder instead of the shared artifacts/bin the engine builds into. The designer host
+             is a long-running process that loads (and so file-locks) the engine dlls; running from its own copy it
+             never locks the engine's build output, so the engine can be rebuilt while the designer is open (no more
+             MSB3027 "being used by another process"). MSBuild copies the full dependency closure here, so the host
+             still finds everything, and assembly Location stays valid (unlike a byte-load) so reflection/themes work.
+             Point the ADAMANTIUM_DESIGNER_HOST env var at the exe under this folder. -->
+        <OutputPath>$(MSBuildProjectDirectory)\..\artifacts\designer-host\$(Configuration)\</OutputPath>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\Adamantium.UI\Adamantium.UI.csproj" />
+        <ProjectReference Include="..\Adamantium.Game\Adamantium.Game.csproj" />
+        <ProjectReference Include="..\Adamantium.UI.Themes\Adamantium.UI.Themes.csproj" />
+    </ItemGroup>
+
+    <!-- After building, stop any running designer host so the plugin respawns this fresh build on the next preview
+         render ("build = redeploy", no manual kill). IgnoreExitCode: taskkill returns non-zero when nothing is running.
+         The lock-proof isolated deploy (build while UI.Sandbox runs) is still deploy-designer-host.ps1. -->
+    <Target Name="StopRunningDesignerHost" AfterTargets="Build" Condition="'$(OS)' == 'Windows_NT'">
+        <!-- Stop-Process -ErrorAction SilentlyContinue is a no-op (and logs nothing) when the host isn't running, so it
+             never fails the build - unlike taskkill, which errors "process not found". -->
+        <Exec Command="powershell -NoProfile -Command &quot;Stop-Process -Name Adamantium.UI.Designer.Host -Force -ErrorAction SilentlyContinue&quot;" IgnoreExitCode="true" />
+    </Target>
+
+</Project>

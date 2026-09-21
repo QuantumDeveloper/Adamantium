@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="utf-8"?>
+<StyleSet xmlns="http://adamantium/ui"
+          xmlns:x="http://adamantium/ui/xaml/extensions">
+
+    <!-- Editor Pro's progress bar: a SQUARE rule, not a rounded capsule.
+
+         A progress bar in an editor lives in a status line or at the foot of a panel, edge to edge - and a capsule
+         edge to edge leaves two rounded gaps where the bar does not reach its own container. Fluent's is a floating
+         pill on a page, where the caps are what make it look placed rather than cropped.
+
+         The track and the fill are Grid SIBLINGS, not parent and child: a decorator shrinks to its child, so a
+         zero-width fill nested in the track would collapse the whole bar to nothing. -->
+
+    <Style Selector="ProgressBar">
+        <Setter Property="MinWidth" Value="{ResourceReference ControlMinWidth}"/>
+        <Setter Property="MinHeight" Value="{ResourceReference ProgressBarThickness}"/>
+    </Style>
+
+    <Style Selector="ProgressBar">
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ProgressBar">
+                    <Grid>
+                        <Border x:Name="PART_Track"
+                                Height="{ResourceReference ProgressBarThickness}"
+                                CornerRadius="0"
+                                Background="{ResourceReference ControlFillColorTertiary}"
+                                VerticalAlignment="Center"/>
+                        <Border x:Name="PART_Indicator"
+                                Height="{ResourceReference ProgressBarThickness}"
+                                CornerRadius="0"
+                                Background="{ThemeResource AccentFillColorDefault}"
+                                HorizontalAlignment="Left"
+                                VerticalAlignment="Center"
+                                Width="0"/>
+                    </Grid>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- Turned on its side: Height="Auto" clears the fixed thickness so Stretch spans the full height, and the fill
+         grows from the bottom - the control drives its Height the way it drives Width when horizontal. -->
+    <Style Selector="ProgressBar">
+        <PropertyTrigger Property="Orientation" Value="Vertical">
+            <Setter TargetName="PART_Track" Property="Width" Value="{ResourceReference ProgressBarThickness}"/>
+            <Setter TargetName="PART_Track" Property="Height" Value="Auto"/>
+            <Setter TargetName="PART_Track" Property="HorizontalAlignment" Value="Center"/>
+            <Setter TargetName="PART_Track" Property="VerticalAlignment" Value="Stretch"/>
+            <Setter TargetName="PART_Indicator" Property="Width" Value="{ResourceReference ProgressBarThickness}"/>
+            <Setter TargetName="PART_Indicator" Property="Height" Value="0"/>
+            <Setter TargetName="PART_Indicator" Property="HorizontalAlignment" Value="Center"/>
+            <Setter TargetName="PART_Indicator" Property="VerticalAlignment" Value="Bottom"/>
+        </PropertyTrigger>
+    </Style>
+
+</StyleSet>

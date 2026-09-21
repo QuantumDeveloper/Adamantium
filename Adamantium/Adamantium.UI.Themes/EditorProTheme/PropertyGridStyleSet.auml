@@ -1,0 +1,193 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<StyleSet xmlns="http://adamantium/ui"
+          xmlns:x="http://adamantium/ui/xaml/extensions">
+
+    <!-- An editor's inspector: FLAT and dense, no frame of its own - it sits in a pane that already has one. The grip
+         is per ROW but the width is the GRID's, so the line reads as one continuous rule down the panel.
+
+         The row's layout is a three-column Grid whose FIRST column the control sets (PART_Layout): binding a column
+         width to an ancestor's property is not something a template can say. -->
+
+    <Style Selector="PropertyGrid">
+        <Setter Property="Background" Value="{ObservableResource SolidBackgroundFillColorBase}"/>
+        <Setter Property="Foreground" Value="{ObservableResource TextFillColorPrimary}"/>
+        <Setter Property="FontSize" Value="{ResourceReference FontSizeBody}"/>
+        <!-- Denser than the other two, like everything in this theme - see Fluent's set. -->
+        <Setter Property="EditorHeight" Value="19"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="PropertyGrid">
+                    <Border Background="{TemplateBinding Background}"
+                            BorderThickness="0"
+                            ClipToBounds="True">
+                        <Grid RowDefinitions="Auto,*">
+                            <!-- Outside the viewer, so it stays put while the rows scroll; the cross sits ON the field
+                                 rather than beside it - see Fluent's set. -->
+                            <Grid Grid.Row="0" Margin="4 4 4 3">
+                                <TextBox x:Name="PART_Search"
+                                         Height="22" Padding="5 0 22 0"
+                                         Placeholder="Search properties"
+                                         Visibility="Collapsed"/>
+                                <!-- The theme's DRAWN cross, not a character - see Fluent's set. -->
+                                <Button x:Name="PART_ClearSearch"
+                                        Visibility="Collapsed"
+                                        Width="16" Height="16" MinWidth="0" MinHeight="0"
+                                        Padding="0" Margin="0 0 4 0"
+                                        HorizontalAlignment="Right" VerticalAlignment="Center"
+                                        ToolTipService.ToolTip="Clear the search (Esc)">
+                                    <Image Source="{ResourceReference CloseIcon}" Width="7" Height="7"
+                                           HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                </Button>
+                            </Grid>
+
+                            <!-- Pixel scrolling, not item scrolling - see Fluent's set. -->
+                            <ScrollViewer Grid.Row="1"
+                                          CanContentScroll="False"
+                                          HorizontalScrollBarVisibility="Disabled"
+                                          VerticalScrollBarVisibility="Auto">
+                                <StackPanel x:Name="PART_Sections" Orientation="Vertical"/>
+                            </ScrollViewer>
+                        </Grid>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <PropertyTrigger Property="ShowSearch" Value="true">
+                            <Setter TargetName="PART_Search" Property="Visibility" Value="Visible"/>
+                        </PropertyTrigger>
+                        <!-- Only while there IS a search - see Fluent's set. -->
+                        <MultiTrigger>
+                            <MultiTrigger.Conditions>
+                                <Condition Property="ShowSearch" Value="true"/>
+                                <Condition Property="HasSearchText" Value="true"/>
+                            </MultiTrigger.Conditions>
+                            <Setter TargetName="PART_ClearSearch" Property="Visibility" Value="Visible"/>
+                        </MultiTrigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- A section is the theme's banded Expander as-is: a filled strip with a hairline under it, rows flush beneath. -->
+    <Style Selector="PropertySection" BasedOn="Expander">
+        <Setter Property="Padding" Value="{ResourceReference PaddingRow}"/>
+    </Style>
+
+    <Style Selector="PropertyRow">
+        <Setter Property="Foreground" Value="{ObservableResource TextFillColorPrimary}"/>
+        <Setter Property="FontSize" Value="{ResourceReference FontSizeBody}"/>
+        <Setter Property="MinHeight" Value="{ResourceReference RowHeight}"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="PropertyRow">
+                    <Border x:Name="RowBorder" Background="Transparent">
+                        <!-- A fourth column for the "..." button - Auto, so off it costs nothing. See Fluent's set. -->
+                        <Grid x:Name="PART_Layout" ColumnDefinitions="140,7,*,Auto">
+                            <Grid Grid.Column="0" ColumnDefinitions="Auto,*" Margin="10 0 0 0">
+                                <!-- The strip that opens a composite row. Reserved on every row, so the names of one
+                                     level line up whether or not that row has children. -->
+                                <Border Grid.Column="0" x:Name="PART_Expander"
+                                        Width="14" Background="Transparent" Cursor="Hand">
+                                    <Image x:Name="Glyph"
+                                           Source="{ResourceReference ChevronRightIcon}"
+                                           Width="8" Height="8"
+                                           HorizontalAlignment="Center" VerticalAlignment="Center"
+                                           Visibility="Collapsed"/>
+                                </Border>
+                                <ContentPresenter Grid.Column="1"
+                                        x:Name="PART_Name"
+                                        VerticalAlignment="Center"
+                                        TextTrimming="CharEllipses"
+                                        Foreground="{TemplateBinding Foreground}"
+                                        FontSize="{TemplateBinding FontSize}"/>
+                            </Grid>
+
+                            <!-- The grip is its own column: a hit area of its own, and the hairline that reads as the
+                                 rule between the halves. -->
+                            <Border Grid.Column="1" x:Name="PART_Grip" Background="Transparent">
+                                <Border Width="1" HorizontalAlignment="Center"
+                                        Background="{ObservableResource ControlStrokeColorDefault}"
+                                        IsHitTestVisible="False"/>
+                            </Border>
+
+                            <!-- The value half STRETCHES - every editor is the row's height. See Fluent's set. -->
+                            <ContentPresenter Grid.Column="2"
+                                    x:Name="PART_Value"
+                                    Margin="8 2 8 2"
+                                    VerticalAlignment="Stretch"
+                                    HorizontalAlignment="Stretch"
+                                    TextTrimming="CharEllipses"
+                                    Foreground="{TemplateBinding Foreground}"
+                                    FontSize="{TemplateBinding FontSize}"/>
+
+                            <!-- Square, the editors' height, and its inherited minimum zeroed - see Fluent's set. -->
+                            <StackPanel Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Center">
+                                <!-- Put the default back, only where there is something to put back - see Fluent's
+                                     set. -->
+                                <!-- ALWAYS THERE and disabled until there is something to put back - see Fluent's set:
+                                     its room is kept, so a line does not change shape because somebody typed in it. -->
+                                <!-- The reset is LAST - see Fluent's set: it must stand the same distance from the
+                                     edge on every line. -->
+                                <Button x:Name="PART_Action"
+                                        Content="..." Visibility="Collapsed"
+                                        Width="19" Height="19" MinWidth="0" MinHeight="0"
+                                        Padding="0" Margin="0 0 2 0"
+                                        FontSize="{ResourceReference FontSizeCaption}"
+                                        ToolTipService.ToolTip="More"/>
+
+                                <Button x:Name="PART_Reset"
+                                        IsEnabled="False"
+                                        Width="19" Height="19" MinWidth="0" MinHeight="0"
+                                        Padding="0" Margin="0 0 4 0"
+                                        ToolTipService.ToolTip="Reset to the default">
+                                    <Image Source="{ResourceReference RevertIcon}" Width="9" Height="9"
+                                           HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                </Button>
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <PropertyTrigger Property="ShowActionButton" Value="true">
+                            <Setter TargetName="PART_Action" Property="Visibility" Value="Visible"/>
+                        </PropertyTrigger>
+                        <PropertyTrigger Property="IsModified" Value="true">
+                            <Setter TargetName="PART_Reset" Property="IsEnabled" Value="True"/>
+                        </PropertyTrigger>
+
+                        <!-- The other two manners a panel can be asked for - see Fluent's set. -->
+                        <MultiTrigger>
+                            <MultiTrigger.Conditions>
+                                <Condition Property="ResetButton" Value="WhenModified"/>
+                                <Condition Property="IsModified" Value="false"/>
+                            </MultiTrigger.Conditions>
+                            <Setter TargetName="PART_Reset" Property="Visibility" Value="Collapsed"/>
+                        </MultiTrigger>
+
+                        <PropertyTrigger Property="ResetButton" Value="Never">
+                            <Setter TargetName="PART_Reset" Property="Visibility" Value="Collapsed"/>
+                        </PropertyTrigger>
+                        <!-- ...AND NEVER ON THE LINE THAT OPENS A GROUP - see Fluent's set: a group is not a value,
+                             and the lines it holds carry their own buttons. -->
+                        <PropertyTrigger Property="HasChildren" Value="true">
+                            <Setter TargetName="Glyph" Property="Visibility" Value="Visible"/>
+                            <Setter TargetName="PART_Reset" Property="Visibility" Value="Collapsed"/>
+                        </PropertyTrigger>
+                        <PropertyTrigger Property="IsExpanded" Value="true">
+                            <Setter TargetName="Glyph" Property="Source" Value="{ResourceReference ChevronDownIcon}"/>
+                        </PropertyTrigger>
+                        <!-- No reset on a line nobody can write to - see Fluent's set. -->
+                        <PropertyTrigger Property="IsReadOnly" Value="true">
+                            <Setter TargetName="PART_Value" Property="Foreground"
+                                    Value="{ObservableResource TextFillColorDisabled}"/>
+                            <Setter TargetName="PART_Reset" Property="Visibility" Value="Collapsed"/>
+                        </PropertyTrigger>
+                        <PropertyTrigger Property="IsMouseOver" Value="true">
+                            <Setter TargetName="RowBorder" Property="Background"
+                                    Value="{ResourceReference SubtleFillColorSecondary}"/>
+                        </PropertyTrigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+</StyleSet>

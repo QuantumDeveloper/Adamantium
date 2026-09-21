@@ -5,9 +5,9 @@ using System.IO;
 using System.Linq;
 using Adamantium.Engine.Compiler.Converter.Configs;
 using Adamantium.Engine.Compiler.Converter.Containers;
-using Adamantium.Engine.Compiler.Converter.ConversionUtils;
-using Adamantium.Engine.Core;
-using Adamantium.Engine.Core.Models;
+using Adamantium.Engine.Compiler.Models.ConversionUtils;
+using Adamantium.Graphics.Core;
+using Adamantium.Graphics.Core.Models;
 using Adamantium.Mathematics;
 
 namespace Adamantium.Engine.Compiler.Converter.Parsers
@@ -46,7 +46,7 @@ namespace Adamantium.Engine.Compiler.Converter.Parsers
             FileName = Path.GetFileNameWithoutExtension(filePath);
         }
 
-        protected override DataContainer ParseData(ConversionConfig config)
+        public override DataContainer ParseData(ConversionConfig config)
         {
             if (!config.GeometryEnabled && !config.MaterialsEnabled)
             {
@@ -72,10 +72,10 @@ namespace Adamantium.Engine.Compiler.Converter.Parsers
 
         private void ParseGeometry()
         {
-            List<Vector3F> positions = new List<Vector3F>();
-            List<Vector3F> normals = new List<Vector3F>();
-            List<Vector2F> uvs = new List<Vector2F>();
-            positions.Add(Vector3F.Zero);
+            var positions = new List<Vector3>();
+            var normals = new List<Vector3F>();
+            var uvs = new List<Vector2F>();
+            positions.Add(Vector3.Zero);
             normals.Add(Vector3F.Zero);
             uvs.Add(Vector2F.Zero);
             ObjMeshData geometryData = null;
@@ -127,7 +127,7 @@ namespace Adamantium.Engine.Compiler.Converter.Parsers
                     }
                     String values = line.Substring(POSITION.Length).Trim(' ');
                     var v = ParseNumericString(values);
-                    positions.Add(new Vector3F(v));
+                    positions.Add(new Vector3(v));
                     _lastParsedStep = ParsedStep.Position;
                 }
 
@@ -139,7 +139,7 @@ namespace Adamantium.Engine.Compiler.Converter.Parsers
                         offsetIndex++;
                     }
                     String values = line.Substring(NORMAL.Length);
-                    var n = ParseNumericString(values);
+                    var n = ParseNumericStringFloat(values);
                     normals.Add(new Vector3F(n));
                     _lastParsedStep = ParsedStep.Normal;
                 }
@@ -152,7 +152,7 @@ namespace Adamantium.Engine.Compiler.Converter.Parsers
                         offsetIndex++;
                     }
                     String values = line.Substring(UV.Length);
-                    var uv = ParseNumericString(values);
+                    var uv = ParseNumericStringFloat(values);
                     uvs.Add(new Vector2F(uv[0], uv[1]));
                     _lastParsedStep = ParsedStep.UV;
                 }
@@ -174,27 +174,31 @@ namespace Adamantium.Engine.Compiler.Converter.Parsers
 
                 else if (line.StartsWith(FACES))
                 {
-                    int indicesCount;
-                    var indices = ParseFace(line.Substring(FACES.Length), out indicesCount);
+                    var corners = ParseFace(line.Substring(FACES.Length), positions.Count, uvs.Count, normals.Count,
+                       out var indicesCount, out var layout);
+
+                    // A file with no o/g and no usemtl is perfectly legal - the minimal form every exporter can
+                    // write. Faces used to be skipped outright when that left semanticData null, so such a file
+                    // imported as an empty model without a word.
                     if (semanticData == null)
                     {
-                        continue;
+                        semanticData = new RawIndicesSemanticData { Offset = offset };
+                        EnsureMesh(ref geometryData).GeometrySemantic.Add(semanticData);
                     }
 
-                    semanticData.RawIndices.AddRange(indices);
+                    semanticData.RawIndices.AddRange(corners);
                     semanticData.VertexType.Add(indicesCount);
                     if (semanticData.MeshTopology == PrimitiveType.Undefined)
                     {
                         var topology = indicesCount >= 3 ? PrimitiveType.TriangleList : PrimitiveType.LineList;
                         semanticData.MeshTopology = topology;
-                        if (offset.UV0 != null)
-                        {
-                            offset.UV0 = 1;
-                        }
-                        if (offset.Normal != null)
-                        {
-                            offset.Normal = 2;
-                        }
+
+                        // The layout is what the FACE says, not what the file happens to contain: a file may carry
+                        // vn lines while its faces never reference them. Every corner is written as three slots
+                        // (position, uv, normal) with 0 where a field is absent, so these offsets always hold.
+                        offset.Position = 0;
+                        offset.UV0 = layout.HasUV ? 1 : null;
+                        offset.Normal = layout.HasNormal ? (ulong?)2 : null;
                         semanticData.Semantic = GetSemantic(offset);
                         offset = new Offset();
                         offsetIndex = 0;
@@ -204,23 +208,22 @@ namespace Adamantium.Engine.Compiler.Converter.Parsers
                 }
             }
 
-            if (_lastParsedStep == ParsedStep.Faces && dataContainer.Meshes.Count == 0)
-            {
-                geometryData = new ObjMeshData(ObjectType.Object);
-                geometryData.Name = FileName;
-                geometryData.GeometrySemantic.Add(semanticData);
-                dataContainer.Meshes.Add(geometryData.Name, geometryData);
-            }
-
             dataContainer.GeometryData.Positions = positions;
             dataContainer.GeometryData.Normals = normals;
             dataContainer.GeometryData.UV = uvs;
             dataContainer.Modules |= Modules.Geometry;
         }
 
-        private float[] ParseNumericString(string values)
+        private double[] ParseNumericString(string values)
         {
-            return values.Split(' ').Where(s => !string.IsNullOrEmpty(s)).Select(s => float.Parse(s, CultureInfo.InvariantCulture.NumberFormat)).ToArray();
+            return values.Split(' ').Where(s => !string.IsNullOrEmpty(s))
+                .Select(s => double.Parse(s, CultureInfo.InvariantCulture.NumberFormat)).ToArray();
+        }
+        
+        private float[] ParseNumericStringFloat(string values)
+        {
+            return values.Split(' ').Where(s => !string.IsNullOrEmpty(s))
+                .Select(s => float.Parse(s, CultureInfo.InvariantCulture.NumberFormat)).ToArray();
         }
 
         private VertexSemantic GetSemantic(Offset offset)
@@ -241,30 +244,71 @@ namespace Adamantium.Engine.Compiler.Converter.Parsers
             return semantic;
         }
 
-        private List<int> ParseFace(string face, out int indicesCount)
+        //A file that never names an object or a group still has one mesh - the file itself
+        private ObjMeshData EnsureMesh(ref ObjMeshData geometryData)
         {
-            List<int> indicesList = new List<int>();
+            if (geometryData != null) return geometryData;
 
-            var values = face.Split(' ');
-            indicesCount = 0;
-            for (int i = 0; i < values.Length; i++)
+            geometryData = new ObjMeshData(ObjectType.Object) { Name = FileName };
+            dataContainer.Meshes.Add(geometryData.Name, geometryData);
+            return geometryData;
+        }
+
+        //Which of the three fields a face corner actually named
+        private readonly struct FaceLayout
+        {
+            public FaceLayout(bool hasUV, bool hasNormal)
             {
-                if (values[i].Contains("/"))
-                {
-                    var indices = values[i].Split(new[] { '/' }, StringSplitOptions.RemoveEmptyEntries)
-                          .Select(s => Int32.Parse(s, CultureInfo.InvariantCulture.NumberFormat)).ToArray();
-                    indicesList.AddRange(indices);
-                    indicesCount++;
-                }
-                else if (!values[i].Contains("/") && !string.IsNullOrEmpty(values[i]))
-                {
-                    var index = Int32.Parse(values[i], CultureInfo.InvariantCulture.NumberFormat);
-                    indicesList.Add(index);
-                    indicesCount++;
-                }
-
+                HasUV = hasUV;
+                HasNormal = hasNormal;
             }
+
+            public readonly bool HasUV;
+            public readonly bool HasNormal;
+        }
+
+        /// <summary>Reads one face into three slots per corner - position, uv, normal - with 0 where the corner
+        /// left a field out. Splitting on '/' with RemoveEmptyEntries used to collapse the gap in "1//1", so a
+        /// position-and-normal face produced two numbers per corner while the offsets assumed three, and every
+        /// index after the first shifted.</summary>
+        private List<int> ParseFace(string face, int positionCount, int uvCount, int normalCount,
+            out int indicesCount, out FaceLayout layout)
+        {
+            var indicesList = new List<int>();
+            var corners = face.Split(new[] { ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries);
+            indicesCount = 0;
+            var hasUV = false;
+            var hasNormal = false;
+
+            foreach (var corner in corners)
+            {
+                var fields = corner.Split('/');
+                indicesList.Add(Resolve(fields.ElementAtOrDefault(0), positionCount));
+
+                var uv = Resolve(fields.ElementAtOrDefault(1), uvCount);
+                var normal = Resolve(fields.ElementAtOrDefault(2), normalCount);
+                indicesList.Add(uv);
+                indicesList.Add(normal);
+
+                hasUV |= uv > 0;
+                hasNormal |= normal > 0;
+                indicesCount++;
+            }
+
+            layout = new FaceLayout(hasUV, hasNormal);
             return indicesList;
+        }
+
+        //An .obj index is 1-based, and a negative one counts back from the newest element
+        private static int Resolve(string field, int count)
+        {
+            if (String.IsNullOrEmpty(field)
+                || !Int32.TryParse(field, NumberStyles.Integer, CultureInfo.InvariantCulture, out var index))
+            {
+                return 0;
+            }
+
+            return index < 0 ? Math.Max(0, count + index) : index;
         }
 
         private void ParseMaterials()

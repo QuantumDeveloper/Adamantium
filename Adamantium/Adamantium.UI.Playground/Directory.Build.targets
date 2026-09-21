@@ -1,9 +1,0 @@
-<Project>
-  <PropertyGroup>
-      <AssignTargetPathsDependsOn>
-         $(AssignTargetPathsDependsOn);
-          EngineContentAndCompileTarget;
-      </AssignTargetPathsDependsOn>
-  </PropertyGroup>
-  
-</Project>

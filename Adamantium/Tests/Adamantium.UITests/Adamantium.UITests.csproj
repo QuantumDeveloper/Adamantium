@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
-        <TargetFramework>net6.0</TargetFramework>
+        <TargetFramework>net10.0</TargetFramework>
 
         <IsPackable>false</IsPackable>
 
@@ -9,18 +9,25 @@
 
         <Configurations>Debug;Release</Configurations>
 
-        <LangVersion>latestmajor</LangVersion>
+        <LangVersion>latest</LangVersion>
+
+        <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     </PropertyGroup>
 
     <ItemGroup>
         <PackageReference Include="NUnit" Version="3.13.2" />
         <PackageReference Include="NUnit3TestAdapter" Version="4.0.0" />
         <PackageReference Include="Microsoft.NET.Test.Sdk" Version="16.11.0" />
+        <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
     </ItemGroup>
 
     <ItemGroup>
       <ProjectReference Include="..\..\Adamantium.Mathematics\Adamantium.Mathematics.csproj" />
       <ProjectReference Include="..\..\Adamantium.UI\Adamantium.UI.csproj" />
+      <!-- The themes themselves, so a style set can be measured as SHIPPED rather than as a hand-copied lookalike. -->
+      <ProjectReference Include="..\..\Adamantium.UI.Themes\Adamantium.UI.Themes.csproj" />
+      <!-- Needed by the [Category("Gpu")] integration tests to spin up a headless render device. -->
+      <ProjectReference Include="..\..\Adamantium.Graphics\Adamantium.Graphics.csproj" />
     </ItemGroup>
 
 </Project>

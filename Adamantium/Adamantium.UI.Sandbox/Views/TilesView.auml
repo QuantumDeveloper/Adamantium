@@ -1,0 +1,42 @@
+<View xmlns="http://adamantium/ui"
+      xmlns:x="http://adamantium/ui/xaml/extensions">
+    <!-- Tiles 3D: the flip-tile mosaic. TilesHost + FlipTile are engine controls now (Adamantium.UI.Controls, themed by
+         Tiles*StyleSet). TilesHost owns the board mechanics: the tilt field (tiles lean toward the cursor), the diagonal
+         flip wave, and the ONE shared photo (decoded once, texture shared) whose gap-true UV fragments it hands to each
+         tile from their arranged bounds. Tiles stay in the instanced SDF/image draw paths while rotating - rotation only
+         rewrites each tile's transform-table matrix. -->
+    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto">
+        <StackPanel Orientation="Vertical" Margin="24" HorizontalAlignment="Center">
+
+            <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
+                <TextBlock Text="3D flip tiles — hover to tilt, click to flip a tile" FontSize="16" VerticalAlignment="Center"/>
+                <Button Content="Flip all" Command="{Binding FlipAllCommand}" Width="120" Height="34" Margin="24,0,0,0"/>
+            </StackPanel>
+
+            <!-- The board's SHAPE comes from the ONE place that owns it - the view-model that built the tiles. It used
+                 to be spelled out again here in pixels (1092 wide at an item width of 91), which is the same fact in
+                 different units, and only the pixels were what the layout obeyed. That left the board with no slack at
+                 all: a theme that frames its scrollable areas took two pixels, twelve stopped fitting, the row dropped
+                 to eleven, and since each tile's photo fragment is a function of its index AND the column count, the
+                 whole mosaic re-cut itself around a grid nobody asked for. The tile size is now DERIVED from the counts
+                 and the space, so chrome costs every tile a fraction of a pixel.
+                 No panel is declared: the board brings its own (see the TilesHost style sets) and is handed these. -->
+            <TilesHost ItemsSource="{Binding Tiles}"
+                       Columns="{Binding Columns}" 
+                       Rows="{Binding Rows}" 
+                       Spacing="6"
+                       Width="1092" 
+                       Height="637" 
+                       HorizontalAlignment="Center"
+                       Photo="Textures/luxfon.tga"
+                       IsFlipped="{Binding AllFlipped}">
+                <TilesHost.ItemTemplate>
+                    <DataTemplate>
+                        <FlipTile FrontBrush="{Binding Color}"/>
+                    </DataTemplate>
+                </TilesHost.ItemTemplate>
+            </TilesHost>
+
+        </StackPanel>
+    </ScrollViewer>
+</View>

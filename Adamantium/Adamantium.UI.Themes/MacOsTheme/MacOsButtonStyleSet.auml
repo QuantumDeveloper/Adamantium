@@ -1,0 +1,153 @@
+<?xml version="1.0" encoding="utf-8"?>
+<StyleSet xmlns="http://adamantium/ui"
+          xmlns:x="http://adamantium/ui/xaml/extensions">
+
+    <!-- The macOS push button. Same shape of style set as Fluent's - one template, the states as brushes on the control,
+         triggers projecting them - because that shape is the engine's, not Windows'. What differs is the behaviour and
+         the weight:
+
+         IT DOES NOT REACT TO HOVER. That is the defining difference and it is deliberate, not an omission: an AppKit
+         push button lights up when it is PRESSED and not when the pointer merely crosses it. Windows treats hover as
+         feedback that a thing is live; a Mac treats the button's own presence as that, and reserves the change for the
+         action. A macOS theme that highlights on hover reads as a Windows theme wearing Mac colours.
+
+         IT IS SEATED, NOT OUTLINED. The border is a hairline whose job is to sit the control on its surface; the fill
+         carries the shape. Hence StrokeControl at 1 in the macOS metrics against Fluent's 2.
+
+         PRESSING DARKENS IT. Windows swaps to a paler fill; a Mac pushes the whole control down a shade, which is why
+         the pressed brushes here go DOWN in lightness rather than up. -->
+
+    <Style Selector="Button">
+        <Setter Property="Background" Value="{ResourceReference ControlFillColorDefault}"/>
+        <Setter Property="BorderBrush" Value="{ResourceReference ControlStrokeColorDefault}"/>
+        <Setter Property="Foreground" Value="{ObservableResource TextFillColorPrimary}"/>
+
+        <!-- Hover leaves it exactly as it was - see above. Stated rather than left out, so that the next person can see
+             it was a decision and not a forgotten setter. -->
+        <Setter Property="BackgroundPointerOver" Value="{ResourceReference ControlFillColorDefault}"/>
+        <Setter Property="BackgroundPressed" Value="{ResourceReference ControlFillColorTertiary}"/>
+        <Setter Property="BackgroundDisabled" Value="{ResourceReference ControlFillColorDisabled}"/>
+        <Setter Property="ForegroundPressed" Value="{ObservableResource TextFillColorPrimary}"/>
+        <Setter Property="ForegroundDisabled" Value="{ResourceReference TextFillColorDisabled}"/>
+
+        <Setter Property="BorderThickness" Value="{ResourceReference StrokeControl}"/>
+        <Setter Property="CornerRadius" Value="{ResourceReference CornerRadiusDefault}"/>
+        <Setter Property="Padding" Value="{ResourceReference PaddingControl}"/>
+        <Setter Property="MinHeight" Value="{ResourceReference ControlHeight}"/>
+        <Setter Property="FontSize" Value="{ResourceReference FontSizeBody}"/>
+        <Setter Property="HorizontalContentAlignment" Value="Center"/>
+        <Setter Property="VerticalContentAlignment" Value="Center"/>
+    </Style>
+
+    <Style Selector="Button">
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border x:Name="InnerBorder"
+                            CornerRadius="{TemplateBinding CornerRadius}"
+                            Background="{TemplateBinding Background}"
+                            BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}"
+                            Padding="{TemplateBinding Padding}">
+                        <ContentPresenter
+                                x:Name="PART_ContentPresenter"
+                                HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
+                                Foreground="{TemplateBinding Foreground}"
+                                FontSize="{TemplateBinding FontSize}"
+                                Content="{TemplateBinding Content}"
+                                ContentTemplate="{TemplateBinding ContentTemplate}"
+                                ContentTemplateSelector="{TemplateBinding ContentTemplateSelector}"/>
+                    </Border>
+                    <!-- No focus ring here either: the application draws ONE, on the adorner layer. See Fluent's note -
+                         a ring restated in a template is a second answer to the same question. -->
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style Selector="Button">
+        <!-- No IsMouseOver trigger at all. The brush above already says hover changes nothing; a trigger that assigns
+             the same value would only invite someone to "fix" it later by giving it a different one. -->
+        <PropertyTrigger Property="IsPressed" Value="true">
+            <Setter TargetName="InnerBorder" Property="Background" Value="{TemplateBinding BackgroundPressed}"/>
+            <Setter TargetName="PART_ContentPresenter" Property="Foreground" Value="{TemplateBinding ForegroundPressed}"/>
+        </PropertyTrigger>
+        <PropertyTrigger Property="IsEnabled" Value="false">
+            <Setter TargetName="InnerBorder" Property="Background" Value="{TemplateBinding BackgroundDisabled}"/>
+            <Setter TargetName="PART_ContentPresenter" Property="Foreground" Value="{TemplateBinding ForegroundDisabled}"/>
+            <!-- AND THE CONTENT AS A WHOLE GOES QUIET - see Fluent's set: a picture carries its own brush and does not
+                 hear the disabled foreground, so a glyph button sat there looking live with nothing to do. -->
+            <Setter TargetName="PART_ContentPresenter" Property="Opacity" Value="0.4"/>
+        </PropertyTrigger>
+    </Style>
+
+    <!-- THE DEFAULT BUTTON. On a Mac this is not "a button someone styled blue" - it is the one the Return key presses,
+         and it is filled with the accent precisely so that it can be found without reading. Same template, only the
+         brushes change; pressed goes DARKER, as everything here does. -->
+    <Style Selector="Button.Accent">
+        <Setter Property="Background" Value="{ThemeResource AccentFillColorDefault}"/>
+        <Setter Property="BorderBrush" Value="{ThemeResource AccentFillColorDefault}"/>
+        <Setter Property="Foreground" Value="{ThemeResource AccentForegroundColor}"/>
+        <Setter Property="BackgroundPointerOver" Value="{ThemeResource AccentFillColorDefault}"/>
+        <Setter Property="BackgroundPressed" Value="{ThemeResource AccentFillColorTertiary}"/>
+        <Setter Property="BackgroundDisabled" Value="{ThemeResource AccentFillColorDisabled}"/>
+        <Setter Property="ForegroundPressed" Value="{ThemeResource AccentForegroundColor}"/>
+    </Style>
+
+    <!-- THE ICON BUTTON, and it is the exception to the no-hover rule above - which is a correction, not a special
+         case. "A Mac answers the press, not the pointer" is true of a BORDERED push button: it is already visible as a
+         button, so lighting it under the cursor tells you nothing you did not know. A borderless one - a close cross in
+         a panel header, a toolbar glyph - is a bare symbol with no outline at all, and what the hover plate says is
+         "this symbol is a control, and it is THIS one", which nothing else in its appearance says. AppKit lights those,
+         and taking it away is how a header full of glyphs stops looking clickable.
+         The plate is a SUBTLE fill, not a control fill: it appears under the pointer and must not read as a button that
+         was there all along. Pressing takes it a step further rather than lightening it, as everything here does. -->
+    <Style Selector="Button.Icon">
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="BorderBrush" Value="Transparent"/>
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="BackgroundPointerOver" Value="{ResourceReference SubtleFillColorSecondary}"/>
+        <Setter Property="BackgroundPressed" Value="{ResourceReference ControlFillColorTertiary}"/>
+        <Setter Property="BackgroundDisabled" Value="Transparent"/>
+        <Setter Property="Padding" Value="0"/>
+        <Setter Property="MinHeight" Value="0"/>
+    </Style>
+
+    <!-- ...and the hover TRIGGER it needs, which the plain button deliberately does without. Its own style, because the
+         plain button's trigger block states its absence as a decision - adding one there would contradict the sentence
+         written beside it. -->
+    <Style Selector="Button.Icon">
+        <PropertyTrigger Property="IsMouseOver" Value="true">
+            <Setter TargetName="InnerBorder" Property="Background" Value="{TemplateBinding BackgroundPointerOver}"/>
+        </PropertyTrigger>
+    </Style>
+
+    <!-- A PAGER'S STEP ARROW. Worn ALONGSIDE Icon - the template says Classes="Icon PagerArrow" - rather than based on
+         it: BasedOn resolves through PURE-TYPE styles only, so BasedOn="Button.Icon" would quietly hand back the plain
+         bordered button and look like a typo in the theme rather than a bug. Two classes on one button is what the
+         mechanism is for, and it leaves the flat look with ONE owner.
+         So this class is only what Icon does not say. THE HEIGHT IS FIXED AND THE WIDTH IS A FLOOR, and that asymmetry
+         is the whole point: a height that followed its content would be one number on an arrow and another on a page
+         button, and the row would step up and down as well as sideways. One height for every entry, taken from the same
+         key, so they cannot drift; width free to grow past the floor, because a five-digit page number has to fit.
+         AND IT DIMS ITS GLYPH. The plain button greys a disabled control through the content presenter's FOREGROUND,
+         which is how these arrows read while they were the characters "<" and ">"; a drawn glyph carries its own brush
+         and ignores that, so on page one the two back arrows sat there looking live. Opacity reaches a picture. -->
+    <Style Selector="Button.PagerArrow">
+        <Setter Property="MinWidth" Value="{ResourceReference PagerButtonMinWidth}"/>
+        <Setter Property="Height" Value="{ResourceReference PagerButtonHeight}"/>
+
+        <!-- Centred in the row and centred in itself, both said outright: the height is fixed, so an arrow left to
+             stretch or to sit at the top would stand at a different level from the numbers beside it. -->
+        <Setter Property="HorizontalContentAlignment" Value="Center"/>
+        <Setter Property="VerticalContentAlignment" Value="Center"/>
+        <Setter Property="VerticalAlignment" Value="Center"/>
+    </Style>
+
+    <Style Selector="Button.PagerArrow">
+        <PropertyTrigger Property="IsEnabled" Value="false">
+            <Setter TargetName="PART_ContentPresenter" Property="Opacity" Value="0.35"/>
+        </PropertyTrigger>
+    </Style>
+</StyleSet>

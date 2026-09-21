@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Runtime.Serialization;
 
-namespace Adamantium.Engine.Compiler.Converter.ConversionUtils
+namespace Adamantium.Engine.Compiler.Models.ConversionUtils
 {
    public class TopologyNotSupportedException : Exception
    {

@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<StyleSet xmlns="http://adamantium/ui"
+          xmlns:x="http://adamantium/ui/xaml/extensions">
+
+    <!-- ListBox: a themed Border around a ScrollViewer hosting the items. CanContentScroll=true so the ScrollViewer
+         delegates to the virtualizing items panel (item scrolling). PART_ItemsPresenter is the items host; its panel
+         comes from ItemsPanel (default = a vertical virtualizing StackPanel; set it to a WrapPanel for a tiled list).
+         Items are ListBoxItem containers (see ListBoxItemStyleSet). Only Background is per-instance (Control.Background);
+         the border/corner are theme chrome. -->
+    <Style Selector="ListBox" BasedOn="ItemsControl">
+        <Setter Property="Background" Value="{ResourceReference CardBackgroundFillColorDefault}"/>
+    </Style>
+
+    <Style Selector="ListBox">
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ListBox">
+                    <Border Background="{TemplateBinding Background}"
+                                     BorderBrush="{ResourceReference ControlStrokeColorDefault}"
+                                     BorderThickness="1"
+                                     CornerRadius="4">
+                        <!-- OWNER-QUALIFIED, so it reaches ScrollViewer's ATTACHED properties: a bare
+                             {TemplateBinding HorizontalScrollBarVisibility} is looked up as a property of the LIST,
+                             which has none, so it resolved to null and threw while the template was being BUILT -
+                             leaving every list with no template of its own. In this form an author writes
+                             ScrollViewer.VerticalScrollBarVisibility="Hidden" on the list and it lands here, which is
+                             how WPF has always let a control's scroll policy be set from outside. -->
+                        <ScrollViewer x:Name="PART_ScrollHost" CanContentScroll="True"
+                                               HorizontalScrollBarVisibility="{TemplateBinding (ScrollViewer.HorizontalScrollBarVisibility)}"
+                                               VerticalScrollBarVisibility="{TemplateBinding (ScrollViewer.VerticalScrollBarVisibility)}">
+                            <ItemsPresenter x:Name="PART_ItemsPresenter"/>
+                        </ScrollViewer>
+                    </Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+</StyleSet>

@@ -1,3 +1,5 @@
+#include "structs.ui.hlsl"
+
 matrix wvp;
 
 float4 fillColor;
@@ -7,30 +9,6 @@ Texture2D shaderTexture;
 float zNear;
 float zFar;
 float transparency = 1;
-
-struct PixelInputType
-{
-	float4 position : SV_POSITION;
-	float4 color: COLOR;
-};
-
-struct VertexInputType
-{
-	float4 position : SV_POSITION;
-};
-
-struct TexturedVertexInputType
-{
-	float4 position : SV_POSITION;
-	float4 color: COLOR;
-	float2 texcoord: TEXCOORD;
-};
-
-struct TexturedPixelInputType
-{
-	float4 position : SV_POSITION;
-	float2 texcoord: TEXCOORD;
-};
 
 ////////////////////////////////////////////////////////////////////////////////
 // Vertex Shader
@@ -89,25 +67,22 @@ float4 TexturedPixelShader(TexturedPixelInputType input) : SV_TARGET
 }
 
 
-technique10 Render
+technique Render
 {
 	pass Debug
 	{
-		Profile = 5.1;
 		VertexShader = LightVertexShader;
 		PixelShader = LightPixelShader;
 	}
 
 	pass SolidColor
 	{
-		Profile = 5.1;
 		VertexShader = TexturedVertexShader;
 		PixelShader = SolidColorPixelShader;
 	}
 
 	pass Textured
 	{
-		Profile = 5.1;
 		VertexShader = TexturedVertexShader;
 		PixelShader = TexturedPixelShader;
 	}

@@ -1,0 +1,122 @@
+using System.Linq;
+using Adamantium.Graphics.Core;
+using Adamantium.Graphics.Core.Models;
+using Adamantium.Mathematics;
+using NUnit.Framework;
+
+namespace Adamantium.Engine.CompilerTests
+{
+    /// <summary>
+    /// The basis change lives in two places: <see cref="Mesh.ChangeCoordinateSystem"/> moves the vertices, while
+    /// <see cref="AxisConversion"/> moves the bones and the animation key frames. They must not drift apart, or the
+    /// skeleton ends up flipped relative to its model again. This is where they are checked against each other.
+    /// </summary>
+    [TestFixture]
+    public class AxisConversionTests
+    {
+        private static readonly (UpAxis From, UpAxis To)[] Pairs =
+        {
+            (UpAxis.Z_UP, UpAxis.Y_UP_RH),
+            (UpAxis.Z_UP, UpAxis.Y_UP_LH),
+            (UpAxis.Z_UP, UpAxis.Y_DOWN_RH),
+            (UpAxis.Y_UP_RH, UpAxis.Y_UP_LH),
+            (UpAxis.Y_UP_RH, UpAxis.Y_DOWN_RH),
+        };
+
+        [Test]
+        public void Matrix_MovesAPointExactlyAsTheMeshDoes([ValueSource(nameof(Pairs))] (UpAxis From, UpAxis To) pair)
+        {
+            // An asymmetric point: on (1,1,1) an axis swap is indistinguishable from identity
+            var point = new Vector3(2, 3, 5);
+
+            var mesh = new Mesh(PrimitiveType.TriangleList) { UpAxis = pair.From };
+            mesh.SetPoints([point]);
+            mesh.ChangeCoordinateSystem(pair.To);
+
+            var byMatrix = Vector3F.TransformCoordinate((Vector3F)point, AxisConversion.Between(pair.From, pair.To));
+
+            Assert.That((Vector3F)mesh.Points[0], Is.EqualTo(byMatrix).Using<Vector3F>(
+                (a, b) => (a - b).Length() < 0.0001f ? 0 : 1),
+                $"{pair.From} -> {pair.To}: the mesh and the matrix sent the point to different places");
+        }
+
+        /// <summary>A normal the importer works out itself has to agree with the winding the mesh ENDS UP with, so
+        /// it can only be derived after the axis change. This is what ConverterBase relies on when it tells Optimize
+        /// not to compute normals.</summary>
+        [Test]
+        public void ANormalDerivedAfterTheAxisChangeAgreesWithItsFace(
+            [ValueSource(nameof(Pairs))] (UpAxis From, UpAxis To) pair)
+        {
+            var mesh = Triangle(pair.From);
+            mesh.ChangeCoordinateSystem(pair.To);
+            mesh.CalculateNormals();
+
+            var a = (Vector3F)mesh.Points[mesh.Indices[0]];
+            var b = (Vector3F)mesh.Points[mesh.Indices[1]];
+            var c = (Vector3F)mesh.Points[mesh.Indices[2]];
+            var face = Vector3F.Normalize(Vector3F.Cross(b - a, c - a));
+
+            Assert.That(Vector3F.Dot(face, Vector3F.Normalize(mesh.Normals[0])), Is.GreaterThan(0.99f),
+                $"{pair.From} -> {pair.To}");
+        }
+
+        /// <summary>A triangle has to keep facing the way it faced. Whatever the axis change does to the points, the
+        /// side the winding names must come out as the mapped original side - which is only true if the winding is
+        /// reversed exactly when the change flips handedness, and left alone when it is a plain rotation.</summary>
+        [Test]
+        public void TheAxisChangeKeepsATriangleFacingTheSameWay(
+            [ValueSource(nameof(Pairs))] (UpAxis From, UpAxis To) pair)
+        {
+            var mesh = Triangle(pair.From);
+            var before = Vector3F.Normalize(Facing(mesh));
+
+            mesh.ChangeCoordinateSystem(pair.To);
+            var after = Vector3F.Normalize(Facing(mesh));
+
+            var expected = Vector3F.Normalize(
+               Vector3F.TransformNormal(before, AxisConversion.Between(pair.From, pair.To)));
+
+            Assert.That(Vector3F.Dot(after, expected), Is.GreaterThan(0.99f),
+                $"{pair.From} -> {pair.To}: the triangle ended up facing the other way");
+        }
+
+        //Which side the winding names
+        private static Vector3F Facing(Mesh mesh)
+        {
+            var a = (Vector3F)mesh.Points[mesh.Indices[0]];
+            var b = (Vector3F)mesh.Points[mesh.Indices[1]];
+            var c = (Vector3F)mesh.Points[mesh.Indices[2]];
+            return Vector3F.Cross(b - a, c - a);
+        }
+
+        private static Mesh Triangle(UpAxis upAxis)
+        {
+            var mesh = new Mesh(PrimitiveType.TriangleList) { UpAxis = upAxis };
+            mesh.SetPoints([new Vector3(0, 0, 0), new Vector3(2, 0, 0), new Vector3(0, 3, 0)]);
+            mesh.SetIndices([0, 1, 2]);
+            return mesh;
+        }
+
+        [Test]
+        public void Matrix_IsIdentityForAnUnsupportedPair()
+        {
+            // Changing nothing beats mangling it in silence
+            Assert.That(AxisConversion.Between(UpAxis.Y_DOWN_RH, UpAxis.Z_UP), Is.EqualTo(Matrix4x4F.Identity));
+            Assert.That(AxisConversion.Between(UpAxis.Z_UP, UpAxis.Z_UP), Is.EqualTo(Matrix4x4F.Identity));
+        }
+
+        [Test]
+        public void Convert_KeepsTheTranslationOfATransform([ValueSource(nameof(Pairs))] (UpAxis From, UpAxis To) pair)
+        {
+            // Moving a transform must send its translation exactly where the matrix sends a point
+            var translation = new Vector3F(2, 3, 5);
+            var conversion = AxisConversion.Between(pair.From, pair.To);
+
+            var moved = AxisConversion.Convert(Matrix4x4F.Translation(translation), conversion);
+            moved.Decompose(out _, out _, out var position);
+
+            var expected = Vector3F.TransformCoordinate(translation, conversion);
+            Assert.That((position - expected).Length(), Is.LessThan(0.0001f), $"{pair.From} -> {pair.To}");
+        }
+    }
+}

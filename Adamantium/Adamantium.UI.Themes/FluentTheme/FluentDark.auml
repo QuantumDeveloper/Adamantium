@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="utf-8" ?>
+
+<!-- The DARK variant of the Fluent theme: the colours its palette resolves to, and the theme values that go with them.
+     Not the brushes - those belong to the theme and are shared by every variant, which is what makes switching cheap.
+
+     Its own file because a variant is four hundred lines of palette and the theme is a list of includes; keeping both
+     in one file meant the includes were three screens below the thing anyone actually opens the file to read. The
+     theme names this class in <Theme.Variants>. -->
+
+<ThemeVariantDefinition xmlns="http://adamantium/ui"
+                        Key="Dark">
+
+  <ThemeVariantDefinition.Values>
+    <ThemeValue Property="AccentColor" Value="#0091F7"/>
+    <ThemeValue Property="AccentFillColorDisabled" Value="#3D3D3D"/>
+    <ThemeValue Property="FocusStrokeColorOuter" Value="#FFFFFF"/>
+    <ThemeValue Property="FocusStrokeColorInner" Value="#000000"/>
+  </ThemeVariantDefinition.Values>
+
+  <ThemeVariantDefinition.Colors>
+    <PaletteColor Key="SolidBackgroundFillColorBase" Color="#202020"/>
+    <PaletteColor Key="SolidBackgroundFillColorSecondary" Color="#1C1C1C"/>
+    <PaletteColor Key="SmokeFillColorDefault" Color="#99000000"/>
+    <PaletteColor Key="SolidBackgroundFillColorTertiary" Color="#282828"/>
+    <PaletteColor Key="CardBackgroundFillColorDefault" Color="#2D2D2D"/>
+    <PaletteColor Key="LayerFillColorDefault" Color="#4C3A3A3A"/>
+    <PaletteColor Key="TileFillColorDefault" Color="#0FFFFFFF"/>
+    <PaletteColor Key="ControlFillColorDefault" Color="#0FFFFFFF"/>
+    <PaletteColor Key="ControlFillColorSecondary" Color="#15FFFFFF"/>
+    <PaletteColor Key="ControlFillColorTertiary" Color="#08FFFFFF"/>
+    <PaletteColor Key="ControlFillColorDisabled" Color="#0BFFFFFF"/>
+    <PaletteColor Key="SubtleFillColorSecondary" Color="#0FFFFFFF"/>
+    <PaletteColor Key="OnAccentOverlayPointerOver" Color="#40FFFFFF"/>
+    <PaletteColor Key="OnAccentOverlayPressed" Color="#73FFFFFF"/>
+    <PaletteColor Key="OnAccentShadePointerOver" Color="#33000000"/>
+    <PaletteColor Key="OnAccentShadePressed" Color="#59000000"/>
+    <PaletteColor Key="DockFoldedStripFill" Color="#14FFFFFF"/>
+    <PaletteColor Key="DockCompassFillColor" Color="#E62F2F2F"/>
+    <PaletteColor Key="DockCompassStrokeColor" Color="#59FFFFFF"/>
+    <PaletteColor Key="DockCompassPreviewColor" Color="#592D7FF9"/>
+    <PaletteColor Key="SubtleFillColorTertiary" Color="#0AFFFFFF"/>
+    <PaletteColor Key="ControlStrokeColorDefault" Color="#12FFFFFF"/>
+    <!-- The table's rules, OPAQUE. Every other stroke in the palette is translucent so it composites with the surface
+         behind it - which is right for a static frame and wrong for a line that content scrolls under: what passes
+         beneath shows through the hairline. This is ControlStrokeColorDefault already composited over the table's own
+         CardBackgroundFillColorDefault, so the table looks the same and stops being see-through. -->
+    <PaletteColor Key="DataGridLineColor" Color="#3B3B3B"/>
+    <!-- What a search hit is washed with - see the macOS dark palette. -->
+    <PaletteColor Key="DataGridSearchMatchColor" Color="#59FCE100"/>
+    <!-- ...and the cell the search is ON - see the macOS dark palette. -->
+    <PaletteColor Key="DataGridSearchCurrentColor" Color="#A6FCE100"/>
+    <PaletteColor Key="DataGridValidationErrorColor" Color="#59FF99A4"/>
+    <PaletteColor Key="ControlStrokeColorSecondary" Color="#18FFFFFF"/>
+    <!-- The canvas grid is CONTENT, not a control's hairline: it is a ruler the user reads while working, so it needs
+         far more contrast than the strokes that separate controls (which are meant to go unnoticed). The axes stand out
+         from it again - on an edgeless plane they are the only thing saying where the origin went. -->
+    <PaletteColor Key="CanvasGridColor" Color="#38FFFFFF"/>
+    <PaletteColor Key="CanvasAxisColor" Color="#7AFFFFFF"/>
+    <!-- The band dragged round several things: the accent at a fraction of its opacity, because it is drawn OVER what
+         it is selecting and has to leave that readable. -->
+    <PaletteColor Key="CanvasBandColor" Color="#2B0091F7"/>
+    <PaletteColor Key="TextFillColorPrimary" Color="#FFFFFF"/>
+    <PaletteColor Key="TextFillColorSecondary" Color="#C5FFFFFF"/>
+    <PaletteColor Key="TextFillColorTertiary" Color="#87FFFFFF"/>
+    <PaletteColor Key="TextFillColorDisabled" Color="#5DFFFFFF"/>
+    <PaletteColor Key="SystemFillColorSuccess" Color="#6CCB5F"/>
+    <PaletteColor Key="SystemFillColorCaution" Color="#FCE100"/>
+    <PaletteColor Key="SystemFillColorCritical" Color="#FF99A4"/>
+    <PaletteColor Key="SkeletonPulseFill" Color="#FFFFFF"/>
+    <PaletteColor Key="ShimmerTrackFill" Color="#14FFFFFF"/>
+    <PaletteColor Key="KeyTipPlateFill" Color="#F2F2F2"/>
+    <PaletteColor Key="KeyTipPlateStroke" Color="#5A5A5A"/>
+    <PaletteColor Key="KeyTipForeground" Color="#101010"/>
+    <!-- Served as raw COLOURS, not brushes: a gradient stop takes a colour. As brushes they would not
+         resolve at all, and the surfaces using them would paint nothing. -->
+    <PaletteColor Key="ShimmerPeakColor" Color="#99FFFFFF" As="Color"/>
+    <PaletteColor Key="ShimmerTrackColor" Color="#14FFFFFF" As="Color"/>
+    <PaletteColor Key="EdgeFadeColor" Color="#E6161616" As="Color"/>
+    <PaletteColor Key="EdgeFadeColorTransparent" Color="#00161616" As="Color"/>
+    <!-- What ACRYLIC is tinted with. A colour and not a brush because it goes into MaterialBrush.TintColor, and darker
+         than the solid surfaces it replaces on purpose: the tint is laid over whatever the surface happens to be
+         standing on, so it has to carry the contrast a menu's text needs even above a pale document. -->
+    <PaletteColor Key="AcrylicFillColorDefault" Color="#2C2C2C" As="Color"/>
+  </ThemeVariantDefinition.Colors>
+
+</ThemeVariantDefinition>

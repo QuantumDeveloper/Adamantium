@@ -1,0 +1,149 @@
+﻿using Adamantium.Graphics.Core;
+using Adamantium.Mathematics;
+using Adamantium.UI.Core.Graphics;
+using Adamantium.UI.Core.RoutedEvents;
+
+namespace Adamantium.UI.Core;
+
+public interface IWindow : IRootVisualComponent, IContentControl
+{
+    void Show();
+    void Close();
+    void Hide();
+
+    /// <summary>Bring the window to the foreground and give it focus.</summary>
+    void Activate();
+
+    /// <summary>Raise the window above the others WITHOUT taking focus - safe to call mid-drag, unlike
+    /// <see cref="Activate"/>, which would make the OS revoke the capture the drag depends on.</summary>
+    void BringToFront();
+
+    /// <summary>The PLATFORM moved the window - a caption drag, Aero Snap, a monitor going away - and reports where it
+    /// ended up, WITHOUT the window moving itself again in response. The OS move loop is invisible to managed code, so
+    /// without this Left/Top only ever hold what was last assigned to them, and anything that reads a window's
+    /// position afterwards (a layout being saved) writes down where it used to be.</summary>
+    void UpdatePositionFromPlatform(double left, double top);
+
+    /// <summary>Record where the OS just put this window, callable from ANY thread - see
+    /// <see cref="IRootVisualComponent.LivePosition"/>. Separate from
+    /// <see cref="UpdatePositionFromPlatform"/> because that one writes bindable properties and must be marshalled to
+    /// the loop thread, which is exactly the delay anything drawn from the position cannot afford.</summary>
+    void UpdateLivePosition(double left, double top);
+        
+    bool IsActive { get; }
+
+    IntPtr Handle { get; }
+    
+    IntPtr SurfaceHandle { get; }
+    
+    bool IsClosed { get; }
+        
+    MSAALevel MSAALevel { get; set; }
+
+    /// <summary>Toggles the GPU analytic anti-aliasing (coverage fringe on fills + feathered strokes). True = on.
+    /// Independent of <see cref="MSAALevel"/>, so the two can be compared in any combination.</summary>
+    bool AnalyticAntialiasing { get; set; }
+
+    WindowState State { get; set; }
+
+    /// <summary>When true the OS frame is removed (WM_NCCALCSIZE reclaims the non-client area) and the window draws its
+    /// own chrome (title bar) - the modern borderless look. WS_THICKFRAME is kept so native resize borders, Aero Snap,
+    /// the drop shadow and maximize-to-work-area still work. Read by the platform worker.</summary>
+    bool UseCustomChrome { get; }
+
+    /// <summary>How the user may resize the window (honoured by the custom-chrome hit-test). Default CanResize.</summary>
+    WindowResizeMode ResizeMode { get; }
+
+    // Overlay traits. Settable, and they take effect on a window that is already open: a property that can only be set
+    // before the window exists is one that silently does nothing afterwards, which is worse than not having it.
+
+    /// <summary>Stays above other windows.</summary>
+    bool Topmost { get; set; }
+
+    /// <summary>Clicks pass through to whatever is behind.</summary>
+    bool TransparentToInput { get; set; }
+
+    /// <summary>False shows the window without giving it focus. Read when the window is shown.</summary>
+    bool ActivateOnShow { get; set; }
+
+    /// <summary>Uniform translucency of the whole window, 0..1.</summary>
+    double WindowOpacity { get; set; }
+
+    /// <summary>Whether the window has the OS frame around it - the ambient drop shadow and the 1px accent outline the
+    /// desktop draws. Its OWN property because it is its own decision: a window can be see-through and still framed, or
+    /// opaque and frameless. Tying it to how the window is composed makes one of those impossible to ask for.</summary>
+    bool ShowWindowBorder { get; set; }
+
+    /// <summary>Per-pixel transparency: the window's own rendering is composed by the desktop WITH its alpha, so a
+    /// translucent brush or a rounded, antialiased edge shows what is behind it. Read when the surface is created.
+    /// <para>This is the honest version of a see-through window - not a colour key with its exact-match fringing, and
+    /// not a bitmap pushed at the OS. Needs the surface to offer pre-multiplied composition; when it does not, the
+    /// window is simply opaque and says so.</para></summary>
+    bool UseTransparentComposition { get; set; }
+
+    /// <summary>How this window's frames reach the screen, or Inherit to follow the application's setting. Each window
+    /// owns its own swapchain and they can sit on different displays, so the choice belongs here - with an
+    /// application-wide default for the usual case where it is set once.</summary>
+    Adamantium.Graphics.Core.Presentation.PresentPolicy PresentPolicy { get; set; }
+
+    /// <summary>The ONE draggable caption region (client DIP): the bounds of the title bar's drag-area element. A point
+    /// inside it is HTCAPTION (native window drag + Aero Snap); everything else - commands, buttons - stays HTCLIENT and
+    /// clickable. A TitleBar publishes this on layout; the platform worker reads it (a plain Rect, thread-safe) from the
+    /// OS message thread. Empty = nothing draggable (custom chrome off, or no title bar).</summary>
+    Rect CaptionDragRect { get; set; }
+
+    /// <summary>The resize-grip region (client DIP): the bounds of a <c>ResizeGripper</c> in the bottom-right corner. A
+    /// point inside it hit-tests as the bottom-right sizing corner (HTBOTTOMRIGHT) so the window resizes from the grip,
+    /// used by the grip-only <see cref="Core.WindowResizeMode.CanResizeWithGrip"/> mode (a fully custom-chromed window
+    /// with no edge resize borders). A ResizeGripper publishes it on layout; the worker reads it (plain Rect, thread-safe)
+    /// from the OS message thread. Empty = no grip.</summary>
+    Rect ResizeGripRect { get; set; }
+
+    /// <summary>Per-window DPI scale (device pixels per DIP), separate X/Y (usually equal on desktop). 1,1 = 96 DPI /
+    /// 100%. Set by the platform on create and on WM_DPICHANGED; drives the render scale and the DIP&lt;-&gt;physical map.</summary>
+    Vector2 DpiScale { get; set; }
+
+    IWindowRenderer DefaultRenderer { get; set; }
+
+    IWindowRenderer Renderer { get; set; }
+
+    /// <summary>Framework tooling overlays (selection frames etc.) drawn ON TOP of the window's content in the same
+    /// frame by the renderer's adorner stage. Empty by default; the WPF-equivalent of an AdornerLayer's adorners.</summary>
+    IReadOnlyList<IUIComponent> Adorners { get; }
+
+    /// <summary>The laid-out children of the open popups, drawn ON TOP of the content (and adorners) within the window by
+    /// the renderer's popup stage. Empty by default. <see cref="LayoutPopups"/> refreshes their positions each frame.</summary>
+    IReadOnlyList<IUIComponent> PopupRoots { get; }
+
+    /// <summary>Re-evaluates every open popup's position from its target's current location and lays its child out,
+    /// clamped inside the window. Called by the popup render stage each frame so a popup follows a moving target.</summary>
+    void LayoutPopups();
+    
+    bool ShouldDisplayWindow { get; }
+    
+    IDrawingContext GetDrawingContext();
+
+    /// <summary>A desktop point (physical) in this window's client coordinates (logical DIP).</summary>
+    Vector2 ScreenToClient(PixelPoint p);
+
+    /// <summary>A client point (logical DIP) as a desktop point (physical).</summary>
+    PixelPoint ClientToScreen(Vector2 p);
+    
+    event SizeChangedEventHandler ClientSizeChanged;
+    event EventHandler<WindowClosingEventArgs> Closing;
+    event MSAALeveChangedHandler MSAALevelChanged;
+    event StateChangedHandler StateChanged;
+
+    /// <summary>Raised after <see cref="ResizeMode"/> changes, so the platform worker can refresh its thread-safe snapshot
+    /// (the WM_NCHITTEST hit-test must not read the lockable ResizeMode property from the OS message thread).</summary>
+    event System.EventHandler ResizeModeChanged;
+
+    /// <summary>Raised after <see cref="DpiScale"/> changes (the window moved to a monitor with a different scale).</summary>
+    event EventHandler<EventArgs> DpiChanged;
+
+    event EventHandler<EventArgs> Closed;
+
+    event EventHandler<WindowRendererChangedEventArgs> RendererChanged;
+    
+    event EventHandler<EventArgs> SourceInitialized;
+}

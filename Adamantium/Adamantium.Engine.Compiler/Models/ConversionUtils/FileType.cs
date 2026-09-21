@@ -1,7 +1,10 @@
-﻿namespace Adamantium.Engine.Compiler.Converter.ConversionUtils
+﻿namespace Adamantium.Engine.Compiler.Models.ConversionUtils
 {
    public enum FileType
    {
-      Undefinied, Collada, AutoDesk3DS, Obj
+      Undefinied, 
+      Collada, 
+      AutoDesk3DS, 
+      Obj
    }
 }

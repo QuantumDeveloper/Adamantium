@@ -34,7 +34,7 @@ namespace Adamantium.Core
         private unsafe sbyte* _buffer;
         private GCHandle _gCHandle;
         private readonly bool _ownsBuffer;
-        private int _size;
+        private ulong _size;
 
         /// <summary>
         /// Creates the specified user buffer.
@@ -49,36 +49,34 @@ namespace Adamantium.Core
             unsafe
             {
                 if (userBuffer == null)
-                    throw new ArgumentNullException("userBuffer");
+                    throw new ArgumentNullException(nameof(userBuffer));
 
                 if (index < 0 || index > userBuffer.Length)
                     throw new ArgumentException("Index is out of range [0, userBuffer.Length-1]", "index");
-
-                DataBuffer buffer;
 
                 var sizeOfBuffer = Utilities.SizeOf(userBuffer);
                 var indexOffset = index * Utilities.SizeOf<T>();
 
                 var handle = GCHandle.Alloc(userBuffer, GCHandleType.Pinned);
-                buffer = new DataBuffer(indexOffset + (byte*)handle.AddrOfPinnedObject(), sizeOfBuffer - indexOffset, handle);
+                var buffer = new DataBuffer(indexOffset + (byte*)handle.AddrOfPinnedObject(), (ulong)(sizeOfBuffer - indexOffset), handle);
 
                 return buffer;
             }
         }
 
         /// <summary>
-        ///   Initializes a new instance of the <see cref = "SharpDX.DataBuffer" /> class, and allocates a new buffer to use as a backing store.
+        ///   Initializes a new instance of the <see cref = "DataBuffer" /> class, and allocates a new buffer to use as a backing store.
         /// </summary>
         /// <param name = "sizeInBytes">The size of the buffer to be allocated, in bytes.</param>
         /// <exception cref = "T:System.ArgumentOutOfRangeException">
         ///   <paramref name = "sizeInBytes" /> is less than 1.</exception>
-        public DataBuffer(int sizeInBytes)
+        public DataBuffer(ulong sizeInBytes)
         {
             unsafe
             {
                 System.Diagnostics.Debug.Assert(sizeInBytes > 0);
 
-                _buffer = (sbyte*)Utilities.AllocateMemory(sizeInBytes);
+                _buffer = (sbyte*)Utilities.AllocateMemory((int)sizeInBytes);
                 _size = sizeInBytes;
                 _ownsBuffer = true;
             }
@@ -95,17 +93,17 @@ namespace Adamantium.Core
 
 
         /// <summary>
-        ///   Initializes a new instance of the <see cref = "SharpDX.DataBuffer" /> class, using an unmanaged buffer as a backing store.
+        ///   Initializes a new instance of the <see cref = "DataBuffer" /> class, using an unmanaged buffer as a backing store.
         /// </summary>
         /// <param name = "userBuffer">A pointer to the buffer to be used as a backing store.</param>
         /// <param name = "sizeInBytes">The size of the buffer provided, in bytes.</param>
-        public unsafe DataBuffer(IntPtr userBuffer, int sizeInBytes)
+        public unsafe DataBuffer(IntPtr userBuffer, ulong sizeInBytes)
             : this((void*)userBuffer, sizeInBytes, false)
         {
         }
 
 
-        internal unsafe DataBuffer(void* buffer, int sizeInBytes, GCHandle handle)
+        internal unsafe DataBuffer(void* buffer, ulong sizeInBytes, GCHandle handle)
         {
             System.Diagnostics.Debug.Assert(sizeInBytes > 0);
 
@@ -115,14 +113,14 @@ namespace Adamantium.Core
             _ownsBuffer = false;
         }
 
-        internal unsafe DataBuffer(void* buffer, int sizeInBytes, bool makeCopy)
+        internal unsafe DataBuffer(void* buffer, ulong sizeInBytes, bool makeCopy)
         {
             System.Diagnostics.Debug.Assert(sizeInBytes > 0);
 
             if (makeCopy)
             {
-                _buffer = (sbyte*)Utilities.AllocateMemory(sizeInBytes);
-                Utilities.CopyMemory((IntPtr)_buffer, (IntPtr)buffer, sizeInBytes);
+                _buffer = (sbyte*)Utilities.AllocateMemory((int)sizeInBytes);
+                Utilities.CopyMemory((IntPtr)_buffer, (IntPtr)buffer, (long)sizeInBytes);
             }
             else
             {
@@ -157,7 +155,7 @@ namespace Adamantium.Core
         public unsafe void Clear(byte value = 0)
         {
             var buf = (IntPtr)_buffer;
-            Utilities.ClearMemory(ref buf, value, Size);
+            Utilities.ClearMemory(ref buf, value, (int)Size);
         }
 
         /// <summary>
@@ -327,13 +325,10 @@ namespace Adamantium.Core
         ///   Gets the length in bytes of the buffer.
         /// </summary>
         /// <value>A long value representing the length of the buffer in bytes.</value>
-        public int Size
-        {
-            get { return _size; }
-        }
+        public ulong Size => _size;
 
         /// <summary>
-        /// Performs an explicit conversion from <see cref="SharpDX.DataBuffer"/> to <see cref="SharpDX.DataPointer"/>.
+        /// Performs an explicit conversion from <see cref="DataBuffer"/> to <see cref="DataPointer"/>.
         /// </summary>
         /// <param name="from">The from value.</param>
         /// <returns>The result of the conversion.</returns>

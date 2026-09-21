@@ -1,5 +1,5 @@
-﻿using Adamantium.Engine.Compiler.Converter.ConversionUtils;
-using Adamantium.Engine.Core.Models;
+﻿using Adamantium.Engine.Compiler.Models.ConversionUtils;
+using Adamantium.Graphics.Core.Models;
 
 namespace Adamantium.Engine.Compiler.Converter.Containers
 {

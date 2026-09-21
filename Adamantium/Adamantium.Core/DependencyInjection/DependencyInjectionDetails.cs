@@ -55,26 +55,22 @@ namespace Adamantium.Core.DependencyInjection
             DependencyItems.Add(item);
         }
 
-        public object GetDependency(AdamantiumServiceLocator container, Type type, string name = "")
+        public object GetDependency(IDependencyContainer container, Type type, string name = "")
         {
             var service = type;
             DependencyItem item = DependencyItems.FirstOrDefault(x => x.RegistryName == name);
             
             if (item == null) throw new ArgumentException($"Cannot resolve {service.Name} because its not registered");
 
-            if (LifeTimeVariant == LifeTimeVariant.Transient || LifeTimeVariant == LifeTimeVariant.Singleton)
+            if (LifeTimeVariant is LifeTimeVariant.Transient or LifeTimeVariant.Singleton)
             {
                 var parameters = new List<object>();
                 if (item.Ctor != null)
                 {
                     foreach (var parameter in item.Ctor.GetParameters())
                     {
-                        if (!container.IsRegistered(parameter.ParameterType))
-                        {
-                            throw new ArgumentException(
-                                $"{parameter.ParameterType.Name} is not registered in {item.ImplementationType.Name}");
-                        }
-
+                        // The container resolves the dependency, handling an alias redirect, the auto-register
+                        // fallback, or a strict-mode throw - see AdamantiumDependencyContainer.Resolve.
                         parameters.Add(container.Resolve(parameter.ParameterType));
                     }
                 }

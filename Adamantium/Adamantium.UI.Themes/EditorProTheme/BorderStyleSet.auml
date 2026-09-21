@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<StyleSet xmlns="http://adamantium/ui">
+
+    <!-- What a bare Border is worth before anyone says otherwise: this theme's hairline, and a ground that is not there.
+         Transparent rather than unset is load-bearing - hit-testing is decoupled from Background here, so a transparent
+         Border is an invisible surface that still answers the pointer, which is what a decorator has to be. -->
+
+    <Style Selector="Border">
+        <Setter Property="BorderBrush" Value="{ResourceReference ControlStrokeColorDefault}"/>
+        <Setter Property="Background" Value="Transparent"/>
+    </Style>
+
+</StyleSet>

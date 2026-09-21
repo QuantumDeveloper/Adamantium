@@ -1,0 +1,83 @@
+<View xmlns="http://adamantium/ui"
+      xmlns:x="http://adamantium/ui/xaml/extensions"
+      xmlns:vm="clr-namespace:Adamantium.UI.Sandbox.ViewModels">
+    <!-- DataContext is the ButtonsViewModel, injected by the TabControl's content presenter (no x:ViewModel here). -->
+    <StackPanel Orientation="Vertical" Margin="24">
+
+        <!-- Click counter: Button + auto-repeating RepeatButton both invoke AddCommand; Reset zeroes it. The buttons are
+             disabled while the ToggleSwitch below is off (Button.IsEnabled bound to the same VM flag). -->
+        <TextBlock Text="Commands" FontSize="18" Margin="0,0,0,10"/>
+        <StackPanel Orientation="Horizontal">
+            <Button Content="Add"
+                    Command="{Binding AddCommand}"
+                    IsEnabled="{Binding ActionsEnabled}"
+                    Width="90" Height="34" Margin="0,0,8,0"/>
+            <RepeatButton Content="Hold to add"
+                          Command="{Binding AddCommand}"
+                          IsEnabled="{Binding ActionsEnabled}"
+                          Width="130" Height="34" Delay="400" Interval="80" Margin="0,0,8,0"/>
+            <Button Content="Reset" Command="{Binding ResetCommand}" Width="90" Height="34" Margin="0,0,16,0"/>
+            <TextBlock Text="Clicks:" VerticalAlignment="Center" Margin="0,0,6,0"/>
+            <TextBlock Text="{Binding ClickCount}" VerticalAlignment="Center" FontSize="16"/>
+        </StackPanel>
+
+        <!-- Toggle family: each control is two-way bound to a VM flag that also drives its live status text. -->
+        <TextBlock Text="Toggles" FontSize="18" Margin="0,24,0,10"/>
+        <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+            <ToggleSwitch Content="Enable actions" IsChecked="{Binding ActionsEnabled, Mode=TwoWay}"/>
+            <TextBlock Text="{Binding ActionsStatus}" VerticalAlignment="Center" Margin="14,0,0,0"/>
+        </StackPanel>
+        <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+            <ToggleButton Content="Notify" IsChecked="{Binding Notify, Mode=TwoWay}" Width="120" Height="32"/>
+            <TextBlock Text="{Binding NotifyStatus}" VerticalAlignment="Center" Margin="14,0,0,0"/>
+        </StackPanel>
+        <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+            <CheckBox Content="Accept terms" IsThreeState="true" IsChecked="{Binding TermsAccepted, Mode=TwoWay}"/>
+            <TextBlock Text="{Binding TermsStatus}" VerticalAlignment="Center" Margin="14,0,0,0"/>
+        </StackPanel>
+
+        <!-- Mutually-exclusive radio group -> one selected plan. -->
+        <TextBlock Text="Plan" FontSize="18" Margin="0,24,0,10"/>
+        <StackPanel Orientation="Horizontal">
+            <RadioButton Content="Free" GroupName="plan" IsChecked="{Binding PlanFree, Mode=TwoWay}" Margin="0,0,16,0"/>
+            <RadioButton Content="Pro" GroupName="plan" IsChecked="{Binding PlanPro, Mode=TwoWay}" Margin="0,0,16,0"/>
+            <TextBlock Text="Selected:" VerticalAlignment="Center" Margin="0,0,6,0"/>
+            <TextBlock Text="{Binding PlanStatus}" VerticalAlignment="Center"/>
+        </StackPanel>
+
+        <!-- DropDown: a string list (via ItemsSource) and an enum (via EnumType - the dropdown shows each member's
+             [Display] name while the bound value stays the enum). Near the bottom, so opening tests the edge-aware flip. -->
+        <TextBlock Text="Dropdowns" FontSize="18" Margin="0,24,0,10"/>
+        <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+            <DropDown ItemsSource="{Binding Cities}"
+                      SelectedItem="{Binding SelectedCity, Mode=TwoWay}"
+                      Placeholder="Select a city..."
+                      Width="200"/>
+            <TextBlock Text="{Binding CityStatus}" VerticalAlignment="Center" Margin="14,0,0,0"/>
+        </StackPanel>
+        <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+            <DropDown EnumType="{x:Type vm:Priority}"
+                      SelectedItem="{Binding SelectedPriority, Mode=TwoWay}"
+                      Width="220"/>
+            <TextBlock Text="{Binding PriorityStatus}" VerticalAlignment="Center" Margin="14,0,0,0"/>
+        </StackPanel>
+
+        <!-- ItemTemplate DropDown: each row (and the header) renders a colour swatch + name, not plain text. -->
+        <StackPanel Orientation="Horizontal">
+            <DropDown ItemsSource="{Binding Palette}"
+                      SelectedItem="{Binding SelectedColor, Mode=TwoWay}"
+                      Width="200">
+                <DropDown.ItemTemplate>
+                    <DataTemplate>
+                        <StackPanel Orientation="Horizontal">
+                            <Border Background="{Binding Swatch}" Width="16" Height="16"
+                                    CornerRadius="3" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                            <TextBlock Text="{Binding Name}" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </DataTemplate>
+                </DropDown.ItemTemplate>
+            </DropDown>
+            <TextBlock Text="{Binding ColorStatus}" VerticalAlignment="Center" Margin="14,0,0,0"/>
+        </StackPanel>
+    </StackPanel>
+</View>

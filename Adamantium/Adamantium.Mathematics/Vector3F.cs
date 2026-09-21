@@ -1102,8 +1102,11 @@ namespace Adamantium.Mathematics
             Matrix4x4F matrix = new Matrix4x4F();
             Matrix4x4F.Invert(ref worldViewProjection, out matrix);
 
+            // Y is NOT negated: this engine's clip space runs Y DOWN (its projections map y=0 to NDC -1, the Vulkan
+            // convention), so negating - the DirectX/OpenGL Y-up form - unprojected to the vertically mirrored point
+            // and every pick missed by that much.
             v.X = (((vector.X - x) / width) * 2.0f) - 1.0f;
-            v.Y = -((((vector.Y - y) / height) * 2.0f) - 1.0f);
+            v.Y = (((vector.Y - y) / height) * 2.0f) - 1.0f;
             v.Z = (vector.Z - minZ) / (maxZ - minZ);
 
             TransformCoordinate(ref v, ref matrix, out result);
@@ -1930,7 +1933,7 @@ namespace Adamantium.Mathematics
             return Equals(ref strongValue);
         }
 
-        public static implicit operator Vector3(Vector3F value)
+        public static explicit operator Vector3(Vector3F value)
         {
             return new Vector3(value.X, value.Y, value.Z);
         }

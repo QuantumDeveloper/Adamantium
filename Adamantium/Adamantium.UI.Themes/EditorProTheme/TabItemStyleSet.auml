@@ -1,0 +1,176 @@
+<?xml version="1.0" encoding="utf-8"?>
+<StyleSet xmlns="http://adamantium/ui"
+          xmlns:x="http://adamantium/ui/xaml/extensions">
+
+    <!-- Editor Pro's tab is a LINE, not a card: no fill, no corners, and the current one is marked by an accent rule
+         under it. That is a shape difference, so this theme writes its own template rather than overriding numbers.
+
+         The PART NAMES are Fluent's on purpose. Its trigger style still applies to this control (both sets are in the
+         theme), and those triggers carry a lot of behaviour that has nothing to do with the look: when the close and
+         pin buttons are reserved, revealed or pinned open, when the icon slot exists. Keeping the names means all of
+         that keeps working and this file states only what actually differs. The card fill it would paint is turned off
+         by making the selected background transparent, not by re-declaring the triggers.
+
+         Per the small-styles convention: properties, then the template, then the triggers. -->
+
+    <Style Selector="TabItem">
+        <Setter Property="MinHeight" Value="{ResourceReference TabStripHeight}"/>
+        <!-- A tab's own padding, not a row's: the two differ in the vertical pair, and on a folded strip that pair is
+             what keeps one turned label off the next. -->
+        <Setter Property="Padding" Value="{ResourceReference PaddingTab}"/>
+        <!-- A CEILING on the width, which the strip had none of: a tab sizes to its content, so one long title made one
+             enormous tab and pushed the rest out of reach. Past this the header trims with an ellipsis. Set
+             TabPanel.ItemWidth to make every tab the same width instead. -->
+        <Setter Property="MaxWidth" Value="240"/>
+        <Setter Property="FontSize" Value="{ResourceReference FontSizeBody}"/>
+        <Setter Property="CornerRadius" Value="0"/>
+        <!-- A line tab has no card behind it. Fluent's IsSelected trigger still runs and still writes this brush onto
+             the border - it just has nothing to paint. -->
+        <Setter Property="BackgroundSelected" Value="Transparent"/>
+        <Setter Property="BackgroundPointerOver" Value="{ResourceReference SubtleFillColorSecondary}"/>
+        <Setter Property="Foreground" Value="{ObservableResource TextFillColorTertiary}"/>
+        <Setter Property="ForegroundSelected" Value="{ObservableResource TextFillColorPrimary}"/>
+        <Setter Property="HorizontalContentAlignment" Value="Left"/>
+        <Setter Property="VerticalContentAlignment" Value="Center"/>
+    </Style>
+
+    <Style Selector="TabItem">
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="TabItem">
+                    <!-- No rule of its own here. The accent rule under the current tab belongs to the STRIP, not to the
+                         item: the tab control owns PART_SelectionIndicator and SLIDES it as the selection moves, and a
+                         second static line drawn per item meant two accent marks for one selection - plainly visible in
+                         a docked layout, where the strip's own indicator sat under the group while the item's sat under
+                         the label. One selection, one mark, and it is the one the control drives.
+                         Weight and colour still come from this theme: SelectionIndicatorThickness resolves against
+                         Editor Pro's own metrics. -->
+                    <Grid>
+                        <Border x:Name="TabBorder"
+                                CornerRadius="{TemplateBinding CornerRadius}"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                Padding="{TemplateBinding Padding}">
+                            <!-- Same shape as Fluent's inner grid, and for the same reason: the starred middle track
+                                 keeps the close button against the right edge when a lone tab is stretched. -->
+                            <Grid ColumnDefinitions="Auto,*,Auto,Auto" VerticalAlignment="Center">
+                                <ContentPresenter x:Name="PART_Icon" Grid.Column="0"
+                                        VerticalAlignment="Center"
+                                        Visibility="Collapsed"
+                                        Margin="0 0 4 0"
+                                        Content="{TemplateBinding Icon}"
+                                        ContentTemplate="{TemplateBinding IconTemplate}"/>
+                                <ContentPresenter
+                                        x:Name="PART_ContentPresenter" Grid.Column="1"
+                                        HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                        VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
+                                        Foreground="{TemplateBinding Foreground}"
+                                        FontSize="{TemplateBinding FontSize}"
+                                        TextTrimming="CharEllipses"
+                                        Content="{TemplateBinding Header}"
+                                        ContentTemplate="{TemplateBinding HeaderTemplate}"
+                                        ContentTemplateSelector="{TemplateBinding HeaderTemplateSelector}"/>
+                                <ToggleButton x:Name="PART_PinButton" Grid.Column="2"
+                                        Template="{TemplateBinding PinButtonTemplate}"
+                                        Margin="4 0 0 0"
+                                        MinWidth="0" MinHeight="0" Padding="0"
+                                        VerticalAlignment="Center"
+                                        Visibility="Collapsed"/>
+                                <Button x:Name="PART_CloseButton" Grid.Column="3"
+                                        Template="{TemplateBinding CloseButtonTemplate}"
+                                        Margin="4 0 0 0"
+                                        MinWidth="0" MinHeight="0" Padding="0"
+                                        VerticalAlignment="Center"
+                                        Visibility="Collapsed"/>
+                            </Grid>
+                        </Border>
+
+                    </Grid>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+
+    <!-- The STATES. These are not decoration - they are most of what a tab does, and they are the reason a tab with a
+         template but no triggers looks like plain text: no hover, no close button, no icon slot, nothing to say which
+         one is current beyond the strip's own rule.
+         They used to come from Fluent's set, which this theme included and this file leaned on by keeping its part
+         names. When that include was dropped the template stayed and the behaviour left with it - the same way the
+         list's did. A theme that owns a control's template owns its STATES too. -->
+    <Style Selector="TabItem">
+        <PropertyTrigger Property="IsMouseOver" Value="true">
+            <Setter TargetName="TabBorder" Property="Background" Value="{TemplateBinding BackgroundPointerOver}"/>
+        </PropertyTrigger>
+        <!-- The icon slot exists only when there is an icon to put in it: an always-reserved gutter would inset every
+             label in a strip where most tabs have no icon at all. -->
+        <PropertyTrigger Property="HasIcon" Value="true">
+            <Setter TargetName="PART_Icon" Property="Visibility" Value="Visible"/>
+        </PropertyTrigger>
+        <PropertyTrigger Property="IsSelected" Value="true">
+            <Setter TargetName="TabBorder" Property="Background" Value="{TemplateBinding BackgroundSelected}"/>
+            <Setter TargetName="PART_ContentPresenter" Property="Foreground" Value="{TemplateBinding ForegroundSelected}"/>
+        </PropertyTrigger>
+        <!-- The close button reveals on hover and stays on the current tab, the way every editor and browser does it.
+             Three states, and the middle one is the point: off = Collapsed (no space at all); on but idle = Hidden,
+             which RESERVES the space so the tab does not change width the moment the pointer arrives; on and
+             hovered/selected = Visible. Later triggers win on the value stack, so those two override the reserved
+             Hidden. -->
+        <PropertyTrigger Property="ShowCloseButton" Value="true">
+            <Setter TargetName="PART_CloseButton" Property="Visibility" Value="Hidden"/>
+        </PropertyTrigger>
+        <MultiTrigger>
+            <MultiTrigger.Conditions>
+                <Condition Property="ShowCloseButton" Value="true"/>
+                <Condition Property="IsMouseOver" Value="true"/>
+            </MultiTrigger.Conditions>
+            <Setter TargetName="PART_CloseButton" Property="Visibility" Value="Visible"/>
+        </MultiTrigger>
+        <MultiTrigger>
+            <MultiTrigger.Conditions>
+                <Condition Property="ShowCloseButton" Value="true"/>
+                <Condition Property="IsSelected" Value="true"/>
+            </MultiTrigger.Conditions>
+            <Setter TargetName="PART_CloseButton" Property="Visibility" Value="Visible"/>
+        </MultiTrigger>
+        <!-- The pin button follows the same rule, with one addition: on a PINNED tab it is always visible, because it
+             is the only way back and a button you have to hunt for is not one. -->
+        <PropertyTrigger Property="ShowPinButton" Value="true">
+            <Setter TargetName="PART_PinButton" Property="Visibility" Value="Hidden"/>
+        </PropertyTrigger>
+        <MultiTrigger>
+            <MultiTrigger.Conditions>
+                <Condition Property="ShowPinButton" Value="true"/>
+                <Condition Property="IsMouseOver" Value="true"/>
+            </MultiTrigger.Conditions>
+            <Setter TargetName="PART_PinButton" Property="Visibility" Value="Visible"/>
+        </MultiTrigger>
+        <MultiTrigger>
+            <MultiTrigger.Conditions>
+                <Condition Property="ShowPinButton" Value="true"/>
+                <Condition Property="IsSelected" Value="true"/>
+            </MultiTrigger.Conditions>
+            <Setter TargetName="PART_PinButton" Property="Visibility" Value="Visible"/>
+        </MultiTrigger>
+        <MultiTrigger>
+            <MultiTrigger.Conditions>
+                <Condition Property="ShowPinButton" Value="true"/>
+                <Condition Property="IsPinned" Value="true"/>
+            </MultiTrigger.Conditions>
+            <Setter TargetName="PART_PinButton" Property="Visibility" Value="Visible"/>
+        </MultiTrigger>
+    </Style>
+
+    <!-- A LONE document tab stretched across its strip. Fluent fills it with the accent, which in a one-tab window
+         paints a bar the width of the screen in the loudest colour there is - and says only what the window's caption
+         already says. Here it stays an ordinary tab that happens to be wide: the same rule under it, the same ground.
+         The style exists to say that outright, because without it the base rules for a stretched tab would be whatever
+         another theme happened to leave. -->
+    <Style Selector="TabItem[IsStretched=true]">
+        <Setter Property="BackgroundSelected" Value="Transparent"/>
+        <Setter Property="BackgroundPointerOver" Value="{ResourceReference SubtleFillColorSecondary}"/>
+        <Setter Property="CornerRadius" Value="0"/>
+    </Style>
+
+</StyleSet>

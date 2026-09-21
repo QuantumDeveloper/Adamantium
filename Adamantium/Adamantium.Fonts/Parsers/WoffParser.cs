@@ -16,20 +16,19 @@ namespace Adamantium.Fonts.Parsers
         private WoffTableDirectory tableDirectory;
         private List<WoffTable> tables;
         
-        private WoffParser(string filePath, byte resolution = 1)
+        protected internal WoffParser(string filePath, byte resolution = 1)
         {
             InitializeBase(filePath, resolution);
             reader = filePath.LoadIntoStream();
-            Parse();
         }
 
-        internal static TypeFace Parse(string filePath, byte resolution = 1)
+        protected internal WoffParser(FontStreamReader fontReader, byte resolution)
         {
-            var parser = new WoffParser(filePath, resolution);
-            return parser.TypeFace;
+            InitializeBase(string.Empty, resolution);
+            reader = fontReader;
         }
 
-        protected override void Parse()
+        public override void Parse()
         {
             ReadWoffHeader();
             ReadTableDirectory();
@@ -92,13 +91,13 @@ namespace Adamantium.Fonts.Parsers
                 var compressedBuffer = reader.ReadBytes(table.CompLength, true);
                 if (compressedBuffer.Length == table.OrigLength)
                 {
-                    FontReader.Write(compressedBuffer);
+                    FontReader.Write(compressedBuffer, 0, compressedBuffer.Length);
                 }
                 else
                 {
                     var decompressedBuffer = new byte[table.OrigLength];
                     DecompressWoff(compressedBuffer, decompressedBuffer);
-                    FontReader.Write(decompressedBuffer);
+                    FontReader.Write(decompressedBuffer, 0, decompressedBuffer.Length);
                 }
             }
 
@@ -129,9 +128,9 @@ namespace Adamantium.Fonts.Parsers
 
             otfTableDirectory.CreateTableEntriesMap();
 
-            foreach (var (key, value) in tableDirectory.Tables)
+            foreach (var kvp in tableDirectory.Tables)
             {
-                otfTableDirectory.TablesOffsets[key] = value.ExpectedOffset;
+                otfTableDirectory.TablesOffsets[kvp.Key] = kvp.Value.ExpectedOffset;
             }
         }
 

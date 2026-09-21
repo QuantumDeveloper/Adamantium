@@ -52,14 +52,16 @@ namespace Adamantium.Fonts.Extensions
                 }
             }
 
-            var data = reader.ReadBytes((int)cffIndex.Offsets.Last() - 1).Reverse().ToArray();
+            var data = reader.ReadBytes((int)cffIndex.Offsets.Last() - 1);
+            Array.Reverse(data);
             var dataByOffset = new List<byte[]>();
 
             for (int i = 1; i < cffIndex.Offsets.Count; ++i)
             {
                 var startIndex = cffIndex.Offsets[i - 1] - 1;
                 var endIndex = cffIndex.Offsets[i] - 1;
-                var bytes = data[(int)startIndex ..(int)endIndex];
+                var range = endIndex - startIndex;
+                var bytes = data.Skip((int)startIndex).Take((int)range).ToArray();
                 dataByOffset.Add(bytes);
             }
 

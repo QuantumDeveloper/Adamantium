@@ -1,8 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
-using Adamantium.Engine.Compiler.Converter.ConversionUtils;
-using Adamantium.Engine.Core.Models;
+using Adamantium.Engine.Compiler.Models.ConversionUtils;
+using Adamantium.Graphics.Core.Models;
 
 namespace Adamantium.Engine.Compiler.Converter.Containers
 {
@@ -13,23 +13,26 @@ namespace Adamantium.Engine.Compiler.Converter.Containers
          FilePath = filePath;
          FileName = Path.GetFileName(filePath);
          Axis = UpAxis.Y_UP_RH;
+         UnsupportedFeatures = new List<String>();
       }
 
-      //путь к файлу
+      /// <summary>What the file has that the import cannot do. Losing part of a model in silence is the worst
+      /// outcome there is: it looks whole right up until somebody notices half of it is missing.</summary>
+      public List<String> UnsupportedFeatures { get; }
+
       public string FilePath { get;}
-      //имя файла
+
       public string FileName { get;}
-      //какой конвертер использовать
+
       public ConverterVariant ConverterToUse { get; set; }
-      //переменая содержит значение является ли файл валидным
+
       public Boolean IsFileValid { get; set; }
-      //тип файла
+
       public abstract FileType Type { get; }
 
-      //коллекция доступных в файле библиотек
+      //Which libraries the file turned out to have
       public Modules Modules { get; internal set; }
 
-      //Ориентация осей
       public UpAxis Axis { get; set; }
 
       public FileMetadata Metadata { get; set; }

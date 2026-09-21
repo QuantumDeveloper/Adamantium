@@ -1,32 +1,34 @@
-using System;
+namespace Adamantium.Fonts.Common;
 
-namespace Adamantium.Fonts.Common
+public readonly struct LanguageTag
 {
-    public readonly struct LanguageTag
+    public readonly string Tag;
+    public readonly string FriendlyName;
+    public readonly string[] ISONames;
+
+    public LanguageTag(string tag, string friendlyName, params string[] isoNames)
     {
-        public readonly string Tag;
-        public readonly string FriendlyName;
-        public readonly string[] ISONames;
-
-        public LanguageTag(string tag, string friendlyName, params string[] isoNames)
+        Tag = tag;
+        FriendlyName = friendlyName;
+        ISONames = new string[isoNames.Length];
+        for (int i = 0; i < isoNames.Length; ++i)
         {
-            Tag = tag;
-            FriendlyName = friendlyName;
-            ISONames = new string[isoNames.Length];
-            for (int i = 0; i < isoNames.Length; ++i)
-            {
-                ISONames[i] = isoNames[i];
-            }
+            ISONames[i] = isoNames[i];
         }
+    }
 
-        public override int GetHashCode()
+    public override int GetHashCode()
+    {
+        unchecked
         {
-            return HashCode.Combine(Tag, FriendlyName);
+            var hashCode = Tag.GetHashCode();
+            hashCode = (hashCode * 397) ^ FriendlyName.GetHashCode();
+            return hashCode;
         }
+    }
 
-        public override string ToString()
-        {
-            return $"Tag: {Tag} Name: {FriendlyName}";
-        }
+    public override string ToString()
+    {
+        return $"Tag: {Tag} Name: {FriendlyName}";
     }
 }

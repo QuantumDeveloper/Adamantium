@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 
 namespace Adamantium.Fonts.Common
 {
@@ -103,10 +103,23 @@ namespace Adamantium.Fonts.Common
 
             if (BlendData != null)
             {
-                blendDataString = $", BlendData: {string.Join(',', BlendData.Data)}";
+                blendDataString = $", BlendData: {string.Join(",", BlendData.Data)}";
             }
 
             return $"{Value}" + blendDataString;
+        }
+
+        public override bool Equals(object obj)
+        {
+            if (obj == null) return false;
+
+            var instance = obj as CommandOperand;
+            return Value == instance.Value && BlendData == instance.BlendData;
+        }
+
+        public override int GetHashCode()
+        {
+            return Value.GetHashCode() + BlendData.GetHashCode();
         }
     }
 }

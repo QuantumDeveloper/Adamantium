@@ -11,11 +11,11 @@ namespace Adamantium.Core.Collections
    /// </summary>
    /// <typeparam name="TKey"></typeparam>
    /// <typeparam name="TValue"></typeparam>
-   /// <remarks>Notofocations for binding could be switched on or off using EnableNotifications property</remarks>
+   /// <remarks>Notifications for binding could be switched on or off using EnableNotifications property</remarks>
    public class AdamantiumDictionary<TKey, TValue>: IDictionary<TKey, TValue>, IDictionary, INotifyPropertyChanged, INotifyCollectionChanged
    {
       private readonly Dictionary<TKey, TValue> innerDictionary;
-      private readonly object syncObject = new object();
+      protected readonly object syncObject = new object();
 
       /// <summary>
       /// Enbales/disables sending notifications for binding
@@ -440,12 +440,26 @@ namespace Adamantium.Core.Collections
          lock (SyncRoot)
          {
             Validate?.Invoke(value);
-            var val = innerDictionary[key];
-            innerDictionary[key] = value;
-            if (EnableNotifications)
+            
+            if (innerDictionary.TryGetValue(key, out var oldValue))
             {
-               int index = GetIndexForKey(key);
-               NotifyReplace(new KeyValuePair<TKey, TValue>(key, val), new KeyValuePair<TKey, TValue>(key, value), index);
+               innerDictionary[key] = value;
+
+               if (EnableNotifications)
+               {
+                  int index = GetIndexForKey(key);
+                  NotifyReplace(new KeyValuePair<TKey, TValue>(key, oldValue), new KeyValuePair<TKey, TValue>(key, value), index);
+               }
+            }
+            else
+            {
+               innerDictionary[key] = value;
+
+               if (EnableNotifications)
+               {
+                  int index = GetIndexForKey(key);
+                  NotifyAdd(new KeyValuePair<TKey, TValue>(key, value), index);
+               }
             }
          }
       }

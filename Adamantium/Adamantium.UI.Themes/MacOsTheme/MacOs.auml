@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<Theme xmlns="http://adamantium/ui"
+       xmlns:x="http://adamantium/ui/xaml/extensions"
+       xmlns:fluent="clr-namespace:Adamantium.UI.Themes.FluentTheme"
+       xmlns:mac="clr-namespace:Adamantium.UI.Themes.MacOsTheme"
+       xmlns:shared="clr-namespace:Adamantium.UI.Themes.Shared"
+       Name="macOS"
+       SystemLightVariant="Light"
+       SystemDarkVariant="Dark"
+       ResourceContext.Scope="Theme">
+
+  <!-- Every set below is this theme's own; Shared/BusyEffectsStyleSet belongs to no theme (its classes name EFFECTS an
+       application asks for by name). macOS's metrics are linked after Fluent's - the later link answers first - so only
+       the numbers that differ override. -->
+
+  <ResourceContext.Resources>
+    <!-- FIRST - see Fluent's. The canvas's pictures belong to no theme, so MacOsIcons can still override any of them.
+         -->
+    <ResourceLink Source="{x:Type shared:CanvasIcons}"/>
+    <!-- ...and what its inspector SHOWS - see the note in Fluent's: content, shared by all three. -->
+    <ResourceLink Source="{x:Type shared:CanvasInspectorContent}"/>
+    <ResourceLink Source="{x:Type fluent:Icons}"/>
+    <ResourceLink Source="{x:Type fluent:Metrics}"/>
+    <ResourceLink Source="{x:Type fluent:Materials}"/>
+    <ResourceLink Source="{x:Type mac:MacOsMetrics}"/>
+    <ResourceLink Source="{x:Type mac:MacOsIcons}"/>
+    <ResourceLink Source="{x:Type mac:MacOsMaterials}"/>
+  </ResourceContext.Resources>
+
+  <Theme.Variants>
+    <mac:MacOsDark/>
+    <mac:MacOsLight/>
+  </Theme.Variants>
+
+  <Theme.StyleIncludes>
+        <StyleInclude Source="{x:Type shared:BusyEffectsStyleSet}"/>
+        <StyleInclude Source="{x:Type mac:MacOsBorderStyleSet}"/>
+        <StyleInclude Source="{x:Type mac:MacOsContentControlStyleSet}"/>
+        <StyleInclude Source="{x:Type mac:MacOsThumbStyleSet}"/>
+        <StyleInclude Source="{x:Type mac:MacOsItemsControlStyleSet}"/>
+        <StyleInclude Source="{x:Type mac:MacOsResizeGripperStyleSet}"/>
+        <StyleInclude Source="{x:Type mac:MacOsTextBlockStyleSet}"/>
+        <StyleInclude Source="{x:Type mac:MacOsWindowStyleSet}"/>
+        <StyleInclude Source="{x:Type mac:MacOsTitleBarStyleSet}"/>
+        <StyleInclude Source="{x:Type mac:MacOsButtonStyleSet}"/>
+        <StyleInclude Source="{x:Type mac:MacOsToggleSwitchStyleSet}"/>
+        <StyleInclude Source="{x:Type mac:MacOsCheckBoxStyleSet}"/>
+        <StyleInclude Source="{x:Type mac:MacOsRadioButtonStyleSet}"/>
+        <StyleInclude Source="{x:Type mac:MacOsTextBoxStyleSet}"/>
+        <StyleInclude Source="{x:Type mac:MacOsScrollBarStyleSet}"/>
+        <StyleInclude Source="{x:Type mac:MacOsScrollViewerStyleSet}"/>
+        <StyleInclude Source="{x:Type mac:MacOsDropDownStyleSet}"/>
+        <StyleInclude Source="{x:Type mac:MacOsExpanderStyleSet}"/>
+        <StyleInclude Source="{x:Type mac:MacOsPropertyGridStyleSet}"/>
+        <StyleInclude Source="{x:Type mac:MacOsSliderStyleSet}"/>
+        <StyleInclude Source="{x:Type mac:MacOsRangeSliderStyleSet}"/>
+        <StyleInclude Source="{x:Type mac:MacOsSliderKnobStyleSet}"/>
+        <StyleInclude Source="{x:Type mac:MacOsListBoxStyleSet}"/>
+        <StyleInclude Source="{x:Type mac:MacOsDataGridStyleSet}"/>
+        <StyleInclude Source="{x:Type mac:MacOsListBoxItemStyleSet}"/>
+        <StyleInclude Source="{x:Type mac:MacOsDropDownItemStyleSet}"/>
+        <StyleInclude Source="{x:Type mac:MacOsProgressBarStyleSet}"/>
+        <StyleInclude Source="{x:Type mac:MacOsToolTipStyleSet}"/>
+        <StyleInclude Source="{x:Type mac:MacOsKeyTipAdornerStyleSet}"/>
+        <StyleInclude Source="{x:Type mac:MacOsZoomBoxStyleSet}"/>
+        <!-- The canvas AND everything that only exists inside one - see Fluent's list. -->
+        <StyleInclude Source="{x:Type mac:MacOsInfiniteCanvasStyleSet}"/>
+        <StyleInclude Source="{x:Type mac:MacOsTilesHostStyleSet}"/>
+        <StyleInclude Source="{x:Type mac:MacOsFlipTileStyleSet}"/>
+        <StyleInclude Source="{x:Type mac:MacOsGridSplitterStyleSet}"/>
+        <StyleInclude Source="{x:Type mac:MacOsRingProgressBarStyleSet}"/>
+        <StyleInclude Source="{x:Type mac:MacOsSlidePanelStyleSet}"/>
+        <StyleInclude Source="{x:Type mac:MacOsRepeatButtonStyleSet}"/>
+        <StyleInclude Source="{x:Type mac:MacOsToggleButtonStyleSet}"/>
+        <StyleInclude Source="{x:Type mac:MacOsNumericUpDownStyleSet}"/>
+        <StyleInclude Source="{x:Type mac:MacOsBusyIndicatorStyleSet}"/>
+        <StyleInclude Source="{x:Type mac:MacOsFocusAdornerStyleSet}"/>
+        <StyleInclude Source="{x:Type mac:MacOsSelectionAdornerStyleSet}"/>
+        <StyleInclude Source="{x:Type mac:MacOsHoverAdornerStyleSet}"/>
+        <StyleInclude Source="{x:Type mac:MacOsDropInsertionIndicatorStyleSet}"/>
+        <StyleInclude Source="{x:Type mac:MacOsDragHandleStyleSet}"/>
+        <StyleInclude Source="{x:Type mac:MacOsMenuStyleSet}"/>
+        <StyleInclude Source="{x:Type mac:MacOsOverlayWindowStyleSet}"/>
+        <StyleInclude Source="{x:Type mac:MacOsTreeViewStyleSet}"/>
+        <StyleInclude Source="{x:Type mac:MacOsTabControlStyleSet}"/>
+        <StyleInclude Source="{x:Type mac:MacOsTabItemStyleSet}"/>
+        <StyleInclude Source="{x:Type mac:MacOsDockingStyleSet}"/>
+        <StyleInclude Source="{x:Type mac:MacOsColorPickerStyleSet}"/>
+        <StyleInclude Source="{x:Type mac:MacOsColorPickerButtonStyleSet}"/>
+        <StyleInclude Source="{x:Type mac:MacOsColorWheelStyleSet}"/>
+        <StyleInclude Source="{x:Type mac:MacOsRibbonStyleSet}"/>
+        <StyleInclude Source="{x:Type mac:MacOsDataPagerStyleSet}"/>
+  </Theme.StyleIncludes>
+
+</Theme>

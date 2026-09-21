@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="utf-8"?>
+<StyleSet xmlns="http://adamantium/ui"
+          xmlns:x="http://adamantium/ui/xaml/extensions">
+
+    <!-- Editor Pro's slider. The handle is a BAR, not a disc.
+
+         A round handle has to be as tall as it is wide, so a 20-pixel circle forces the whole control to 20 pixels
+         however thin the rail is - and in a properties panel, where a slider sits in a row beside a label and a number
+         field, that circle is the tallest thing in the row and sets its height. An upright bar is wide enough to grab
+         and short enough to leave the row alone; it also points AT the rail, which a circle does not.
+
+         Square, like everything else here: at three pixels a rounded rail is two semicircles with nothing between. -->
+
+    <Style Selector="Slider">
+        <Setter Property="MinHeight" Value="{ResourceReference ControlHeightCompact}"/>
+        <Setter Property="MinWidth" Value="{ResourceReference ControlMinWidth}"/>
+    </Style>
+
+    <Style Selector="Slider">
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Slider">
+                    <Grid>
+                        <Border x:Name="Rail"
+                                Height="{ResourceReference SliderTrackThickness}" CornerRadius="0"
+                                Background="{ResourceReference ControlFillColorTertiary}"
+                                VerticalAlignment="Center"/>
+                        <!-- The accent run from the start to the handle. The control writes its Width on every value
+                             change - a part sized only by the Track's arrange does not repaint when the width moves. -->
+                        <Border x:Name="PART_SelectionRange"
+                                Height="{ResourceReference SliderTrackThickness}" CornerRadius="0"
+                                Background="{ThemeResource AccentFillColorDefault}"
+                                HorizontalAlignment="Left" VerticalAlignment="Center" Width="0"/>
+                        <Track x:Name="PART_Track"
+                                Orientation="{TemplateBinding Orientation}"
+                                Minimum="{TemplateBinding Minimum}"
+                                Maximum="{TemplateBinding Maximum}"
+                                Value="{TemplateBinding Value}"
+                                ViewportSize="0">
+                            <!-- Both page areas are invisible but hit-testable: clicking the rail pages. -->
+                            <Track.DecreaseRepeatButton>
+                                <ScrollBarPageButton Focusable="false"/>
+                            </Track.DecreaseRepeatButton>
+                            <Track.Thumb>
+                                <!-- Named because it has to be TURNED with the control: the bar is asymmetric, so its
+                                     width and length swap when the slider stands up. A round handle needs none of
+                                     this, which is why the shared template never had to name it. -->
+                                <Thumb x:Name="SliderThumb"
+                                       Width="{ResourceReference SliderThumbWidth}"
+                                       Height="{ResourceReference SliderThumbLength}">
+                                    <Thumb.Template>
+                                        <ControlTemplate TargetType="Thumb">
+                                            <Border CornerRadius="{ResourceReference CornerRadiusSmall}"
+                                                    Background="{ThemeResource AccentFillColorDefault}"/>
+                                        </ControlTemplate>
+                                    </Thumb.Template>
+                                </Thumb>
+                            </Track.Thumb>
+                            <!-- The increase side stays empty so the plain rail shows past the handle. -->
+                            <Track.IncreaseRepeatButton>
+                                <ScrollBarPageButton Focusable="false"/>
+                            </Track.IncreaseRepeatButton>
+                        </Track>
+                    </Grid>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- Turned upright. The rail and the fill are laid out horizontally by the template, so they swap axes here; the
+         Track gets its Orientation by binding and moves the handle correctly on its own. -->
+    <Style Selector="Slider">
+        <PropertyTrigger Property="Orientation" Value="Vertical">
+            <!-- The horizontal minimum is a min-LENGTH. Left on a vertical slider it forces the control that WIDE
+                 instead - a dead hit area either side of a three-pixel rail, which swallows clicks. -->
+            <Setter Property="MinWidth" Value="0"/>
+            <Setter Property="MinHeight" Value="{ResourceReference ControlMinLength}"/>
+            <Setter TargetName="Rail" Property="Width" Value="{ResourceReference SliderTrackThickness}"/>
+            <Setter TargetName="Rail" Property="Height" Value="Auto"/>
+            <Setter TargetName="Rail" Property="HorizontalAlignment" Value="Center"/>
+            <Setter TargetName="Rail" Property="VerticalAlignment" Value="Stretch"/>
+            <Setter TargetName="PART_SelectionRange" Property="Width" Value="{ResourceReference SliderTrackThickness}"/>
+            <Setter TargetName="PART_SelectionRange" Property="Height" Value="0"/>
+            <Setter TargetName="PART_SelectionRange" Property="HorizontalAlignment" Value="Center"/>
+            <!-- Bottom-anchored: with the Track reversed the accent fills upward to meet the handle. -->
+            <Setter TargetName="PART_SelectionRange" Property="VerticalAlignment" Value="Bottom"/>
+            <!-- The handle turns with the control: WIDE across the rail, SHORT along it. Left as it is, an asymmetric
+                 bar lies ALONG the rail instead of across it and stops reading as a grip at all. -->
+            <Setter TargetName="SliderThumb" Property="Width" Value="{ResourceReference SliderThumbLength}"/>
+            <Setter TargetName="SliderThumb" Property="Height" Value="{ResourceReference SliderThumbWidth}"/>
+            <!-- Minimum at the BOTTOM, value grows up. The Track defaults to top=min for scrollbars, so a slider has to
+                 opt into the reversal. -->
+            <Setter TargetName="PART_Track" Property="IsDirectionReversed" Value="true"/>
+        </PropertyTrigger>
+    </Style>
+
+</StyleSet>

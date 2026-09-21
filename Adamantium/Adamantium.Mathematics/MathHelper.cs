@@ -1,6 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Runtime.CompilerServices;
+using Enumerable = System.Linq.Enumerable;
 
 namespace Adamantium.Mathematics
 {
@@ -127,7 +129,11 @@ namespace Adamantium.Mathematics
         /// <param name="b">The right value to compare.</param>
         /// <param name="epsilon">Epsilon value</param>
         /// <returns><c>true</c> if a almost equal to b within a float epsilon, <c>false</c> otherwise</returns>
+        #if NETCORE
         [MethodImpl(MethodImplOptions.AggressiveInlining|MethodImplOptions.AggressiveOptimization)]
+        #else
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        #endif
         public static bool WithinEpsilon(double a, double b, double epsilon)
         {
             double absA = Math.Abs(a);
@@ -479,20 +485,28 @@ namespace Adamantium.Mathematics
             return angle;
         }
 
-        public static float Cross2D(Vector3F v0, Vector3F v1)
+        public static float Cross2D(Vector3F v1, Vector3F v2)
         {
-            return v0.X * v1.Y - v0.Y * v1.X;
+            return v1.X * v2.Y - v1.Y * v2.X;
         }
         
-        public static double Cross2D(Vector2 v0, Vector2 v1)
+        public static double Cross2D(Vector2 v1, Vector2 v2)
         {
-            return v0.X * v1.Y - v0.Y * v1.X;
+            return v1.X * v2.Y - v2.X * v1.Y;
         }
 
         public static float AngleBetween(Vector3F vector0, Vector3F vector1, Vector3F normal)
         {
             var dot = Vector3F.Dot(vector0, vector1);
             var det = Vector3F.Dot(Vector3F.Cross(vector1, vector0), normal);
+            var angle = (float)Math.Atan2(det, dot);
+            return angle;
+        }
+        
+        public static float AngleBetween(Vector3 vector0, Vector3 vector1, Vector3 normal)
+        {
+            var dot = Vector3.Dot(vector0, vector1);
+            var det = Vector3.Dot(Vector3.Cross(vector1, vector0), normal);
             var angle = (float)Math.Atan2(det, dot);
             return angle;
         }
@@ -610,12 +624,43 @@ namespace Adamantium.Mathematics
 
         }
 
+        /// <summary>
+        /// True if a simple polygon (ordered vertices, closed) is convex. Uses a consistent turn-direction
+        /// test PLUS a single-revolution check (total turning ≈ ±2π), so star polygons such as a pentagram —
+        /// which turn consistently but self-intersect (total turning ±4π) — are correctly rejected.
+        /// </summary>
+        public static bool IsConvex(IReadOnlyList<Vector2> points)
+        {
+            int n = points?.Count ?? 0;
+            if (n < 3) return false;
+            if (n == 3) return true;
+
+            int sign = 0;
+            double totalTurn = 0;
+            for (int i = 0; i < n; i++)
+            {
+                var a = points[i];
+                var b = points[(i + 1) % n];
+                var c = points[(i + 2) % n];
+                var e0 = b - a;
+                var e1 = c - b;
+                double cross = e0.X * e1.Y - e0.Y * e1.X;
+                double dot = e0.X * e1.X + e0.Y * e1.Y;
+                if (cross == 0 && dot < 0) return false;            // 180° reversal (spike) -> not convex
+                int s = cross > 0 ? 1 : (cross < 0 ? -1 : 0);
+                if (s != 0)
+                {
+                    if (sign == 0) sign = s;
+                    else if (s != sign) return false;               // turn direction changed -> concave
+                }
+                totalTurn += Math.Atan2(cross, dot);
+            }
+            return Math.Abs(Math.Abs(totalTurn) - 2 * Math.PI) < 1e-3;  // exactly one revolution
+        }
+
         public static QuaternionF GetRotationFromMatrix(Matrix4x4F matrix)
         {
-            Vector3F scale;
-            Vector3F pos;
-            QuaternionF orientation;
-            matrix.Decompose(out scale, out orientation, out pos);
+            matrix.Decompose(out var scale, out var orientation, out var pos);
             return orientation;
         }
 
@@ -802,10 +847,32 @@ namespace Adamantium.Mathematics
             return true;
         }
         
-        public static List<Vector2> GetBSpline2(List<Vector2> controlPoints, uint resolution)
+        public static List<Vector2> GetBSpline2(IEnumerable<Vector2> controlPoints, uint resolution)
         {
-            if (controlPoints == null ||
-                controlPoints.Count < 3 ||
+            static Vector2 Curve(Vector2[] controlPoints, int index, double u)
+            {
+                return (Blend03(u) * controlPoints[index - 1] + Blend13(u) * controlPoints[index] + Blend23(u) * controlPoints[index + 1]);
+            }
+
+            static double Blend03(double u)
+            {
+                return ((1 - u) * (1 - u) / 2.0);
+            }
+
+            static double Blend13(double u)
+            {
+                return (-(u * u) + u + 0.5);
+            }
+
+            static double Blend23(double u)
+            {
+                return ((u * u) / 2);
+            }
+
+            if (controlPoints == null) return new List<Vector2>();
+            
+            var points = controlPoints as Vector2[] ?? Enumerable.ToArray(controlPoints);
+            if (points.Length < 3 ||
                 resolution < 2)
             {
                 // just return empty list
@@ -815,7 +882,7 @@ namespace Adamantium.Mathematics
             var curvePoints = new List<Vector2>();
 
             var start = 1;
-            var end = controlPoints.Count - 1;
+            var end = points.Length - 1;
 
             for (var i = start; i < end; ++i)
             {
@@ -823,37 +890,207 @@ namespace Adamantium.Mathematics
 
                 for (double u = 0.0; u < 1.0; u += uDelta)
                 {
-                    curvePoints.Add(curve(controlPoints, i, u));
+                    curvePoints.Add(Curve(points, i, u));
                 }
 
                 // add last curve point
                 if (i == end - 1)
                 {
-                    curvePoints.Add(curve(controlPoints, i, 1));
+                    curvePoints.Add(Curve(points, i, 1));
                 }
             }
 
             return curvePoints;
         }
+        
+        // Non-rational overload (all weights = 1): a plain B-spline evaluated with the general basis.
+        public static Vector2[] GetNurbsCurve(IEnumerable<Vector2> points, int degree, bool isUniform, double stepSize)
+            => GetNurbsCurve(points, null, degree, isUniform, stepSize);
 
-        private static Vector2 curve(List<Vector2> controlPoints, int index, double u)
+        // RATIONAL: each control point i carries a weight w_i (the "R" in NURBS). A higher weight pulls the curve toward
+        // that point; equal weights degenerate to a plain B-spline. Weights are what let a NURBS trace an EXACT conic
+        // (circle/ellipse) that a B-spline can only approximate. weights == null or shorter than points -> the missing
+        // ones default to 1.
+        public static Vector2[] GetNurbsCurve(IEnumerable<Vector2> points, IReadOnlyList<double> weights,
+            int degree, bool isUniform, double stepSize)
+    {
+        var result = new List<Vector2>();
+        var hash = new HashSet<Vector2>();
+        var pointsArray = points as Vector2[] ?? points.ToArray();
+
+        var knots = CalculateKnots(degree, pointsArray.Length, isUniform);
+
+        for (double i = 0; i < 1; i += stepSize)
         {
-            return (blend03(u) * controlPoints[index - 1] + blend13(u) * controlPoints[index] + blend23(u) * controlPoints[index + 1]);
+            var point = RationalBSplinePoint(pointsArray, weights, degree, knots, i);
+            if (!hash.Contains(point))
+            {
+                hash.Add(point);
+                result.Add(point);
+            }
         }
 
-        private static double blend03(double u)
+        return result.ToArray();
+    }
+
+    private static Vector2 RationalBSplinePoint(Vector2[] points, System.Collections.Generic.IReadOnlyList<double> weights,
+        int degree, double[] knots, double t)
+    {
+        double x = 0, y = 0;
+        double rationalWeight = 0d;
+
+        for (int i = 0; i < points.Length; i++)
         {
-            return ((1 - u) * (1 - u) / 2.0);
+            var w = weights != null && i < weights.Count ? weights[i] : 1.0;
+            rationalWeight += Nip(i, degree, knots, t) * w;
         }
 
-        private static double blend13(double u)
+        if (rationalWeight == 0) return points[0];
+
+        for (int i = 0; i < points.Length; i++)
         {
-            return (-(u * u) + u + 0.5);
+            var w = weights != null && i < weights.Count ? weights[i] : 1.0;
+            double temp = Nip(i, degree, knots, t) * w / rationalWeight;
+            x += points[i].X * temp;
+            y += points[i].Y * temp;
         }
 
-        private static double blend23(double u)
+        return new Vector2(x, y);
+    }
+
+    /// <summary>
+    /// This code is translated to C# from the original C++  code given on page 74-75 in "The NURBS Book" by Les Piegl and Wayne Tiller 
+    /// </summary>
+    /// <param name="i">Current control pont</param>
+    /// <param name="p">The piecewise polynomial degree</param>
+    /// <param name="u">The knot vector</param>
+    /// <param name="t">The value of the current curve point. Valid range from 0 <= u <= 1 </param>
+    /// <returns>N_{i,p}(u)</returns>
+    private static double Nip(int i, int p, double[] u, double t)
+    {
+        double[] N = new double[p + 1];
+        double saved, temp;
+
+        int m = u.Length - 1;
+        if ((i == 0 && t == u[0]) || (i == (m - p - 1) && t == u[m]))
+            return 1;
+
+        if (t < u[i] || t >= u[i + p + 1])
+            return 0;
+
+        for (int j = 0; j <= p; j++)
         {
-            return ((u * u) / 2);
+            if (t >= u[i + j] && t < u[i + j + 1])
+                N[j] = 1d;
+            else
+                N[j] = 0d;
+        }
+
+        for (int k = 1; k <= p; k++)
+        {
+            if (N[0] == 0)
+                saved = 0d;
+            else
+                saved = ((t - u[i]) * N[0]) / (u[i + k] - u[i]);
+
+            for (int j = 0; j < p - k + 1; j++)
+            {
+                double Uleft = u[i + j + 1];
+                double Uright = u[i + j + k + 1];
+
+                if (N[j + 1] == 0)
+                {
+                    N[j] = saved;
+                    saved = 0d;
+                }
+                else
+                {
+                    temp = N[j + 1] / (Uright - Uleft);
+                    N[j] = saved + (Uright - t) * temp;
+                    saved = (t - Uleft) * temp;
+                }
+            }
+        }
+        return N[0];
+    }
+    private static double[] CalculateKnots(int degree, int controlPointCount, bool isUniform)
+    {
+        if (degree + 1 > controlPointCount || controlPointCount == 0)
+            return Array.Empty<double>();
+
+        int n = controlPointCount;
+        int m = n + degree + 1;
+        int divisor = m - 1 - 2 * degree;
+
+        var knots = new List<Double>();
+
+        if (isUniform)
+        {
+            knots.Add(0);
+            for (int i = 1; i < m; i++)
+            {
+                if (i >= m - 1)
+                    knots.Add(1);
+                else
+                {
+                    double dividend = m-1;
+                    knots.Add(i/dividend);
+                }
+            }
+        }
+        else
+        {
+            knots.Add(0);
+            for (int i = 1; i < m; i++)
+            {
+                if (i <= degree)
+                    knots.Add(0);
+                else if (i >= m - degree - 1)
+                    knots.Add(1);
+                else
+                {
+                    double dividend = i - degree;
+                    knots.Add(dividend/divisor);
+                }
+            }
+        }
+
+        return knots.ToArray();
+    }
+
+        /// <summary>A Bezier span of ANY degree, sampled along its length. The span is the start point, its controls
+        /// and its end - four points is the cubic, three the quadratic, five the quartic, and so on.
+        /// <para>De Casteljau rather than the polynomial: it is the same curve, it needs no binomial coefficients, and
+        /// it stays numerically well behaved at the degrees where writing the polynomial out starts to lose digits.</para>
+        /// </summary>
+        public static List<Vector2> GetBezier(IReadOnlyList<Vector2> span, uint sampleRate)
+        {
+            if (span == null || span.Count < 2) return new List<Vector2>(span ?? []);
+            if (sampleRate < 2) return new List<Vector2>(span);
+
+            var sampled = new List<Vector2>((int)sampleRate + 1);
+            var work = new Vector2[span.Count];
+            var step = 1.0 / sampleRate;
+
+            for (uint i = 0; i <= sampleRate; i++)
+            {
+                var d = i * step;
+
+                for (var k = 0; k < span.Count; k++) work[k] = span[k];
+
+                for (var level = span.Count - 1; level > 0; level--)
+                {
+                    for (var k = 0; k < level; k++) work[k] = work[k] + (work[k + 1] - work[k]) * d;
+                }
+
+                sampled.Add(work[0]);
+            }
+
+            // because of possible float pointing precision issues
+            sampled[0] = span[0];
+            sampled[sampled.Count - 1] = span[span.Count - 1];
+
+            return sampled;
         }
 
         public static List<Vector2> GetQuadraticBezier(Vector2 start, Vector2 control, Vector2 end, uint sampleRate)
@@ -875,7 +1112,7 @@ namespace Adamantium.Mathematics
             
             // because of possible float pointing precision issues
             bezierPoints[0] = start;
-            bezierPoints[^1] = end;
+            bezierPoints[bezierPoints.Count - 1] = end;
             
             return bezierPoints;
         }
@@ -902,11 +1139,69 @@ namespace Adamantium.Mathematics
             
             // because of possible float pointing precision issues
             bezierPoints[0] = start;
-            bezierPoints[^1] = end;
+            bezierPoints[bezierPoints.Count - 1] = end;
             
             return bezierPoints;
         }
-        
+
+        // Drops points closer than minSpacing to the last KEPT point (the first and last are always kept). Curve
+        // tessellators sample by PARAMETER (uniform t), not arc length, so a "slow" stretch of the curve packs samples
+        // sub-pixel-close; the GPU stroke expander then builds degenerate/overlapping quads there and the stroke looks
+        // torn. Removing the sub-pixel samples leaves clean >= minSpacing segments (works for solid AND dashed strokes).
+        public static Vector2[] SimplifyByMinSpacing(System.Collections.Generic.IReadOnlyList<Vector2> points, double minSpacing)
+        {
+            if (points == null || points.Count == 0) return System.Array.Empty<Vector2>();
+            var minSq = minSpacing * minSpacing;
+            var result = new System.Collections.Generic.List<Vector2>(points.Count) { points[0] };
+            for (var i = 1; i < points.Count - 1; i++)
+                if ((points[i] - result[result.Count - 1]).LengthSquared() >= minSq)
+                    result.Add(points[i]);
+            if (points.Count > 1)
+            {
+                var last = points[points.Count - 1];
+                if ((last - result[result.Count - 1]).LengthSquared() >= minSq) result.Add(last);
+                else result[result.Count - 1] = last;   // collapse a sub-min final segment onto the true endpoint
+            }
+            return result.ToArray();
+        }
+
+        // Total length of a polyline (sum of segment lengths).
+        public static double PolylineLength(System.Collections.Generic.IReadOnlyList<Vector2> poly)
+        {
+            double len = 0;
+            for (var i = 1; i < (poly?.Count ?? 0); i++) len += (poly[i] - poly[i - 1]).Length();
+            return len;
+        }
+
+        // Resamples a polyline to `count` points spaced EVENLY BY ARC LENGTH (both endpoints preserved). Curve tessellators
+        // sample by PARAMETER (uniform t), which bunches points where the curve is "slow" (sub-pixel-close -> the stroke
+        // expander tears) and starves the "fast" flats (angular). Walking the flattened curve by arc length instead gives
+        // uniform spacing: smooth strokes, no sub-pixel bunching, no under-sampled straights.
+        public static Vector2[] ResampleByArcLength(System.Collections.Generic.IReadOnlyList<Vector2> poly, int count)
+        {
+            if (poly == null || poly.Count == 0) return System.Array.Empty<Vector2>();
+            if (count < 2 || poly.Count < 2) return new[] { poly[0] };
+
+            var cum = new double[poly.Count];
+            for (var i = 1; i < poly.Count; i++) cum[i] = cum[i - 1] + (poly[i] - poly[i - 1]).Length();
+            var total = cum[poly.Count - 1];
+            if (total <= 1e-9) return new[] { poly[0], poly[poly.Count - 1] };
+
+            var result = new Vector2[count];
+            result[0] = poly[0];
+            var seg = 1;
+            for (var k = 1; k < count - 1; k++)
+            {
+                var target = total * k / (count - 1);
+                while (seg < poly.Count - 1 && cum[seg] < target) seg++;
+                var span = cum[seg] - cum[seg - 1];
+                var t = span > 1e-9 ? (target - cum[seg - 1]) / span : 0.0;
+                result[k] = poly[seg - 1] + (poly[seg] - poly[seg - 1]) * t;
+            }
+            result[count - 1] = poly[poly.Count - 1];
+            return result;
+        }
+
         private static (double startAngle, double sweepAngle, Vector2 center) GetArcData(Vector2 start, Vector2 end, double radius, bool clockwise = true)
         {
             var d = new Vector2((end.X - start.X) * 0.5, (end.Y - start.Y) * 0.5);
@@ -950,7 +1245,7 @@ namespace Adamantium.Mathematics
             }
             
             points[0] = start;
-            points[^1] = end;
+            points[points.Count - 1] = end;
 
             return points;
         }

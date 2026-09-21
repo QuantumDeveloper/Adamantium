@@ -9,7 +9,7 @@ namespace Adamantium.Imaging.Png.Chunks
             Name = "IEND";
         }
 
-        internal override byte[] GetChunkBytes(PNGState state)
+        internal override byte[] GetChunkBytes(PngState state)
         {
             var bytes = new List<byte>();
             bytes.AddRange(GetNameAsBytes());

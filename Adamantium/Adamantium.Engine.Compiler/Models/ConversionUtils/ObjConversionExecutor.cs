@@ -3,10 +3,10 @@ using System.Collections.Generic;
 using System.Globalization;
 using Adamantium.Engine.Compiler.Converter.Configs;
 using Adamantium.Engine.Compiler.Converter.Containers;
-using Adamantium.Engine.Core.Models;
+using Adamantium.Graphics.Core.Models;
 using Adamantium.Mathematics;
 
-namespace Adamantium.Engine.Compiler.Converter.ConversionUtils
+namespace Adamantium.Engine.Compiler.Models.ConversionUtils
 {
    internal class ObjConversionExecutor:ConversionExecutorBase
    {
@@ -72,11 +72,11 @@ namespace Adamantium.Engine.Compiler.Converter.ConversionUtils
       {
       }
 
-      /* Методы для конвертации Obj формата*/
+      /* Obj conversion */
 
       internal SceneData.Model ConstructMeshGeometry(SceneData model, List<IndicesContainer> indicesContainers, ObjGeometryData geometryData, ObjMeshData meshData)
       {
-         //присваиваем настоящему мешу семантику временного
+         //The real mesh takes the temporary one's semantic
          SceneData.Model constructedMesh = null;
          var meshName = meshData.Name;
          if (meshData.Type == ObjectType.Group)
@@ -89,7 +89,7 @@ namespace Adamantium.Engine.Compiler.Converter.ConversionUtils
                {
                   parent = model.CreateMesh(parent, "", names[i]);
                }
-               meshName = names[names.Length - 1];
+               meshName = names[^1];
                constructedMesh = model.GetModelByName(meshName);
             }
             else
@@ -109,23 +109,31 @@ namespace Adamantium.Engine.Compiler.Converter.ConversionUtils
             mesh.MaterialID = indicesContainer.MaterialId;
 
             var semantic = indicesContainer.Semantic;
-            //Собираем вершины в таком порядке, в котором они должны идти
-            //то есть достаём из tempMesh.Vertices координаты вершин не по порядку как они заисаны в файле,
-            //а в том порядке, в котором они записаны в IndicesContainer.Vertices (в таком случае наборы коодинат могут повторяться)
-            List<Vector3F> positions = new List<Vector3F>();
-            List<Vector2F> uv0 = new List<Vector2F>();
+            //Vertices are reordered the way the faces name them, not the way the file stores them - so a
+            //coordinate set may well repeat
+            var positions = new List<Vector3>();
+            var normals = new List<Vector3F>();
+            var uv0 = new List<Vector2F>();
             for (int i = 0; i < indicesContainer.Positions.Count; i++)
             {
                var position = geometryData.Positions[indicesContainer.Positions[i]];
                positions.Add(position);
-               
+
+               // vn was parsed and then dropped right here, so the mesh re-derived normals by averaging and the
+               // hard edges the file described were lost.
+               if (semantic.HasFlag(VertexSemantic.Normal) && i < indicesContainer.Normals.Count)
+               {
+                  normals.Add(geometryData.Normals[indicesContainer.Normals[i]]);
+               }
+
                if (semantic.HasFlag(VertexSemantic.UV0))
                {
                   uv0.Add(geometryData.UV[indicesContainer.UV0[i]]);
                }
             }
             mesh.SetPoints(positions);
-            mesh.SetUVs(0, uv0);
+            if (normals.Count == positions.Count) mesh.SetNormals(normals);
+            if (uv0.Count == positions.Count) mesh.SetUVs(0, uv0);
             mesh.GenerateBasicIndices();
             constructedMesh.Meshes.Add(mesh);
          }

@@ -14,14 +14,14 @@ namespace Adamantium.Imaging.Png.Chunks
 
         public byte[] FrameData { get; set; }
 
-        internal override byte[] GetChunkBytes(PNGState state)
+        internal override byte[] GetChunkBytes(PngState state)
         {
-            PNGCompressor compressor = new PNGCompressor();
+            PngCompressor compressor = new PngCompressor();
             var compressedData = new List<byte>();
             var result = compressor.Compress(FrameData, state.EncoderSettings, compressedData);
             if (result > 0)
             {
-                throw new PNGEncoderException(result);
+                throw new PngEncoderException(result);
             }
 
             var bytes = new List<byte>();

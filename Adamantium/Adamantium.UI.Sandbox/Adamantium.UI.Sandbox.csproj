@@ -1,0 +1,316 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+	<PropertyGroup>
+		<OutputType>WinExe</OutputType>
+		<TargetFramework>net10.0</TargetFramework>
+		<Platforms>x64</Platforms>
+		<Configurations>Debug;Release</Configurations>
+		<LangVersion>latest</LangVersion>
+		<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+		<!-- Product metadata surfaced by the About dialog (read from assembly attributes at runtime). -->
+		<Product>Adamantium Engine Sandbox</Product>
+		<Company>Adamantium</Company>
+		<Version>0.1.0</Version>
+		<Copyright>Copyright © 2026 Adamantium</Copyright>
+		<!-- MEASUREMENT (not yet a decision): a 4K tile grid takes the managed heap from 130MB to 936MB, and the workstation
+		     collector then stops every thread for 240-460ms of each second - a quarter to a half of the frame budget, spent
+		     where no profiler of ours was looking. Server GC collects per-core and in parallel, which is the shape this
+		     workload has. It is a MITIGATION: the real fix is to stop retaining three and a half million objects for sixty
+		     thousand components. Keep or drop it on the numbers. -->
+		<!-- DROPPED on the numbers, as the note above said to. The retention that made it necessary is much reduced (the
+		     record no longer re-records what draws nothing, and the frozen layout is no longer re-published three times a
+		     frame), so the workstation collector is what we measure against now. NB on net10.0 the server collector is
+		     DATAS-adaptive by default (.NET 9+), so "server" here was never the classic per-core-heap shape anyway. -->
+		<ServerGarbageCollection>false</ServerGarbageCollection>
+		<ConcurrentGarbageCollection>true</ConcurrentGarbageCollection>
+		<EmitCompilerGeneratedFiles>true</EmitCompilerGeneratedFiles>
+		<CompilerGeneratedFilesOutputPath>$(BaseIntermediateOutputPath)Generated</CompilerGeneratedFilesOutputPath>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<ProjectReference Include="..\Adamantium.Game\Adamantium.Game.csproj" />
+		<ProjectReference Include="..\Adamantium.MVVM\Adamantium.MVVM.csproj" />
+		<ProjectReference Include="..\Adamantium.UI\Adamantium.UI.csproj" />
+		<ProjectReference Include="..\Adamantium.UI.Themes\Adamantium.UI.Themes.csproj" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<Content Include="Models\swordman.dae">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</Content>
+		<Content Include="Textures\texture.jpg">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</Content>
+		<Content Include="Textures\texture.png">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</Content>
+		<Content Include="Textures\texture2.jpg">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</Content>
+		<None Remove="AumlResources\FluentDarkRepository.xml" />
+		<None Remove="Brushes.xml" />
+		<None Remove="ControlTemplate.auml" />
+		<None Remove="FluentDark.xml" />
+		<None Remove="FontData.aff" />
+		<None Remove="Models\F-15C_Eagle\F-15C_Eagle.aemf" />
+		<Content Include="Models\F-15C_Eagle\F-15C_Eagle.aemf">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</Content>
+		<None Remove="Models\F15C\F-15C_Eagle.dae" />
+		<Content Include="Models\F15C\F-15C_Eagle.dae">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</Content>
+		<None Remove="Models\F15C\F-15C_Eagle.3ds" />
+		<Content Include="Models\F15C\F-15C_Eagle.3ds">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</Content>
+		<None Remove="Models\F15C\F-15C_Eagle.obj" />
+		<None Remove="Models\F15C\Body 1.png" />
+		<Content Include="Models\F15C\Body 1.png">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</Content>
+		<None Remove="Models\F15C\Body 2.png" />
+		<Content Include="Models\F15C\Body 2.png">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</Content>
+		<None Remove="Models\F15C\Body 3.png" />
+		<Content Include="Models\F15C\Body 3.png">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</Content>
+		<None Remove="Models\F15C\Body 4.png" />
+		<Content Include="Models\F15C\Body 4.png">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</Content>
+		<None Remove="Models\F15C\Body 5.png" />
+		<Content Include="Models\F15C\Body 5.png">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</Content>
+		<None Remove="Models\F15C\Body 6.png" />
+		<Content Include="Models\F15C\Body 6.png">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</Content>
+		<None Remove="Models\F15C\Parts 1.png" />
+		<Content Include="Models\F15C\Parts 1.png">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</Content>
+		<None Remove="Models\F15C\panel.png" />
+		<Content Include="Models\F15C\panel.png">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</Content>
+		<None Remove="Models\F15C\panel1.png" />
+		<Content Include="Models\F15C\panel1.png">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</Content>
+		<None Remove="Models\F15C\pilot.png" />
+		<Content Include="Models\F15C\pilot.png">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</Content>
+		<None Remove="Models\monkey\monkey.dae" />
+		<Content Include="Models\monkey\monkey.dae">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</Content>
+		<None Remove="Models\monkey\monkey_diffuse.png" />
+		<Content Include="Models\monkey\monkey_diffuse.png">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</Content>
+		<None Remove="Models\monkey\monkey_height.png" />
+		<Content Include="Models\monkey\monkey_height.png">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</Content>
+		<None Remove="Models\monkey\monkey_metallic.png" />
+		<Content Include="Models\monkey\monkey_metallic.png">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</Content>
+		<None Remove="Models\monkey\monkey_normals.png" />
+		<Content Include="Models\monkey\monkey_normals.png">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</Content>
+		<None Remove="Models\monkey\monkey_roughness.png" />
+		<Content Include="Models\monkey\monkey_roughness.png">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</Content>
+		<None Remove="Models\F15C\Glass.png" />
+		<Content Include="Models\F15C\Glass.png">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</Content>
+		<None Remove="Models\F15C\weapons.png" />
+		<Content Include="Models\F15C\weapons.png">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</Content>
+		<None Remove="Fonts\WoffFonts\Sarabun-Regular.woff2" />
+		<Content Include="Fonts\WoffFonts\Sarabun-Regular.woff2">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</Content>
+		<None Remove="Fonts\TTFFonts\Sarabun-Regular.ttf" />
+		<Content Include="Fonts\TTFFonts\Sarabun-Regular.ttf">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</Content>
+		<None Remove="Fonts\OTFFonts\CFF2\SourceHanSerifVFProtoJP.otf" />
+		<Content Include="Fonts\OTFFonts\CFF2\SourceHanSerifVFProtoJP.otf">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</Content>
+		<None Remove="Fonts\OTFFonts\CFF2\AdobeVFPrototype.otf" />
+		<Content Include="Fonts\OTFFonts\CFF2\AdobeVFPrototype.otf">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</Content>
+		<None Remove="Fonts\OTFFonts\SourceSans3-Regular.otf" />
+		<Content Include="Fonts\OTFFonts\SourceSans3-Regular.otf">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</Content>
+		<None Remove="Textures\sdf.png" />
+		<None Remove="Fonts\OTFFonts\Japan\NotoSansCJKjp-Light.otf" />
+		<Content Include="Fonts\OTFFonts\Japan\NotoSansCJKjp-Light.otf">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</Content>
+		<None Remove="Fonts\OTFFonts\GlametrixLight-0zjo.otf" />
+		<Content Include="Fonts\OTFFonts\GlametrixLight-0zjo.otf">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</Content>
+		<None Remove="Fonts\OTFFonts\CFF\Quicksand-Regular.otf" />
+		<Content Include="Fonts\OTFFonts\CFF\Quicksand-Regular.otf">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</Content>
+		<Content Update="Effects\structs.hlsl">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</Content>
+		<None Remove="Textures\infinity.gif" />
+		<Content Include="Textures\infinity.gif">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</Content>
+		<None Remove="Textures\APNG-cube.png" />
+		<Content Include="Textures\APNG-cube.png">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</Content>
+		<None Remove="Textures\ball.png" />
+		<Content Include="Textures\ball.png">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</Content>
+		<None Remove="Textures\elephant.png" />
+		<Content Include="Textures\elephant.png">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</Content>
+		<None Remove="Textures\nine-slice-frame.png" />
+		<Content Include="Textures\nine-slice-frame.png">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</Content>
+		<None Remove="Textures\nine-slice-stone.png" />
+		<Content Include="Textures\nine-slice-stone.png">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</Content>
+		<None Remove="Textures\nine-slice-scifi.png" />
+		<Content Include="Textures\nine-slice-scifi.png">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</Content>
+		<None Remove="Textures\nine-slice-parchment.png" />
+		<Content Include="Textures\nine-slice-parchment.png">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</Content>
+		<None Remove="Textures\tile-sample.png" />
+		<Content Include="Textures\tile-sample.png">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</Content>
+		<None Remove="Textures\RotatingEarth2.gif" />
+		<Content Include="Textures\RotatingEarth2.gif">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</Content>
+		<None Remove="Textures\balls.dds" />
+		<Content Include="Textures\balls.dds">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</Content>
+		<None Remove="Textures\TextureCube.dds" />
+		<Content Include="Textures\TextureCube.dds">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</Content>
+		<None Remove="Textures\ai.ico" />
+		<Content Include="Textures\ai.ico">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</Content>
+		<None Remove="Textures\SharpDoc.ico" />
+		<Content Include="Textures\SharpDoc.ico">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</Content>
+		<None Remove="Textures\PDF-Document.ico" />
+		<Content Include="Textures\PDF-Document.ico">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</Content>
+		<None Remove="Textures\ColoredImage.jpg" />
+		<Content Include="Textures\ColoredImage.jpg">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</Content>
+		<None Remove="Textures\luxfon.tga" />
+		<Content Include="Textures\luxfon.tga">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</Content>
+		<None Remove="Textures\AplhaTestBitmap.bmp" />
+		<Content Include="Textures\AplhaTestBitmap.bmp">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</Content>
+		<AdditionalFiles Update="ControlTemplate.auml">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</AdditionalFiles>
+		<None Remove="Fonts\OTFFonts\Crimson-Italic.otf" />
+		<Content Include="Fonts\OTFFonts\Crimson-Italic.otf">
+		  <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</Content>
+		<AdditionalFiles Remove="obj\**" />
+		<None Remove="obj\**" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<ProjectReference Include="..\Adamantium.Core\Adamantium.Core.csproj" />
+		<ProjectReference Include="..\Adamantium.UI.Markup\Adamantium.UI.Markup.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="true" />
+		<ProjectReference Include="..\Adamantium.UI.Generators\Adamantium.UI.Generators.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" SetTargetFramework="TargetFramework=netstandard2.0" />
+		<ProjectReference Include="..\Adamantium.MVVM.Generators\Adamantium.MVVM.Generators.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" SetTargetFramework="TargetFramework=netstandard2.0" />
+
+		<ProjectReference Include="..\Adamantium.Engine.Generators\Adamantium.Engine.Generators.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" SetTargetFramework="TargetFramework=netstandard2.0" />
+		<ProjectReference Include="..\Adamantium.EffectsCompiler\Adamantium.EffectsCompiler.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="true" />
+		<ProjectReference Include="..\Adamantium.Mathematics\Adamantium.Mathematics.csproj" />
+		<ProjectReference Include="..\Adamantium.Fonts\Adamantium.Fonts.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="true" SetTargetFramework="TargetFramework=netstandard2.0"/>
+		<!-- netstandard2.0 analyzer deps for the source generators above (Roslyn analyzers must be netstandard2.0).
+		     Analyzer-ONLY so the netstandard2.0 build isn't copied into this net10.0 output - runtime/compile
+		     Core+Mathematics come from the normal net10.0 refs above. -->
+		<ProjectReference Include="..\Adamantium.Core\Adamantium.Core.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" SetTargetFramework="TargetFramework=netstandard2.0" />
+		<ProjectReference Include="..\Adamantium.Mathematics\Adamantium.Mathematics.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" SetTargetFramework="TargetFramework=netstandard2.0" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<AdditionalFiles Include="$(ProjectDir)**\*.auml" />
+		<AdditionalFiles Include="$(ProjectDir)**\*.fx" />
+		<AdditionalFiles Include="$(ProjectDir)**\*.fxh" />
+		<AdditionalFiles Remove="$(ProjectDir)ControlTemplate.auml" />
+		<!-- Content resources fed to AssetsGenerator (it filters by extension and skips cooked .aemf). -->
+		<AdditionalFiles Include="$(ProjectDir)Models\**\*.*" />
+		<AdditionalFiles Include="$(ProjectDir)Textures\**\*.*" />
+		<AdditionalFiles Include="$(ProjectDir)Fonts\**\*.*" />
+		<CompilerVisibleProperty Include="RootNamespace" />
+		<CompilerVisibleProperty Include="ProjectDir" />
+		<CompilerVisibleProperty Include="MSBuildProjectName" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<!-- Source-generator inputs (.auml/.fx/.hlsl) are fed to the generators as AdditionalFiles, not as
+		     Compile items. The IDE's fast up-to-date check doesn't treat AdditionalFiles as build inputs, so
+		     editing only one of them leaves the project "up to date": the IDE skips csc and runs a STALE
+		     assembly, even though the design-time generator shows fresh code. Listing them as
+		     UpToDateCheckInput makes the IDE rebuild when they change. Placed after the AdditionalFiles are
+		     defined so @(AdditionalFiles) is the fully-resolved set.
+
+		     CustomAdditionalCompileInputs is the one that makes MSBUILD ITSELF notice. CoreCompile does NOT
+		     list @(AdditionalFiles) among its Inputs, so touching a .auml left the target "up to date, all
+		     outputs newer than inputs" and csc never ran - measured, not assumed: editing a view and
+		     rebuilding ran a stale assembly. This item IS in CoreCompile's Inputs, so it invalidates the
+		     compile the way an edited .cs does, for the CLI and the IDE alike. -->
+		<UpToDateCheckInput Include="@(AdditionalFiles)" Visible="false" />
+		<CustomAdditionalCompileInputs Include="@(AdditionalFiles)" Visible="false" />
+	</ItemGroup>
+
+	<ItemGroup>
+	  <Compile Remove="obj\**" />
+	</ItemGroup>
+
+	<ItemGroup>
+	  <EmbeddedResource Remove="obj\**" />
+	</ItemGroup>
+
+	<!--    <Import Project="$(SolutionDir)Adamantium.targets" />-->
+</Project>

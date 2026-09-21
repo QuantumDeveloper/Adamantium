@@ -1,12 +1,18 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Runtime.CompilerServices;
+using Adamantium.Mathematics.Triangulation;
 
 namespace Adamantium.Mathematics
 {
     public static class Collision2D
     {
+        #if NETCORE
         [MethodImpl(MethodImplOptions.AggressiveInlining|MethodImplOptions.AggressiveOptimization)]
+        #else
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        #endif
         public static bool IsPointOnSegment(ref LineSegment2D segment2D, ref Vector2 point)
         {
             var ab = segment2D.Direction.Length();
@@ -44,8 +50,40 @@ namespace Adamantium.Mathematics
             }
 
             point = p + r * t;
-            point.X = Math.Round(point.X, 4, MidpointRounding.AwayFromZero);
-            point.Y = Math.Round(point.Y, 4, MidpointRounding.AwayFromZero);
+            point = Vector2.Round(point, 4);
+            return true;
+        }
+        
+        public static bool SegmentSegmentIntersection(GeometrySegment segment1, GeometrySegment segment2, out Vector2 point)
+        {
+            var p = segment1.Start;
+            var q = segment2.Start;
+            var r = segment1.Direction;
+            var s = segment2.Direction;
+            // t = (q − p) × s / (r × s)
+            // u = (q − p) × r / (r × s)
+
+            var denominator = MathHelper.Determinant(r, s);
+
+            if (denominator == 0.0)
+            {
+                point = Vector2.Zero;
+                return false;
+            }
+
+            var tNumerator = MathHelper.Determinant(q - p, s);
+            var uNumerator = MathHelper.Determinant(q - p, r);
+            var t = tNumerator / denominator;
+            var u = uNumerator / denominator;
+
+            if (t < 0 || t > 1 || u < 0 || u > 1)
+            {
+                point = Vector2.Zero;
+                return false;
+            }
+
+            point = p + r * t;
+            point = Vector2.Round(point, 4);
             return true;
         }
 
@@ -116,6 +154,69 @@ namespace Adamantium.Mathematics
             point = p + r * t;
             return true;
         }
+        
+        public static bool RaySegmentIntersection(ref Ray2D ray, GeometrySegment segment, out Vector2 point)
+        {
+            var collinear = ray.Direction.IsCollinear(segment.Direction);
+            if (collinear)
+            {
+                point = Vector2.Zero;
+                return false;
+            }
+
+            var p = ray.Origin;
+            var r = ray.Direction;
+            var q = segment.Start;
+            var s = segment.Direction;
+            // t = (q − p) × s / (r × s)
+            // u = (q − p) × r / (r × s)
+
+            var denominator = MathHelper.Determinant(r, s);
+
+            if (denominator == 0.0f)
+            {
+                point = Vector2.Zero;
+                return false;
+            }
+
+            var tNumerator = MathHelper.Determinant(q - p, s);
+            var uNumerator = MathHelper.Determinant(q - p, r);
+
+            var t = tNumerator / denominator;
+            var u = uNumerator / denominator;
+
+            
+            if (MathHelper.NearEqual(t, 0) && t < 0)
+            {
+                t = 0;
+            }
+
+            if (MathHelper.NearEqual(t, 1) && t > 1)
+            {
+                t = 1;
+            }
+
+            if (MathHelper.NearEqual(u, 0) && u < 0)
+            {
+                u = 0;
+            }
+
+            if (MathHelper.NearEqual(u, 1) && u > 1)
+            {
+                u = 1;
+            }
+            
+
+            if (t < 0 || u < 0 || u > 1)
+            {
+                point = Vector2.Zero;
+                return false;
+            }
+
+            point = p + r * t;
+
+            return true;
+        }
 
 
         public static bool RaySegmentIntersection(ref Ray2D ray, ref LineSegment2D segment2D, out Vector2 point, out double distance)
@@ -164,7 +265,7 @@ namespace Adamantium.Mathematics
         public static double Distance(Vector2 v1, Vector2 v2)
         {
             //return Math.Sqrt(Math.Pow(v2.X - v1.X, 2) + Math.Pow(v2.Y - v1.Y, 2));
-            return Math.Sqrt((v2.X - v1.X) * (v2.X - v1.X) + (v2.Y - v1.Y) * (v2.Y - v1.Y));
+            return (v2 - v1).Length(); //Math.Sqrt((v2.X - v1.X) * (v2.X - v1.X) + (v2.Y - v1.Y) * (v2.Y - v1.Y));
         }
         
         public static double Distance(double x1, double y1, double x2, double y2)
@@ -244,7 +345,7 @@ namespace Adamantium.Mathematics
             }
         }
         
-        public static Vector2? LineLineIntersection(Vector2 a, Vector2 b, Vector2 c, Vector2 d)
+        public static bool LineLineIntersection(Vector2 a, Vector2 b, Vector2 c, Vector2 d, out Vector2 v)
         {
             // Line 'ab' represented as a1x + b1y = c1 
             double a1 = b.Y - a.Y;
@@ -260,13 +361,15 @@ namespace Adamantium.Mathematics
   
             if (determinant == 0)
             {
+                v = Vector2.Zero;
                 // The lines are parallel 
-                return null;
+                return false;
             }
             
             double x = (b2 * c1 - b1 * c2) / determinant;
             double y = (a1 * c2 - a2 * c1) / determinant;
-            return new Vector2(x, y);
+            v = new Vector2(x, y);
+            return true;
         }
         
         /// <summary>
@@ -286,22 +389,22 @@ namespace Adamantium.Mathematics
             foreach (var a in area)
             {
                 var segment = a;
-                if (RaySegmentIntersection(ref rayLeft, ref segment, out var interPoint))
+                if (RaySegmentIntersection(ref rayLeft, ref segment, out _))
                 {
                     sides |= IntersectionSides.Left;
                 }
 
-                if (RaySegmentIntersection(ref rayDown, ref segment, out interPoint))
+                if (RaySegmentIntersection(ref rayDown, ref segment, out _))
                 {
                     sides |= IntersectionSides.Down;
                 }
 
-                if (RaySegmentIntersection(ref rayRight, ref segment, out interPoint))
+                if (RaySegmentIntersection(ref rayRight, ref segment, out _))
                 {
                     sides |= IntersectionSides.Right;
                 }
 
-                if (RaySegmentIntersection(ref rayUp, ref segment, out interPoint))
+                if (RaySegmentIntersection(ref rayUp, ref segment, out _))
                 {
                     sides |= IntersectionSides.Up;
                 }
@@ -312,6 +415,43 @@ namespace Adamantium.Mathematics
                 }
             }
             return false;
+        }
+        
+        public static bool IsSegmentInsideArea(GeometrySegment segment, IEnumerable<GeometrySegment> area)
+        {
+            var segmentCenter = (segment.End - segment.Start) * 0.5 + segment.Start;
+            
+            var rayList = new List<Ray2D>()
+            {
+                new (segmentCenter, -Vector2.UnitX),
+                new (segmentCenter, Vector2.UnitX),
+                new (segmentCenter, -Vector2.UnitY),
+                new (segmentCenter, Vector2.UnitY)
+            };
+
+            var segmentsArray = area.ToArray();
+            
+            foreach (var ray in rayList)
+            {
+                var intersection = false;
+
+                foreach (var areaSeg in segmentsArray)
+                {
+                    if (areaSeg == segment) continue;
+                    
+                    var tmpRay = ray;
+
+                    if (RaySegmentIntersection(ref tmpRay, areaSeg, out _))
+                    {
+                        intersection = true;
+                        break;
+                    }
+                }
+
+                if (!intersection) return false;
+            }
+
+            return true;
         }
     }
 }

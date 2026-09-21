@@ -20,7 +20,7 @@
 
 using System;
 using System.Runtime.InteropServices;
-using AdamantiumVulkan.Core;
+using Adamantium.Vulkan.Core;
 #pragma warning disable 1584,1581,1580
 
 namespace Adamantium.Imaging
@@ -37,7 +37,7 @@ namespace Adamantium.Imaging
         public TextureDimension Dimension;
 
         /// <summary>	
-        /// <dd> <p>Texture width (in texels).
+        /// <p>Texture width (in texels).</p>
         /// </summary>	
         /// <remarks>
         /// This field is valid for all textures: <see cref="Texture"/>.
@@ -48,7 +48,7 @@ namespace Adamantium.Imaging
         public uint Width;
 
         /// <summary>	
-        /// <dd> <p>Texture height (in texels).
+        /// <p>Texture height (in texels).</p>
         /// </summary>	
         /// <remarks>
         /// This field is only valid for <see cref="Texture2D"/>, <see cref="Texture3D"/> and <see cref="TextureCube"/>.
@@ -59,7 +59,7 @@ namespace Adamantium.Imaging
         public uint Height;
 
         /// <summary>	
-        /// <dd> <p>Texture depth (in texels).
+        /// <p>Texture depth (in texels).</p>
         /// </summary>	
         /// <remarks>
         /// This field is only valid for <see cref="Texture3D"/>.
@@ -70,13 +70,12 @@ namespace Adamantium.Imaging
         public uint Depth;
 
         /// <summary>	
-        /// <dd> <p>Number of textures in the array
+        /// <p>Number of textures in the array</p>
         /// </summary>	
         /// <remarks>
         /// This field is only valid for <see cref="Texture1D"/>, <see cref="Texture2D"/> and <see cref="TextureCube"/>
         /// </remarks>
         /// <remarks>
-        /// This field is only valid for textures: <see cref="Texture1D"/>, <see cref="Texture2D"/> and <see cref="TextureCube"/>.
         /// </remarks>
         /// <msdn-id>ff476252</msdn-id>	
         /// <unmanaged>unsigned int ArraySize</unmanaged>	
@@ -84,7 +83,7 @@ namespace Adamantium.Imaging
         public uint ArraySize;
 
         /// <summary>	
-        /// <dd> <p>The maximum number of mipmap levels in the texture.
+        /// <p>The maximum number of mipmap levels in the texture.</p>
         /// </summary>	
         /// <msdn-id>ff476252</msdn-id>	
         /// <unmanaged>unsigned int MipLevels</unmanaged>	
@@ -92,10 +91,14 @@ namespace Adamantium.Imaging
         public uint MipLevels;
 
         /// <summary>	
-        /// <dd> <p>Texture format (see <strong><see cref="AdamantiumVulkan.Core.Format"/></strong>).</p> </dd>	
+        /// <dd> <p>Texture format (see <strong><see cref="Adamantium.Vulkan.Core.Format"/></strong>).</p> </dd>	
         /// </summary>	
         /// <unmanaged>Vulkan imange Format</unmanaged>	
         public Format Format;
+
+        public long RowStride => Width * Format.SizeOfInBytes();
+
+        public long TotalSizeInBytes => RowStride * Height;
 
         /// <inheritdoc />
         public bool Equals(ImageDescription other)
@@ -164,6 +167,22 @@ namespace Adamantium.Imaging
         {
             return
                $"Dimension: {Dimension}, Width: {Width}, Height: {Height}, Depth: {Depth}, Format: {Format}, ArraySize: {ArraySize}, MipLevels: {MipLevels}";
+        }
+
+        public static ImageDescription Default2D(uint width, uint height, SurfaceFormat format)
+        {
+            var descr = new ImageDescription
+            {
+                Depth = 1,
+                ArraySize = 1,
+                Dimension = TextureDimension.Texture2D,
+                MipLevels = 1,
+                Width = width,
+                Height = height,
+                Format = format
+            };
+
+            return descr;
         }
     }
 }

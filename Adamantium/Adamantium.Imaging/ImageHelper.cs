@@ -1,6 +1,6 @@
 ﻿using System;
 using Adamantium.Core;
-using AdamantiumVulkan.Core;
+using Adamantium.Vulkan.Core;
 
 namespace Adamantium.Imaging
 {
@@ -222,7 +222,7 @@ namespace Adamantium.Imaging
                     case Format.B8G8R8A8_UNORM:
                     case Format.B8G8R8A8_SRGB:
                         {
-                            uint alpha = (format == Format.R8G8B8A8_SNORM || format == Format.R8G8B8A8_SINT) ? 0x7f000000 : 0xff000000;
+                            uint alpha = format is Format.R8G8B8A8_SNORM or Format.R8G8B8A8_SINT ? 0x7f000000 : 0xff000000;
 
                             if (pDestination == pSource)
                             {
@@ -420,9 +420,112 @@ namespace Adamantium.Imaging
             Utilities.CopyMemory(pDestination, pSource, Math.Min(outSize, inSize));
         }
 
-        public static unsafe void CopyScanline(IntPtr pDestination, IntPtr pSource, int size)
+        public static void CopyScanline(IntPtr pDestination, IntPtr pSource, int size)
         {
             Utilities.CopyMemory(pDestination, pSource, size);
+        }
+
+        public static unsafe PixelBuffer[] CreatePixelBuffers(ImageDescription description, IntPtr dataPointer, ulong offset, PitchFlags pitchFlags = PitchFlags.None)
+            => CreatePixelBuffers(description, dataPointer, offset, out _, pitchFlags);
+
+        /// <summary>
+        /// As above, but also reports the block this call ALLOCATED (<see cref="IntPtr.Zero"/> when the caller supplied
+        /// the memory). A caller that owns the memory must free exactly this pointer - NOT
+        /// <c>buffers[0].DataPointer</c>, which is where the first image happens to start and is not the address the
+        /// allocator handed out. Freeing that instead corrupts the heap, and the process dies later at an unrelated
+        /// allocation; that is how a DDS cube map took the whole app down.
+        /// </summary>
+        public static unsafe PixelBuffer[] CreatePixelBuffers(ImageDescription description, IntPtr dataPointer, ulong offset, out IntPtr allocatedBlock, PitchFlags pitchFlags = PitchFlags.None)
+        {
+            allocatedBlock = IntPtr.Zero;
+            // Calculate mipmaps
+            var mipMapToZIndex = Image.CalculateImageArray(description, pitchFlags, out var pixelBufferCount, out var totalSizeInBytes);
+            var mipMapDescriptions = Image.CalculateMipMapDescription(description, pitchFlags);
+            
+            // Allocate all pixel buffers
+            var pixelBuffers = new PixelBuffer[pixelBufferCount];
+            
+            // Setup all pointers
+            // only release buffer that is not pinned and is asked to be disposed.
+            
+            var buffer = dataPointer;
+
+            if (dataPointer == IntPtr.Zero)
+            {
+                buffer = Utilities.AllocateMemory((int)totalSizeInBytes);
+                allocatedBlock = buffer;
+                offset = 0;
+            }
+
+            Image.SetupImageArray((IntPtr)((byte*)buffer + offset), description, pitchFlags, pixelBuffers, mipMapDescriptions);
+
+            return pixelBuffers;
+        }
+
+        public static byte[] FlipBuffer(byte[] buffer, uint width, uint height, int bytesPerPixel, FlipBufferOptions flipOptions)
+        {
+            var flipped = new byte[buffer.Length];
+            var rowStride = width * bytesPerPixel;
+            
+            switch (flipOptions)
+            {
+                case FlipBufferOptions.FlipVertically:
+                {
+                    int offset = 0;
+                    for (int i = (int)height - 1; i >= 0; --i)
+                    {
+                        System.Buffer.BlockCopy(buffer, (int)(i * rowStride), flipped, offset, (int)rowStride);
+                        offset += (int)rowStride;
+                    }
+
+                    break;
+                }
+                case FlipBufferOptions.FlipHorizontally:
+                {
+                    for (int i = 0; i < height; ++i)
+                    {
+                        var originalOffset = i * rowStride;
+                        var offset = ((i + 1) * rowStride) - bytesPerPixel;
+                        for (int k = 0; k < width; ++k)
+                        {
+                            System.Buffer.BlockCopy(buffer, (int)originalOffset, flipped, (int)offset, bytesPerPixel);
+                            offset -= bytesPerPixel;
+                            originalOffset += bytesPerPixel;
+                        }
+                    }
+
+                    break;
+                }
+                default:
+                {
+                    int rowOffset = 0;
+                    for (int i = (int)height - 1; i >= 0; --i)
+                    {
+                        System.Buffer.BlockCopy(buffer, (int)(i * rowStride), flipped, rowOffset, (int)rowStride);
+                        var originalOffset = i * rowStride;
+                        var columnOffset = rowOffset + rowStride - bytesPerPixel;
+                        for (int k = 0; k < width; ++k)
+                        {
+                            System.Buffer.BlockCopy(buffer, (int)originalOffset, flipped, (int)columnOffset, bytesPerPixel);
+                            columnOffset -= bytesPerPixel;
+                            originalOffset += bytesPerPixel;
+                        }
+                        rowOffset += (int)rowStride;
+                    }
+
+                    break;
+                }
+            }
+
+            return flipped;
+        }
+
+        public static void SetAlpha(byte[] buffer, byte value)
+        {
+            for (int i = 0; i< buffer.Length; i+=4)
+            {
+                buffer[i + 3] = value;
+            }
         }
     }
 }

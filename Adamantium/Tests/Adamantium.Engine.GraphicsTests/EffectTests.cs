@@ -1,22 +1,38 @@
 ﻿using NUnit.Framework;
-using System;
-using System.Collections.Generic;
-using System.Text;
 using System.IO;
-using Adamantium.Engine.Graphics;
-using Adamantium.Engine.Graphics.Effects;
+using Adamantium.Graphics;
+using Adamantium.Graphics.Core;
+using Adamantium.Graphics.Core.EffectsFramework;
 
 namespace Adamantium.Engine.GraphicsTests
 {
     [TestFixture]
     public class EffectTests
     {
+        [TearDown]
+        public void ReleaseDevices() => GpuFixture.ReleaseRenderDevices();
+
         [Test]
         public void EffectLoadingTest()
         {
-            var main = MainGraphicsDevice.Create("TestApp", true);
-            var device = main.CreateRenderDevice(new PresentationParameters(PresenterType.RenderTarget, 100, 100, IntPtr.Zero));
-            var effect = Effect.CompileFromFile(Path.Combine("EffectsData", "UIEffect.fx"), device);
+            var main = GpuFixture.Main;
+            var device = GpuFixture.CreateRenderDevice();
+            var effect = Effect.CompileFromFile(Path.Combine("EffectsData", "FontEffect.fx"), device);
+        }
+
+        // Line-rendering Step A3a (cheap de-risk before the full dispatch harness): just compiling+loading the
+        // compute effect exercises the two biggest unknowns - that Slang compiles the BDA compute (uint* from a
+        // uint64 device address) and that the driver creates a COMPUTE shader-object (vkCreateShadersEXT) on this GPU.
+        // If this throws, the dispatch harness isn't worth building yet; if it passes, the rest is plumbing.
+        [Test]
+        public void ComputeShaderCompilesAndCreates()
+        {
+            var main = GpuFixture.Main;
+            var device = GpuFixture.CreateRenderDevice();
+            var effect = Effect.CompileFromFile(Path.Combine("EffectsData", "ComputeSmoke.fx"), device);
+
+            Assert.That(effect, Is.Not.Null);
+            Assert.That(effect.Techniques.Count, Is.GreaterThan(0), "compute technique should be present");
         }
     }
 }

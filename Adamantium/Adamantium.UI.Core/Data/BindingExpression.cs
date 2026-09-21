@@ -1,0 +1,629 @@
+﻿using System;
+using System.Collections.Concurrent;
+using System.ComponentModel;
+using System.Globalization;
+using System.Linq.Expressions;
+using System.Reflection;
+using Adamantium.UI.Core.Diagnostics;
+using Adamantium.UI.Core.RoutedEvents;
+
+namespace Adamantium.UI.Core.Data;
+
+/// <summary>
+/// A live <c>{Binding}</c> connection between a target <see cref="AdamantiumProperty"/> and a source object reached
+/// through the binding's <see cref="Binding.Path"/>. The source is the binding's explicit <see cref="Binding.Source"/>,
+/// otherwise the target's (inherited) <c>DataContext</c>. On connect — and whenever the source raises
+/// <see cref="INotifyPropertyChanged"/> — the source value is pushed to the target (one-way); two-way also writes the
+/// target back. Dotted paths (<c>A.B.C</c>) are walked by reflection and the leaf object is observed.
+/// <see cref="EstablishConnection"/> is idempotent, so it is re-run when the target's DataContext changes (the tree is
+/// usually built before its DataContext is assigned).
+/// <para>When created with a null <see cref="BindingExpressionBase.TargetProperty"/> the expression runs in
+/// <em>producer</em> mode: instead of writing to a target it exposes the converted value via
+/// <see cref="BindingExpressionBase.ProducedValue"/> and raises <see cref="BindingExpressionBase.ValueChanged"/> — this
+/// is how a child of a <see cref="MultiBinding"/> feeds the parent converter.</para>
+/// </summary>
+public class BindingExpression : BindingExpressionBase
+{
+   public object ResolvedSource { get; private set; }
+   public string SourcePropertyName { get; private set; }
+
+   /// <inheritdoc/>
+   public override bool IsResolved => ResolvedSource != null && (_bindToSource || _sourceProperty != null || _leaf != null);
+
+   /// <inheritdoc/>
+   public override Type SourceType => _leaf?.Type ?? _sourceProperty?.PropertyType;
+
+   /// <inheritdoc/>
+   public override bool IsSourceEdited
+   {
+      get
+      {
+         var (component, property) = SourceSlot();
+
+         return property != null && component.IsSet(property, ValuePriority.Local);
+      }
+   }
+
+   /// <inheritdoc/>
+   public override bool ResetSource()
+   {
+      var (component, property) = SourceSlot();
+      if (property == null) return false;
+
+      component.ClearValue(property);
+      return true;
+   }
+
+   // The property system's own slot behind the path, where there is one. A plain object's property has none - there is
+   // nothing there that knows what "untouched" means - and the answer is then nothing.
+   private (AdamantiumComponent Component, AdamantiumProperty Property) SourceSlot()
+   {
+      // A path ending inside a struct has no slot of its own: the slot belongs to the WHOLE value, and putting one
+      // number back by clearing all of them is not what the line says it does.
+      if (_leaf != null) return (null, null);
+      if (ResolvedSource is not AdamantiumComponent component || SourcePropertyName == null) return (null, null);
+
+      return (component, component.GetProperty(SourcePropertyName));
+   }
+
+   private PropertyInfo _sourceProperty;
+   private Func<object, object> _sourceGetter;   // compiled reader for _sourceProperty (the hot ComputeValue path)
+   private bool _bindToSource;   // empty path ({Binding}, {Binding ElementName=x}) -> the value IS the resolved source object
+   private INotifyPropertyChanged _observed;
+   private AdamantiumComponent _observedComponent;   // element source ({ElementName}) - observed via AdamantiumProperty changes, not INPC
+   private string[] _segments;   // cached Binding.Path split on '.', computed once (path is fixed per expression)
+
+   // Property-accessor cache: `GetType().GetProperty(name)` is a slow metadata search and `PropertyInfo.GetValue` a slow
+   // reflection invoke, and a virtualized list re-runs both for EVERY binding of EVERY recycled row on scroll (a fling can
+   // rebind hundreds of rows x ~15 bindings/frame). Cache the PropertyInfo + a COMPILED getter delegate per (type, name)
+   // so a rebind is a dictionary hit + a near-native call instead. Shared across all bindings, populated once per shape.
+   private static readonly ConcurrentDictionary<(Type, string), (PropertyInfo Prop, Func<object, object> Getter)> _accessors = new();
+
+   private static (PropertyInfo Prop, Func<object, object> Getter) GetAccessor(Type type, string name)
+      => _accessors.GetOrAdd((type, name), static key =>
+      {
+         var prop = key.Item1.GetProperty(key.Item2);
+         if (prop is not { CanRead: true }) return (prop, null);
+         var o = Expression.Parameter(typeof(object), "o");
+         var body = Expression.Convert(Expression.Property(Expression.Convert(o, key.Item1), prop), typeof(object));
+         return (prop, Expression.Lambda<Func<object, object>>(body, o).Compile());
+      });
+
+   // A PATH THAT ENDS INSIDE A STRUCT (`Offset.X`, `Bounds.X`): the walk reaches a box - a copy made on the way - so a
+   // read is frozen at the moment the path resolved and a write lands in the copy and is dropped, both silently. Such
+   // a path is therefore walked fresh on every read and written back UP, and it is watched at the object the path
+   // STARTS at, by its first segment: the box has nothing to announce.
+   private sealed record Hop(Type Type, bool CanWrite, Func<object, object> Get, Action<object, object> Set);
+
+   private static readonly ConcurrentDictionary<(Type, string), Hop> _hops = new();
+
+   // Fields as well as properties: the maths types are fields (Vector2.X), and a path that cannot see them cannot see
+   // a position.
+   private static Hop HopTo(Type type, string name) => _hops.GetOrAdd((type, name), static key =>
+   {
+      var (owner, member) = key;
+      var o = Expression.Parameter(typeof(object), "o");
+      var self = Expression.Convert(o, owner);
+
+      if (owner.GetProperty(member) is { } prop)
+      {
+         var read = prop.CanRead
+            ? Expression.Lambda<Func<object, object>>(Expression.Convert(Expression.Property(self, prop), typeof(object)), o).Compile()
+            : null;
+
+         return new Hop(prop.PropertyType, prop.CanWrite, read, prop.SetValue);
+      }
+
+      if (owner.GetField(member) is { } field)
+      {
+         var read = Expression.Lambda<Func<object, object>>(
+            Expression.Convert(Expression.Field(self, field), typeof(object)), o).Compile();
+
+         return new Hop(field.FieldType, !field.IsInitOnly, read, field.SetValue);
+      }
+
+      return null;
+   });
+
+   private Hop _leaf;      // set only for a struct-ended path; the fast path leaves it null
+   private object[] _boxes;   // what each segment was read from, reused between walks
+
+   public Binding Binding { get; set; }
+   public BindingMode Mode { get; set; }
+
+   private bool IsProducer => TargetProperty == null;
+
+   public BindingExpression(IAdamantiumComponent target, AdamantiumProperty targetProperty, BindingBase bindingBase)
+   {
+      Target = target;
+      TargetProperty = targetProperty;
+      BindingBase = bindingBase;
+      Binding = (Binding)bindingBase;
+
+      // Default means "whatever this PROPERTY says" (PropertyMetadataOptions.BindsTwoWayByDefault). Read HERE because
+      // nothing else read it: the metadata carried DefaultBindingMode for 67 properties and no expression ever asked,
+      // so every {Binding} without an explicit Mode was silently one-way.
+      // A producer (a trigger's condition, a MultiBinding child) has no target property to ask, and stays as written.
+      Mode = Binding.Mode == BindingMode.Default && target != null && targetProperty != null
+         ? targetProperty.GetDefaultMetadata(target.GetType()).DefaultBindingMode
+         : Binding.Mode;
+   }
+
+   public BindingExpression(IAdamantiumComponent target, string targetPropertyName, BindingBase bindingBase)
+      : this(target, target.GetProperty(targetPropertyName), bindingBase)
+   {
+   }
+
+   // Factory + dispatch: a MultiBinding becomes a MultiBindingExpression, anything else a plain BindingExpression.
+   // This is the single place that turns a BindingBase into a live, connected expression.
+   public static BindingExpressionBase CreateBindingExpression(IAdamantiumComponent target,
+      AdamantiumProperty targetProperty, BindingBase bindingBase)
+   {
+      BindingExpressionBase expression = bindingBase is MultiBinding
+         ? new MultiBindingExpression(target, targetProperty, bindingBase)
+         : new BindingExpression(target, targetProperty, bindingBase);
+      expression.EstablishConnection();
+      return expression;
+   }
+
+   public static BindingExpressionBase CreateBindingExpression(IAdamantiumComponent target,
+      string targetPropertyName, BindingBase bindingBase)
+      => CreateBindingExpression(target, target.GetProperty(targetPropertyName), bindingBase);
+
+   public override void EstablishConnection()
+   {
+      // Re-resolve against the (possibly new) DataContext BEFORE touching subscriptions.
+      var previousObserved = _observed;
+      ResolveSource();
+      var newObserved = ResolvedSource as INotifyPropertyChanged;
+
+      // Fast path: the resolved SOURCE OBJECT is unchanged. This is the norm for a virtualized-list rebind whose bound
+      // path points at a shared sub-view-model every item exposes (e.g. item.Stroke): the DataContext changed, but
+      // item.Stroke is the SAME object for every item. The existing PropertyChanged subscription is therefore still
+      // correct - so do NOT unsubscribe + re-subscribe. On a source with many subscribers (one per such binding per
+      // realized tile), each -=/+= rebuilds the whole multicast invocation list (O(subscribers)); doing that for every
+      // tile every scroll frame is O(N^2) and was the ~118 KB-per-binding rebind allocation storm (gen2 GC freeze).
+      if (ReferenceEquals(newObserved, previousObserved) && previousObserved != null)
+      {
+         // The source object AND our subscription are unchanged, so the value cannot have moved since it was last
+         // pushed (a real change arrives via OnSourcePropertyChanged -> batched apply). The recycled target already
+         // holds exactly this value - the item it previously showed bound to this SAME shared source. So skip the
+         // re-push entirely: for a shared sub-VM (the 12 Stroke.* bindings per tile) this was re-computing + re-writing
+         // an identical value on every rebind of every tile every scroll frame - the dominant per-rebind cost
+         // (updTarget ~33 ms/frame, incl. the brush-string re-parse). Producer mode must still republish for its parent.
+         if (IsProducer) Refresh();
+         return;
+      }
+
+      // Source object genuinely changed: tear down the old subscription and establish the new one.
+      CloseConnection();
+
+      // OneWayToSource: the flow is TARGET -> SOURCE only. Never observe or push the source; write its initial value from
+      // the target, then update it whenever the target changes (a target with a read-only/private-set property that can't
+      // be bound TwoWay - e.g. reading a control's SelectedItem out into a view-model).
+      if (Mode == BindingMode.OneWayToSource && !IsProducer)
+      {
+         UpdateSource();
+         if (Target != null) Target.PropertyChanged += OnTargetPropertyChanged;
+         return;
+      }
+
+      Refresh();                    // initial push (or produce)
+      if (newObserved != null)
+      {
+         _observed = newObserved;
+         SharedSourceRegistry.Subscribe(newObserved, this);   // one shared subscription per source, O(1) add (see SharedSourceRegistry)
+      }
+      // Element source ({ElementName}): a UI element does not implement INotifyPropertyChanged - its properties change
+      // through the AdamantiumProperty system. Observe THAT so source->target updates flow (a wheel-zoom moving a slider
+      // bound to ZoomBox.ScaleX, a value readout, ...). Not shared (element bindings aren't the virtualized-list hot path).
+      if (newObserved == null && ResolvedSource is AdamantiumComponent component)
+      {
+         _observedComponent = component;
+         component.PropertyChanged += OnSourceComponentChanged;
+         System.Threading.Interlocked.Increment(ref SourceHooks);
+      }
+      if (Mode == BindingMode.TwoWay && !IsProducer && Target != null)
+         Target.PropertyChanged += OnTargetPropertyChanged;
+   }
+
+   public override void CloseConnection()
+   {
+      BindingUpdateQueue.Remove(this);   // F2: a closed binding must not be applied by a later flush
+      if (_observed != null)
+      {
+         SharedSourceRegistry.Unsubscribe(_observed, this);   // O(1) remove - the reason a shrunk window can release cheaply
+         _observed = null;
+      }
+      if (_observedComponent != null)
+      {
+         _observedComponent.PropertyChanged -= OnSourceComponentChanged;
+         System.Threading.Interlocked.Increment(ref SourceUnhooks);
+         _observedComponent = null;
+      }
+      if ((Mode == BindingMode.TwoWay || Mode == BindingMode.OneWayToSource) && !IsProducer && Target != null)
+         Target.PropertyChanged -= OnTargetPropertyChanged;
+   }
+
+   // Source = explicit Binding.Source, else the target's DataContext. Walk all but the last path segment to reach
+   // the object that owns the bound property; the leaf segment is the property we read/observe.
+   private void ResolveSource()
+   {
+      ResolvedSource = null;
+      _sourceProperty = null;
+      _sourceGetter = null;
+      SourcePropertyName = null;
+      _bindToSource = false;
+      _leaf = null;
+
+      var root = Binding.Source ?? ResolveElementName() ?? DataContextSource?.DataContext;
+      var path = Binding.Path?.Path;
+      if (root == null) return;
+
+      // Empty path with a source -> bind to the SOURCE OBJECT ITSELF ({Binding}, {Binding ElementName=x}, {Binding Source=y}),
+      // the standard WPF behaviour. There is no leaf property to read/observe - the value simply IS the resolved source.
+      if (string.IsNullOrEmpty(path))
+      {
+         ResolvedSource = root;
+         _bindToSource = true;
+         return;
+      }
+
+      // Split ONCE per expression, not per resolve: the path is fixed for the binding's life, but ResolveSource runs on
+      // every DataContext change (every rebind of every recycled tile) - a fresh string[] alloc per call was steady GC
+      // churn on the scroll hot path.
+      var segments = _segments ??= path.Split('.');
+      object current = root;
+      for (var i = 0; i < segments.Length - 1 && current != null; i++)
+         current = GetAccessor(current.GetType(), segments[i]).Getter?.Invoke(current);
+
+      if (current == null)
+         return;
+
+      if (current.GetType().IsValueType)
+      {
+         _leaf = HopTo(current.GetType(), segments[^1]);
+         if (_leaf == null) return;
+
+         _boxes ??= new object[segments.Length];
+         ResolvedSource = root;
+         SourcePropertyName = segments[0];
+         return;
+      }
+
+      ResolvedSource = current;
+      SourcePropertyName = segments[^1];
+      (_sourceProperty, _sourceGetter) = GetAccessor(current.GetType(), SourcePropertyName);
+   }
+
+   // {Binding Path, ElementName=X}: the source is the element named X in the target's tree (not the DataContext). Resolved
+   // by walking to the tree root and searching for a matching Name - re-runs with ResolveSource on every DataContext change
+   // (attach), so a forward-referenced element resolves once the whole tree exists. Null until then.
+   private object ResolveElementName()
+   {
+      if (string.IsNullOrEmpty(Binding.ElementName)) return null;
+
+      // A NON-VISUAL target - a brush, a pen, a gradient stop - has no place in the tree to search FROM, so it borrows
+      // the element that holds it (the same InheritanceParent a resource lookup uses; see Brush.Anchor). Without this
+      // an ElementName written on a brush resolved to nothing, silently - and a VisualBrush cannot name its source at
+      // all in markup, which is the only way to write one.
+      var target = AnchorElement(Target);
+      if (target == null) 
+         return null;
+
+      // The TEMPLATE first, when this binding was written inside one. A template is its own namescope - its names belong
+      // to the control that applied it, not to the window - so they are not on the visual tree under Name and the walk
+      // below cannot see them. Without this an ElementName inside a ControlTemplate silently resolved to nothing, which
+      // is a binding that never reports a problem and simply never has a value.
+      if (target.TemplatedParent is ITemplateHost host && host.GetTemplateChild(Binding.ElementName) is IUIComponent inTemplate)
+         return inTemplate;
+
+      var root = target;
+      while (root.VisualParent is { } parent) root = parent;
+      return FindByName(root, Binding.ElementName);
+   }
+
+   // The element a search starts from: the target itself when it is one, otherwise the nearest one holding it.
+   private static IUIComponent AnchorElement(object target)
+   {
+      for (var node = target as IAdamantiumComponent; node != null; node = node.InheritanceParent)
+      {
+         if (node is IUIComponent element) return element;
+      }
+
+      return null;
+   }
+
+   private static IUIComponent FindByName(IUIComponent node, string name)
+   {
+      if (node is IFundamentalUIComponent named && named.Name == name) return node;
+      foreach (var child in node.VisualChildren)
+         if (FindByName(child, name) is { } found) return found;
+      return null;
+   }
+
+   // True WHILE UpdateSource writes the source (a TwoWay write-back from the target). The write raises the source's
+   // PropertyChanged synchronously; without this guard OnSourcePropertyChanged would schedule a source->target push that
+   // echoes our OWN write back onto the target one frame later - fighting an active drag so a TwoWay-bound slider never
+   // converges on the endpoint (stuck ~0.1 short of Minimum). Other bindings to the same source still update; only THIS
+   // expression skips echoing its own write.
+   private bool _writingSource;
+
+   // THE SOURCE SPOKE WHILE WE WERE WRITING IT. Not the echo of our own value - that one is thrown away - but the fact
+   // that it said anything at all, which is the difference between a source that ANSWERED the write with another value
+   // and one that simply ignored it. See UpdateSource.
+   private bool _sourceSpoke;
+
+   // Called by SharedSourceRegistry (the source's single fan-out handler), not subscribed directly.
+   internal void OnSourcePropertyChanged(object sender, PropertyChangedEventArgs e)
+   {
+      var ours = string.IsNullOrEmpty(e.PropertyName) || e.PropertyName == SourcePropertyName;
+
+      if (_writingSource)   // our own TwoWay write-back - don't echo it back to the target
+      {
+         if (ours) _sourceSpoke = true;
+         return;
+      }
+
+      // F2: a runtime source change is batched + coalesced (applied once per frame), not pushed synchronously.
+      if (ours) ScheduleUpdate();
+   }
+
+   // Element source ({ElementName}) property changed via the AdamantiumProperty system - push to the target if it's the
+   // property we bind.
+   private void OnSourceComponentChanged(object sender, AdamantiumPropertyChangedEventArgs e)
+   {
+      var ours = e.Property?.Name == SourcePropertyName;
+
+      if (_writingSource)   // our own TwoWay write-back - don't echo it back to the target
+      {
+         if (ours) _sourceSpoke = true;
+         return;
+      }
+
+      if (ours) ScheduleUpdate();
+   }
+
+   // F2: the coalesced apply reads the current source value (producer mode publishes ProducedValue, top-level pushes
+   // to the target) - same path as a source change, just deferred to the per-frame flush.
+   internal override void ApplyPending() => Refresh();
+
+   private void OnTargetPropertyChanged(object sender, AdamantiumPropertyChangedEventArgs e)
+   {
+      if ((Mode == BindingMode.TwoWay || Mode == BindingMode.OneWayToSource) && e.Property == TargetProperty)
+         UpdateSource();
+   }
+
+   // Top-level: push to the target property. Producer: publish ProducedValue for a parent MultiBinding.
+   private void Refresh()
+   {
+      if (IsProducer)
+      {
+         // A producer feeds a trigger's condition or a MultiBinding's converter, and both of those compare against
+         // NULL, not against the engine's unset token. The distinction is the target property's business, and a
+         // producer has none.
+         var produced = ComputeValue(typeof(object));
+         ProducedValue = ReferenceEquals(produced, AdamantiumProperty.UnsetValue) ? null : produced;
+         RaiseValueChanged();
+      }
+      else
+      {
+         UpdateTarget();
+      }
+   }
+
+   // Reads the source value through the (optional) converter. targetType drives the converter's requested type.
+   // FallbackValue is used when the binding can't resolve a source/path (WPF semantics); TargetNullValue when the
+   // resolved value is null (falling back to FallbackValue if no TargetNullValue is set).
+   // Returns the engine's UNSET token - never a bare null - when there is nothing to say: no source, no such property,
+   // and no fallback either. A null that came from a source that DID resolve is a VALUE and is returned as one; the two
+   // used to arrive as the same null, and the caller could only guess, so it dropped both.
+   private object ComputeValue(Type targetType) => Formatted(ReadValue(targetType), targetType);
+
+   // StringFormat lived on every binding, travelled into every expression, and was read by NOBODY except MultiBinding:
+   // a single binding took the format, ignored it and showed the raw value without a word. Only where it can mean
+   // something - a string target, a value that exists. A PRODUCER (trigger condition, MultiBinding input) asks for
+   // object and must keep its type: a comparison against a formatted string is not the comparison that was written.
+   private object Formatted(object value, Type targetType)
+   {
+      if (targetType != typeof(string) || string.IsNullOrEmpty(BindingBase.StringFormat)) return value;
+      if (value == null || ReferenceEquals(value, AdamantiumProperty.UnsetValue)) return value;
+
+      return string.Format(CultureInfo.CurrentCulture, BindingBase.StringFormat, value);
+   }
+
+   private object ReadValue(Type targetType)
+   {
+      // Empty-path binding: the value is the resolved source object itself (optionally run through the converter).
+      if (_bindToSource)
+      {
+         if (ResolvedSource == null)
+            return BindingBase.TargetNullValue ?? BindingBase.FallbackValue ?? AdamantiumProperty.UnsetValue;
+
+         return Binding.Converter != null ? ConvertCached(ResolvedSource, targetType) : ResolvedSource;
+      }
+      if (_leaf != null)
+      {
+         if (!Walk()) return BindingBase.FallbackValue ?? AdamantiumProperty.UnsetValue;
+
+         var read = _leaf.Get(_boxes[^1]);
+         if (Binding.Converter != null) read = ConvertCached(read, targetType);
+         return read ?? BindingBase.TargetNullValue ?? BindingBase.FallbackValue;
+      }
+      if (_sourceProperty == null) return BindingBase.FallbackValue ?? AdamantiumProperty.UnsetValue;
+      var value = _sourceGetter != null ? _sourceGetter(ResolvedSource) : _sourceProperty.GetValue(ResolvedSource);
+      if (Binding.Converter != null)
+         value = ConvertCached(value, targetType);
+      if (value == null)
+         value = BindingBase.TargetNullValue ?? BindingBase.FallbackValue;
+      return value;
+   }
+
+   // Per-SOURCE-OBJECT converted-value cache. A value-converter (e.g. a colour string -> Brush) is otherwise re-run for
+   // every realized tile every scroll frame - the dominant per-rebind cost. Keyed by the SOURCE OBJECT (the item), so
+   // each item gets ONE converted instance: reused across rebinds and across whichever recycled container currently shows
+   // the item, yet DISTINCT per item (mutating one item's brush never bleeds into another item that happens to share a
+   // colour string). Weak keys -> an item's cached conversions die with the item, no manual eviction. The stored RAW
+   // input guards staleness: if the source property changed (item.Color mutated -> re-convert), the raw differs and we
+   // rebuild. A boxed value-type source can't key a weak table (identity-less), so it falls back to a direct convert.
+   private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<object,
+      Dictionary<(IValueConverter, Type, string), (object Raw, object Converted)>> _convertCache = new();
+
+   private object ConvertCached(object raw, Type targetType)
+   {
+      var source = ResolvedSource;
+      if (source == null || source.GetType().IsValueType)
+         return Binding.Converter.Convert(raw, targetType, Binding.ConverterParameter, CultureInfo.CurrentCulture);
+
+      var cache = _convertCache.GetOrCreateValue(source);
+      var key = (Binding.Converter, targetType, SourcePropertyName);
+      if (cache.TryGetValue(key, out var entry) && Equals(entry.Raw, raw))
+         return entry.Converted;
+
+      var converted = Binding.Converter.Convert(raw, targetType, Binding.ConverterParameter, CultureInfo.CurrentCulture);
+      cache[key] = (raw, converted);
+      return converted;
+   }
+
+   public override void UpdateTarget()
+   {
+      if (TargetProperty == null) return;
+      var value = ComputeValue(TargetProperty.PropertyType);
+      // Nothing to say - no source, no path, no fallback: leave the target where it is. A resolved null is NOT that; it
+      // is the source asking for the property's default back, and refusing to carry it meant no page could ever hand
+      // one of the "null = let the theme decide" properties back to the theme from markup.
+      if (ReferenceEquals(value, AdamantiumProperty.UnsetValue)) return;
+      // ...and a property with no way to HOLD nothing cannot be handed one either. A double has no null to go back to,
+      // and the slot would be read as (double)null - the mirror of the rule UpdateSource already applies on the way out.
+      if (value == null && !CanHoldNothing(TargetProperty.PropertyType)) return;
+      // Can't make the value fit the target type (e.g. a FallbackValue="50" on an ICommand property)? Leave the target
+      // at its default instead of pushing an incompatible value, which would throw in SetValue and abort the whole load.
+      if (!TryCoerce(value, TargetProperty.PropertyType, out var coerced)) return;
+      Target.SetValue(TargetProperty, coerced, ValuePriority.Binding);
+      RuntimeStats.BindingUpdatesApplied++;   // diagnostics: a binding wrote its target (initial/establish, DataContext re-resolve, or a batched source change)
+   }
+
+   // Walks the path from the root, remembering what each segment was read FROM - the last of them owns the leaf.
+   private bool Walk()
+   {
+      object current = ResolvedSource;
+
+      for (var i = 0; i < _segments.Length; i++)
+      {
+         if (current == null) return false;
+
+         _boxes[i] = current;
+         if (i < _segments.Length - 1) current = HopTo(current.GetType(), _segments[i])?.Get?.Invoke(current);
+      }
+
+      return true;
+   }
+
+   // The leaf into its box, then each box into whatever held it - until something that is not a copy is reached.
+   private void Backfill(object written)
+   {
+      _leaf.Set(_boxes[^1], written);
+
+      for (var i = _segments.Length - 1; i >= 1; i--)
+      {
+         if (!_boxes[i].GetType().IsValueType) return;
+
+         var into = HopTo(_boxes[i - 1].GetType(), _segments[i - 1]);
+         if (into is not { CanWrite: true }) return;
+
+         into.Set(_boxes[i - 1], _boxes[i]);
+      }
+   }
+
+   private object ReadSource()
+   {
+      if (_leaf == null) return _sourceProperty.GetValue(ResolvedSource);
+
+      return Walk() ? _leaf.Get(_boxes[^1]) : null;
+   }
+
+   private void WriteSource(object written)
+   {
+      if (_leaf != null) Backfill(written);
+      else _sourceProperty.SetValue(ResolvedSource, written);
+   }
+
+   public override void UpdateSource()
+   {
+      var sourceType = _leaf?.Type ?? _sourceProperty?.PropertyType;
+      var writable = _leaf?.CanWrite ?? _sourceProperty is { CanWrite: true };
+
+      if (sourceType == null || !writable || TargetProperty == null) return;
+      if (_leaf != null && !Walk()) return;
+
+      var targetValue = Target.GetValue(TargetProperty);
+      var value = targetValue;
+      if (Binding.Converter != null)
+         value = Binding.Converter.ConvertBack(value, sourceType, Binding.ConverterParameter,
+            CultureInfo.CurrentCulture);
+
+      // "No value" cannot be written into a source that has no way to hold it: a NumericUpDown that was cleared has a
+      // null Value, and a view-model exposing a plain double would take it as a reflection error mid-keystroke. Leave
+      // the source at what it last agreed to instead - and leave our own copy of it alone too, since nothing moved.
+      if (value == null && sourceType.IsValueType && Nullable.GetUnderlyingType(sourceType) == null)
+      {
+         return;
+      }
+
+      // Guard the ECHO (see _writingSource): our synchronous source write must not schedule a source->target push back.
+      var written = Coerce(value, sourceType);
+
+      _sourceSpoke = false;
+      _writingSource = true;
+      try
+      {
+         WriteSource(written);
+      }
+      finally
+      {
+         _writingSource = false;
+      }
+
+      // The Binding slot is this expression's copy of what the SOURCE holds, and the write above just moved the source.
+      // The echo guard suppresses the push that would normally refresh that copy, so without this the target keeps a
+      // request the source no longer has anywhere: a value that had to be CLAMPED was published to the source as the
+      // clamped one, yet the target still remembered the number from before the clamp - and a later re-coercion (the
+      // ceiling moving back up) resurrected it and overwrote the source with it. A range slider whose end had been
+      // squeezed by a shrinking Maximum therefore rode the edge all the way back up instead of staying where the
+      // view-model said it was. Re-entrancy is bounded by the write below leaving the effective value alone (it IS the
+      // effective value), which raises nothing.
+      if (Mode != BindingMode.TwoWay || _syncingSlot)
+         return;
+
+      _syncingSlot = true;
+      try
+      {
+         // WHAT THE SOURCE ANSWERED WITH, when it answered at all. A source is free to take a write and put something
+         // else there - a value it clamped, or a request it has already acted on and taken back: a list of kinds
+         // answers "put one of these on the plane" by making the node and letting the choice go, and a target left
+         // holding the old pick cannot be picked from again, because picking the same row is then no change at all.
+         // The echo guard above hides that second change from us, so it is asked for here.
+         //
+         // ONLY when the source actually SAID something, though. A source that silently ignores a write has not
+         // answered anything, and re-reading it would undo the click that caused the write: one of a pair of radio
+         // buttons clears the other, the view-model behind it ignores "you are not the choice" (it hears only the
+         // positive half), and pushing that back re-checked the button the click had just cleared - both halves of one
+         // choice lit, and the pair stopped switching at all.
+         if (_sourceSpoke && !Equals(ReadSource(), written))
+         {
+            UpdateTarget();
+         }
+         else
+         {
+            Target.SetValue(TargetProperty, targetValue, ValuePriority.Binding);
+         }
+      }
+      finally
+      {
+         _syncingSlot = false;
+      }
+   }
+
+   private bool _syncingSlot;   // see UpdateSource: the slot refresh must not drive another write-back
+
+}

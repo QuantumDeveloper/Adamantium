@@ -243,7 +243,7 @@ namespace Adamantium.Fonts.Extensions
             var ligatureArrayOffset = reader.ReadUInt16() + subtableOffset;
             
             var lookupType5 = new MarkToLigatureAttachmentPositioningSubTable();
-            lookupType5.MarkCoverage = reader.ReadCoverageTable(markArrayOffset);
+            lookupType5.MarkCoverage = reader.ReadCoverageTable(markCoverageOffset);
             lookupType5.LigatureCoverage = reader.ReadCoverageTable(ligatureCoverageOffset);
             lookupType5.MarkArrayTable = reader.ReadMarkArrayTable(markArrayOffset);
             lookupType5.LigatureArrayTable = reader.ReadLigatureArrayTable(ligatureArrayOffset, markClassCount);

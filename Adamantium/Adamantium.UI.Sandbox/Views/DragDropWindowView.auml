@@ -1,0 +1,34 @@
+<View xmlns="http://adamantium/ui"
+      xmlns:x="http://adamantium/ui/xaml/extensions">
+    <Border CornerRadius="8" Padding="12" Margin="16" BorderThickness="2"
+            DragDrop.AllowDrop="True" DragDrop.DropCommand="{Binding DropCommand}">
+        <Border.Styles>
+            <Style Selector="Border">
+                <Setter Property="Background" Value="{ResourceReference CardBackgroundFillColorDefault}"/>
+                <Setter Property="BorderBrush" Value="{ResourceReference ControlStrokeColorDefault}"/>
+                <PropertyTrigger Property="DragDrop.IsDragOver" Value="True">
+                    <Setter Property="Background" Value="{ResourceReference SubtleFillColorSecondary}"/>
+                    <Setter Property="BorderBrush" Value="{ResourceReference SystemFillColorSuccess}"/>
+                </PropertyTrigger>
+            </Style>
+        </Border.Styles>
+        <StackPanel Orientation="Vertical">
+            <TextBlock Text="Wildlife" Foreground="{ThemeResource AccentFillColorDefault}" MarginBottom="4"/>
+            <TextBlock Text="Drag items to/from the main window's lists." FontSize="12"
+                       Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="10"/>
+            <ListBox ItemsSource="{Binding Items}" SelectedItems="{Binding Selection}"
+                     SelectionMode="Extended" Background="Transparent">
+                <ListBox.ItemTemplate>
+                    <DataTemplate>
+                        <Border Background="{ResourceReference TileFillColorDefault}" CornerRadius="6" Padding="10" MarginBottom="6"
+                                DragDrop.AllowDrag="True" DragDrop.DragData="{Binding}"
+                                DragDrop.DragStartedCommand="{Ancestor ItemsControl, DataContext.DragStartedCommand}"
+                                DragDrop.DragCompletedCommand="{Ancestor ItemsControl, DataContext.DragCompletedCommand}">
+                            <TextBlock Text="{Binding}"/>
+                        </Border>
+                    </DataTemplate>
+                </ListBox.ItemTemplate>
+            </ListBox>
+        </StackPanel>
+    </Border>
+</View>

@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Diagnostics;
 using Adamantium.Mathematics;
+using Adamantium.Mathematics.Triangulation;
 using NUnit.Framework;
 
 namespace Adamantium.MathTests
@@ -31,12 +32,10 @@ namespace Adamantium.MathTests
             points.Add(new Vector2(20, 20));
             points.Add(new Vector2(20, 0));
 
-            Polygon polygon = new Polygon();
-            polygon.AddItem(new PolygonItem(points));
+            var contour = new MeshContour(points);
+            contour.SplitOnSegments();
 
-            var timer = Stopwatch.StartNew();
-            Assert.IsTrue(PolygonHelper.IsPolygonConcave(polygon.MergedSegments), "polygon is not concave");
-            timer.Stop();
+            Assert.IsTrue(PolygonHelper.IsPolygonConcave(contour.Segments), "polygon is not concave");
         }
 
         [Test]
@@ -65,10 +64,11 @@ namespace Adamantium.MathTests
             points.Add(new Vector2(20, 20));
             points.Add(new Vector2(20, 0));
             points.Add(new Vector2(0, 0));
-            PolygonItem p = new PolygonItem(points);
+            MeshContour p = new MeshContour(points);
             p.SplitOnSegments();
-            var hasSelfIntersections = p.CheckForSelfIntersection(FillRule.NonZero);
-            Assert.IsTrue(!hasSelfIntersections, "polygon has selfintersections");
+            var before = p.Points.Length;
+            p.RemoveSelfIntersections(FillRule.NonZero);
+            Assert.AreEqual(before, p.Points.Length, "a simple polygon must not gain points");
         }
 
         [Test]
@@ -80,11 +80,11 @@ namespace Adamantium.MathTests
             points.Add(new Vector2(10, 0));
             points.Add(new Vector2(-15, 15));
             points.Add(new Vector2(15, 15));
-            PolygonItem p = new PolygonItem(points);
+            MeshContour p = new MeshContour(points);
             p.SplitOnSegments();
-            var hasSelfIntersections = p.CheckForSelfIntersection(FillRule.NonZero);
-            Assert.IsTrue(hasSelfIntersections, "polygon has no selfintersections");
-            Assert.AreEqual(p.SelfIntersectedPoints.Count, 5);
+            var before = p.Points.Length;
+            p.RemoveSelfIntersections(FillRule.NonZero);
+            Assert.Greater(p.Points.Length, before, "a self-intersecting polygon must gain split points");
         }
 
         [Test]
@@ -319,10 +319,10 @@ namespace Adamantium.MathTests
             points.Add(new Vector2(-15, -15));
             points.Add(new Vector2(15, -15));
 
-            polygon.AddItem(new PolygonItem(points));
+            polygon.AddContour(new MeshContour(points));
 
             polygon.FillRule = FillRule.NonZero;
-            var result = polygon.Fill();
+            var result = polygon.FillIndirect();
 
         }
 

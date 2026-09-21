@@ -1,0 +1,84 @@
+using System;
+
+namespace Adamantium.UI.Rendering;
+
+// SCRATCH (phase 0 of §5a): does the layer key hold? A LAYER is one FlushBatches cycle - the set of draws whose mutual
+// order is irrelevant - and the doc's one pre-condition is that layers are no more numerous than today's segments, or the
+// number of draw calls would grow. Also counts the repairs the redesign is meant to make unnecessary.
+public static class LayerProbe
+{
+    public static long Frames, Cycles, Segments, MaxCycles, MaxSegments;
+    public static long Splits, SplitsAvoided, Renumbers, Refusals;
+
+    // Phase 3: how often a control leaving the paint order costs a pass over the arena, and how many slots that pass
+    // covered. The phase is verified on these being small and rare - a sweep per hidden control, not per frame.
+    public static long OrphanSweeps, OrphanSweptSlots;
+
+    // FAZA 3 measurement: a layer re-issued INSIDE the room it owns costs a range upload and nothing else; one that has
+    // outgrown that room is carried to the end of the arena, and every group drawing in it has to be re-indexed. The
+    // second number is what a per-layer arena is supposed to remove, so it has to be known before anything is rewritten.
+    public static long SegmentEditsInPlace, SegmentRelocations, RelocatedSlots;
+
+    private static long _cyclesThisFrame, _segmentsThisFrame;
+
+    public static void FrameStart()
+    {
+        if (_cyclesThisFrame > 0 || _segmentsThisFrame > 0)
+        {
+            Frames++;
+            Cycles += _cyclesThisFrame;
+            Segments += _segmentsThisFrame;
+            if (_cyclesThisFrame > MaxCycles) MaxCycles = _cyclesThisFrame;
+            if (_segmentsThisFrame > MaxSegments) MaxSegments = _segmentsThisFrame;
+        }
+
+        _cyclesThisFrame = 0;
+        _segmentsThisFrame = 0;
+    }
+
+    /// <summary>Zero everything - for a test that asks a question about ONE frame it drives itself.</summary>
+    public static void Reset()
+    {
+        Frames = Cycles = Segments = MaxCycles = MaxSegments = 0;
+        Splits = SplitsAvoided = Renumbers = Refusals = 0;
+        OrphanSweeps = OrphanSweptSlots = 0;
+        _cyclesThisFrame = _segmentsThisFrame = 0;
+    }
+
+    public static void Cycle() => _cyclesThisFrame++;
+    public static void Segment() => _segmentsThisFrame++;
+
+    // SCRATCH (ADAM_OP_OWNERS=1): WHO ends a batch. A scissor change closes the run, so the draw count is decided by
+    // which elements clip, and the op stream is the only place that says which. Filled at the end of a record walk.
+    public static readonly bool DumpOwners = Environment.GetEnvironmentVariable("ADAM_OP_OWNERS") == "1";
+    public static string LastOpDump = "";
+    public static int LastOpCount;
+
+    // A CONTROL THAT STOPS BEING DRAWN WHILE IT IS STILL THERE cannot be seen from outside the render thread: the tree
+    // says the control is present, visible and the right size, and the picture says otherwise. What decides it is
+    // whether the bytes it drew survived its trip out of the paint order - so the two ends of that trip are written
+    // down here, named by the control they belong to.
+    //
+    // ADAM_RENDER_WATCH=<file>: off by default and free when off (one null check on a static). A hand can then do the
+    // gesture that loses the picture and the file says what happened to it, which no timing or counter can.
+    public static readonly string WatchPath = Environment.GetEnvironmentVariable("ADAM_RENDER_WATCH");
+
+    private static readonly object WatchLock = new();
+
+    public static void Say(string line)
+    {
+        if (WatchPath == null) return;
+
+        // The render thread writes these while the UI thread may be writing its own - a probe that loses lines, or
+        // throws, is worse than no probe.
+        lock (WatchLock) System.IO.File.AppendAllText(WatchPath, line + Environment.NewLine);
+    }
+
+    public static string Dump()
+    {
+        var f = Math.Max(1, Frames);
+        return $"layers/frame {Cycles / (double)f:0.0} (max {MaxCycles}) | segments/frame {Segments / (double)f:0.0} (max {MaxSegments})"
+               + $" | recorded frames {Frames} | splits {Splits} (avoided {SplitsAvoided}) | renumbers {Renumbers} | patch refusals {Refusals}"
+               + $" | orphan sweeps {OrphanSweeps} over {OrphanSweptSlots} slots | layer edits in place {SegmentEditsInPlace}, relocations {SegmentRelocations} over {RelocatedSlots} slots";
+    }
+}

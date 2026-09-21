@@ -1,0 +1,87 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>netstandard2.0</TargetFramework>
+        <Configurations>Debug;Release</Configurations>
+        <Platforms>x64</Platforms>
+        <LangVersion>latest</LangVersion>
+        <Nullable>disable</Nullable>
+        <IsRoslynComponent>false</IsRoslynComponent>
+		<EmitCompilerGeneratedFiles>true</EmitCompilerGeneratedFiles>
+		<CompilerGeneratedFilesOutputPath>Generated</CompilerGeneratedFilesOutputPath>
+        <EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>
+    </PropertyGroup>
+
+    <!--<PropertyGroup>
+        <GeneratePackageOnBuild>true</GeneratePackageOnBuild> --><!-- Generates a package at build --><!--
+        <IncludeBuildOutput>false</IncludeBuildOutput> --><!-- Do not include the generator as a lib dependency --><!--
+    </PropertyGroup>-->
+
+    <ItemGroup>
+        <Compile Remove="bin\**" />
+        <EmbeddedResource Remove="bin\**" />
+        <None Remove="bin\**" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="5.3.0" PrivateAssets="all" />
+        <PackageReference Include="Microsoft.CodeAnalysis.Analyzers" Version="5.3.0" PrivateAssets="all" />
+        <CompilerVisibleItemMetadata Include="AdditionalFiles" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\Adamantium.EffectsCompiler\Adamantium.EffectsCompiler.csproj" GeneratePathProperty="true" PrivateAssets="all" />
+        <ProjectReference Include="..\Adamantium.Core\Adamantium.Core.csproj" GeneratePathProperty="true" PrivateAssets="all" />
+        <ProjectReference Include="..\Adamantium.Mathematics\Adamantium.Mathematics.csproj" GeneratePathProperty="true" PrivateAssets="all" />
+		<ProjectReference Include="..\Adamantium.Fonts\Adamantium.Fonts.csproj" GeneratePathProperty="true" PrivateAssets="all" />
+    </ItemGroup>
+
+	<ItemGroup>
+         <!--Generator dependencies-->
+		
+		<PackageReference Include="Adamantium.Vulkan.Spirv" Version="1.0.9" GeneratePathProperty="true" PrivateAssets="all" />
+		<PackageReference Include="Adamantium.Vulkan.Slang" Version="1.0.7" GeneratePathProperty="true" PrivateAssets="all" />
+        <PackageReference Include="QuantumBinding.Utils" Version="2.0.1" GeneratePathProperty="true" PrivateAssets="all" />
+        <PackageReference Include="MessagePack" Version="3.1.7" GeneratePathProperty="true" PrivateAssets="all" />
+        <PackageReference Include="MessagePack.Annotations" Version="3.1.7" GeneratePathProperty="true" PrivateAssets="all" />
+		<PackageReference Include="System.Runtime.CompilerServices.Unsafe" Version="6.1.2" GeneratePathProperty="true" PrivateAssets="all" />
+
+        <!--<None Include="$(OutputPath)\$(AssemblyName).dll" Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false" />-->
+    </ItemGroup>
+    
+    <ItemGroup>
+        <EmbeddedResource Include="spirv-cross-c-shared.dll"/>
+        <EmbeddedResource Include="slang.dll"/>
+        <EmbeddedResource Include="slang-c-shared.dll"/>
+    </ItemGroup>
+
+	<ItemGroup>
+	  <Content Remove="C:\Users\dzapo\.nuget\packages\adamantium.vulkan.spirv\1.0.3\contentFiles\any\netstandard2.0\spirv-cross-c-shared.dll" />
+	</ItemGroup>
+    
+    <PropertyGroup>
+        <GetTargetPathDependsOn>$(GetTargetPathDependsOn);GetDependencyTargetPaths</GetTargetPathDependsOn>
+    </PropertyGroup>
+    
+    <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|x64' ">
+      <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+      <NoWarn>1701;1702;RS1035</NoWarn>
+    </PropertyGroup>
+    
+    <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|x64' ">
+      <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+      <NoWarn>1701;1702;RS1035</NoWarn>
+    </PropertyGroup>
+
+    <Target Name="GetDependencyTargetPaths">
+        <ItemGroup>
+            <TargetPathWithTargetPlatformMoniker Include="$(PKGAdamantium_Vulkan_Spirv)\lib\netstandard2.0\Adamantium.Vulkan.Spirv.dll" IncludeRuntimeDependency="false" />
+            <TargetPathWithTargetPlatformMoniker Include="$(PKGAdamantium_Vulkan_Slang)\lib\netstandard2.0\Adamantium.Vulkan.Slang.dll" IncludeRuntimeDependency="false" />
+            <TargetPathWithTargetPlatformMoniker Include="$(PKGQuantumBinding_Utils)\lib\netstandard2.0\QuantumBinding.Utils.dll" IncludeRuntimeDependency="false" />
+            <TargetPathWithTargetPlatformMoniker Include="$(PKGMessagePack)\lib\netstandard2.0\MessagePack.dll" IncludeRuntimeDependency="false" />
+            <TargetPathWithTargetPlatformMoniker Include="$(PKGMessagePack_Annotations)\lib\netstandard2.0\MessagePack.Annotations.dll" IncludeRuntimeDependency="false" />
+            <TargetPathWithTargetPlatformMoniker Include="$(PKGSystem_Runtime_CompilerServices_Unsafe)\lib\netstandard2.0\System.Runtime.CompilerServices.Unsafe.dll" IncludeRuntimeDependency="false" />
+		</ItemGroup>
+    </Target>
+
+</Project>

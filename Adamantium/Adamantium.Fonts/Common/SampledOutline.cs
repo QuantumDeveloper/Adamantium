@@ -5,7 +5,7 @@ namespace Adamantium.Fonts.Common
     public class SampledOutline
     {
         public Vector2[] Points { get; }
-        
+
         public LineSegment2D[] Segments { get; }
 
         public SampledOutline(Vector2[] points)

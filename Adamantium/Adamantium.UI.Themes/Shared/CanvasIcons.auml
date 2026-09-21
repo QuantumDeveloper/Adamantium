@@ -1,0 +1,356 @@
+<ResourceDictionary xmlns:x="http://adamantium/ui/xaml/extensions"
+        xmlns="http://adamantium/ui">
+
+    <!-- The INFINITE CANVAS's own pictures, and the one icon set in this project that belongs to no theme.
+
+         They are here rather than in Fluent's because that is what they are: the grip a pane is carried by, the
+         tools a canvas offers, the bin that clears it. Every theme showed them by linking Fluent's dictionary, which
+         said - wrongly - that a canvas in the macOS theme is wearing a Fluent icon. A theme that wants its own still
+         overrides a key in its own dictionary; what changes is only where the DEFAULT lives.
+
+         Drawn on a 10x10 field, stroked rather than filled wherever the mark IS a stroke, and colored from the
+         palette so they follow the theme they are shown in. -->
+
+    <!-- Stick to the edge: a wall and something coming to rest against it. Off by default and asked for by this
+         button, because a panel that jumps to an edge whenever it passes near one will not stay where it was put. -->
+    <DrawingImage x:Key="PaneSnapIcon">
+        <GeometryDrawing Geometry="M1.5,1 L1.5,9 M9,5 L3.4,5 M5.2,3.2 L3.4,5 L5.2,6.8"
+                         Stroke="{ResourceReference TextFillColorSecondary}"
+                         StrokeThickness="1.2"/>
+    </DrawingImage>
+
+    <!-- Turn the panel: a bent arrow, which says "the same thing, the other way round". Its own button rather than
+         something the placement decides, because where a panel sits and which way its contents run are two separate
+         choices and a panel that reshaped itself every time it was moved was unusable. -->
+    <DrawingImage x:Key="PaneTurnIcon">
+        <GeometryDrawing Geometry="M2.5,1.5 L2.5,7.5 L8.5,7.5 M7,6 L8.5,7.5 L7,9"
+                         Stroke="{ResourceReference TextFillColorSecondary}"
+                         StrokeThickness="1.2"/>
+    </DrawingImage>
+
+    <!-- Something to take hold of: the ridged grip every movable panel has had since toolbars had them. Bars rather
+         than an arrow because it says "pick this up", not "this way". -->
+    <DrawingImage x:Key="GripIcon">
+        <GeometryDrawing Geometry="M0,1.5 L10,1.5 M0,5 L10,5 M0,8.5 L10,8.5"
+                         Stroke="{ResourceReference TextFillColorSecondary}"
+                         StrokeThickness="1.2"/>
+    </DrawingImage>
+
+    <!-- The tools, each drawn as the thing it makes rather than as a picture of an instrument: what a tool button has to
+         answer is "what will appear when I drag", and the shape is the shortest way to say it. -->
+    <DrawingImage x:Key="ToolSelectIcon">
+        <GeometryDrawing Geometry="M1,0.5 L1,9 L3.2,7 L4.6,9.8 L6.1,9.1 L4.7,6.5 L7.6,6.3 Z"
+                         Brush="{ResourceReference TextFillColorSecondary}"/>
+    </DrawingImage>
+
+    <DrawingImage x:Key="ToolPenIcon">
+        <GeometryDrawing Geometry="M0.6,9.4 L2,6.6 L7.4,1.2 L8.8,2.6 L3.4,8 Z"
+                         Brush="{ResourceReference TextFillColorSecondary}"/>
+    </DrawingImage>
+
+    <DrawingImage x:Key="ToolRectangleIcon">
+        <GeometryDrawing Geometry="M0.8,2 L9.2,2 L9.2,8 L0.8,8 Z"
+                         Stroke="{ResourceReference TextFillColorSecondary}"
+                         StrokeThickness="1.2"/>
+    </DrawingImage>
+
+    <!-- A ring drawn as a twelve-sided polygon: the path parser reads LINE segments, so a circle here is the polygon
+         that is indistinguishable from one at the size an icon is seen. -->
+    <DrawingImage x:Key="ToolEllipseIcon">
+        <GeometryDrawing Geometry="M9,5 L8.46,7 L7,8.46 L5,9 L3,8.46 L1.54,7 L1,5 L1.54,3 L3,1.54 L5,1 L7,1.54 L8.46,3 Z"
+                         Stroke="{ResourceReference TextFillColorSecondary}"
+                         StrokeThickness="1.2"/>
+    </DrawingImage>
+
+    <!-- A polygon, drawn as the PENTAGON rather than a triangle: a triangle reads as "play" or as a warning sign, and
+         five sides say "however many you like" the way three never will. -->
+    <DrawingImage x:Key="ToolPolygonIcon">
+        <GeometryDrawing Geometry="M5,0.8 L9.2,3.9 L7.6,8.9 L2.4,8.9 L0.8,3.9 Z"
+                         Stroke="{ResourceReference TextFillColorSecondary}"
+                         StrokeThickness="1.2"/>
+    </DrawingImage>
+
+    <!-- The two erasers. Both are the rubber on its slant; what tells them apart is what is left UNDER it - which is
+         exactly the difference the two modes make, so the icons differ by the same thing the tools do.
+         By point: the line continues either side with a HOLE rubbed through the middle. -->
+    <DrawingImage x:Key="ToolEraseIcon">
+        <GeometryDrawing Geometry="M1.2,6.6 L5.4,0.8 L8.8,3.2 L4.6,9 L1.2,6.6 Z M0.2,9.8 L2.4,9.8 M7.6,9.8 L9.8,9.8"
+                         Stroke="{ResourceReference TextFillColorSecondary}"
+                         StrokeThickness="1.2"/>
+    </DrawingImage>
+
+    <!-- By stroke: the same rubber, and a CROSS where the line was - the mark for "this one goes", not "this much of
+         it". A whole line drawn under it would read as a line being left alone. -->
+    <DrawingImage x:Key="ToolEraseStrokeIcon">
+        <GeometryDrawing Geometry="M1.2,6.2 L5.4,0.4 L8.8,2.8 L4.6,8.6 L1.2,6.2 Z M5.6,7.4 L9.6,10 M9.6,7.4 L5.6,10"
+                         Stroke="{ResourceReference TextFillColorSecondary}"
+                         StrokeThickness="1.2"/>
+    </DrawingImage>
+
+    <!-- The CONTROL tools: what they put down is a real control on the plane, so each icon is that control drawn small
+         rather than an abstract mark. A tool that leaves a button behind should look like a button. -->
+    <DrawingImage x:Key="ToolButtonIcon">
+        <GeometryDrawing Geometry="M0.8,3 L9.2,3 L9.2,7 L0.8,7 Z M3,5 L7,5"
+                         Stroke="{ResourceReference TextFillColorSecondary}"
+                         StrokeThickness="1.2"/>
+    </DrawingImage>
+
+    <!-- The box and its tick, and the tick leaves the box: that overshoot is what makes a checkbox read as ticked at
+         icon size instead of as a square with a scribble in it. -->
+    <DrawingImage x:Key="ToolCheckBoxIcon">
+        <GeometryDrawing Geometry="M0.8,2.2 L6,2.2 L6,7.4 L0.8,7.4 Z M2.2,4.8 L3.6,6.2 L9.2,1"
+                         Stroke="{ResourceReference TextFillColorSecondary}"
+                         StrokeThickness="1.2"/>
+    </DrawingImage>
+
+    <!-- A field with the I-beam standing in it - the caret, which is the one thing a text box has that a plain box does
+         not. -->
+    <DrawingImage x:Key="ToolTextBoxIcon">
+        <GeometryDrawing Geometry="M0.8,2.6 L9.2,2.6 L9.2,7.4 L0.8,7.4 Z M2.8,3.9 L2.8,6.1 M2.1,3.9 L3.5,3.9 M2.1,6.1 L3.5,6.1"
+                         Stroke="{ResourceReference TextFillColorSecondary}"
+                         StrokeThickness="1.2"/>
+    </DrawingImage>
+
+    <!-- A NODE of a graph: the body, the strip across its top, and the stubs down its sides. The stubs are what make it
+         a node rather than a panel, so they leave the body - at this size a socket drawn inside the outline is a dot
+         nobody reads. -->
+    <DrawingImage x:Key="ToolNodeIcon">
+        <GeometryDrawing Geometry="M1.8,1.6 L8.2,1.6 L8.2,8.4 L1.8,8.4 Z M1.8,3.6 L8.2,3.6 M0.4,5.4 L1.8,5.4 M0.4,7.1 L1.8,7.1 M8.2,6.2 L9.6,6.2"
+                         Stroke="{ResourceReference TextFillColorSecondary}"
+                         StrokeThickness="1.1"/>
+    </DrawingImage>
+
+    <!-- MORE of them: the button that opens a family of tools rather than picking one. A plus, because that is what it
+         offers - not a tool, but the choice of which. -->
+    <DrawingImage x:Key="ToolAddIcon">
+        <GeometryDrawing Geometry="M5,1 L5,9 M1,5 L9,5"
+                         Stroke="{ResourceReference TextFillColorSecondary}"
+                         StrokeThickness="1.4"/>
+    </DrawingImage>
+
+    <!-- UNDO and REDO: an arrow that goes back over a STEP - a straight shaft, a right-angled drop, and a chunky head.
+         Not an arc. An arc round an implied centre is what ROTATION is drawn as everywhere, and these two sat beside
+         the zoom controls, where a turn is exactly what the eye expects - so they were read as rotating the drawing.
+         The corner is square on purpose: it is the one line in the glyph that a rotation icon never has. -->
+    <DrawingImage x:Key="UndoIcon">
+        <GeometryDrawing Geometry="M1,3.6 L8,3.6 L8,8.8 M1,3.6 L3.4,1.2 M1,3.6 L3.4,6"
+                         Stroke="{ResourceReference TextFillColorSecondary}"
+                         StrokeThickness="1.3"/>
+    </DrawingImage>
+
+    <DrawingImage x:Key="RedoIcon">
+        <GeometryDrawing Geometry="M9,3.6 L2,3.6 L2,8.8 M9,3.6 L6.6,1.2 M9,3.6 L6.6,6"
+                         Stroke="{ResourceReference TextFillColorSecondary}"
+                         StrokeThickness="1.3"/>
+    </DrawingImage>
+
+    <!-- GROUP: two shapes and the frame that now holds them - what grouping does, drawn. Corner marks rather than a
+         whole rectangle, because a closed frame round two boxes reads as a third box. -->
+    <DrawingImage x:Key="GroupIcon">
+        <GeometryDrawing Geometry="M1,3.4 L1,1 L3.4,1 M6.6,1 L9,1 L9,3.4 M9,6.6 L9,9 L6.6,9 M3.4,9 L1,9 L1,6.6 M2.6,2.6 L5,2.6 L5,5 L2.6,5 Z M5,5 L7.4,5 L7.4,7.4 L5,7.4 Z"
+                         Stroke="{ResourceReference TextFillColorSecondary}"
+                         StrokeThickness="1.1"/>
+    </DrawingImage>
+
+    <!-- UNGROUP: the same frame, broken - the corner marks are gone from two sides and the shapes are coming apart. -->
+    <DrawingImage x:Key="UngroupIcon">
+        <GeometryDrawing Geometry="M1,3.4 L1,1 L3.4,1 M9,6.6 L9,9 L6.6,9 M2.2,2.6 L4.6,2.6 L4.6,5 L2.2,5 Z M5.4,5 L7.8,5 L7.8,7.4 L5.4,7.4 Z"
+                         Stroke="{ResourceReference TextFillColorSecondary}"
+                         StrokeThickness="1.1"/>
+    </DrawingImage>
+
+    <!-- Throw it away: a bin, which is a different statement from rubbing something out and has to look it. ONE bin for
+         both scales - what is selected and the whole drawing - because the verb is the same and the scale is said by
+         where the button sits and what its tooltip says. Two nearly identical bins would say the difference twice and
+         badly. -->
+    <DrawingImage x:Key="BinIcon">
+        <GeometryDrawing Geometry="M1.6,2.6 L2.4,9.6 L7.6,9.6 L8.4,2.6 M0.6,2.6 L9.4,2.6 M3.6,2.6 L3.6,1 L6.4,1 L6.4,2.6"
+                         Stroke="{ResourceReference TextFillColorSecondary}"
+                         StrokeThickness="1.2"/>
+    </DrawingImage>
+
+    <!-- FOLDING a node down to its strip. A chevron, which is the one mark everybody already reads as "there is more
+         under this" - and it is drawn in the strip's own foreground rather than the text colour, because the strip
+         wears the accent and the accent decides what is legible on it. -->
+    <!-- The node's FOLD chevron is NOT here, and deliberately. It is drawn on the accent strip, so it has to take the
+         accent's own foreground - and that family is resolved by ThemeResource, which a DrawingImage cannot carry: the
+         binding needs a component to hang a theme change on, and a drawing is not one. It lives in the node's template
+         as a Path, where the accent is reachable. -->
+
+    <!-- The INSPECTOR: rows of a name and a value beside it, which is what a property panel looks like from across the
+         room and the only thing about one that survives being drawn ten pixels wide. -->
+    <DrawingImage x:Key="FaceInspectorIcon">
+        <GeometryDrawing Geometry="M0.8,2.2 L4.2,2.2 M5.8,2.2 L9.2,2.2 M0.8,5 L4.2,5 M5.8,5 L9.2,5 M0.8,7.8 L4.2,7.8 M5.8,7.8 L9.2,7.8"
+                         Stroke="{ResourceReference TextFillColorSecondary}"
+                         StrokeThickness="1.1"/>
+    </DrawingImage>
+
+    <!-- WHAT IS ON THE PLANE, stacked: a plate seen at an angle with more of them under it. Not another list of rows -
+         the panel beside this one is already that, and two icons of rows say nothing about which is which. -->
+    <DrawingImage x:Key="FaceStructureIcon">
+        <GeometryDrawing Geometry="M5,1.2 L9.2,3.3 L5,5.4 L0.8,3.3 Z M0.8,5.4 L5,7.5 L9.2,5.4 M0.8,7.2 L5,9.3 L9.2,7.2"
+                         Stroke="{ResourceReference TextFillColorSecondary}"
+                         StrokeThickness="1.1"/>
+    </DrawingImage>
+
+    <!-- Paint ORDER, and the arrow is what carries it: the bars are the stack and the arrow says which way this one
+         goes through it. Fill emphasis - a solid square over an outlined one - reads as nothing at all at this size,
+         while up and down are unmistakable. -->
+    <DrawingImage x:Key="BringToFrontIcon">
+        <GeometryDrawing Geometry="M0.8,3.2 L6,3.2 M0.8,5.5 L6,5.5 M0.8,7.8 L6,7.8 M8.4,9 L8.4,1.6 M7.2,2.8 L8.4,1.6 L9.6,2.8"
+                         Stroke="{ResourceReference TextFillColorSecondary}"
+                         StrokeThickness="1.2"/>
+    </DrawingImage>
+
+    <!-- ONE PLACE, not all the way: the same stack of lines, and an arrow that steps over ONE of them rather than
+         running past the lot. The pair beside these go to the ends; these two are how a thing is put BETWEEN two
+         others, which is where most arranging actually happens. -->
+    <DrawingImage x:Key="BringForwardIcon">
+        <GeometryDrawing Geometry="M0.8,3.2 L6,3.2 M0.8,5.5 L6,5.5 M0.8,7.8 L6,7.8 M8.4,7 L8.4,3.4 M7.2,4.6 L8.4,3.4 L9.6,4.6"
+                         Stroke="{ResourceReference TextFillColorSecondary}"
+                         StrokeThickness="1.2"/>
+    </DrawingImage>
+
+    <DrawingImage x:Key="SendBackwardIcon">
+        <GeometryDrawing Geometry="M0.8,3.2 L6,3.2 M0.8,5.5 L6,5.5 M0.8,7.8 L6,7.8 M8.4,3 L8.4,6.6 M7.2,5.4 L8.4,6.6 L9.6,5.4"
+                         Stroke="{ResourceReference TextFillColorSecondary}"
+                         StrokeThickness="1.2"/>
+    </DrawingImage>
+
+    <DrawingImage x:Key="SendToBackIcon">
+        <GeometryDrawing Geometry="M0.8,3.2 L6,3.2 M0.8,5.5 L6,5.5 M0.8,7.8 L6,7.8 M8.4,1 L8.4,8.4 M7.2,7.2 L8.4,8.4 L9.6,7.2"
+                         Stroke="{ResourceReference TextFillColorSecondary}"
+                         StrokeThickness="1.2"/>
+    </DrawingImage>
+
+    <!-- Text: the serif A every tool bar uses, drawn as the letter rather than as a picture of a cursor - what the tool
+         makes is the shortest way to say what it does. -->
+    <DrawingImage x:Key="ToolTextIcon">
+        <GeometryDrawing Geometry="M0.8,9.4 L5,0.8 L9.2,9.4 M2.6,6.6 L7.4,6.6"
+                         Stroke="{ResourceReference TextFillColorSecondary}"
+                         StrokeThickness="1.2"/>
+    </DrawingImage>
+
+    <DrawingImage x:Key="ToolLineIcon">
+        <GeometryDrawing Geometry="M0.8,9 L9.2,1"
+                         Stroke="{ResourceReference TextFillColorSecondary}"
+                         StrokeThickness="1.2"/>
+    </DrawingImage>
+
+    <!-- A CURVE, drawn as the S every curve tool has been drawn as since the first one: two bends, because one bend is
+         an arc and an arc is a different tool. -->
+    <DrawingImage x:Key="ToolCurveIcon">
+        <GeometryDrawing Geometry="M0.8,8.8 L1.7,6.8 L3,5.8 L4.8,5.6 L6.4,5 L7.6,3.2 L8.4,1.8 L9.2,1.2"
+                         Stroke="{ResourceReference TextFillColorSecondary}"
+                         StrokeThickness="1.2"/>
+    </DrawingImage>
+
+    <!-- The line again, with the head it is named for. Barbs rather than a filled triangle: at ten pixels a filled
+         head is a blob, and what has to read here is that this one POINTS. -->
+    <DrawingImage x:Key="ToolArrowIcon">
+        <GeometryDrawing Geometry="M0.8,9.2 L9.2,0.8 M5.4,1 L9.2,0.8 L9,4.6"
+                         Stroke="{ResourceReference TextFillColorSecondary}"
+                         StrokeThickness="1.2"/>
+    </DrawingImage>
+
+    <!-- KEEPING and FETCHING a file. A disk and a folder: both are pictures of objects rather than of marks, which the
+         rest of this set avoids - but these two are the pair every application has drawn the same way for thirty years,
+         and a mark invented here would be a mark nobody has seen before on the one button people look for first. -->
+    <DrawingImage x:Key="SaveIcon">
+        <GeometryDrawing Geometry="M1.2,1.2 L7,1.2 L8.8,3 L8.8,8.8 L1.2,8.8 Z M3.4,1.2 L3.4,3.6 L6.6,3.6 L6.6,1.2 M3,8.8 L3,5.8 L7,5.8 L7,8.8"
+                         Stroke="{ResourceReference TextFillColorSecondary}"
+                         StrokeThickness="1.1"/>
+    </DrawingImage>
+
+    <DrawingImage x:Key="OpenIcon">
+        <GeometryDrawing Geometry="M1,8.4 L1,2.2 L3.8,2.2 L4.8,3.6 L8.2,3.6 L8.2,4.8 M1,8.4 L2.8,4.8 L9.2,4.8 L7.4,8.4 Z"
+                         Stroke="{ResourceReference TextFillColorSecondary}"
+                         StrokeThickness="1.1"/>
+    </DrawingImage>
+
+    <!-- A PICTURE: the frame, the little sun and the hill every photo icon has been since icons began - read at a
+         glance and never mistaken for the comment frame beside it, which has a strip and no contents. -->
+    <DrawingImage x:Key="ToolTextureIcon">
+        <GeometryDrawing Geometry="M1,2 L9,2 L9,8 L1,8 Z M1,6.6 L3.4,4.4 L5.6,6.2 L7,5 L9,6.8 M6.6,3.6 A0.7,0.7 0 1,1 6.6,3.59"
+                         Stroke="{ResourceReference TextFillColorSecondary}"
+                         StrokeThickness="1.1"/>
+    </DrawingImage>
+
+    <!-- A COMMENT FRAME: a box with a strip along its top, which is what one looks like on the plane. Not the group
+         mark - a group is corner brackets round things that have become one, and a frame is a place things stand in. -->
+    <DrawingImage x:Key="FrameIcon">
+        <GeometryDrawing Geometry="M1,2 L9,2 L9,9 L1,9 Z M1,4.2 L9,4.2"
+                         Stroke="{ResourceReference TextFillColorSecondary}"
+                         StrokeThickness="1.1"/>
+    </DrawingImage>
+
+    <!-- LINING UP: the rule everything comes to, with two THINGS brought against it. Boxes and not bars, because a bar
+         is a line and a rule crossed by two lines is a cross - which is what the middle one read as, and nothing to do
+         with alignment. Boxes are the things being lined up, which is what the picture is about. -->
+    <DrawingImage x:Key="AlignLeftIcon">
+        <GeometryDrawing Geometry="M1,0.6 L1,9.4 M2.4,2 L8.6,2 L8.6,4.2 L2.4,4.2 Z M2.4,5.8 L6.2,5.8 L6.2,8 L2.4,8 Z"
+                         Stroke="{ResourceReference TextFillColorSecondary}"
+                         StrokeThickness="1.1"/>
+    </DrawingImage>
+
+    <DrawingImage x:Key="AlignMiddleIcon">
+        <GeometryDrawing Geometry="M5,0.6 L5,9.4 M1.6,2 L8.4,2 L8.4,4.2 L1.6,4.2 Z M3.1,5.8 L6.9,5.8 L6.9,8 L3.1,8 Z"
+                         Stroke="{ResourceReference TextFillColorSecondary}"
+                         StrokeThickness="1.1"/>
+    </DrawingImage>
+
+    <DrawingImage x:Key="AlignRightIcon">
+        <GeometryDrawing Geometry="M9,0.6 L9,9.4 M1.4,2 L7.6,2 L7.6,4.2 L1.4,4.2 Z M3.8,5.8 L7.6,5.8 L7.6,8 L3.8,8 Z"
+                         Stroke="{ResourceReference TextFillColorSecondary}"
+                         StrokeThickness="1.1"/>
+    </DrawingImage>
+
+    <DrawingImage x:Key="AlignTopIcon">
+        <GeometryDrawing Geometry="M0.6,1 L9.4,1 M2,2.4 L4.2,2.4 L4.2,8.6 L2,8.6 Z M5.8,2.4 L8,2.4 L8,6.2 L5.8,6.2 Z"
+                         Stroke="{ResourceReference TextFillColorSecondary}"
+                         StrokeThickness="1.1"/>
+    </DrawingImage>
+
+    <!-- BRING IT INTO VIEW: corner brackets facing outwards round what is being looked at - the mark every viewer uses
+         for "fit". The brackets face OUT, where a group's face in: one gathers, the other opens up. -->
+    <DrawingImage x:Key="FitIcon">
+        <GeometryDrawing Geometry="M1,3.4 L1,1 L3.4,1 M6.6,1 L9,1 L9,3.4 M9,6.6 L9,9 L6.6,9 M3.4,9 L1,9 L1,6.6 M3.6,3.6 L6.4,3.6 L6.4,6.4 L3.6,6.4 Z"
+                         Stroke="{ResourceReference TextFillColorSecondary}"
+                         StrokeThickness="1.1"/>
+    </DrawingImage>
+
+    <!-- EQUAL GAPS, drawn as three of a thing with the same space between them - which is the only way to draw a gap.
+         The two differ by which way they run, and that is exactly the difference the buttons had to say in words. -->
+    <DrawingImage x:Key="SpreadRowsIcon">
+        <GeometryDrawing Geometry="M1.6,1.4 L8.4,1.4 M1.6,5 L8.4,5 M1.6,8.6 L8.4,8.6"
+                         Stroke="{ResourceReference TextFillColorSecondary}"
+                         StrokeThickness="1.1"/>
+    </DrawingImage>
+
+    <DrawingImage x:Key="SpreadColumnsIcon">
+        <GeometryDrawing Geometry="M1.4,1.6 L1.4,8.4 M5,1.6 L5,8.4 M8.6,1.6 L8.6,8.4"
+                         Stroke="{ResourceReference TextFillColorSecondary}"
+                         StrokeThickness="1.1"/>
+    </DrawingImage>
+
+    <!-- A BOOKMARK: this view is the one to come back to. Filled, because it stands beside Home, which is where it is
+         come back to from - an outline there would read as a second, quieter kind of button. -->
+    <DrawingImage x:Key="KeepViewIcon">
+        <GeometryDrawing Geometry="M2.4,0.8 L7.6,0.8 L7.6,9.2 L5,6.7 L2.4,9.2 Z"
+                         Brush="{ResourceReference TextFillColorSecondary}"/>
+    </DrawingImage>
+
+    <!-- ...and the same bookmark struck through: the kept view given up, so Home means the origin again. -->
+    <DrawingImage x:Key="ForgetViewIcon">
+        <GeometryDrawing Geometry="M2.6,1.4 L7.4,1.4 L7.4,8.6 L5,6.5 L2.6,8.6 Z M1,9.4 L9,1"
+                         Stroke="{ResourceReference TextFillColorSecondary}"
+                         StrokeThickness="1.1"/>
+    </DrawingImage>
+
+    <!-- HOME, as a house with a door - the one picture everything means by "back to where I started". -->
+    <DrawingImage x:Key="HomeIcon">
+        <GeometryDrawing Geometry="M5,0.7 L9.6,5.1 L8.3,5.1 L8.3,9.3 L6,9.3 L6,6.5 L4,6.5 L4,9.3 L1.7,9.3 L1.7,5.1 L0.4,5.1 Z"
+                         Brush="{ResourceReference TextFillColorSecondary}"/>
+    </DrawingImage>
+
+</ResourceDictionary>

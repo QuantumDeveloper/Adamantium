@@ -16,14 +16,14 @@ namespace Adamantium.Imaging.Png.Chunks
 
         public ushort KeyB { get; set; }
 
-        internal override byte[] GetChunkBytes(PNGState state)
+        internal override byte[] GetChunkBytes(PngState state)
         {
             var bytes = new List<byte>();
 
             var transparencyBytes = new List<byte>();
             var info = state.ColorModeRaw;
 
-            if (info.ColorType == PNGColorType.Palette)
+            if (info.ColorType == PngColorType.Palette)
             {
                 var amount = state.ColorModeRaw.PaletteSize;
                 /*the tail of palette values that all have 255 as alpha, does not have to be encoded*/
@@ -41,12 +41,12 @@ namespace Adamantium.Imaging.Png.Chunks
                     transparencyBytes.Add(info.Palette[4 * i + 3]);
                 }
             }
-            else if (info.ColorType == PNGColorType.Grey)
+            else if (info.ColorType == PngColorType.Grey)
             {
                 transparencyBytes.Add((byte)(KeyR >> 8));
                 transparencyBytes.Add((byte)(KeyR & 255));
             }
-            else if (info.ColorType == PNGColorType.RGB)
+            else if (info.ColorType == PngColorType.RGB)
             {
                 transparencyBytes.Add((byte)(KeyR >> 8));
                 transparencyBytes.Add((byte)(KeyR & 255));
@@ -63,7 +63,7 @@ namespace Adamantium.Imaging.Png.Chunks
             return bytes.ToArray();
         }
 
-        internal static tRNS FromState(PNGState state)
+        internal static tRNS FromState(PngState state)
         {
             var trns = new tRNS();
             trns.KeyR = (ushort)state.ColorModeRaw.KeyR;

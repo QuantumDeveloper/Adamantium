@@ -1,0 +1,144 @@
+<?xml version="1.0" encoding="utf-8"?>
+<StyleSet xmlns="http://adamantium/ui"
+          xmlns:x="http://adamantium/ui/xaml/extensions">
+
+    <!-- Editor Pro's button. Not Fluent's with different numbers: a different thing - a HAIRLINE OUTLINE and no fill,
+         where Fluent's is a filled plate with a two-pixel border.
+
+         This started out with no chrome at all at rest, on the argument that a toolbar is a row of these and twenty
+         filled boxes across a strip read as a fence. That argument is right about a row of ICONS and wrong about a
+         button: a lone "Add" under a list came out as bare text, and an affordance that appears only once you have
+         already found it is not one. The flat form moved to Button.Toolbar, which is where it was actually true.
+         So: an outline at rest says "this is pressable", and the FILL is still reserved for the pointer being on it.
+
+         Per the small-styles convention: properties, then the template, then the triggers. -->
+
+    <Style Selector="Button">
+        <!-- No fill at rest - the outline carries it. The hover and pressed grounds are what the button fills with. -->
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="BorderBrush" Value="{ResourceReference ControlStrokeColorDefault}"/>
+        <Setter Property="Foreground" Value="{ObservableResource TextFillColorPrimary}"/>
+
+        <Setter Property="BackgroundPointerOver" Value="{ResourceReference SubtleFillColorSecondary}"/>
+        <Setter Property="BackgroundPressed" Value="{ResourceReference SubtleFillColorTertiary}"/>
+        <Setter Property="BackgroundDisabled" Value="Transparent"/>
+        <Setter Property="ForegroundPressed" Value="{ObservableResource TextFillColorPrimary}"/>
+        <Setter Property="ForegroundDisabled" Value="{ObservableResource TextFillColorDisabled}"/>
+
+        <Setter Property="MinHeight" Value="{ResourceReference ControlHeight}"/>
+        <Setter Property="Padding" Value="{ResourceReference PaddingControl}"/>
+        <Setter Property="CornerRadius" Value="{ResourceReference CornerRadiusDefault}"/>
+        <Setter Property="BorderThickness" Value="{ResourceReference StrokeControl}"/>
+        <Setter Property="FontSize" Value="{ResourceReference FontSizeBody}"/>
+        <Setter Property="HorizontalContentAlignment" Value="Center"/>
+        <Setter Property="VerticalContentAlignment" Value="Center"/>
+    </Style>
+
+    <Style Selector="Button">
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <!-- ONE border, no outer grid. Fluent wraps its chrome in a Grid to stack a focus layer over it;
+                         this theme draws no ring of its own - the window's focus adorner is the single answer to that
+                         question - so the extra element would hold nothing. -->
+                    <Border x:Name="InnerBorder"
+                            CornerRadius="{TemplateBinding CornerRadius}"
+                            Background="{TemplateBinding Background}"
+                            BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}"
+                            Padding="{TemplateBinding Padding}">
+                        <ContentPresenter
+                                x:Name="PART_ContentPresenter"
+                                HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
+                                Foreground="{TemplateBinding Foreground}"
+                                FontSize="{TemplateBinding FontSize}"
+                                Content="{TemplateBinding Content}"
+                                ContentTemplate="{TemplateBinding ContentTemplate}"
+                                ContentTemplateSelector="{TemplateBinding ContentTemplateSelector}"/>
+                    </Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style Selector="Button">
+        <PropertyTrigger Property="IsMouseOver" Value="true">
+            <Setter TargetName="InnerBorder" Property="Background" Value="{TemplateBinding BackgroundPointerOver}"/>
+            <!-- The outline BRIGHTENS rather than appearing: it is already there, so hover has only to strengthen it. -->
+            <Setter TargetName="InnerBorder" Property="BorderBrush"
+                    Value="{ResourceReference ControlStrokeColorSecondary}"/>
+        </PropertyTrigger>
+        <PropertyTrigger Property="IsPressed" Value="true">
+            <Setter TargetName="InnerBorder" Property="Background" Value="{TemplateBinding BackgroundPressed}"/>
+            <Setter TargetName="PART_ContentPresenter" Property="Foreground" Value="{TemplateBinding ForegroundPressed}"/>
+        </PropertyTrigger>
+        <PropertyTrigger Property="IsEnabled" Value="false">
+            <Setter TargetName="InnerBorder" Property="Background" Value="{TemplateBinding BackgroundDisabled}"/>
+            <Setter TargetName="PART_ContentPresenter" Property="Foreground" Value="{TemplateBinding ForegroundDisabled}"/>
+            <!-- AND THE CONTENT AS A WHOLE GOES QUIET - see Fluent's set: a picture carries its own brush and does not
+                 hear the disabled foreground, so a glyph button sat there looking live with nothing to do. -->
+            <Setter TargetName="PART_ContentPresenter" Property="Opacity" Value="0.4"/>
+            <!-- The outline dims WITH the label. Left crisp, it would keep promising a press the button cannot take -
+                 and on this theme the outline IS the button, so it is the part that has to go quiet.
+                 A direct resource, not a {TemplateBinding}: there is no BorderBrushDisabled on Button, and binding a
+                 name the control does not have resolves to a null property and throws while the template is BUILT. -->
+            <Setter TargetName="InnerBorder" Property="BorderBrush"
+                    Value="{ResourceReference ControlFillColorDisabled}"/>
+        </PropertyTrigger>
+    </Style>
+
+    <!-- The flat form, for the case the outline was originally written for: a ROW of them. A toolbar of icon buttons
+         outlined one after another is a fence, and there the neighbours plus the strip's own edge already say what
+         these are. Opt in with Classes="Toolbar" - which is the difference from before, when every button in the
+         application was quietly assumed to be in a toolbar. -->
+    <Style Selector="Button.Toolbar">
+        <Setter Property="BorderBrush" Value="Transparent"/>
+        <Setter Property="Padding" Value="{ResourceReference PaddingRow}"/>
+    </Style>
+
+    <Style Selector="Button.Toolbar">
+        <!-- The edge appears WITH the hover here, since there is none at rest to brighten - and goes away again when
+             the button cannot be pressed, rather than dimming to the grey the outlined form fades to. -->
+        <PropertyTrigger Property="IsMouseOver" Value="true">
+            <Setter TargetName="InnerBorder" Property="BorderBrush"
+                    Value="{ResourceReference ControlStrokeColorDefault}"/>
+        </PropertyTrigger>
+        <PropertyTrigger Property="IsEnabled" Value="false">
+            <Setter TargetName="InnerBorder" Property="BorderBrush" Value="Transparent"/>
+        </PropertyTrigger>
+    </Style>
+
+    <!-- The accent button is the one that KEEPS its fill: it is the commit action of a dialog, and the only button in
+         this theme allowed to shout. -->
+    <Style Selector="Button.Accent">
+        <Setter Property="Background" Value="{ThemeResource AccentFillColorDefault}"/>
+        <Setter Property="BorderBrush" Value="{ThemeResource AccentFillColorDefault}"/>
+        <Setter Property="Foreground" Value="{ThemeResource AccentForegroundColor}"/>
+        <Setter Property="BackgroundPointerOver" Value="{ThemeResource AccentFillColorSecondary}"/>
+        <Setter Property="BackgroundPressed" Value="{ThemeResource AccentFillColorTertiary}"/>
+        <Setter Property="BackgroundDisabled" Value="{ThemeResource AccentFillColorDisabled}"/>
+        <Setter Property="ForegroundPressed" Value="{ThemeResource AccentForegroundColor}"/>
+    </Style>
+
+    <!-- A PAGER'S STEP ARROW (Button.PagerArrow). This theme's buttons are already quiet - an editor's toolbar is a
+         field of glyphs and a fill per glyph would be a wall - so an arrow only has to give up the outline it carries
+         at rest and let the pointer's own plate say where it is.
+         Height fixed, width a floor: the pair every entry on the pager's line takes, so the row cannot step. Disabled
+         dims the GLYPH, because a drawn one carries its own brush and never sees ForegroundDisabled. -->
+    <Style Selector="Button.PagerArrow">
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="BorderBrush" Value="Transparent"/>
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="BackgroundDisabled" Value="Transparent"/>
+        <Setter Property="Padding" Value="0"/>
+        <Setter Property="MinWidth" Value="{ResourceReference PagerButtonMinWidth}"/>
+        <Setter Property="Height" Value="{ResourceReference PagerButtonHeight}"/>
+        <Setter Property="MinHeight" Value="0"/>
+        <Setter Property="HorizontalContentAlignment" Value="Center"/>
+        <Setter Property="VerticalContentAlignment" Value="Center"/>
+        <Setter Property="VerticalAlignment" Value="Center"/>
+    </Style>
+
+
+</StyleSet>

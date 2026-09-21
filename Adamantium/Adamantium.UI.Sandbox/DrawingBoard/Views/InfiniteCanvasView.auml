@@ -1,0 +1,147 @@
+<View xmlns="http://adamantium/ui"
+      xmlns:x="http://adamantium/ui/xaml/extensions"
+      xmlns:models="clr-namespace:Adamantium.UI.Sandbox.DrawingBoard.Models">
+
+    <!-- WHAT IS INSIDE A NODE, written HERE because it is a picture. The page's table of kinds hands each node a plain
+         state object and nothing else; which of these draws it is decided by the type of that object. A view-model that
+         built these controls itself would be a view-model drawing, and the value a person set would then have to be dug
+         back out of the visual tree to save it. -->
+    <ResourceContext.Resources>
+        <models:NodeBodySelector x:Key="NodeBodies">
+            <models:NodeBodySelector.Number>
+                <DataTemplate>
+                    <!-- THOUSANDTHS, and no more. A number here is something a hand dragged to, and the hand cannot
+                         mean the seventeen digits that come out of adding a twentieth to itself - "1,0125000000000002"
+                         is the arithmetic showing through. -->
+                    <NumericUpDown Value="{Binding Value, Mode=TwoWay}"
+                                   Minimum="0" Maximum="4" SmallChange="0.05" StringFormat="0.###"
+                                   AreButtonsVisible="False" IsDragScrubEnabled="True"/>
+                </DataTemplate>
+            </models:NodeBodySelector.Number>
+
+            <models:NodeBodySelector.Color>
+                <DataTemplate>
+                    <ColorPickerButton SelectedColor="{Binding Color, Mode=TwoWay}"
+                                       Height="26" MinWidth="0" Padding="2"/>
+                </DataTemplate>
+            </models:NodeBodySelector.Color>
+
+            <!-- WHAT CAME OUT, live: the color the whole graph works out, drawn as itself. This is the node that makes
+                 the difference between a graph and a picture of one - change a number anywhere upstream and this
+                 swatch follows. -->
+            <models:NodeBodySelector.Result>
+                <DataTemplate>
+                    <Border Height="40" CornerRadius="3"
+                            BorderThickness="1"
+                            BorderBrush="{ObservableResource ControlStrokeColorDefault}"
+                            Background="{Binding Result, Converter={ColorToBrushConverter}}"/>
+                </DataTemplate>
+            </models:NodeBodySelector.Result>
+
+            <!-- A node that is ALL SOCKETS shows nothing between them. -->
+            <models:NodeBodySelector.None>
+                <DataTemplate>
+                    <Grid/>
+                </DataTemplate>
+            </models:NodeBodySelector.None>
+
+        </models:NodeBodySelector>
+
+        <!-- ...and the same on the DRAWING side: the page says a button is at such a place, and this says what a button
+             looks like. A shape needs nothing here - the canvas draws one from its description - so only what is not a
+             shape comes past. -->
+        <models:PlacedThingSelector x:Key="PlacedThings">
+            <models:PlacedThingSelector.Button>
+                <DataTemplate>
+                    <Button Content="{Binding Text}"/>
+                </DataTemplate>
+            </models:PlacedThingSelector.Button>
+
+            <models:PlacedThingSelector.Switch>
+                <DataTemplate>
+                    <CheckBox Content="{Binding Text}" IsChecked="{Binding IsOn, Mode=TwoWay}"/>
+                </DataTemplate>
+            </models:PlacedThingSelector.Switch>
+
+            <models:PlacedThingSelector.Field>
+                <DataTemplate>
+                    <TextBox Text="{Binding Text, Mode=TwoWay}"/>
+                </DataTemplate>
+            </models:PlacedThingSelector.Field>
+        </models:PlacedThingSelector>
+    </ResourceContext.Resources>
+
+    <Grid RowDefinitions="Auto,Auto,Auto,*" Margin="16">
+
+
+        <TextBlock Grid.Row="0" Text="InfiniteCanvas" FontSize="18"/>
+        <TextBlock Grid.Row="1" Margin="0,4,0,12" TextWrapping="WrapByWords"
+                   Text="A plane with no edges: the wheel zooms toward the cursor, the middle button or space pans, and Home - or a double click of the middle button - returns to the origin. What the plain left button does belongs to the TOOL - select, pen, or a shape. What is selected gets a frame with grips, in screen pixels; dragging those moves and resizes the whole selection at once. Delete removes it, Escape lets go."/>
+
+        <!-- EVERYTHING that steers the canvas is in the canvas's own panel, with no exceptions out here: a tool panel
+             belongs ON the surface it works, and a row of switches above the frame is a second place to look.
+             The two that stood here are gone rather than moved. One of them was the whiteboard, which is the Grid row
+             of the inspector saying Transparent and was never anything else. The other hid the tool panel, and that one
+             could NOT come inside: a switch that takes away the panel it lives in can be used exactly once. The panel
+             folds by its own grip, which is the same thing and comes back.  -->
+
+        <Border Grid.Row="3" BorderThickness="1" CornerRadius="0"
+                BorderBrush="{ObservableResource ControlStrokeColorDefault}">
+            <!-- Square corners on purpose: the clip here is a rectangular scissor, and a rounded frame would let the
+                 canvas's own square corners poke out from under it. -->
+            <Grid>
+            <!-- UNDER the canvas: an ordinary page of controls, so the whiteboard mode has something to be a whiteboard
+                 OVER. In the other three modes it is hidden behind the ground and never seen. -->
+            <StackPanel Orientation="Vertical" Margin="40,30,0,0" HorizontalAlignment="Left"
+                        VerticalAlignment="Top" Width="320">
+                <TextBlock Text="Somebody else's screen" FontSize="16"/>
+                <TextBlock Margin="0,6,0,0" TextWrapping="WrapByWords"
+                           Text="An ordinary page of controls. Turn Whiteboard on and the canvas above becomes glass: this stays live underneath while the pen draws over it."
+                           Foreground="{ObservableResource TextFillColorSecondary}"/>
+                <Button Content="A button" Margin="0,14,0,0" HorizontalAlignment="Left"/>
+                <CheckBox Content="A checkbox" Margin="0,10,0,0"/>
+                <TextBox Text="A field" Margin="0,10,0,0" Width="200" HorizontalAlignment="Left"/>
+            </StackPanel>
+
+            <!-- The SCENE comes from the page. The canvas asks it what falls inside the piece of world it can see and
+                 puts finished items into it; everything a drawing is for - undo, saving - stays with whoever owns
+                 the drawing.
+                 WHAT PAINTS A PIN is said by the TABLE above it (SocketKinds): the page says which word means which
+                 color, and the canvas does the rest. There is nothing to hand over but the table - which is what makes
+                 it impossible to paint the graph wrong. -->
+            <InfiniteCanvas x:Name="Canvas"
+                            GridStyle="{Binding GridStyle}"
+                            Mode="{Binding Mode, Mode=TwoWay}"
+                            Scene="{Binding Scene}"
+                            History="{Binding History}"
+                            Tools="{Binding Tools}"
+                            Selection="{Binding Selection, Mode=TwoWay}"
+                            Tool="{Binding Tool, Mode=TwoWay}"
+                            DefaultTool="{Binding SelectTool}"
+                            Layout="{Binding Layout, Mode=TwoWay}"
+                            Ink="{Binding Ink}"
+                            ShapeFill="{Binding ShapeFillOrNothing}"
+                            InkThickness="{Binding InkThickness}"
+                            TextSize="{Binding TextSize}"
+                            EraserSize="{Binding EraserSize}"
+                            IsDesignMode="{Binding DesignMode}"
+                            SnapToGrid="{Binding SnapToGrid}"
+                            ShowsPointerReadout="{Binding ShowReadout}"
+                            MaxScale="{Binding MaxZoom}"
+                            SnapMarkBrush="{Binding SnapMark}"
+                            SnapMarkSize="{Binding SnapMarkSize}"
+                            OverlayPlacement="TopLeft"
+                            Scale="{Binding Scale, Mode=TwoWay}"
+                            Offset="{Binding Offset, Mode=TwoWay}"
+                            Objects="{Binding Objects}"
+                            ObjectTemplateSelector="{ResourceReference PlacedThings}"
+                            Nodes="{Binding Nodes}"
+                            NodeKinds="{Binding NodeKinds}"
+                            SocketKinds="{Binding SocketKinds}"
+                            NodeContentSelector="{ResourceReference NodeBodies}"
+                            ConfirmsDelete="{Binding AsksBeforeDelete}"/>
+            </Grid>
+        </Border>
+
+    </Grid>
+</View>

@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<StyleSet xmlns="http://adamantium/ui"
+          xmlns:x="http://adamantium/ui/xaml/extensions">
+
+    <!-- The shared Thumb - what the ScrollBar's Track puts in its channel. Square, because everything in this theme is:
+         the fields, the tabs, the adorners and the trough it slides in all have no radius, so a rounded thumb would be
+         the one curved thing on screen and would read as belonging to another theme.
+
+         Fluent rounds its thumb because it sits inside a rounded trough. Here the trough is square, so the corners have
+         nothing to follow.
+
+         The sliders are NOT affected: each supplies its own Thumb.Template inline, because their grips are a different
+         object from a scroll thumb (they carry state and change shape with orientation). -->
+
+    <Style Selector="Thumb">
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Thumb">
+                    <Border CornerRadius="0" Background="{ResourceReference TextFillColorTertiary}"/>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+</StyleSet>

@@ -95,7 +95,7 @@ namespace Adamantium.Imaging
         public int MipLevels => 1;
 
         /// <summary>	
-        /// <dd> <p>Texture format (see <strong><see cref="AdamantiumVulkan.Core.Format"/></strong>).</p> </dd>	
+        /// <dd> <p>Texture format (see <strong><see cref="Adamantium.Vulkan.Core.Format"/></strong>).</p> </dd>	
         /// </summary>	
         /// <unmanaged>Vulkan imange Format</unmanaged>	
         public int BytesPerPixel;

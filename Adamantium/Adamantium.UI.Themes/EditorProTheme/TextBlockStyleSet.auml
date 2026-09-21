@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<StyleSet xmlns="http://adamantium/ui"
+          xmlns:x="http://adamantium/ui/xaml/extensions">
+
+    <!-- Plain text, and in THIS theme it is the file that carries the theme's density: the body size here is 12 against
+         Fluent's 14, so a label that fell back to TextBlock's own C# default stood out beside controls that had gone
+         denser around it.
+
+         The file used to be deliberately empty - see the long note in Fluent's copy for why a setter here was once
+         fatal, and why it no longer is: a selector that narrows by nothing but the type is filed as a default for the
+         type, below inheritance, so it dresses loose text without masking what a control says about its own content. -->
+
+    <Style Selector="TextBlock">
+        <Setter Property="Foreground" Value="{ObservableResource TextFillColorPrimary}"/>
+        <Setter Property="FontSize" Value="{ResourceReference FontSizeBody}"/>
+        <!-- Said once here rather than at every label - see Fluent's copy for why the property's own Bottom default
+             cannot be the thing that changes. -->
+        <Setter Property="VerticalTextAlignment" Value="Center"/>
+    </Style>
+
+</StyleSet>

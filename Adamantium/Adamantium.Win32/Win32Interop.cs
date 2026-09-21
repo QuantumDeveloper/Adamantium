@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Runtime.InteropServices;
 using Adamantium.Mathematics;
-using Adamantium.Win32.RawInput;
 
 namespace Adamantium.Win32
 {
@@ -42,6 +41,37 @@ namespace Adamantium.Win32
         [DllImport("user32.dll", SetLastError = true, EntryPoint = "DefWindowProcW")]
         public static extern IntPtr DefWindowProcW(IntPtr hWnd, uint msg, IntPtr wParam, IntPtr lParam);
 
+        // --- Clipboard (used by the text-input controls via a WindowsClipboard : IClipboard) ---
+        public const uint CF_UNICODETEXT = 13;
+        public const uint GMEM_MOVEABLE = 0x0002;
+
+        [DllImport("user32.dll", SetLastError = true)]
+        public static extern bool OpenClipboard(IntPtr hWndNewOwner);
+
+        [DllImport("user32.dll", SetLastError = true)]
+        public static extern bool CloseClipboard();
+
+        [DllImport("user32.dll", SetLastError = true)]
+        public static extern bool EmptyClipboard();
+
+        [DllImport("user32.dll", SetLastError = true)]
+        public static extern bool IsClipboardFormatAvailable(uint format);
+
+        [DllImport("user32.dll", SetLastError = true)]
+        public static extern IntPtr GetClipboardData(uint uFormat);
+
+        [DllImport("user32.dll", SetLastError = true)]
+        public static extern IntPtr SetClipboardData(uint uFormat, IntPtr hMem);
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        public static extern IntPtr GlobalAlloc(uint uFlags, UIntPtr dwBytes);
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        public static extern IntPtr GlobalLock(IntPtr hMem);
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        public static extern bool GlobalUnlock(IntPtr hMem);
+
         public static IntPtr DefWindowProc(IntPtr hWnd, WindowMessages msg, IntPtr wParam, IntPtr lParam)
         {
             return DefWindowProcW(hWnd, (uint)msg, wParam, lParam);
@@ -53,8 +83,40 @@ namespace Adamantium.Win32
         [DllImport("user32.dll")]
         public static extern bool GetClientRect(IntPtr hWnd, out RECT lpRect);
 
+        // --- Per-Monitor DPI (PMv2). See docs/PER_MONITOR_DPI_PLAN.md. ---
+        [DllImport("user32.dll", SetLastError = true)]
+        public static extern bool SetProcessDpiAwarenessContext(IntPtr value);
+
+        [DllImport("user32.dll")]
+        public static extern uint GetDpiForWindow(IntPtr hwnd);
+
+        [DllImport("user32.dll")]
+        public static extern IntPtr MonitorFromWindow(IntPtr hwnd, uint dwFlags);
+
+        [DllImport("shcore.dll")]
+        public static extern int GetDpiForMonitor(IntPtr hmonitor, int dpiType, out uint dpiX, out uint dpiY);
+
+        // DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2 is a pseudo-handle (-4), not a real pointer.
+        public static readonly IntPtr DpiAwarenessContextPerMonitorAwareV2 = new IntPtr(-4);
+        public const uint MonitorDefaultToNearest = 2;
+        public const int MdtEffectiveDpi = 0;   // MONITOR_DPI_TYPE.MDT_EFFECTIVE_DPI
+
+        // Mouse capture: while a window holds the capture the OS delivers ALL mouse messages (move + button-up) to it,
+        // even when the cursor is outside the client area - so a drag keeps tracking and the release is caught off-window.
+        [DllImport("user32.dll", EntryPoint = "SetCapture")]
+        public static extern IntPtr SetCapture(IntPtr hWnd);
+
+        [DllImport("user32.dll", EntryPoint = "ReleaseCapture")]
+        public static extern bool ReleaseCapture();
+
         [DllImport("user32.dll")]
         public static extern bool GetWindowRect(IntPtr hWnd, out RECT lpRect);
+
+        /// <summary>The active window OF THE CALLING THREAD - which is the UI thread, so it is our own window and never
+        /// another application's. What a modal dialog is owned by, so it centres on the window the user pressed in and
+        /// that window cannot be used behind it.</summary>
+        [DllImport("user32.dll")]
+        public static extern IntPtr GetActiveWindow();
 
         [DllImport("user32.dll", SetLastError = true)]
         public static extern Boolean AdjustWindowRect(ref RECT lpRect, UInt32 dwStyle, bool bMenu);
@@ -62,17 +124,15 @@ namespace Adamantium.Win32
         [DllImport("user32.dll")]
         public static extern short GetKeyState(uint key);
 
-        [DllImport("user32.dll", SetLastError = true)]
-        [return: MarshalAs(UnmanagedType.Bool)]
-        public static extern bool GetKeyboardState(byte[] keys);
-
         [DllImport("user32.dll")]
         public static extern short GetAsyncKeyState(uint key);
 
         [DllImport("user32.dll")]
         public static extern IntPtr LoadCursor(IntPtr hInstance, NativeCursors cursorName);
 
-        [DllImport("user32.dll", EntryPoint = "LoadCursorFromFileW", SetLastError = true)]
+        // CharSet.Unicode is REQUIRED: the entry point is the W (wide) variant, so the path must be marshalled as UTF-16.
+        // Without it the string goes as ANSI, the W function reads garbage, the file "isn't found" and it returns NULL.
+        [DllImport("user32.dll", EntryPoint = "LoadCursorFromFileW", CharSet = CharSet.Unicode, SetLastError = true)]
         public static extern IntPtr LoadCursorFromFile(string filePath);
 
         [DllImport("user32.dll")]
@@ -104,6 +164,9 @@ namespace Adamantium.Win32
             return new IntPtr(SetWindowLong32(hWnd, nIndex, dwNewLong.ToInt32()));
         }
 
+        [DllImport("user32.dll", EntryPoint = "SetWindowText")]
+        public static extern bool SetWindowText(IntPtr hwnd, string title);
+
         [DllImport("user32.dll", EntryPoint = "SetWindowLongPtr", CharSet = CharSet.Unicode)]
         private static extern IntPtr SetWindowLong64(IntPtr hwnd, WindowLongType index, IntPtr wndProc);
 
@@ -113,6 +176,11 @@ namespace Adamantium.Win32
         [DllImport("user32.dll")]
         [return: MarshalAs(UnmanagedType.Bool)]
         public static extern bool GetCursorPos(out NativePoint lpPoint);
+
+        /// <summary>The window under a SCREEN point, honouring the real z-order. Hidden, disabled and click-through
+        /// (WS_EX_TRANSPARENT) windows are skipped - which is why the drag ghost never shadows the window behind it.</summary>
+        [DllImport("user32.dll")]
+        public static extern IntPtr WindowFromPoint(NativePoint point);
 
         [DllImport("user32.dll")]
         [return: MarshalAs(UnmanagedType.Bool)]
@@ -164,44 +232,6 @@ namespace Adamantium.Win32
 
         [DllImport("Kernel32.dll")]
         public static extern UInt64 GetTickCount64();
-
-        [DllImport("user32.dll")]
-        [return: MarshalAs(UnmanagedType.Bool)]
-        public static extern Boolean RegisterRawInputDevices(
-            [MarshalAs(UnmanagedType.LPArray, SizeParamIndex = 0)] InputDevice[] pInputDevices,
-            int uiNumDevices,
-            int cbSize);
-
-        [DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Auto)]
-        public static extern uint GetRawInputDeviceList(
-            [In, Out] RawInputDeviceList[] rawInputDeviceList,
-            ref int numDevices,
-            int size /* = (uint)Marshal.SizeOf(typeof(RawInputDeviceList)) */);
-
-        [DllImport("user32.dll", SetLastError = true)]
-        public static extern uint GetRawInputDeviceInfo(
-            IntPtr hDevice,
-            RawInputDeviceInfoCommand uiCommand,
-            IntPtr pData,
-            ref int pcbSize);
-
-        /// <summary>
-        /// Function to retrieve raw input data.
-        /// </summary>
-        /// <param name="hRawInput">Handle to the raw input.</param>
-        /// <param name="uiCommand">Command to issue when retrieving data.</param>
-        /// <param name="pData">Raw input data.</param>
-        /// <param name="pcbSize">Number of bytes in the array.</param>
-        /// <param name="cbSizeHeader">Size of the header.</param>
-        /// <returns>0 if successful if pData is null, otherwise number of bytes if pData is not null.</returns>
-        [DllImport("user32.dll")]
-        public static extern int GetRawInputData(
-            IntPtr hRawInput,
-            RawInputCommand uiCommand,
-            out RawInputData pData,
-            ref int pcbSize,
-            int cbSizeHeader);
-
 
         [DllImport("user32.dll")]
         public static extern IntPtr BeginDeferWindowPos(int nNumWindows);
@@ -260,6 +290,15 @@ namespace Adamantium.Win32
         [DllImport("kernel32.dll")]
         public static extern uint GetCurrentThreadId();
 
+        // True if the window is currently maximized (zoomed). Queried live from the OS so frame math never trusts a
+        // cached state that can lag a native restore-drag.
+        [DllImport("user32.dll")]
+        public static extern bool IsZoomed(IntPtr hWnd);
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        public static extern bool CloseHandle(IntPtr hObject);
+
         [DllImport("user32.dll")]
         [return: MarshalAs(UnmanagedType.Bool)]
         public static extern bool SetForegroundWindow(IntPtr hWnd);
@@ -297,6 +336,35 @@ namespace Adamantium.Win32
         [DllImport("dwmapi.dll")]
         public static extern IntPtr DwmExtendFrameIntoClientArea(IntPtr hwnd, ref Margins margins);
 
+        // Windows 11 (build 22000+): set a DWM window attribute. For DWMWA_BORDER_COLOR (34) the value is a COLORREF
+        // (0x00BBGGRR); DWMWA_COLOR_DEFAULT/NONE are sentinels. Returns S_OK (0) on success, an error HRESULT on older OS.
+        [DllImport("dwmapi.dll")]
+        public static extern int DwmSetWindowAttribute(IntPtr hwnd, int attribute, ref int pvAttribute, int cbAttribute);
+
+        // Whether Windows currently asks applications to look dark. The personalisation setting lives in the registry
+        // and there is no API for it, so this reads the value directly - here, in the assembly that owns the platform
+        // calls, rather than as a DllImport dropped wherever it happened to be needed.
+        // HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize\AppsUseLightTheme,
+        // a DWORD: 0 = dark, 1 = light. Absent on older Windows, which had no dark mode - hence light by default.
+        private const string PersonalizeKey = @"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize";
+        private static readonly IntPtr HkeyCurrentUser = new(unchecked((int)0x80000001));
+        private const uint RrfRtRegDword = 0x00000010;
+
+        [DllImport("advapi32.dll", CharSet = CharSet.Unicode, EntryPoint = "RegGetValueW")]
+        private static extern int RegGetValue(IntPtr hkey, string subKey, string value, uint flags,
+            out uint type, out int data, ref uint dataSize);
+
+        /// <summary>Reads the Windows "apps use light theme" setting. Returns false (light) when the value cannot be
+        /// read at all, which is what a Windows without dark mode looks like.</summary>
+        public static bool SystemPrefersDarkAppearance()
+        {
+            uint size = sizeof(int);
+            var result = RegGetValue(HkeyCurrentUser, PersonalizeKey, "AppsUseLightTheme", RrfRtRegDword,
+                out _, out var appsUseLightTheme, ref size);
+
+            return result == 0 && appsUseLightTheme == 0;
+        }
+
         /*
             Graphics
         */
@@ -318,5 +386,127 @@ namespace Adamantium.Win32
 
         [DllImport("gdi32.dll", EntryPoint = "CreatePen")]
         public static extern IntPtr CreatePen(PenStyle penStyle, int width, uint color);
+
+        /*
+            Layered window (drag ghost): per-pixel-alpha composite done by the OS.
+        */
+
+        public const int ULW_ALPHA = 0x00000002;
+
+        // Uniform translucency for a window that renders ITSELF (no bitmap pushed at the OS): the DWM composites the
+        // whole window at one alpha. Per-pixel transparency does not come from here - it comes from the swapchain
+        // asking for pre-multiplied composition.
+        public const uint LWA_ALPHA = 0x00000002;
+
+        [DllImport("user32.dll", SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        public static extern bool SetLayeredWindowAttributes(IntPtr hwnd, uint crKey, byte bAlpha, uint dwFlags);
+
+        public const byte AC_SRC_OVER = 0x00;
+        public const byte AC_SRC_ALPHA = 0x01;
+        public const uint BI_RGB = 0;
+        public const uint DIB_RGB_COLORS = 0;
+
+        [DllImport("user32.dll")]
+        public static extern IntPtr GetDC(IntPtr hWnd);
+
+        // Push a 32-bit premultiplied-BGRA bitmap onto a WS_EX_LAYERED window; the DWM composites it with per-pixel alpha.
+        [DllImport("user32.dll", SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        public static extern bool UpdateLayeredWindow(
+            IntPtr hwnd, IntPtr hdcDst,
+            ref NativePoint pptDst, ref NativeSize psize,
+            IntPtr hdcSrc, ref NativePoint pptSrc,
+            uint crKey, ref BLENDFUNCTION pblend, uint dwFlags);
+
+        [DllImport("gdi32.dll", SetLastError = true)]
+        public static extern IntPtr CreateCompatibleDC(IntPtr hdc);
+
+        // 32-bit top-down DIB section; ppvBits points at its pixel buffer (write premultiplied BGRA straight into it).
+        [DllImport("gdi32.dll", SetLastError = true)]
+        public static extern IntPtr CreateDIBSection(
+            IntPtr hdc, ref BITMAPINFOHEADER pbmi, uint usage, out IntPtr ppvBits, IntPtr hSection, uint offset);
+
+        [DllImport("gdi32.dll")]
+        public static extern bool DeleteDC(IntPtr hdc);
+
+        [DllImport("gdi32.dll")]
+        public static extern bool DeleteObject(IntPtr hObject);
+
+        /*
+            OLE drag-drop (docs/DRAG_DROP_PLAN.md phases 5-6): the bridge to other applications.
+        */
+
+        /// <summary>Standard clipboard format ids (CF_UNICODETEXT sits with the clipboard block above). The drag payload
+        /// speaks these on the wire; the neutral names a view-model sees live in <c>DataFormats</c>.</summary>
+        public const uint CF_TEXT = 1;
+        /// <summary>A packed device-independent bitmap: BITMAPINFOHEADER immediately followed by the pixels, with no
+        /// file header. What the classic imaging applications (Paint, Word) accept - modern ones prefer the registered
+        /// "PNG" format.</summary>
+        public const uint CF_DIB = 8;
+        public const uint CF_HDROP = 15;
+
+        /// <summary>Bring OLE up on the CALLING thread (it must be an STA). Required before RegisterDragDrop /
+        /// DoDragDrop; returns RPC_E_CHANGED_MODE when the thread is already an MTA.</summary>
+        [DllImport("ole32.dll")]
+        public static extern int OleInitialize(IntPtr reserved);
+
+        [DllImport("ole32.dll")]
+        public static extern void OleUninitialize();
+
+        /// <summary>Make an HWND a drop target. The interface is kept alive by the OS until RevokeDragDrop; the window
+        /// must belong to the calling thread.</summary>
+        [DllImport("ole32.dll")]
+        public static extern int RegisterDragDrop(IntPtr hwnd, [MarshalAs(UnmanagedType.Interface)] Ole.IDropTarget dropTarget);
+
+        [DllImport("ole32.dll")]
+        public static extern int RevokeDragDrop(IntPtr hwnd);
+
+        /// <summary>Run the modal OLE drag loop. BLOCKS the calling thread for the whole gesture and returns
+        /// DRAGDROP_S_DROP / DRAGDROP_S_CANCEL, with the effect the target applied in <paramref name="effect"/>.</summary>
+        [DllImport("ole32.dll")]
+        public static extern int DoDragDrop(
+            [MarshalAs(UnmanagedType.Interface)] System.Runtime.InteropServices.ComTypes.IDataObject data,
+            [MarshalAs(UnmanagedType.Interface)] Ole.IDropSource dropSource,
+            Ole.DropEffect allowedEffects,
+            out Ole.DropEffect effect);
+
+        [DllImport("ole32.dll")]
+        public static extern void ReleaseStgMedium(ref System.Runtime.InteropServices.ComTypes.STGMEDIUM medium);
+
+        [DllImport("ole32.dll")]
+        public static extern int CoCreateInstance(ref Guid clsid, IntPtr outer, uint context, ref Guid iid,
+            [MarshalAs(UnmanagedType.Interface)] out object instance);
+
+        /// <summary>CLSCTX_INPROC_SERVER - the shell's drag-image helper lives in-process.</summary>
+        public const uint ClsCtxInprocServer = 1;
+
+        /// <summary>CLSCTX_ALL - let COM pick the server it is actually registered as. The wallpaper service is NOT
+        /// in-process: its CLSID carries an AppId and no InProcServer32, so asking for in-process only comes back
+        /// REGDB_E_CLASSNOTREG - the class is there, the context is not.</summary>
+        public const uint ClsCtxAll = 23;
+
+        /// <summary>CLSID_DragDropHelper: implements both IDragSourceHelper and IDropTargetHelper.</summary>
+        public static readonly Guid ClsidDragDropHelper = new("4657278A-411B-11D2-839A-00C04FD918D0");
+
+        /// <summary>CLSID_DesktopWallpaper: the shell's wallpaper service, which backdrop materials read (Mica shows
+        /// the desktop picture behind the window, not the frame behind the element).</summary>
+        public static readonly Guid ClsidDesktopWallpaper = new("C2CF3110-460E-4FC1-B9D0-8A1C0C9CC4BD");
+
+        /// <summary>Register (or look up) a private clipboard format by name - how a non-standard payload crosses
+        /// processes.</summary>
+        [DllImport("user32.dll", EntryPoint = "RegisterClipboardFormatW", CharSet = CharSet.Unicode, SetLastError = true)]
+        public static extern ushort RegisterClipboardFormat(string format);
+
+        /// <summary>Read a CF_HDROP block: index 0xFFFFFFFF returns the file COUNT, any other index fills
+        /// <paramref name="file"/> with that path.</summary>
+        [DllImport("shell32.dll", EntryPoint = "DragQueryFileW", CharSet = CharSet.Unicode)]
+        public static extern uint DragQueryFile(IntPtr drop, uint index, [Out] char[] file, uint charCount);
+
+        [DllImport("kernel32.dll")]
+        public static extern UIntPtr GlobalSize(IntPtr mem);
+
+        [DllImport("kernel32.dll")]
+        public static extern IntPtr GlobalFree(IntPtr mem);
     }
 }

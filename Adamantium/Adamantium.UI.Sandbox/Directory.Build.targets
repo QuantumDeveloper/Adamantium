@@ -1,0 +1,20 @@
+<Project>
+  <PropertyGroup>
+      <AssignTargetPathsDependsOn>
+         <!--$(AssignTargetPathsDependsOn);
+          EngineContentAndCompileTarget;-->
+      </AssignTargetPathsDependsOn>
+  </PropertyGroup>
+
+  <!-- Cooked content produced by the content pipeline (Adamantium.Engine.ContentCompiler.CLI). The .aemf
+       files live under Content\ (gitignored, regenerated); copy them next to the executable preserving the
+       Content\ prefix so CookedContentResolver finds them at runtime.
+       Not just *.aemf: the pipeline puts an asset's companions (a model's textures) beside it, and the
+       artifact references them by a RELATIVE name - left behind, the model loads black. -->
+  <ItemGroup>
+    <Content Include="Content\**\*.*">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
+</Project>

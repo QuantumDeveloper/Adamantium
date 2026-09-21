@@ -14,7 +14,7 @@ namespace Adamantium.Imaging.Png.Chunks
         public uint PhysY { get; set; }
         public Unit Unit { get; set; }
 
-        internal override byte[] GetChunkBytes(PNGState state)
+        internal override byte[] GetChunkBytes(PngState state)
         {
             var bytes = new List<byte>();
             bytes.AddRange(GetNameAsBytes());
@@ -25,7 +25,7 @@ namespace Adamantium.Imaging.Png.Chunks
             return bytes.ToArray();
         }
 
-        internal static pHYs FromState(PNGState state)
+        internal static pHYs FromState(PngState state)
         {
             var phys = new pHYs();
             phys.PhysX = state.InfoPng.PhysX;

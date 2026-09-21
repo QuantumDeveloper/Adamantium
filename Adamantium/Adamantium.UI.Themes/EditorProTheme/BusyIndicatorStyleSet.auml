@@ -1,0 +1,674 @@
+<?xml version="1.0" encoding="utf-8"?>
+<StyleSet xmlns="http://adamantium/ui"
+          xmlns:x="http://adamantium/ui/xaml/extensions">
+
+    <!-- The loading-indicator pack. BusyIndicator has NO look of its own - only IsActive - so every indicator here is
+         purely a theme template, picked by class (<BusyIndicator Classes="Dots"/>). A new indicator is a new <Style>,
+         not a new enum value in the engine, and an app can add its own the same way.
+
+         WHAT THIS THEME CHANGES, and it runs through every one of the ten: TEMPO and AMPLITUDE.
+
+         Fluent's timings are a product page's - a ring around in 1.1s, dots bouncing over half their own size twice a
+         second. An editor's indicator is different in kind: it sits in a corner of a panel, in peripheral vision, for
+         as long as the work takes, next to text somebody is reading. Fast, wide motion off to the side is the single
+         most distracting thing a UI can do. So every loop here is roughly half again as long and every excursion is
+         smaller - calm enough to ignore while you read, alive enough to answer "is it still working?" at a glance.
+
+         WHAT IT DOES NOT CHANGE is the forms. The class name IS the form: Dots that were not three dots, or Ants
+         without a marching dash, would be a different indicator wearing the same name, and an app that asked for one
+         by name would get the other. The SIZES are already this theme's own - every number below resolves against
+         Editor Pro's Metrics, where the pieces are square-cornered - so shape follows without being restated.
+
+         Each look starts on the IsActive trigger and STOPS on the way out. These loops never end by themselves
+         (IterationCount="Infinity"), so without the ExitAction a hidden indicator would keep animating - and a looping
+         animation on a detached element is a leak. -->
+
+    <!-- ============================== Ring (default): a sweeping arc over a dim track ============================== -->
+    <Style Selector="BusyIndicator">
+        <Setter Property="Width" Value="{ResourceReference BusySize}"/>
+        <Setter Property="Height" Value="{ResourceReference BusySize}"/>
+        <Setter Property="HorizontalAlignment" Value="Center"/>
+        <Setter Property="VerticalAlignment" Value="Center"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="BusyIndicator">
+                    <Grid>
+                        <!-- The track the arc travels over. A STROKE colour, not a fill one: it is the same hairline
+                             grey every other outline in this theme uses, so an indicator dropped into a panel is
+                             drawn in the panel's own line weight rather than in a wash of its own. -->
+                        <Ellipse Stroke="{ResourceReference ControlStrokeColorDefault}"
+                                 StrokeThickness="{ResourceReference BusyArcThickness}"
+                                 Fill="Transparent"
+                                 EllipseType="EdgeToEdge"/>
+                        <!-- The accent arc; it is the ARC that spins. RenderTransformOrigin is a FRACTION of the
+                             element's own size, so it turns about its centre at ANY size the control is given - an
+                             absolute pixel centre would be right only at the one size this was written for. -->
+                        <Ellipse Stroke="{ThemeResource AccentFillColorDefault}"
+                                 StrokeThickness="{ResourceReference BusyArcThickness}"
+                                 Fill="Transparent"
+                                 EllipseType="EdgeToEdge"
+                                 StartAngle="0"
+                                 StopAngle="90"
+                                 RenderTransformOrigin="0.5,0.5">
+                            <Ellipse.RenderTransform>
+                                <Transform x:Name="RingSpin"/>
+                            </Ellipse.RenderTransform>
+                        </Ellipse>
+                    </Grid>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style Selector="BusyIndicator">
+        <PropertyTrigger Property="IsActive" Value="True">
+            <PropertyTrigger.EnterActions>
+                <RunAnimationAction TargetName="RingSpin">
+                    <Animation Duration="0:0:1.6" IterationCount="Infinity">
+                        <KeyFrame Cue="0"><Setter Property="RotationAngle" Value="0"/></KeyFrame>
+                        <KeyFrame Cue="1"><Setter Property="RotationAngle" Value="360"/></KeyFrame>
+                    </Animation>
+                </RunAnimationAction>
+            </PropertyTrigger.EnterActions>
+            <PropertyTrigger.ExitActions>
+                <StopAnimationAction TargetName="RingSpin"/>
+            </PropertyTrigger.ExitActions>
+        </PropertyTrigger>
+    </Style>
+
+    <!-- ============================== Dots: three dots breathing in sequence ============================== -->
+    <Style Selector="BusyIndicator.Dots">
+        <Setter Property="Width" Value="Auto"/>
+        <Setter Property="Height" Value="Auto"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="BusyIndicator">
+                    <StackPanel Orientation="Horizontal">
+                        <Ellipse Width="{ResourceReference BusyDotSize}" Height="{ResourceReference BusyDotSize}"
+                                 Margin="{ResourceReference BusyDotGap}"
+                                 Fill="{ThemeResource AccentFillColorDefault}"
+                                 EllipseType="EdgeToEdge"
+                                 RenderTransformOrigin="0.5,0.5">
+                            <Ellipse.RenderTransform>
+                                <Transform x:Name="Dot1"/>
+                            </Ellipse.RenderTransform>
+                        </Ellipse>
+                        <Ellipse Width="{ResourceReference BusyDotSize}" Height="{ResourceReference BusyDotSize}"
+                                 Margin="{ResourceReference BusyDotGap}"
+                                 Fill="{ThemeResource AccentFillColorDefault}"
+                                 EllipseType="EdgeToEdge"
+                                 RenderTransformOrigin="0.5,0.5">
+                            <Ellipse.RenderTransform>
+                                <Transform x:Name="Dot2"/>
+                            </Ellipse.RenderTransform>
+                        </Ellipse>
+                        <Ellipse Width="{ResourceReference BusyDotSize}" Height="{ResourceReference BusyDotSize}"
+                                 Margin="{ResourceReference BusyDotGap}"
+                                 Fill="{ThemeResource AccentFillColorDefault}"
+                                 EllipseType="EdgeToEdge"
+                                 RenderTransformOrigin="0.5,0.5">
+                            <Ellipse.RenderTransform>
+                                <Transform x:Name="Dot3"/>
+                            </Ellipse.RenderTransform>
+                        </Ellipse>
+                    </StackPanel>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- ONE animation played by three dots at three Delays - that is what makes it read as a travelling wave rather
+         than three things blinking. Scale, not opacity: a scaled dot keeps its colour and stays legible on any ground.
+         The floor is 0.65, not Fluent's 0.5: a dot that halves is a dot that flickers. -->
+    <Style Selector="BusyIndicator.Dots">
+        <PropertyTrigger Property="IsActive" Value="True">
+            <PropertyTrigger.EnterActions>
+                <RunAnimationAction TargetName="Dot1">
+                    <Animation Duration="0:0:0.85" IterationCount="Infinity" AutoReverse="True" Easing="CubicInOut">
+                        <KeyFrame Cue="0"><Setter Property="ScaleX" Value="0.65"/><Setter Property="ScaleY" Value="0.65"/></KeyFrame>
+                        <KeyFrame Cue="1"><Setter Property="ScaleX" Value="1.0"/><Setter Property="ScaleY" Value="1.0"/></KeyFrame>
+                    </Animation>
+                </RunAnimationAction>
+                <RunAnimationAction TargetName="Dot2">
+                    <Animation Duration="0:0:0.85" Delay="0:0:0.2" IterationCount="Infinity" AutoReverse="True" Easing="CubicInOut">
+                        <KeyFrame Cue="0"><Setter Property="ScaleX" Value="0.65"/><Setter Property="ScaleY" Value="0.65"/></KeyFrame>
+                        <KeyFrame Cue="1"><Setter Property="ScaleX" Value="1.0"/><Setter Property="ScaleY" Value="1.0"/></KeyFrame>
+                    </Animation>
+                </RunAnimationAction>
+                <RunAnimationAction TargetName="Dot3">
+                    <Animation Duration="0:0:0.85" Delay="0:0:0.4" IterationCount="Infinity" AutoReverse="True" Easing="CubicInOut">
+                        <KeyFrame Cue="0"><Setter Property="ScaleX" Value="0.65"/><Setter Property="ScaleY" Value="0.65"/></KeyFrame>
+                        <KeyFrame Cue="1"><Setter Property="ScaleX" Value="1.0"/><Setter Property="ScaleY" Value="1.0"/></KeyFrame>
+                    </Animation>
+                </RunAnimationAction>
+            </PropertyTrigger.EnterActions>
+            <PropertyTrigger.ExitActions>
+                <StopAnimationAction TargetName="Dot1"/>
+                <StopAnimationAction TargetName="Dot2"/>
+                <StopAnimationAction TargetName="Dot3"/>
+            </PropertyTrigger.ExitActions>
+        </PropertyTrigger>
+    </Style>
+
+    <!-- ============================== Bar: an indeterminate sweep along a track ============================== -->
+    <Style Selector="BusyIndicator.Bar">
+        <Setter Property="Width" Value="{ResourceReference BusyBarWidth}"/>
+        <Setter Property="Height" Value="{ResourceReference BusyBarHeight}"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="BusyIndicator">
+                    <!-- ClipToBounds is what makes it a SWEEP and not a stripe wandering across the page: the piece
+                         runs from off the left edge to off the right one and the track hides it outside itself. -->
+                    <Border Background="{ResourceReference ControlFillColorTertiary}"
+                            CornerRadius="{ResourceReference BusyPieceRadius}"
+                            ClipToBounds="True">
+                        <Border x:Name="BarPill"
+                                Width="{ResourceReference BusyBarSegmentWidth}"
+                                Height="{ResourceReference BusyBarHeight}"
+                                CornerRadius="{ResourceReference BusyPieceRadius}"
+                                HorizontalAlignment="Left"
+                                Background="{ThemeResource AccentFillColorDefault}">
+                            <Border.RenderTransform>
+                                <Transform x:Name="BarSlide" TranslateX="-40"/>
+                            </Border.RenderTransform>
+                        </Border>
+                    </Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- The travel is EXACTLY the track: -40 is the segment fully off the left edge, 120 fully off the right, both
+         read from the same two metrics the template uses. Fluent overshoots at both ends, which parks the piece
+         off-stage for a beat every cycle - and an indeterminate bar that stops moving is precisely how a hang looks,
+         which is the one message this control must never send by accident. -->
+    <Style Selector="BusyIndicator.Bar">
+        <PropertyTrigger Property="IsActive" Value="True">
+            <PropertyTrigger.EnterActions>
+                <RunAnimationAction TargetName="BarSlide">
+                    <Animation Duration="0:0:1.9" IterationCount="Infinity" Easing="CubicInOut">
+                        <KeyFrame Cue="0"><Setter Property="TranslateX" Value="-40"/></KeyFrame>
+                        <KeyFrame Cue="1"><Setter Property="TranslateX" Value="120"/></KeyFrame>
+                    </Animation>
+                </RunAnimationAction>
+            </PropertyTrigger.EnterActions>
+            <PropertyTrigger.ExitActions>
+                <StopAnimationAction TargetName="BarSlide"/>
+            </PropertyTrigger.ExitActions>
+        </PropertyTrigger>
+    </Style>
+
+    <!-- ============================== Ripple: two rings expanding out of the centre ============================== -->
+    <Style Selector="BusyIndicator.Ripple">
+        <Setter Property="Width" Value="{ResourceReference BusySize}"/>
+        <Setter Property="Height" Value="{ResourceReference BusySize}"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="BusyIndicator">
+                    <Grid>
+                        <Ellipse x:Name="Ripple1"
+                                 Stroke="{ThemeResource AccentFillColorDefault}"
+                                 StrokeThickness="{ResourceReference BusyRippleThickness}"
+                                 Fill="Transparent"
+                                 EllipseType="EdgeToEdge"
+                                 RenderTransformOrigin="0.5,0.5">
+                            <Ellipse.RenderTransform>
+                                <Transform x:Name="RippleScale1" ScaleX="0.2" ScaleY="0.2"/>
+                            </Ellipse.RenderTransform>
+                        </Ellipse>
+                        <Ellipse x:Name="Ripple2"
+                                 Stroke="{ThemeResource AccentFillColorDefault}"
+                                 StrokeThickness="{ResourceReference BusyRippleThickness}"
+                                 Fill="Transparent"
+                                 EllipseType="EdgeToEdge"
+                                 RenderTransformOrigin="0.5,0.5">
+                            <Ellipse.RenderTransform>
+                                <Transform x:Name="RippleScale2" ScaleX="0.2" ScaleY="0.2"/>
+                            </Ellipse.RenderTransform>
+                        </Ellipse>
+                    </Grid>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- Two rings half a period apart, each growing while it fades. The scale and the fade are SEPARATE animations on
+         the same element because they are different properties of it - the transform grows, the element itself dims.
+         Starting opacity 0.7, not 0.9: this is the widest thing in the pack, and at full strength a ring the size of
+         the whole control pulsing beside a text panel pulls the eye off the text every cycle. -->
+    <Style Selector="BusyIndicator.Ripple">
+        <PropertyTrigger Property="IsActive" Value="True">
+            <PropertyTrigger.EnterActions>
+                <RunAnimationAction TargetName="RippleScale1">
+                    <Animation Duration="0:0:2.2" IterationCount="Infinity" Easing="CubicOut">
+                        <KeyFrame Cue="0"><Setter Property="ScaleX" Value="0.2"/><Setter Property="ScaleY" Value="0.2"/></KeyFrame>
+                        <KeyFrame Cue="1"><Setter Property="ScaleX" Value="1.0"/><Setter Property="ScaleY" Value="1.0"/></KeyFrame>
+                    </Animation>
+                </RunAnimationAction>
+                <RunAnimationAction TargetName="Ripple1">
+                    <Animation Duration="0:0:2.2" IterationCount="Infinity">
+                        <KeyFrame Cue="0"><Setter Property="Opacity" Value="0.7"/></KeyFrame>
+                        <KeyFrame Cue="1"><Setter Property="Opacity" Value="0"/></KeyFrame>
+                    </Animation>
+                </RunAnimationAction>
+                <RunAnimationAction TargetName="RippleScale2">
+                    <Animation Duration="0:0:2.2" Delay="0:0:1.1" IterationCount="Infinity" Easing="CubicOut">
+                        <KeyFrame Cue="0"><Setter Property="ScaleX" Value="0.2"/><Setter Property="ScaleY" Value="0.2"/></KeyFrame>
+                        <KeyFrame Cue="1"><Setter Property="ScaleX" Value="1.0"/><Setter Property="ScaleY" Value="1.0"/></KeyFrame>
+                    </Animation>
+                </RunAnimationAction>
+                <RunAnimationAction TargetName="Ripple2">
+                    <Animation Duration="0:0:2.2" Delay="0:0:1.1" IterationCount="Infinity">
+                        <KeyFrame Cue="0"><Setter Property="Opacity" Value="0.7"/></KeyFrame>
+                        <KeyFrame Cue="1"><Setter Property="Opacity" Value="0"/></KeyFrame>
+                    </Animation>
+                </RunAnimationAction>
+            </PropertyTrigger.EnterActions>
+            <PropertyTrigger.ExitActions>
+                <StopAnimationAction TargetName="RippleScale1"/>
+                <StopAnimationAction TargetName="Ripple1"/>
+                <StopAnimationAction TargetName="RippleScale2"/>
+                <StopAnimationAction TargetName="Ripple2"/>
+            </PropertyTrigger.ExitActions>
+        </PropertyTrigger>
+    </Style>
+
+    <!-- ============================== Arc: a spinning arc that also grows and shrinks ============================== -->
+    <Style Selector="BusyIndicator.Arc">
+        <Setter Property="Width" Value="{ResourceReference BusySize}"/>
+        <Setter Property="Height" Value="{ResourceReference BusySize}"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="BusyIndicator">
+                    <Ellipse x:Name="ArcStroke"
+                             Stroke="{ThemeResource AccentFillColorDefault}"
+                             StrokeThickness="{ResourceReference BusyArcThickness}"
+                             StartLineCap="ConvexRound"
+                             EndLineCap="ConvexRound"
+                             Fill="Transparent"
+                             EllipseType="EdgeToEdge"
+                             StrokeTrimStart="0"
+                             StrokeTrimEnd="0.1"
+                             RenderTransformOrigin="0.5,0.5">
+                        <Ellipse.RenderTransform>
+                            <Transform x:Name="ArcSpin"/>
+                        </Ellipse.RenderTransform>
+                    </Ellipse>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- Two loops of DIFFERENT periods: the arc spins in 1.8s while its length breathes in 1.25s. Because the two
+         never line up, the whole thing never looks like it is repeating - that is the entire trick of this spinner,
+         and it is why the two durations must stay coprime-ish rather than tidy multiples. AutoReverse on the trim
+         means the arc retracts the way it grew, so there is no seam at the loop boundary; a one-way 0->1 trim shows
+         that boundary as a jump. -->
+    <Style Selector="BusyIndicator.Arc">
+        <PropertyTrigger Property="IsActive" Value="True">
+            <PropertyTrigger.EnterActions>
+                <RunAnimationAction TargetName="ArcSpin">
+                    <Animation Duration="0:0:1.8" IterationCount="Infinity">
+                        <KeyFrame Cue="0"><Setter Property="RotationAngle" Value="0"/></KeyFrame>
+                        <KeyFrame Cue="1"><Setter Property="RotationAngle" Value="360"/></KeyFrame>
+                    </Animation>
+                </RunAnimationAction>
+                <RunAnimationAction TargetName="ArcStroke">
+                    <Animation Duration="0:0:1.25" IterationCount="Infinity" AutoReverse="True" Easing="CubicInOut">
+                        <KeyFrame Cue="0"><Setter Property="StrokeTrimEnd" Value="0.08"/></KeyFrame>
+                        <KeyFrame Cue="1"><Setter Property="StrokeTrimEnd" Value="0.75"/></KeyFrame>
+                    </Animation>
+                </RunAnimationAction>
+            </PropertyTrigger.EnterActions>
+            <PropertyTrigger.ExitActions>
+                <StopAnimationAction TargetName="ArcSpin"/>
+                <StopAnimationAction TargetName="ArcStroke"/>
+            </PropertyTrigger.ExitActions>
+        </PropertyTrigger>
+    </Style>
+
+    <!-- ============================== Ants: a marching dashed outline ============================== -->
+    <Style Selector="BusyIndicator.Ants">
+        <Setter Property="Width" Value="{ResourceReference BusySize}"/>
+        <Setter Property="Height" Value="{ResourceReference BusySize}"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="BusyIndicator">
+                    <!-- A RECTANGLE, not a ring, and that is not a style choice. On a circle "the dashes travel along
+                         the contour" and "the dashed ring spins" are the SAME motion - nothing can tell them apart,
+                         so the marching would read as a spin, which the Ring class already is. Straight runs and
+                         corners are what make it legible, which is also why every selection marquee this effect is
+                         named after is rectangular.
+                         The dash numbers are PIXELS (the array is not scaled by thickness): a dash has to be longer
+                         than the stroke is thick or it reads as a dot. -->
+                    <Rectangle x:Name="AntsRing"
+                               CornerRadius="{ResourceReference BusyPieceRadius}"
+                               Stroke="{ThemeResource AccentFillColorDefault}"
+                               StrokeThickness="{ResourceReference BusyRippleThickness}"
+                               StrokeDashArray="5 7"
+                               StrokeDashStartCap="Flat"
+                               StrokeDashEndCap="Flat"
+                               StrokeDashFit="True"
+                               StrokeDashOffset="0"
+                               Fill="Transparent"/>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- One dash period per cycle, so the phase wraps seamlessly. Slower than Fluent's: this is the busiest-looking
+         thing in the pack - the whole outline is in motion at once - and at a third of a second it crawls fast enough
+         to catch the eye from across the window. -->
+    <Style Selector="BusyIndicator.Ants">
+        <PropertyTrigger Property="IsActive" Value="True">
+            <PropertyTrigger.EnterActions>
+                <RunAnimationAction TargetName="AntsRing">
+                    <Animation Duration="0:0:0.5" IterationCount="Infinity">
+                        <KeyFrame Cue="0"><Setter Property="StrokeDashPhase" Value="0"/></KeyFrame>
+                        <KeyFrame Cue="1"><Setter Property="StrokeDashPhase" Value="1"/></KeyFrame>
+                    </Animation>
+                </RunAnimationAction>
+            </PropertyTrigger.EnterActions>
+            <PropertyTrigger.ExitActions>
+                <StopAnimationAction TargetName="AntsRing"/>
+            </PropertyTrigger.ExitActions>
+        </PropertyTrigger>
+    </Style>
+
+    <!-- ============================== Shimmer: a glare gliding across a placeholder card ============================== -->
+    <Style Selector="BusyIndicator.Shimmer">
+        <Setter Property="Width" Value="{ResourceReference BusyShimmerWidth}"/>
+        <Setter Property="Height" Value="{ResourceReference BusyShimmerHeight}"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="BusyIndicator">
+                    <!-- ONE shape carrying the gradient, not a band clipped by a rounded parent. The clip is
+                         RECTANGULAR - it knows nothing about CornerRadius - so a band reaching an end filled the
+                         card's rounded corner square while the other end stayed round. With a single shape there is
+                         nothing to clip and the rounding is the shape's own, so that cannot come back. -->
+                    <Rectangle CornerRadius="{ResourceReference BusyShimmerRadius}" Stroke="Transparent">
+                        <Rectangle.Fill>
+                            <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
+                                <GradientStop x:Name="ShimmerLead" Color="{ResourceReference ShimmerTrackColor}" Offset="0"/>
+                                <GradientStop x:Name="ShimmerPeak" Color="{ResourceReference ShimmerPeakColor}" Offset="0.15"/>
+                                <GradientStop x:Name="ShimmerTrail" Color="{ResourceReference ShimmerTrackColor}" Offset="0.3"/>
+                            </LinearGradientBrush>
+                        </Rectangle.Fill>
+                    </Rectangle>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- The three stops slide together, keeping their spacing. They stay inside 0..1 for the whole sweep on purpose:
+         gradient offsets are clamped to that range, so a stop running past an edge would stall there and the glare
+         would pile up in the corner instead of gliding. AutoReverse so it comes back rather than snapping home. -->
+    <Style Selector="BusyIndicator.Shimmer">
+        <PropertyTrigger Property="IsActive" Value="True">
+            <PropertyTrigger.EnterActions>
+                <RunAnimationAction TargetName="ShimmerLead">
+                    <Animation Duration="0:0:2.6" IterationCount="Infinity" AutoReverse="True" Easing="CubicInOut">
+                        <KeyFrame Cue="0"><Setter Property="Offset" Value="0"/></KeyFrame>
+                        <KeyFrame Cue="1"><Setter Property="Offset" Value="0.7"/></KeyFrame>
+                    </Animation>
+                </RunAnimationAction>
+                <RunAnimationAction TargetName="ShimmerPeak">
+                    <Animation Duration="0:0:2.6" IterationCount="Infinity" AutoReverse="True" Easing="CubicInOut">
+                        <KeyFrame Cue="0"><Setter Property="Offset" Value="0.15"/></KeyFrame>
+                        <KeyFrame Cue="1"><Setter Property="Offset" Value="0.85"/></KeyFrame>
+                    </Animation>
+                </RunAnimationAction>
+                <RunAnimationAction TargetName="ShimmerTrail">
+                    <Animation Duration="0:0:2.6" IterationCount="Infinity" AutoReverse="True" Easing="CubicInOut">
+                        <KeyFrame Cue="0"><Setter Property="Offset" Value="0.3"/></KeyFrame>
+                        <KeyFrame Cue="1"><Setter Property="Offset" Value="1"/></KeyFrame>
+                    </Animation>
+                </RunAnimationAction>
+            </PropertyTrigger.EnterActions>
+            <PropertyTrigger.ExitActions>
+                <StopAnimationAction TargetName="ShimmerLead"/>
+                <StopAnimationAction TargetName="ShimmerPeak"/>
+                <StopAnimationAction TargetName="ShimmerTrail"/>
+            </PropertyTrigger.ExitActions>
+        </PropertyTrigger>
+    </Style>
+
+    <!-- ============================== Flip: three cards turning in sequence ============================== -->
+    <Style Selector="BusyIndicator.Flip">
+        <Setter Property="Width" Value="Auto"/>
+        <Setter Property="Height" Value="Auto"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="BusyIndicator">
+                    <StackPanel Orientation="Horizontal">
+                        <!-- Perspective is what makes this a TURN rather than a squeeze: without it, foreshortening a
+                             Y-rotation is just a width scale. Origin at the centre so each card turns about itself. -->
+                        <Border Width="{ResourceReference BusyFlipWidth}" Height="{ResourceReference BusyFlipHeight}"
+                                Margin="{ResourceReference BusyFlipGap}"
+                                CornerRadius="{ResourceReference BusyPieceRadiusLarge}"
+                                Background="{ThemeResource AccentFillColorDefault}"
+                                RenderTransformOrigin="0.5,0.5">
+                            <Border.RenderTransform>
+                                <Transform x:Name="Flip1" Perspective="240"/>
+                            </Border.RenderTransform>
+                        </Border>
+                        <Border Width="{ResourceReference BusyFlipWidth}" Height="{ResourceReference BusyFlipHeight}"
+                                Margin="{ResourceReference BusyFlipGap}"
+                                CornerRadius="{ResourceReference BusyPieceRadiusLarge}"
+                                Background="{ThemeResource AccentFillColorDefault}"
+                                RenderTransformOrigin="0.5,0.5">
+                            <Border.RenderTransform>
+                                <Transform x:Name="Flip2" Perspective="240"/>
+                            </Border.RenderTransform>
+                        </Border>
+                        <Border Width="{ResourceReference BusyFlipWidth}" Height="{ResourceReference BusyFlipHeight}"
+                                Margin="{ResourceReference BusyFlipGap}"
+                                CornerRadius="{ResourceReference BusyPieceRadiusLarge}"
+                                Background="{ThemeResource AccentFillColorDefault}"
+                                RenderTransformOrigin="0.5,0.5">
+                            <Border.RenderTransform>
+                                <Transform x:Name="Flip3" Perspective="240"/>
+                            </Border.RenderTransform>
+                        </Border>
+                    </StackPanel>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style Selector="BusyIndicator.Flip">
+        <PropertyTrigger Property="IsActive" Value="True">
+            <PropertyTrigger.EnterActions>
+                <RunAnimationAction TargetName="Flip1">
+                    <Animation Duration="0:0:1.6" IterationCount="Infinity" Easing="CubicInOut">
+                        <KeyFrame Cue="0"><Setter Property="RotationY" Value="0"/></KeyFrame>
+                        <KeyFrame Cue="1"><Setter Property="RotationY" Value="360"/></KeyFrame>
+                    </Animation>
+                </RunAnimationAction>
+                <RunAnimationAction TargetName="Flip2">
+                    <Animation Duration="0:0:1.6" Delay="0:0:0.2" IterationCount="Infinity" Easing="CubicInOut">
+                        <KeyFrame Cue="0"><Setter Property="RotationY" Value="0"/></KeyFrame>
+                        <KeyFrame Cue="1"><Setter Property="RotationY" Value="360"/></KeyFrame>
+                    </Animation>
+                </RunAnimationAction>
+                <RunAnimationAction TargetName="Flip3">
+                    <Animation Duration="0:0:1.6" Delay="0:0:0.4" IterationCount="Infinity" Easing="CubicInOut">
+                        <KeyFrame Cue="0"><Setter Property="RotationY" Value="0"/></KeyFrame>
+                        <KeyFrame Cue="1"><Setter Property="RotationY" Value="360"/></KeyFrame>
+                    </Animation>
+                </RunAnimationAction>
+            </PropertyTrigger.EnterActions>
+            <PropertyTrigger.ExitActions>
+                <StopAnimationAction TargetName="Flip1"/>
+                <StopAnimationAction TargetName="Flip2"/>
+                <StopAnimationAction TargetName="Flip3"/>
+            </PropertyTrigger.ExitActions>
+        </PropertyTrigger>
+    </Style>
+
+    <!-- ============================== Equalizer: five bars, each on its own clock ============================== -->
+    <Style Selector="BusyIndicator.Equalizer">
+        <Setter Property="Width" Value="Auto"/>
+        <Setter Property="Height" Value="Auto"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="BusyIndicator">
+                    <!-- Bottom-aligned, and every origin is 0.5,1: the bars grow UPWARD out of a shared floor. With a
+                         centred origin they would swell in both directions and the floor line would break up. -->
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Bottom">
+                        <Border Width="{ResourceReference BusyEqualizerBarWidth}" Height="{ResourceReference BusyEqualizerBarHeight}"
+                                Margin="{ResourceReference BusyEqualizerGap}" CornerRadius="{ResourceReference BusyPieceRadius}"
+                                Background="{ThemeResource AccentFillColorDefault}"
+                                RenderTransformOrigin="0.5,1">
+                            <Border.RenderTransform><Transform x:Name="Eq1" ScaleY="0.4"/></Border.RenderTransform>
+                        </Border>
+                        <Border Width="{ResourceReference BusyEqualizerBarWidth}" Height="{ResourceReference BusyEqualizerBarHeight}"
+                                Margin="{ResourceReference BusyEqualizerGap}" CornerRadius="{ResourceReference BusyPieceRadius}"
+                                Background="{ThemeResource AccentFillColorDefault}"
+                                RenderTransformOrigin="0.5,1">
+                            <Border.RenderTransform><Transform x:Name="Eq2" ScaleY="0.4"/></Border.RenderTransform>
+                        </Border>
+                        <Border Width="{ResourceReference BusyEqualizerBarWidth}" Height="{ResourceReference BusyEqualizerBarHeight}"
+                                Margin="{ResourceReference BusyEqualizerGap}" CornerRadius="{ResourceReference BusyPieceRadius}"
+                                Background="{ThemeResource AccentFillColorDefault}"
+                                RenderTransformOrigin="0.5,1">
+                            <Border.RenderTransform><Transform x:Name="Eq3" ScaleY="0.4"/></Border.RenderTransform>
+                        </Border>
+                        <Border Width="{ResourceReference BusyEqualizerBarWidth}" Height="{ResourceReference BusyEqualizerBarHeight}"
+                                Margin="{ResourceReference BusyEqualizerGap}" CornerRadius="{ResourceReference BusyPieceRadius}"
+                                Background="{ThemeResource AccentFillColorDefault}"
+                                RenderTransformOrigin="0.5,1">
+                            <Border.RenderTransform><Transform x:Name="Eq4" ScaleY="0.4"/></Border.RenderTransform>
+                        </Border>
+                        <Border Width="{ResourceReference BusyEqualizerBarWidth}" Height="{ResourceReference BusyEqualizerBarHeight}"
+                                Margin="{ResourceReference BusyEqualizerGap}" CornerRadius="{ResourceReference BusyPieceRadius}"
+                                Background="{ThemeResource AccentFillColorDefault}"
+                                RenderTransformOrigin="0.5,1">
+                            <Border.RenderTransform><Transform x:Name="Eq5" ScaleY="0.4"/></Border.RenderTransform>
+                        </Border>
+                    </StackPanel>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- Five DIFFERENT periods, none a multiple of another, so the bars never fall into step - a row of bars moving
+         together is a wave, not an equalizer. The floor is lifted to 0.4: at Fluent's 0.25 the shortest bars all but
+         vanish and the row reads as gaps rather than as levels. -->
+    <Style Selector="BusyIndicator.Equalizer">
+        <PropertyTrigger Property="IsActive" Value="True">
+            <PropertyTrigger.EnterActions>
+                <RunAnimationAction TargetName="Eq1">
+                    <Animation Duration="0:0:0.70" IterationCount="Infinity" AutoReverse="True" Easing="CubicInOut">
+                        <KeyFrame Cue="0"><Setter Property="ScaleY" Value="0.4"/></KeyFrame>
+                        <KeyFrame Cue="1"><Setter Property="ScaleY" Value="1.0"/></KeyFrame>
+                    </Animation>
+                </RunAnimationAction>
+                <RunAnimationAction TargetName="Eq2">
+                    <Animation Duration="0:0:0.95" IterationCount="Infinity" AutoReverse="True" Easing="CubicInOut">
+                        <KeyFrame Cue="0"><Setter Property="ScaleY" Value="0.9"/></KeyFrame>
+                        <KeyFrame Cue="1"><Setter Property="ScaleY" Value="0.45"/></KeyFrame>
+                    </Animation>
+                </RunAnimationAction>
+                <RunAnimationAction TargetName="Eq3">
+                    <Animation Duration="0:0:0.60" IterationCount="Infinity" AutoReverse="True" Easing="CubicInOut">
+                        <KeyFrame Cue="0"><Setter Property="ScaleY" Value="0.5"/></KeyFrame>
+                        <KeyFrame Cue="1"><Setter Property="ScaleY" Value="1.0"/></KeyFrame>
+                    </Animation>
+                </RunAnimationAction>
+                <RunAnimationAction TargetName="Eq4">
+                    <Animation Duration="0:0:1.05" IterationCount="Infinity" AutoReverse="True" Easing="CubicInOut">
+                        <KeyFrame Cue="0"><Setter Property="ScaleY" Value="1.0"/></KeyFrame>
+                        <KeyFrame Cue="1"><Setter Property="ScaleY" Value="0.42"/></KeyFrame>
+                    </Animation>
+                </RunAnimationAction>
+                <RunAnimationAction TargetName="Eq5">
+                    <Animation Duration="0:0:0.80" IterationCount="Infinity" AutoReverse="True" Easing="CubicInOut">
+                        <KeyFrame Cue="0"><Setter Property="ScaleY" Value="0.45"/></KeyFrame>
+                        <KeyFrame Cue="1"><Setter Property="ScaleY" Value="0.95"/></KeyFrame>
+                    </Animation>
+                </RunAnimationAction>
+            </PropertyTrigger.EnterActions>
+            <PropertyTrigger.ExitActions>
+                <StopAnimationAction TargetName="Eq1"/>
+                <StopAnimationAction TargetName="Eq2"/>
+                <StopAnimationAction TargetName="Eq3"/>
+                <StopAnimationAction TargetName="Eq4"/>
+                <StopAnimationAction TargetName="Eq5"/>
+            </PropertyTrigger.ExitActions>
+        </PropertyTrigger>
+    </Style>
+
+    <!-- ============================== Heartbeat: a core with a halo, beating ============================== -->
+    <Style Selector="BusyIndicator.Heartbeat">
+        <Setter Property="Width" Value="{ResourceReference BusySize}"/>
+        <Setter Property="Height" Value="{ResourceReference BusySize}"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="BusyIndicator">
+                    <Grid>
+                        <Ellipse x:Name="BeatHalo"
+                                 Fill="{ThemeResource AccentFillColorDefault}"
+                                 Opacity="0.25"
+                                 EllipseType="EdgeToEdge"
+                                 RenderTransformOrigin="0.5,0.5">
+                            <Ellipse.RenderTransform>
+                                <Transform x:Name="BeatHaloScale" ScaleX="0.6" ScaleY="0.6"/>
+                            </Ellipse.RenderTransform>
+                        </Ellipse>
+                        <Ellipse Width="{ResourceReference BusyHeartSize}" Height="{ResourceReference BusyHeartSize}"
+                                 Fill="{ThemeResource AccentFillColorDefault}"
+                                 EllipseType="EdgeToEdge"
+                                 HorizontalAlignment="Center" VerticalAlignment="Center"
+                                 RenderTransformOrigin="0.5,0.5">
+                            <Ellipse.RenderTransform>
+                                <Transform x:Name="BeatCore"/>
+                            </Ellipse.RenderTransform>
+                        </Ellipse>
+                    </Grid>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- What makes this a HEARTBEAT rather than a pulse is the rhythm: two beats close together (cues 0.10 and 0.28)
+         and then a long rest for the remaining ~60% of the period. A two-keyframe sine would just be a throb.
+         The punch is 1.22/1.13 rather than Fluent's 1.35/1.25 - enough to see, small enough to sit in the corner of a
+         panel without demanding to be looked at. -->
+    <Style Selector="BusyIndicator.Heartbeat">
+        <PropertyTrigger Property="IsActive" Value="True">
+            <PropertyTrigger.EnterActions>
+                <RunAnimationAction TargetName="BeatCore">
+                    <Animation Duration="0:0:1.8" IterationCount="Infinity" Easing="CubicOut">
+                        <KeyFrame Cue="0"><Setter Property="ScaleX" Value="1.0"/><Setter Property="ScaleY" Value="1.0"/></KeyFrame>
+                        <KeyFrame Cue="0.10"><Setter Property="ScaleX" Value="1.22"/><Setter Property="ScaleY" Value="1.22"/></KeyFrame>
+                        <KeyFrame Cue="0.20"><Setter Property="ScaleX" Value="1.0"/><Setter Property="ScaleY" Value="1.0"/></KeyFrame>
+                        <KeyFrame Cue="0.28"><Setter Property="ScaleX" Value="1.13"/><Setter Property="ScaleY" Value="1.13"/></KeyFrame>
+                        <KeyFrame Cue="0.40"><Setter Property="ScaleX" Value="1.0"/><Setter Property="ScaleY" Value="1.0"/></KeyFrame>
+                        <KeyFrame Cue="1"><Setter Property="ScaleX" Value="1.0"/><Setter Property="ScaleY" Value="1.0"/></KeyFrame>
+                    </Animation>
+                </RunAnimationAction>
+                <RunAnimationAction TargetName="BeatHaloScale">
+                    <Animation Duration="0:0:1.8" IterationCount="Infinity" Easing="CubicOut">
+                        <KeyFrame Cue="0"><Setter Property="ScaleX" Value="0.6"/><Setter Property="ScaleY" Value="0.6"/></KeyFrame>
+                        <KeyFrame Cue="0.40"><Setter Property="ScaleX" Value="1.0"/><Setter Property="ScaleY" Value="1.0"/></KeyFrame>
+                        <KeyFrame Cue="1"><Setter Property="ScaleX" Value="1.0"/><Setter Property="ScaleY" Value="1.0"/></KeyFrame>
+                    </Animation>
+                </RunAnimationAction>
+                <RunAnimationAction TargetName="BeatHalo">
+                    <Animation Duration="0:0:1.8" IterationCount="Infinity" Easing="CubicOut">
+                        <KeyFrame Cue="0"><Setter Property="Opacity" Value="0.25"/></KeyFrame>
+                        <KeyFrame Cue="0.40"><Setter Property="Opacity" Value="0"/></KeyFrame>
+                        <KeyFrame Cue="1"><Setter Property="Opacity" Value="0"/></KeyFrame>
+                    </Animation>
+                </RunAnimationAction>
+            </PropertyTrigger.EnterActions>
+            <PropertyTrigger.ExitActions>
+                <StopAnimationAction TargetName="BeatCore"/>
+                <StopAnimationAction TargetName="BeatHaloScale"/>
+                <StopAnimationAction TargetName="BeatHalo"/>
+            </PropertyTrigger.ExitActions>
+        </PropertyTrigger>
+    </Style>
+
+</StyleSet>

@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="utf-8"?>
+<StyleSet xmlns="http://adamantium/ui"
+          xmlns:x="http://adamantium/ui/xaml/extensions">
+
+    <!-- A repeat button is a button held down: a spin box's arrows, a scrollbar's page area. Same resting quiet as the
+         plain button - it appears under the pointer and is otherwise a glyph on the panel.
+
+         Its own template rather than the plain button's, because it is the one button in this theme that is often
+         TINY: a spinner arrow is a few pixels tall, and the button's minimum height would make the spin box twice as
+         tall as the field beside it. So this one states no minimum at all and takes the size its host gives it. -->
+
+    <Style Selector="RepeatButton">
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="BorderBrush" Value="Transparent"/>
+        <Setter Property="Foreground" Value="{ObservableResource TextFillColorSecondary}"/>
+
+        <Setter Property="BackgroundPointerOver" Value="{ResourceReference SubtleFillColorSecondary}"/>
+        <Setter Property="BackgroundPressed" Value="{ResourceReference SubtleFillColorTertiary}"/>
+        <Setter Property="BackgroundDisabled" Value="Transparent"/>
+        <Setter Property="ForegroundPressed" Value="{ObservableResource TextFillColorPrimary}"/>
+        <Setter Property="ForegroundDisabled" Value="{ObservableResource TextFillColorDisabled}"/>
+
+        <Setter Property="Padding" Value="{ResourceReference PaddingTight}"/>
+        <Setter Property="CornerRadius" Value="{ResourceReference CornerRadiusSmall}"/>
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="FontSize" Value="{ResourceReference FontSizeBody}"/>
+        <Setter Property="HorizontalContentAlignment" Value="Center"/>
+        <Setter Property="VerticalContentAlignment" Value="Center"/>
+    </Style>
+
+    <Style Selector="RepeatButton">
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="RepeatButton">
+                    <Border x:Name="InnerBorder"
+                            CornerRadius="{TemplateBinding CornerRadius}"
+                            Background="{TemplateBinding Background}"
+                            BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}"
+                            Padding="{TemplateBinding Padding}">
+                        <ContentPresenter
+                                x:Name="PART_ContentPresenter"
+                                HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
+                                Foreground="{TemplateBinding Foreground}"
+                                FontSize="{TemplateBinding FontSize}"
+                                Content="{TemplateBinding Content}"
+                                ContentTemplate="{TemplateBinding ContentTemplate}"
+                                ContentTemplateSelector="{TemplateBinding ContentTemplateSelector}"/>
+                    </Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- The trough and page areas of a scrollbar and of a slider's track are ScrollBarPageButtons - a RepeatButton
+         SUBTYPE. Style matching is IS-A, so everything above bleeds onto them, and the hover fill turns the empty half
+         of every slider into a lit rectangle the moment the pointer crosses it. They must be INVISIBLE but still
+         hit-testable, since clicking the trough is how paging works - and a component hit-tests its box with a
+         transparent background, so nothing is lost by painting nothing.
+         The STATE brushes have to be cleared too, not just the resting one: the triggers below project them onto the
+         chrome, and a transparent rest with a lit hover is exactly the artefact this prevents. -->
+    <Style Selector="ScrollBarPageButton">
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="BorderBrush" Value="Transparent"/>
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="CornerRadius" Value="0"/>
+        <Setter Property="Padding" Value="0"/>
+        <Setter Property="BackgroundPointerOver" Value="Transparent"/>
+        <Setter Property="BackgroundPressed" Value="Transparent"/>
+        <Setter Property="BackgroundDisabled" Value="Transparent"/>
+    </Style>
+
+    <Style Selector="RepeatButton">
+        <PropertyTrigger Property="IsMouseOver" Value="true">
+            <Setter TargetName="InnerBorder" Property="Background" Value="{TemplateBinding BackgroundPointerOver}"/>
+        </PropertyTrigger>
+        <PropertyTrigger Property="IsPressed" Value="true">
+            <Setter TargetName="InnerBorder" Property="Background" Value="{TemplateBinding BackgroundPressed}"/>
+            <Setter TargetName="PART_ContentPresenter" Property="Foreground" Value="{TemplateBinding ForegroundPressed}"/>
+        </PropertyTrigger>
+        <PropertyTrigger Property="IsEnabled" Value="false">
+            <Setter TargetName="PART_ContentPresenter" Property="Foreground" Value="{TemplateBinding ForegroundDisabled}"/>
+        </PropertyTrigger>
+    </Style>
+
+</StyleSet>

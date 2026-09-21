@@ -1,0 +1,230 @@
+﻿using System.Diagnostics;
+using Adamantium.Core;
+using Adamantium.Graphics.Core;
+using Adamantium.Graphics.Core.Presentation;
+using Adamantium.Mathematics;
+using Adamantium.UI.Core;
+using Adamantium.UI.Core.Graphics;
+using Adamantium.UI.FX;
+using Adamantium.Vulkan.Core;
+
+namespace Adamantium.UI.Rendering;
+
+public abstract class WindowRendererBase : IWindowRenderer
+{
+    protected Viewport Viewport { get; set; }
+    protected Rect2D Scissor { get; set; }
+    protected Rect2D ClipRect { get; set; }
+    protected Matrix4x4F ProjectionMatrix { get; set; }
+    protected IGraphicsDevice GraphicsDevice { get; }
+    
+    protected IRenderUnitFactory RenderUnitFactory { get; } 
+    protected PresentationParameters Parameters { get; set; }
+    
+    protected UIBasicEffect UiEffect { get; set; }
+
+    public virtual void PrepareData()
+    {
+
+    }
+
+    // Phase 3.2 record/apply split (docs/RENDER_THREAD_PLAN.md). Default no-ops; ForwardWindowRenderer implements them.
+    public virtual void RecordData()
+    {
+
+    }
+
+    public virtual void ApplyData()
+    {
+
+    }
+
+    // No-op by default: the on-screen renderer keeps its cache across frames (attachment-based reconciliation). A
+    // renderer that rebuilds a fresh tree every frame (headless designer) overrides this to drop its units.
+    public virtual void ResetCache()
+    {
+
+    }
+
+    public GraphicsPresenter Presenter { get; private set; }
+    
+    protected WindowRendererBase(IGraphicsDevice device, IRenderUnitFactory renderUnitFactory)
+    {
+        Viewport = new Viewport();
+        Scissor = new Rect2D();
+        ClipRect = new Rect2D();
+        ClipRect.Offset = new Offset2D();
+        ClipRect.Extent = new Extent2D();
+        GraphicsDevice = device;
+        DrawingContext = new DrawingContext();
+        RenderUnitFactory = renderUnitFactory;
+    }
+    
+    protected IWindow Window { get; set; }
+
+    public IDrawingContext DrawingContext { get; }
+
+    private volatile bool _isRendererUpToDate;
+    // Cleared on the LOOP thread (a size/DPI/MSAA change) and set on the RENDER thread (after ResizePresenter);
+    // volatile so the render thread promptly observes a pending resize instead of a cached value.
+    public bool IsRendererUpToDate
+    {
+        get => _isRendererUpToDate;
+        protected set => _isRendererUpToDate = value;
+    }
+
+    public bool FirstFrameProcessed { get; private set; }
+
+    // Render resolution multiplier (1 = on-screen 1:1). The presenter + viewport are sized ClientSize x RenderScale,
+    // the projection stays ClientSize - so the designer renders crisply at design x scale (zoom) without changing layout.
+    public double RenderScale { get; set; } = 1.0;
+
+    protected virtual void UnsubscribeFromEvents()
+    {
+        
+    }
+
+    protected virtual void SubscribeToEvents()
+    {
+        
+    }
+    
+    public virtual void SetWindow(IWindow window)
+    {
+        if (window == null) return;
+
+        UnsubscribeFromEvents();
+        Window = window;
+        Window.Renderer = this;
+        FillParameters();
+        SubscribeToEvents();
+        InitializeWindowResources();
+    }
+
+    // Re-points the renderer at a different window REUSING the existing presenter (just resized to the new window's
+    // size) instead of recreating it like SetWindow. The designer switches the previewed window this way - one
+    // presenter for the whole session, no render-target churn. First call (no presenter yet) falls back to SetWindow.
+    public virtual void Retarget(IWindow window)
+    {
+        if (window == null) return;
+        if (Presenter == null) { SetWindow(window); return; }
+
+        UnsubscribeFromEvents();
+        Window = window;
+        Window.Renderer = this;
+        SubscribeToEvents();
+        ResizePresenter((uint)(window.ClientWidth * RenderScale), (uint)(window.ClientHeight * RenderScale));
+        InitializeWindowResources();
+    }
+
+    /// <summary>
+    /// The presenter kind this renderer builds. Defaults to the on-screen swapchain; a headless renderer
+    /// overrides it to <see cref="PresenterType.Headless"/>, in which case the surface is window-less.
+    /// </summary>
+    protected virtual PresenterType PresenterKind => PresenterType.Swapchain;
+
+    private void FillParameters()
+    {
+        Parameters = new PresentationParameters(
+            PresenterKind,
+            (uint)(Window.ClientWidth * RenderScale),
+            (uint)(Window.ClientHeight * RenderScale),
+            Window.SurfaceHandle,
+            Window.MSAALevel
+        )
+        {
+            HInstanceHandle = Process.GetCurrentProcess().Handle,
+            // A see-through window is a property of the WINDOW, so it travels from there to the surface that composes it.
+            TransparentComposition = Window.UseTransparentComposition,
+            PresentPolicy = ResolvePresentPolicy()
+        };
+
+        Presenter = GraphicsPresenter.Create(GraphicsDevice, Parameters, "Window_presenter");
+    }
+
+    /// <summary>The window's own choice, or the application's when it made none. Resolved HERE, in the one place that
+    /// builds the parameters, so Inherit never reaches a presenter and no other code has to know the rule.</summary>
+    private PresentPolicy ResolvePresentPolicy()
+    {
+        if (Window.PresentPolicy != PresentPolicy.Inherit) return Window.PresentPolicy;
+
+        var app = UIApplication.Current?.PresentPolicy ?? PresentPolicy.Adaptive;
+        return app == PresentPolicy.Inherit ? PresentPolicy.Adaptive : app;
+    }
+
+    protected virtual void InitializeWindowResources()
+    {
+        
+    }
+
+    public abstract void Render(AppTime appTime);
+
+    public abstract void PreRender();
+
+
+    public void ResizePresenter(PresentationParameters parameters)
+    {
+        Presenter.Resize(parameters);
+        IsRendererUpToDate = true;
+    }
+
+    public void ResizePresenter(uint width, uint height)
+    {
+        // Re-read the window's transparency and present policy HERE rather than trusting the values captured when this
+        // renderer was built: both are chosen while the swapchain is created, so a rebuild is the only moment a change
+        // can land - and this is the rebuild. Costs two field reads on a path that is already tearing the swapchain
+        // down. The policy was the one left out, so changing it invalidated the renderer, rebuilt the swapchain and
+        // then picked the present mode from the value the renderer started life with: V-Sync did nothing at all.
+        if (Window != null && Presenter != null)
+        {
+            Presenter.Description.TransparentComposition = Window.UseTransparentComposition;
+            Parameters.TransparentComposition = Window.UseTransparentComposition;
+
+            var policy = ResolvePresentPolicy();
+            Presenter.Description.PresentPolicy = policy;
+            Parameters.PresentPolicy = policy;
+        }
+
+        Presenter.Resize(width, height);
+        IsRendererUpToDate = true;
+    }
+
+    /// <summary>The presenter no longer matches its window: rebuild it at the next frame boundary. The frame loop
+    /// already recreates a stale presenter in BeginDraw, before the frame draws and on the render thread - so a toggle
+    /// simply joins the queue a resize is in, instead of destroying a swapchain someone may be drawing into.</summary>
+    public void InvalidatePresenter()
+    {
+        IsRendererUpToDate = false;
+    }
+
+    public virtual void OnFrameEnded()
+    {
+        FirstFrameProcessed = true;
+    }
+
+    public virtual void Present()
+    {
+        // Present ONLY when this frame actually acquired + submitted. GraphicsDevice.CanPresent is reset false at
+        // BeginDraw start and set true only after a successful Submit, so a frame skipped/aborted during resize churn
+        // (no acquire/submit) does NOT re-present a stale, not-reacquired swapchain image with an unsignaled semaphore
+        // - the pair of VUIDs that lost the device on drag-resize.
+        if (GraphicsDevice.CanPresent)
+            Presenter?.Present();
+
+        if (Window.ShouldDisplayWindow)
+        {
+            // Dispatcher.CurrentDispatcher.Invoke(() =>
+            // {
+            //     Window.Show();
+            // });
+            Window.UIContext.UIApplication.ExecuteOnUIThread(() => Window.Show());
+        }
+    }
+    
+    public virtual void Dispose()
+    {
+        UnsubscribeFromEvents();
+        Presenter?.Dispose();
+        Presenter = null;
+    }
+}

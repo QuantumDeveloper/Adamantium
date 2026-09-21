@@ -1,0 +1,248 @@
+﻿using System;
+using System.Linq;
+using Adamantium.UI.Core;
+using Adamantium.UI.Core.Controls;
+using Adamantium.UI.Core.RoutedEvents;
+using Adamantium.UI.Core.Templates;
+
+namespace Adamantium.UI.Controls.Base;
+
+public class TemplatedUIComponent : InputUIComponent, ITemplatedUIComponent, ITemplateHost
+{
+    private TemplateResult templateResult;
+    private ControlTemplate appliedTemplate;
+
+    public static readonly AdamantiumProperty TemplateProperty =
+        AdamantiumProperty.Register(nameof(Template), typeof(ControlTemplate), typeof(MeasurableUIComponent),
+            // AffectsMeasure too: a NEW template can change the desired size (as in WPF). Without it a template that
+            // arrives AFTER the first measure - e.g. a part's Template set via {TemplateBinding} once the owner supplies
+            // it - re-renders but never re-measures, so the part stays 0x0 (the tab close button was invisible).
+            new PropertyMetadata(null, PropertyMetadataOptions.AffectsMeasure | PropertyMetadataOptions.AffectsRender, TemplateChangedCallback));
+
+    private static void TemplateChangedCallback(AdamantiumComponent a, AdamantiumPropertyChangedEventArgs e)
+    {
+        if (a is TemplatedUIComponent component)
+        {
+            component.OnTemplateChanged();
+        }
+    }
+
+    // The metadata callback fires on EVERY write to the property (any priority slot), not only when the EFFECTIVE value
+    // changes. So a trigger that swaps Template at Trigger priority - over a Style-priority base - must (re)build off the
+    // effective template, not off the raw written value: otherwise a masked lower-priority write would wrongly rebuild,
+    // and swap-back would tear the template down without restoring the base. Rebuild only when the effective template
+    // actually differs from the one currently applied.
+    // While a theme is being applied (ApplyCurrentTheme below), Template can be written MULTIPLE times - a base style's
+    // Template setter (e.g. ItemsControl's Border+ScrollViewer default) then a more-specific one (MenuItem's own). Building
+    // each in turn constructs a whole template subtree only to tear it down for the next - dozens of wasted elements per
+    // control, across every ContentControl/ItemsControl-derived type. So defer the build until the theme SETTLES: writes
+    // just mark it pending, and the single build (off the final, effective Template) runs once when ApplyCurrentTheme returns.
+    private bool _suspendTemplateBuild;
+    private bool _pendingTemplateBuild;
+
+    protected override void ApplyCurrentThemeCore()
+    {
+        var wasSuspended = _suspendTemplateBuild;   // save/restore so a nested re-theme doesn't build early - only the outermost does
+        _suspendTemplateBuild = true;
+        base.ApplyCurrentThemeCore();
+        _suspendTemplateBuild = wasSuspended;
+        if (!wasSuspended && _pendingTemplateBuild)
+        {
+            _pendingTemplateBuild = false;
+            OnTemplateChanged();
+        }
+    }
+
+    private void OnTemplateChanged()
+    {
+        if (_suspendTemplateBuild) { _pendingTemplateBuild = true; return; }
+        var effective = Template;
+        if (ReferenceEquals(effective, appliedTemplate)) return;
+
+        if (appliedTemplate != null) RemoveTemplate();
+        appliedTemplate = effective;
+        if (effective != null && !DeferTemplate)
+        {
+            ApplyTemplate();
+        }
+
+        // Template parts just changed: re-point any style/element triggers that target named parts at the new tree
+        // (and tear down what they held on the old, now-discarded parts) so a runtime template swap stays leak-free.
+        ReevaluateTriggersForTemplateChange();
+    }
+    
+    public ControlTemplate Template
+    {
+        get => GetValue<ControlTemplate>(TemplateProperty);
+        set => SetValue(TemplateProperty, value);
+    }
+    
+    public IAdamantiumComponent GetTemplateChild(string name)
+    {
+        if (Template == null || templateResult?.RootComponent == null) return null;
+
+        return templateResult.GetComponentByName(name);
+    }
+
+    /// <summary>Hold the template back instead of building it as soon as it is themed. A control that is shown nowhere
+    /// inline - a <c>ContextMenu</c>, whose rows live in the popup overlay and which exists only to be right-clicked open -
+    /// answers true until it is asked for, and calls <see cref="EnsureTemplate"/> then.</summary>
+    protected virtual bool DeferTemplate => false;
+
+    /// <summary>Builds the template that <see cref="DeferTemplate"/> held back. Does nothing if it is already built.</summary>
+    protected void EnsureTemplate()
+    {
+        if (templateResult == null && appliedTemplate != null)
+        {
+            ApplyTemplate();
+        }
+    }
+
+    /// <summary>TEMP (leak hunt): templates built, and templated controls ever constructed, since start.</summary>
+    public static long TemplatesBuilt, TemplatedControlsMade, TemplatesRemoved;
+
+    public static readonly System.Collections.Concurrent.ConcurrentDictionary<string,
+        System.Runtime.CompilerServices.StrongBox<int>> RemovesByType = new();
+
+    // ...and WHICH types, counted here rather than through LayoutTrace: that one is behind a gate of its own and came
+    // back with 14 events for a window in which 723 templates were built.
+    public static readonly System.Collections.Concurrent.ConcurrentDictionary<string,
+        System.Runtime.CompilerServices.StrongBox<int>> BuildsByType = new();
+
+    public static string DumpBuilds() => Dump(BuildsByType);
+
+    public static string DumpRemoves() => Dump(RemovesByType);
+
+    private static string Dump(System.Collections.Concurrent.ConcurrentDictionary<string,
+        System.Runtime.CompilerServices.StrongBox<int>> counts)
+    {
+        var rows = new List<string>();
+        foreach (var pair in counts) rows.Add($"{pair.Value.Value,6}  {pair.Key}");
+        rows.Sort((a, b) => int.Parse(b.Trim().Split(' ')[0]).CompareTo(int.Parse(a.Trim().Split(' ')[0])));
+        return string.Join("\n", rows.GetRange(0, Math.Min(20, rows.Count)));
+    }
+
+    public TemplatedUIComponent() => System.Threading.Interlocked.Increment(ref TemplatedControlsMade);
+
+    private void ApplyTemplate()
+    {
+        if (Template == null) return;
+
+        Core.Diagnostics.LayoutTrace.Count(GetType(), "*template-build*");
+        // TEMP (leak hunt): how many templates a swap BUILDS, against how many templated controls there are. The hunt
+        // so far asked who holds what is left over; the better question is why a swap makes several times a whole
+        // application's worth of elements in the first place.
+        System.Threading.Interlocked.Increment(ref TemplatesBuilt);
+        System.Threading.Interlocked.Increment(ref BuildsByType.GetOrAdd(GetType().Name,
+            static _ => new System.Runtime.CompilerServices.StrongBox<int>()).Value);
+        templateResult = Template.Build(this);
+        if (templateResult != null)
+        {
+            // var overrides = ControlTemplateOverride.GetOverrides(this);
+            // if (overrides != null)
+            // {
+            //     foreach (var @override in overrides)
+            //     {
+            //         // TODO: add here logic for applying overrides
+            //     }
+            // }
+            
+            AddTemplateChild(templateResult.RootComponent);
+            OnApplyTemplate();
+        }
+    }
+
+    private void RemoveTemplate()
+    {
+        // A prior ApplyTemplate whose Build returned null leaves templateResult null while appliedTemplate is set;
+        // nothing to tear down then.
+        if (templateResult == null) return;
+
+        // TEMP (leak hunt): a REBUILD, as against a first build. A swap builds 2.4x as many templates as the tree
+        // holds; this separates "the control was re-templated" from "a new part was made and templated once".
+        System.Threading.Interlocked.Increment(ref TemplatesRemoved);
+        System.Threading.Interlocked.Increment(ref RemovesByType.GetOrAdd(GetType().Name,
+            static _ => new System.Runtime.CompilerServices.StrongBox<int>()).Value);
+
+        TraverseVisualTreeAndUnload(templateResult.RootComponent);
+        // Undo the inheritance link set in AddTemplateChild so the detached old template root stops tracking this
+        // control's inherited values (a stale parent would keep pushing DataContext/FontFamily changes into orphaned UI).
+        if (templateResult.RootComponent is AdamantiumComponent oldRoot)
+            oldRoot.InheritanceParent = null;
+        RemoveVisualChildren();
+        templateResult.Destroy();
+        templateResult = null;
+        OnRemoveTemplate();
+    }
+
+
+    // The template boundary is the crux of the two-tree model (docs/TREE_MODEL_DESIGN.md): parts are attached VISUAL-only,
+    // so the logical tree stays shallow and dead-ends here. Inheritance is bridged by InheritanceParent (below); an UP
+    // logical walk is bridged by TemplatedParent (UIExtensions.GetLogicalParentOrBridge), set on every part in ControlTemplate.Build.
+    protected void AddTemplateChild(IUIComponent child)
+    {
+        // Template content inherits the templated control's inherited values (DataContext, FontFamily, ...) so a
+        // {Binding} inside a ControlTemplate resolves against the control's DataContext, as in WPF. A template root is
+        // attached as a VISUAL child only, and visual-child wiring does NOT set the inheritance parent (only the logical
+        // tree does, see FundamentalUIComponent.SetParent) - so without this an ItemsPanel's ItemWidth={Binding RectSize}
+        // (or any template-part {Binding}) silently binds to a null DataContext. A container that assigns DataContext
+        // explicitly (e.g. ContentPresenter -> item) still wins: an explicit local value overrides the inherited one.
+        if (child is AdamantiumComponent component)
+            component.InheritanceParent = this;
+        AddVisualChild(child);
+
+        // A template ROOT is attached visual-only (no logical SetParent), so - unlike every logical child, which SetParent
+        // themes on attach - it never gets its theme applied. That is invisible for a plain Border/Grid root (renders
+        // directly), but a TEMPLATED control used as a template root (e.g. a ScrollViewer) would then never build its OWN
+        // template. Apply the theme here, mirroring SetParent. Its descendants are logical children built by Template.Build
+        // and are already themed through their own SetParent, so the IsStyleApplied guard keeps this to the root only.
+        if (child is FundamentalUIComponent { IsStyleApplied: false } themedRoot)
+            themedRoot.ApplyCurrentTheme();
+    }
+
+    public virtual void OnRemoveTemplate()
+    {
+        
+    }
+    
+    private void TraverseVisualTreeAndUnload(IUIComponent component)
+    {
+        foreach (var child in component.VisualChildren)
+        {
+            TraverseVisualTreeAndUnload(child);
+        }
+
+        if (component is ObservableUIComponent observableUiComponent)
+        {
+            observableUiComponent.RaiseEvent(new RoutedEventArgs(UnloadedEvent, component));
+        }
+
+        // MY OWN parts are going down with the template - say so, so a pass already holding them in its drain buffer
+        // skips them. Skipping matters: theming a control swaps its Template, which builds a whole template subtree, and
+        // one swap built 723 templates against 282 templated controls in the tree - every extra build a part that had
+        // just been destroyed.
+        //
+        // The TEMPLATE'S OWN ID says "mine", not the visual walk and not TemplatedParent. The walk reaches the CONTENT
+        // presented inside this template, which is not being destroyed at all - it moves into the new one; marking that
+        // left 791 of 894 elements in the tree with their style never applied, wearing the previous theme. And
+        // TemplatedParent is no better: an ItemsPanelTemplate stamps the same templated parent on the presenter's live
+        // items panel, so that got marked too. Only the id of the result that BUILT the part is exact.
+        if (component is FundamentalUIComponent part && templateResult != null &&
+            part.OwningTemplateId == templateResult.Id)
+        {
+            part.MarkDiscarded();
+
+            // A part that is ITSELF a templated control takes its own template down with it. Without this the nesting
+            // stopped here: a ScrollViewer part was marked, but the ScrollContentPresenter and Grid ITS template built
+            // carry a different template id, so nothing marked them - and every sweep that asks "was this discarded"
+            // then answered no for the whole inner tree. Tearing it down is also what it MEANS to destroy the control:
+            // its bindings close, its trigger activators deactivate, its parts are released, all through the path that
+            // already does that. The recursion terminates - each level tears down a strictly smaller tree.
+            if (part is TemplatedUIComponent nested) nested.RemoveTemplate();
+        }
+    }
+
+    public virtual void OnApplyTemplate()
+    {
+    }
+}

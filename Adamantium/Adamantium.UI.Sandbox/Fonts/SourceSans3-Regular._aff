@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FontData>
+    <Name>SourceSans3Regular</Name>
+	<GlyphTextureSize>16</GlyphTextureSize>
+	<SampleRate>3</SampleRate>
+	<PixelRange>4</PixelRange>
+	<StartGlyphIndex>0</StartGlyphIndex>
+	<GlyphCount>0</GlyphCount>
+	<FontName>Crimson-Italic</FontName>
+	<IsSystemFont>false</IsSystemFont>
+	<PathToFont>Fonts/OTFFonts/SourceSans3-Regular.otf</PathToFont>
+</FontData>

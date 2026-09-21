@@ -3,9 +3,9 @@ using System.Collections.Generic;
 using System.IO;
 using Adamantium.Engine.Compiler.Converter.Configs;
 using Adamantium.Engine.Compiler.Converter.Containers;
-using Adamantium.Engine.Compiler.Converter.ConversionUtils;
-using Adamantium.Engine.Core;
-using Adamantium.Engine.Core.Models;
+using Adamantium.Engine.Compiler.Models.ConversionUtils;
+using Adamantium.Graphics.Core;
+using Adamantium.Graphics.Core.Models;
 using Adamantium.Mathematics;
 
 namespace Adamantium.Engine.Compiler.Converter.Parsers
@@ -59,7 +59,7 @@ namespace Adamantium.Engine.Compiler.Converter.Parsers
       private FileStream fileStream;
       private BinaryReader binaryReader;
 
-      protected override DataContainer ParseData(ConversionConfig config)
+      public override DataContainer ParseData(ConversionConfig config)
       {
          dataContainer = new Autodesk3DsDataContainer(FilePath);
          if (!File.Exists(FilePath))
@@ -75,6 +75,8 @@ namespace Adamantium.Engine.Compiler.Converter.Parsers
          dataContainer.Data.Models = root;
          fileStream.Position = 0;
          ReadData(root);
+         //The last mesh has no next ObjectDefinition to close it
+         FinalizeGeometry(ref currentGeometry);
 
          binaryReader.Close();
          fileStream.Close();
@@ -85,10 +87,111 @@ namespace Adamantium.Engine.Compiler.Converter.Parsers
 
       private int bytesCount;
 
+      //The walk descends into itself, so the mesh being read cannot live in a local
+      private Mesh currentGeometry;
+
+      //Raw mesh data, kept until the whole mesh has been read - see the VertexList case
+      private List<Vector3> rawPositions;
+      private List<Vector2F> rawUVs;
+      private List<int> faceIndices;
+      private List<uint> smoothingGroups;
+
+      /// <summary>Puts one mesh together once every chunk of it has been read. 3DS stores no vertex normals, only a
+      /// smoothing group mask per face: two faces sharing a vertex blend their normals when their masks overlap and
+      /// keep their own when they do not - which is exactly what a hard edge is.</summary>
+      private void FinalizeGeometry(ref Mesh geometry)
+      {
+         if (geometry == null || rawPositions == null) return;
+
+         if (faceIndices == null || faceIndices.Count == 0)
+         {
+            geometry.SetPoints(rawPositions);
+            geometry = null;
+            return;
+         }
+
+         var faceNormals = new Vector3F[faceIndices.Count / 3];
+         for (var face = 0; face < faceNormals.Length; face++)
+         {
+            var a = (Vector3F)rawPositions[faceIndices[face * 3]];
+            var b = (Vector3F)rawPositions[faceIndices[face * 3 + 1]];
+            var c = (Vector3F)rawPositions[faceIndices[face * 3 + 2]];
+            faceNormals[face] = Vector3F.Cross(b - a, c - a);
+         }
+
+         // Which faces touch each vertex. Built once: comparing every face against every other one is quadratic,
+         // and a single mesh here can carry thousands of them.
+         var incident = new Dictionary<int, List<int>>();
+         for (var face = 0; face < faceNormals.Length; face++)
+         {
+            for (var corner = 0; corner < 3; corner++)
+            {
+               var vertex = faceIndices[face * 3 + corner];
+               if (!incident.TryGetValue(vertex, out var faces)) incident[vertex] = faces = new List<int>();
+               faces.Add(face);
+            }
+         }
+
+         // Per vertex and group, the sum of the normals of every incident face sharing a bit of that group. A face
+         // with no group blends with nobody, which is what the format means by flat.
+         var blended = new Dictionary<(int Vertex, uint Group), Vector3F>();
+         for (var face = 0; face < faceNormals.Length; face++)
+         {
+            var group = Group(face);
+            if (group == 0) continue;
+
+            for (var corner = 0; corner < 3; corner++)
+            {
+               var vertex = faceIndices[face * 3 + corner];
+               if (blended.ContainsKey((vertex, group))) continue;
+
+               var sum = Vector3F.Zero;
+               foreach (var otherFace in incident[vertex])
+               {
+                  if ((group & Group(otherFace)) != 0) sum += faceNormals[otherFace];
+               }
+               blended[(vertex, group)] = sum;
+            }
+         }
+
+         uint Group(int face) => face < smoothingGroups.Count ? smoothingGroups[face] : 0u;
+
+         var positions = new List<Vector3>(faceIndices.Count);
+         var normals = new List<Vector3F>(faceIndices.Count);
+         var uvs = new List<Vector2F>(faceIndices.Count);
+         var hasUVs = rawUVs.Count == rawPositions.Count;
+
+         for (var face = 0; face < faceNormals.Length; face++)
+         {
+            var group = Group(face);
+            for (var corner = 0; corner < 3; corner++)
+            {
+               var vertex = faceIndices[face * 3 + corner];
+               positions.Add(rawPositions[vertex]);
+               if (hasUVs) uvs.Add(rawUVs[vertex]);
+
+               var normal = group != 0 && blended.TryGetValue((vertex, group), out var sum)
+                  ? sum
+                  : faceNormals[face];
+               normals.Add(Vector3F.Normalize(normal));
+            }
+         }
+
+         geometry.SetPoints(positions);
+         geometry.SetNormals(normals);
+         if (hasUVs) geometry.SetUVs(0, uvs);
+         geometry.GenerateBasicIndices();
+
+         geometry = null;
+         rawPositions = null;
+         rawUVs = null;
+         faceIndices = null;
+         smoothingGroups = null;
+      }
+
       private void ReadData(SceneData.Model rootMesh)
       {
          SceneData.Model currentMesh = null;
-         Mesh currentGeometry = null;
          SceneData.Material material = null;
          MaterialTextureType textureType = MaterialTextureType.None;
          ColorType colorType = ColorType.None;
@@ -116,6 +219,7 @@ namespace Adamantium.Engine.Compiler.Converter.Parsers
                   break;
 
                case Autodesk3DSChunks.ObjectDefinition:
+                  FinalizeGeometry(ref currentGeometry);
                   var meshName = ReadName();
                   currentMesh = dataContainer.Data.CreateMesh(rootMesh, "", meshName);
                   break;
@@ -132,18 +236,23 @@ namespace Adamantium.Engine.Compiler.Converter.Parsers
                   var vertexCount = Convert.ToInt32(count);
                   if (vertexCount > 0)
                   {
-                     currentGeometry = new Mesh();
-                     currentGeometry.MeshTopology = PrimitiveType.TriangleList;
-                     List<Vector3F> positions = new List<Vector3F>();
+                     FinalizeGeometry(ref currentGeometry);
+                     currentGeometry = new Mesh { MeshTopology = PrimitiveType.TriangleList };
+                     // Assembling right here was the trouble: the UV chunk comes AFTER the faces, so by the time
+                     // the coordinates arrived the points had already been reordered and no longer matched them.
+                     // Everything is kept raw now and put together once the whole mesh has been read.
+                     rawPositions = new List<Vector3>(vertexCount);
+                     rawUVs = new List<Vector2F>();
+                     faceIndices = new List<int>();
+                     smoothingGroups = new List<uint>();
                      for (int x = 0; x < vertexCount; x++)
                      {
-                        Vector3F vertex;
+                        Vector3 vertex;
                         vertex.X = binaryReader.ReadSingle();
                         vertex.Y = binaryReader.ReadSingle();
                         vertex.Z = binaryReader.ReadSingle();
-                        positions.Add(vertex);
+                        rawPositions.Add(vertex);
                      }
-                     currentGeometry.SetPoints(positions);
                      currentMesh.Meshes.Add(currentGeometry);
                   }
                   else
@@ -155,20 +264,22 @@ namespace Adamantium.Engine.Compiler.Converter.Parsers
                case Autodesk3DSChunks.FaceDescription:
                   count = binaryReader.ReadUInt16();
                   var polygonCount = Convert.ToInt32(count);
-                  if (polygonCount > 0)
+                  for (int j = 0; j < polygonCount; j++)
                   {
-                     List<int> indices = new List<int>();
-                     for (int j = 0; j < polygonCount; j++)
-                     {
-                        var index = binaryReader.ReadUInt16();
-                        indices.Add(index);
-                        index = binaryReader.ReadUInt16();
-                        indices.Add(index);
-                        index = binaryReader.ReadUInt16();
-                        indices.Add(index);
-                        var faceFlags = binaryReader.ReadUInt16();
-                     }
-                     currentGeometry.AssemblePositions(indices);
+                     faceIndices.Add(binaryReader.ReadUInt16());
+                     faceIndices.Add(binaryReader.ReadUInt16());
+                     faceIndices.Add(binaryReader.ReadUInt16());
+                     binaryReader.ReadUInt16();
+                  }
+                  break;
+
+               // One group mask per face. This is where 3DS keeps its hard edges: the format has no vertex normals
+               // at all, so without this chunk every model imports uniformly smooth and nobody says a word.
+               case Autodesk3DSChunks.FaceSmoothingGroup:
+                  var groupCount = faceIndices == null ? 0 : faceIndices.Count / 3;
+                  for (int j = 0; j < groupCount; j++)
+                  {
+                     smoothingGroups.Add(binaryReader.ReadUInt32());
                   }
                   break;
 
@@ -184,16 +295,14 @@ namespace Adamantium.Engine.Compiler.Converter.Parsers
 
                case Autodesk3DSChunks.UVCoordinates:
                   count = binaryReader.ReadUInt16();
-                  if (count > 0)
+                  for (ushort y = 0; y < count; y++)
                   {
-                     List<Vector2F> uvs = new List<Vector2F>();
-                     for (ushort y = 0; y < count; y++)
-                     {
-                        Vector2F uv;
-                        uv.X = binaryReader.ReadSingle();
-                        uv.Y = binaryReader.ReadSingle();
-                     }
-                     currentGeometry.SetUVs(0, uvs);
+                     // The pair was read into a local and never added to the list, so SetUVs got an empty one:
+                     // every 3DS model arrived without texture coordinates at all.
+                     Vector2F uv;
+                     uv.X = binaryReader.ReadSingle();
+                     uv.Y = binaryReader.ReadSingle();
+                     rawUVs?.Add(uv);
                   }
                   break;
 

@@ -3,7 +3,7 @@ using Adamantium.Mathematics;
 
 namespace Adamantium.Fonts.Common
 {
-    internal class OutlineSegment
+    public class OutlineSegment
     {
         public List<Vector2> Points { get; }
 

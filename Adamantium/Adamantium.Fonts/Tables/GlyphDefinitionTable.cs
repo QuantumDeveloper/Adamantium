@@ -19,12 +19,12 @@ namespace Adamantium.Fonts.Tables
         
         public MarkGlyphSetsTable MarkGlyphSetsTable { get; set; }
 
-        public void FillData(TypeFace typeFace)
+        public void FillData(Typeface typeface)
         {
-            FillClassDefinitions(typeFace);
+            FillClassDefinitions(typeface);
         }
 
-        private void FillClassDefinitions(TypeFace typeFace)
+        private void FillClassDefinitions(Typeface typeface)
         {
             if (GlyphClassDefTable == null) return;
             
@@ -35,7 +35,7 @@ namespace Adamantium.Fonts.Tables
                     var classValues = GlyphClassDefTable.ClassValueArray;
                     for (int i = 0; i < classValues.Length; ++i)
                     {
-                        if (typeFace.GetGlyphByIndex(glyphIndex, out var glyph))
+                        if (typeface.GetGlyphByIndex(glyphIndex, out var glyph))
                         {
                             glyph.ClassDefinition = (GlyphClassDefinition) classValues[i];
                         }
@@ -48,7 +48,7 @@ namespace Adamantium.Fonts.Tables
                         var record = records[i];
                         for (uint k = record.StartGlyphId; k < record.EndGlyphId; ++k)
                         {
-                            if (typeFace.GetGlyphByIndex(k, out var glyph))
+                            if (typeface.GetGlyphByIndex(k, out var glyph))
                             {
                                 glyph.ClassDefinition = (GlyphClassDefinition)record.ClassId;
                             }

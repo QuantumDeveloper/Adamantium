@@ -1,0 +1,18 @@
+<Project>
+
+  <PropertyGroup>
+    <!-- Single top-level artifacts/ root next to the solution.
+         bin is grouped BY TARGET FRAMEWORK: artifacts\bin\<Configuration>\<TargetFramework>\
+         - all projects of the same TFM land together (so net8.0 and net10.0 assemblies never mix in
+           one folder, which avoids System.Runtime version conflicts);
+         - each TFM folder is self-contained, so the executable + its deps are in one predictable place.
+         The TFM segment is appended by the SDK (AppendTargetFrameworkToOutputPath) - do NOT bake
+         $(TargetFramework) into OutputPath here, it is still empty when Directory.Build.props runs.
+         obj is per-project under artifacts\obj\<Project>\; NuGet packages go to artifacts\packages\. -->
+    <OutputPath>$(MSBuildThisFileDirectory)artifacts\bin\$(Configuration)\</OutputPath>
+    <AppendTargetFrameworkToOutputPath>true</AppendTargetFrameworkToOutputPath>
+    <BaseIntermediateOutputPath>$(MSBuildThisFileDirectory)artifacts\obj\$(MSBuildProjectName)\</BaseIntermediateOutputPath>
+    <PackageOutputPath>$(MSBuildThisFileDirectory)artifacts\packages\</PackageOutputPath>
+  </PropertyGroup>
+
+</Project>

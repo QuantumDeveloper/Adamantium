@@ -15,6 +15,6 @@ namespace Adamantium.Imaging.Png.Chunks
             return Encoding.ASCII.GetBytes(Name);
         }
 
-        internal abstract byte[] GetChunkBytes(PNGState state);
+        internal abstract byte[] GetChunkBytes(PngState state);
     }
 }

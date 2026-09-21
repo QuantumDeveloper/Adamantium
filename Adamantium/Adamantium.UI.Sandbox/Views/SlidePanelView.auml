@@ -1,0 +1,50 @@
+<View xmlns="http://adamantium/ui">
+    <!-- SlidePanels live in the window's overlay layer, so they slide in over EVERYTHING regardless of where they are
+         declared here. Each is two-way bound to its toggle; the panel's x button closes it (flows back to the switch). -->
+    <StackPanel Orientation="Vertical" Margin="24">
+
+        <TextBlock Text="SlidePanel - slides in from a window edge, over all content." Margin="0,0,0,6"/>
+        <TextBlock Text="Cross axis always fills the window; the thickness is content/explicit (FullWindow covers all)."
+                   Foreground="#94A3B8" Margin="0,0,0,16"/>
+
+        <StackPanel Orientation="Horizontal">
+            <ToggleSwitch Content="Left" IsChecked="{Binding LeftOpen, Mode=TwoWay}" Margin="0,0,16,0"/>
+            <ToggleSwitch Content="Right" IsChecked="{Binding RightOpen, Mode=TwoWay}" Margin="0,0,16,0"/>
+            <ToggleSwitch Content="Top" IsChecked="{Binding TopOpen, Mode=TwoWay}" Margin="0,0,16,0"/>
+            <ToggleSwitch Content="Bottom" IsChecked="{Binding BottomOpen, Mode=TwoWay}" Margin="0,0,16,0"/>
+            <ToggleSwitch Content="Full-window" IsChecked="{Binding FullOpen, Mode=TwoWay}"/>
+        </StackPanel>
+
+        <!-- Left / Right: explicit Width = thickness, full window height automatically. -->
+        <SlidePanel Placement="Left" Width="320" Header="Left panel"
+                    IsOpen="{Binding LeftOpen, Mode=TwoWay}">
+            <StackPanel Orientation="Vertical">
+                <TextBlock Text="Docked to the LEFT edge, full window height."/>
+                <TextBlock Text="Toggle the switch or press x to close." Foreground="#94A3B8" Margin="0,8,0,0"/>
+            </StackPanel>
+        </SlidePanel>
+
+        <SlidePanel Placement="Right" Width="300" Header="Right panel"
+                    IsOpen="{Binding RightOpen, Mode=TwoWay}">
+            <TextBlock Text="Right edge, full window height."/>
+        </SlidePanel>
+
+        <!-- Top / Bottom: explicit Height = thickness, full window width automatically. -->
+        <SlidePanel Placement="Top" Height="180" Header="Top panel"
+                    IsOpen="{Binding TopOpen, Mode=TwoWay}">
+            <TextBlock Text="Top edge, full window width."/>
+        </SlidePanel>
+
+        <SlidePanel Placement="Bottom" Height="180" Header="Bottom panel"
+                    IsOpen="{Binding BottomOpen, Mode=TwoWay}">
+            <TextBlock Text="Bottom edge, full window width."/>
+        </SlidePanel>
+
+        <!-- FullWindow: covers the whole window, sliding from the left. -->
+        <SlidePanel Placement="Left" FullWindow="True" Header="Full-window panel"
+                    IsOpen="{Binding FullOpen, Mode=TwoWay}">
+            <TextBlock Text="This one covers the WHOLE window (FullWindow=True), sliding in from the left."/>
+        </SlidePanel>
+
+    </StackPanel>
+</View>

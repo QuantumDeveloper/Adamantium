@@ -7,7 +7,7 @@ namespace Adamantium.Win32
    /// Defined in winuser.h from Windows SDK v6.1
    /// Documentation pulled from MSDN.
    /// </summary>
-   public enum WindowMessages:uint
+   public enum WindowMessages : uint
    {
       /// <summary>
       /// The WM_NULL message performs no operation. An application sends the WM_NULL message if it wants to post a message that the recipient window will ignore.
@@ -776,7 +776,12 @@ namespace Adamantium.Win32
       TabletFirst = 0x02c0,
       TabletLast = 0x02df,
       /// <summary>
-      /// An application sends a WM_CUT message to an edit control or combo box to delete (cut) the current selection, if any, in the edit control and copy the deleted text to the clipboard in CF_TEXT format. 
+      /// WM_DPICHANGED: sent to a Per-Monitor-DPI-aware window when its DPI changes (moved to a monitor with a different
+      /// scale, or the scale was changed). wParam: LOWORD/HIWORD = new DPI X/Y. lParam: suggested new window RECT.
+      /// </summary>
+      Dpichanged = 0x02E0,
+      /// <summary>
+      /// An application sends a WM_CUT message to an edit control or combo box to delete (cut) the current selection, if any, in the edit control and copy the deleted text to the clipboard in CF_TEXT format.
       /// </summary>
       Cut = 0x0300,
       /// <summary>

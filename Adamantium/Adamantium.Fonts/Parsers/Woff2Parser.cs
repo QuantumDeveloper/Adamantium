@@ -10,6 +10,7 @@ using Adamantium.Fonts.Extensions;
 using Adamantium.Fonts.Tables;
 using Adamantium.Fonts.Tables.WOFF;
 using Adamantium.Mathematics;
+using BrotliSharpLib;
 
 namespace Adamantium.Fonts.Parsers
 {
@@ -93,21 +94,21 @@ namespace Adamantium.Fonts.Parsers
             };
         }
 
-        private Woff2Parser(string filePath, byte resolution = 1)
+        protected internal Woff2Parser(string filePath, byte resolution = 1)
         {
             InitializeBase(filePath, resolution);
             fontEntries = new List<FontCollectionEntry>();
             reader = filePath.LoadIntoStream();
-            Parse();
         }
 
-        internal static TypeFace Parse(string filePath, byte resolution)
+        protected internal Woff2Parser(FontStreamReader fontReader, byte resolution)
         {
-            var parser = new Woff2Parser(filePath, resolution);
-            return parser.TypeFace;
+            InitializeBase(string.Empty, resolution);
+            fontEntries = new List<FontCollectionEntry>();
+            reader = fontReader;
         }
 
-        protected override void Parse()
+        public override void Parse()
         {
             ReadHeader();
             ReadTableDirectories();
@@ -150,6 +151,11 @@ namespace Adamantium.Fonts.Parsers
                 var version = reader.ReadUInt32();
                 var numFonts = reader.Read255UInt16();
                 // ----
+
+                if (numFonts > 1)
+                {
+                    fontEntries.Clear();
+                }
                 
                 for (int i = 0; i < numFonts; ++i)
                 {
@@ -157,11 +163,14 @@ namespace Adamantium.Fonts.Parsers
                     collectionEntry.NumTables = reader.Read255UInt16();
                     collectionEntry.Flavor = reader.ReadUInt32();
                     var indices = new ushort[collectionEntry.NumTables];
+                    collectionEntry.Tables = new Woff2Table[collectionEntry.NumTables];
                     for (int x = 0; x < collectionEntry.NumTables; ++x)
                     {
                         indices[x] = reader.Read255UInt16();
+                        collectionEntry.Tables[x] = fontEntry.Tables[indices[x]];
                     }
                     
+                    fontEntries.Add(collectionEntry);
                 }
             }
         }
@@ -175,12 +184,15 @@ namespace Adamantium.Fonts.Parsers
 
                 var flags = reader.ReadByte();
 
-                var tableTagIndex = flags & 0x1F;
+                // WOFF2 TableDirectoryEntry flags: bits 0-5 = known-tag index (63 => explicit 4-byte tag follows),
+                // bits 6-7 = transform version. (Was masked one bit short - 0x1F/>>5 - which mis-tagged any table with
+                // index >= 32 and never took the explicit-tag path, desyncing the reader on such fonts, e.g. ASANA.)
+                var tableTagIndex = flags & 0x3F;
                 table.Name = tableTagIndex < 63
                     ? knownTableTags[(byte) tableTagIndex]
                     : reader.ReadString(4, Encoding.UTF8);
 
-                table.PreprocessingTransform = (byte)((flags >> 5) & 0x3);
+                table.PreprocessingTransform = (byte)((flags >> 6) & 0x3);
 
                 if (reader.ReadUIntBase128(out var origLength))
                 {
@@ -225,7 +237,7 @@ namespace Adamantium.Fonts.Parsers
                 var decompressedStream = new FontStreamReader();
                 try
                 {
-                    using (var brotli = new BrotliStream(compressedStream, CompressionMode.Decompress))
+                    using (var brotli = new BrotliSharpLib.BrotliStream(compressedStream, CompressionMode.Decompress))
                     {
                         brotli.CopyTo(decompressedStream);
                         decompressedStream.Position = 0;
@@ -233,7 +245,7 @@ namespace Adamantium.Fonts.Parsers
                 }
                 catch (Exception e)
                 {
-                    TypeFace.AddErrorMessage(e.Message);
+                    Typeface.AddErrorMessage(e.Message);
                 }
 
                 return decompressedStream;
@@ -250,11 +262,11 @@ namespace Adamantium.Fonts.Parsers
 
                 otfTableDirectory.NumTables = fontEntry.NumTables;
                 otfTableDirectory.SfntVersion = fontEntry.Flavor;
-                if (header.Flavor == 0x00010000)
+                if (header.InnerFontType == InnerFontType.TrueType)
                 {
                     otfTableDirectory.OutlineType = OutlineType.TrueType;
                 }
-                else if (header.Flavor == 0x4F54544F)
+                else
                 {
                     otfTableDirectory.OutlineType = OutlineType.CompactFontFormat;
                 }
@@ -441,7 +453,7 @@ namespace Adamantium.Fonts.Parsers
                 glyphs[i].SetInstructions(FontReader.ReadBytes(tempGlyph.InstructionsLength, true));
             }
             
-            TypeFace.SetGlyphs(glyphs);
+            Typeface.SetGlyphs(glyphs);
         }
 
         private void BuildSimpleGlyph(

@@ -1,0 +1,175 @@
+﻿using Adamantium.Mathematics;
+using Adamantium.UI.Core.Graphics;
+using Adamantium.UI.Core.RoutedEvents;
+using Transform = Adamantium.UI.Core.Media.Transform;
+
+namespace Adamantium.UI.Core;
+
+public interface IUIComponent : IFundamentalUIComponent
+{
+    event EventHandler<VisualParentChangedEventArgs> VisualParentChanged;
+    
+    Guid RenderId { get; }
+    Boolean ClipToBounds { get; set; }
+
+    /// <summary>How this clip's corners are rounded (TL, TR, BR, BL). A scissor is square, so rounding is applied by the
+    /// shaders; zero means the plain rectangular clip. Unset falls back to the container's own CornerRadius, where it
+    /// has one - see UIComponent.ClipCornerRadius.</summary>
+    Vector4F ClipRadii { get; }
+
+    Double Opacity { get; set; }
+    Double SelfOpacity { get; set; }
+    bool IsEnabled { get; set; }
+    Boolean AllowDrop { get; set; }
+    Boolean IsHitTestVisible { get; set; }
+    bool IsGeometryValid { get; }
+
+    /// <summary>Its last record produced NO draw commands - a layout-only container (a tile's Border with no brush, a
+    /// presenter, a panel with no Background). RECORDER-owned: the only thing that can know it is the record that just
+    /// counted the commands. False until it has been recorded once, so a component nobody has seen yet is never skipped.
+    /// <para>Its SUBTREE is untouched by this - children are separate components with flags of their own, and a container
+    /// that draws nothing is routinely full of things that do.</para></summary>
+    bool DrawsNothing { get; set; }
+
+    /// <summary>The geometry went stale because what it DRAWS changed (<see cref="InvalidateRender"/>, an AffectsRender
+    /// property - a hover brush arriving), as opposed to because it was re-laid-out. The two used to be one flag, which
+    /// is why resizing 2000 tiles re-recorded 21000 components and 16000 of them rendered to nothing: a resize
+    /// invalidates only what a component draws, and a container that draws nothing has no geometry for it to invalidate.
+    /// Cleared by <see cref="Render"/>.</summary>
+    bool GeometryStaleByContent { get; }
+    Size RenderSize { get; set; }
+    //Vector2 Location { get; }
+    Visibility Visibility { get; set; }
+    Rect Bounds { get; set; }
+    Rect ClipRectangle { get; }
+
+    /// <summary>The soft band around this component's outline, if it wears one. Read at RECORD time and baked into the
+    /// draw command - never dereferenced by the renderer, which is editing-thread state.</summary>
+    Media.Aura Aura { get; set; }
+
+    /// <summary>The shadow this component casts, if any. Same record-time rule as <see cref="Aura"/>.</summary>
+    Media.Shadow Shadow { get; set; }
+
+    Vector2 ClipPosition { get; set; }
+    IUIComponent VisualParent { get; }
+
+    /// <summary>The component in whose coordinate space this one is DRAWN - normally the visual parent. An adorner is not
+    /// in the visual tree at all (its VisualParent is null) yet draws in its adorned element's space, so it reports that
+    /// element here. Both the live <see cref="WorldTransform"/> and the renderer's frozen composition go through this, so
+    /// there is one answer to "whose space am I in", not two that can drift apart.</summary>
+    IUIComponent RenderParent { get; }
+
+    /// <summary>Whether the RENDER PARENT's own <see cref="ClipToBounds"/> applies to this component. True for ordinary
+    /// content - a child lives inside its parent's box. False for an ADORNER: it draws in its target's space precisely
+    /// in order to paint AROUND it, so being clipped to that target's box erases exactly what it exists to draw (a focus
+    /// ring vanished on every control whose template clips its content, and survived only on those that do not). Above
+    /// the target, only <see cref="ClipsAdorners"/> boundaries apply.</summary>
+    bool ClippedByRenderParent { get; }
+
+    /// <summary>Whether this component's <see cref="ClipToBounds"/> also cuts ADORNERS drawn on the content inside it.
+    /// False almost everywhere: a container clipping its children is a layout detail, and letting every such box shave
+    /// the focus ring made any standoff at all unusable - cards, tab strips and docking panels each took a bite out of
+    /// it. True where the clip means a VIEWPORT rather than a box: a ring on a half-scrolled row must not spill out of
+    /// the list it belongs to, which is exactly what a scroll presenter is for.</summary>
+    bool ClipsAdorners { get; }
+
+    IRootVisualComponent RootVisual { get; }
+
+    /// <summary>The subtree root that OWNS this element's layout, when that is not the visual root: overlay content is
+    /// drawn by the window but measured and arranged by the popup layer, which alone knows its constraint (unbounded)
+    /// and its slot (the computed position). Null everywhere else, where the visual root owns layout as usual.
+    /// <para>Two owners running in one frame is not a slowdown but a CRASH: both drive the same virtualizing panel, and
+    /// its generator is re-entered mid-enumeration.</para></summary>
+    IUIComponent LayoutRoot { get; }
+
+    /// <summary>Which STAGE draws this element - the window content, the popup/overlay layer, the adorners - and so
+    /// whose dirty marks its own are. Inherited down the subtree at attach, like <see cref="LayoutRoot"/>, because the
+    /// answer is the same for a whole subtree and a mark is far too hot a path to go looking for it.
+    /// <para>Null until a stage claims the subtree, which means the window content: that is what one shared set of marks
+    /// used to mean for everybody.</para></summary>
+    RenderDirtyScope RenderScope { get; }
+
+    Int32 ZIndex { get; set; }
+
+    /// <summary>Whether this component's shapes are anti-aliased. Off for an axis-aligned rectangle on whole pixels,
+    /// which needs no fringe and is only harmed by one - see UIComponent.UseAnalyticAA.</summary>
+    Boolean UseAnalyticAA { get; set; }
+
+    bool IsAttachedToVisualTree { get; }
+
+    /// <summary>True while this subtree is PARKED: deliberately out of the tree, but kept - so what the renderer cached
+    /// for it must survive. Detachment alone means "gone"; parking is what tells the difference.</summary>
+    bool IsParked { get; }
+
+    /// <summary>Draw this element's SUBTREE once per matrix here, instead of once at its own place - the element becomes
+    /// a PROTOTYPE and each matrix a clone. Null or empty (the normal case) means the ordinary single draw.
+    /// <para>What this buys: N copies of a visual cost ONE real element. The clones exist only in the instance buffer -
+    /// they are in no tree, take no layout, take no hit-test and hold no state. A virtualizing panel's loading skeletons
+    /// are the first user: it built a full template instance per empty slot (measured: 3469 template builds in a 0.25 s
+    /// window against 147 realized containers), and every property write of every build marked layout dirty.</para>
+    /// <para>The matrix is COMPOSED, not substituted: a unit is drawn at <c>clone * itsWorld</c>, so the subtree keeps
+    /// its internal layout and the clone only says where the copy goes.</para></summary>
+    IReadOnlyList<Matrix4x4F> RenderClones { get; }
+
+    /// <summary>A render MOTION NODE: this element's subtree translates as a unit (a transform-only-scrolled panel).
+    /// The render cache bakes its descendants' batched instances in THIS node's space and gives them its transform-table
+    /// slot, so moving the node costs one matrix write instead of re-baking the subtree (the O(1)-scroll path). Set by
+    /// the element that drives such movement (a virtualizing items host) - or by the COMPOSITOR, which promotes any element
+    /// whose transform it takes over: one matrix write is precisely what the render thread can do on its own, and a
+    /// world-baked element could not be moved without a re-record, which is the loop thread's job.</summary>
+    bool IsRenderMotionNode { get; set; }
+
+    bool IsRootComponent { get; }
+
+    Transform LayoutTransform { get; set; }
+    
+    Transform RenderTransform { get; set; }
+
+    /// <summary>The point <see cref="RenderTransform"/> turns/scales about, as a FRACTION of the element's own size (0.5,0.5
+    /// = its centre). Relative, so one template stays centred at any size. Read by the compositor when it composes the
+    /// element's matrix itself.</summary>
+    Vector2 RenderTransformOrigin { get; set; }
+
+    Matrix4x4F WorldTransform { get; }
+
+    /// <summary>This element's transform in its parent's space (the parent-relative part of <see cref="WorldTransform"/>),
+    /// so a frame-scoped consumer can compose world transforms top-down without re-walking to the root per node.</summary>
+    Matrix4x4F LocalTransform { get; }
+
+    IReadOnlyCollection<IUIComponent> GetVisualDescendants();
+        
+    IReadOnlyCollection<IUIComponent> VisualChildren { get; }
+
+    void InvalidateRender(bool invalidateChildren);
+
+    /// <summary>Emits this element's draw commands into <paramref name="context"/> read-only - runs OnRender WITHOUT
+    /// touching IsGeometryValid (no RenderDirty mark, no loop wake) or the clean-frame gate. For an off-screen snapshot of
+    /// a LIVE element through a parallel render cache, where the ordinary <c>Render()</c> would no-op on a valid element.</summary>
+    void RenderReadOnly(IDrawingContext context);
+
+    /// <summary>Only this element's PAINT changed - same shape, same draw commands, a new colour/brush/opacity. It is NOT
+    /// re-rendered: the renderer re-bakes the GPU data of the units it already holds (see
+    /// <see cref="PropertyMetadataOptions.AffectsPaint"/>).</summary>
+    void InvalidatePaint();
+
+    /// <summary>
+    /// Narrow-phase hit test: is <paramref name="localPoint"/> (in this element's local coordinates) actually on the
+    /// element's geometry? The hit-test walk uses <see cref="ClipRectangle"/> as the cheap broad-phase (and to descend
+    /// into children); this is the tight test for whether the element ITSELF is hit. The default is the bounding box
+    /// (always true within it); shapes override it for their real geometry (a Line by distance to its segment, an
+    /// Ellipse by the ellipse equation, a Path by point-in-geometry) so clicks off the shape don't select it.
+    /// </summary>
+    bool HitTestCore(Vector2 localPoint);
+
+    void Render(IDrawingContext context);
+    
+    /// <summary>
+    /// Raised when the control is attached to a rooted logical tree.
+    /// </summary>
+    public event EventHandler<VisualTreeAttachmentEventArgs> AttachedToVisualTreeEvent;
+
+    /// <summary>
+    /// Raised when the control is detached from a rooted logical tree.
+    /// </summary>
+    public event EventHandler<VisualTreeAttachmentEventArgs> DetachedFromVisualTreeEvent;
+}

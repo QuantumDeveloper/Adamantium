@@ -1,0 +1,62 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Platforms>x64</Platforms>
+        <Nullable>disable</Nullable>
+        <EmitCompilerGeneratedFiles>true</EmitCompilerGeneratedFiles>
+        <CompilerGeneratedFilesOutputPath>$(BaseIntermediateOutputPath)Generated</CompilerGeneratedFilesOutputPath>
+        <LangVersion>latest</LangVersion>
+        <OutputType>Library</OutputType>
+    </PropertyGroup>
+
+    <!-- The Slang runtime rides in this package, so the shader compiler does not need the Vulkan SDK installed. Named
+         here only to learn where NuGet put it; the generator is handed the path. -->
+    <ItemGroup>
+        <PackageReference Include="Adamantium.Vulkan.Slang" Version="1.0.7" GeneratePathProperty="true" PrivateAssets="all" />
+    </ItemGroup>
+
+    <PropertyGroup>
+        <AdamantiumSlangPath>$(PKGAdamantium_Vulkan_Slang)</AdamantiumSlangPath>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\Adamantium.Core\Adamantium.Core.csproj" />
+        <ProjectReference Include="..\Adamantium.Graphics.Core\Adamantium.Graphics.Core.csproj" />
+        <ProjectReference Include="..\Adamantium.Mathematics\Adamantium.Mathematics.csproj" />
+        <ProjectReference Include="..\Adamantium.EffectsCompiler\Adamantium.EffectsCompiler.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="true" />
+        <ProjectReference Include="..\Adamantium.Engine.Generators\Adamantium.Engine.Generators.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" SetTargetFramework="TargetFramework=netstandard2.0" />
+        <!-- The source generators above are Roslyn analyzers (netstandard2.0); they need Core/Mathematics as analyzer
+             assemblies too. Analyzer-ONLY (ReferenceOutputAssembly=false) so the netstandard2.0 build is NOT copied into
+             this net10.0 app's output - the runtime/compile Core+Mathematics come from the normal net10.0 refs above. -->
+        <ProjectReference Include="..\Adamantium.Core\Adamantium.Core.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" SetTargetFramework="TargetFramework=netstandard2.0" />
+        <ProjectReference Include="..\Adamantium.Mathematics\Adamantium.Mathematics.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" SetTargetFramework="TargetFramework=netstandard2.0" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <AdditionalFiles Include="$(ProjectDir)**\*.fx" />
+        <AdditionalFiles Include="$(ProjectDir)**\*.fxh" />
+        <CompilerVisibleProperty Include="RootNamespace" />
+        <!-- The generator places each effect's class by the folder its .fx sits in, and needs the project root. -->
+        <CompilerVisibleProperty Include="ProjectDir" />
+        <!-- Where the Slang runtime is, so shaders build without the Vulkan SDK installed. -->
+        <CompilerVisibleProperty Include="AdamantiumSlangPath" />
+        <AdditionalFiles Remove="obj\**" />
+        <!-- IDE up-to-date check: rebuild when generator inputs (AdditionalFiles) change. -->
+        <UpToDateCheckInput Include="@(AdditionalFiles)" Visible="false" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <Compile Remove="obj\**" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <EmbeddedResource Remove="obj\**" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <None Remove="obj\**" />
+    </ItemGroup>
+
+</Project>

@@ -1,0 +1,264 @@
+using System.Runtime.InteropServices;
+using System.Xml.Linq;
+
+namespace Adamantium.UI.LanguageServer;
+
+/// <summary>
+/// Resolves and caches an <see cref="AumlTypeModel"/> per project: a .auml file's completion
+/// uses the types of the project that contains it (its build output) rather than a fixed
+/// assembly set. The cached model is dropped automatically when the project's build output
+/// changes (a <see cref="FileSystemWatcher"/> on the output dir), so newly added types/properties
+/// show up after a rebuild without restarting the language server. A project that has not been
+/// built yet is not cached, so completion enables itself once the first build appears.
+/// </summary>
+public sealed class AumlWorkspace : IDisposable
+{
+    private readonly object _gate = new();
+    private readonly Dictionary<string, AumlTypeModel?> _byProject = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, FileSystemWatcher> _watchers = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, Timer> _debounce = new(StringComparer.OrdinalIgnoreCase);
+    private readonly SyntaxTreeCache _syntaxCache = new();
+    private readonly MetadataReferenceCache _metadataCache = new();
+
+    // A build writes/copies many dlls in a burst; collapse the burst into one refresh once it goes quiet.
+    private static readonly TimeSpan DebounceDelay = TimeSpan.FromMilliseconds(800);
+
+    /// <summary>Raised (off the message-loop thread) after a project's build output changed and its cached type
+    /// model was dropped, so the server can re-validate open documents and stale diagnostics clear without an edit.</summary>
+    public event Action? ModelsChanged;
+
+    /// <summary>Type model for the project that contains <paramref name="filePath"/>, or null.</summary>
+    public AumlTypeModel? GetModelForFile(string filePath)
+    {
+        var project = FindProjectFile(filePath);
+        if (project is null)
+        {
+            Console.Error.WriteLine($"[auml] no .csproj found above {filePath}");
+            return null;
+        }
+
+        lock (_gate)
+        {
+            if (_byProject.TryGetValue(project, out var cached))
+                return cached;
+
+            var binDir = FindProjectBinDir(project);
+            if (binDir is null)
+            {
+                // Deliberately NOT cached: the next request retries, so completion enables itself once the
+                // project is built — no language-server restart needed.
+                Console.Error.WriteLine($"[auml] no build output for {Path.GetFileName(project)} — build it once; completion enables itself after the build (no restart needed)");
+                return null;
+            }
+
+            // In-repo dependency projects are compiled from source (CompilationReference), so edits to control
+            // types/properties anywhere in the engine show up on save without a build; the rest stay as dlls.
+            var (compilation, repoRoot, xmlnsMappings) = SourceProjectGraph.Build(project, binDir, _syntaxCache, _metadataCache);
+            var model = AumlTypeModel.FromCompilation(compilation, xmlnsMappings);
+
+            // Pre-register the project's own AUML views so an embedded <ControlsView/> is recognised and its inherited
+            // properties complete - the source generator does the same when it builds. Parsed from the .auml files
+            // directly (obj/bin copies excluded), so it needs no build.
+            var projectDir = Path.GetDirectoryName(project);
+            if (projectDir is not null)
+            {
+                var aumlFiles = Directory.EnumerateFiles(projectDir, "*.auml", SearchOption.AllDirectories)
+                    .Where(f => !f.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}")
+                             && !f.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}"));
+                model.RegisterViews(aumlFiles, compilation.AssemblyName, projectDir);
+            }
+
+            _byProject[project] = model;
+            WatchBin(project, binDir);
+            WatchSources(project, repoRoot);
+            return model;
+        }
+    }
+
+    /// <summary>
+    /// Builds an assembly-only type model from every managed dll in <paramref name="binDir"/> plus the runtime
+    /// (used by the console --demo). The per-project path uses <see cref="SourceProjectGraph"/> for live source.
+    /// </summary>
+    public static AumlTypeModel BuildFromBin(string binDir)
+    {
+        var byName = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var dll in Directory.GetFiles(binDir, "*.dll"))
+            byName[Path.GetFileName(dll)] = dll;
+        foreach (var dll in Directory.GetFiles(RuntimeEnvironment.GetRuntimeDirectory(), "*.dll"))
+            byName.TryAdd(Path.GetFileName(dll), dll);
+        return AumlTypeModel.Build(byName.Values);
+    }
+
+    // Watch the resolved output dir: when a rebuild copies new dlls there, drop the cached model so the next
+    // request rebuilds it from the fresh assemblies. One watcher per project, kept for the session.
+    private void WatchBin(string project, string binDir)
+    {
+        if (_watchers.ContainsKey(project)) return;
+        try
+        {
+            var watcher = new FileSystemWatcher(binDir, "*.dll")
+            {
+                NotifyFilter = NotifyFilters.LastWrite | NotifyFilters.FileName | NotifyFilters.Size,
+                IncludeSubdirectories = false,
+            };
+            FileSystemEventHandler onChange = (_, _) => ScheduleInvalidate(project);
+            watcher.Changed += onChange;
+            watcher.Created += onChange;
+            watcher.Deleted += onChange;
+            watcher.Renamed += (_, _) => ScheduleInvalidate(project);
+            watcher.EnableRaisingEvents = true;
+            _watchers[project] = watcher;
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"[auml] could not watch {binDir} ({ex.Message}); completion won't auto-refresh for {Path.GetFileName(project)}");
+        }
+    }
+
+    // Watch the project's C# source so a save (no build needed) refreshes the type model — edits to
+    // properties/types/classes show up in completion. One watcher per project, kept for the session.
+    private void WatchSources(string project, string projectDir)
+    {
+        var key = project + "|src";
+        if (_watchers.ContainsKey(key)) return;
+        try
+        {
+            var watcher = new FileSystemWatcher(projectDir, "*.cs")
+            {
+                NotifyFilter = NotifyFilters.LastWrite | NotifyFilters.FileName | NotifyFilters.Size,
+                IncludeSubdirectories = true,
+            };
+            FileSystemEventHandler onChange = (_, e) =>
+            {
+                if (!IsInObjOrBin(e.FullPath, projectDir)) ScheduleInvalidate(project);
+            };
+            watcher.Changed += onChange;
+            watcher.Created += onChange;
+            watcher.Deleted += onChange;
+            watcher.Renamed += (_, e) =>
+            {
+                if (!IsInObjOrBin(e.FullPath, projectDir)) ScheduleInvalidate(project);
+            };
+            watcher.EnableRaisingEvents = true;
+            _watchers[key] = watcher;
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"[auml] could not watch {projectDir} (*.cs) ({ex.Message}); source edits won't auto-refresh completion for {Path.GetFileName(project)}");
+        }
+    }
+
+    private static bool IsInObjOrBin(string file, string projectDir)
+    {
+        var relative = file.Substring(projectDir.Length).TrimStart('/', '\\').Replace('\\', '/');
+        return relative.StartsWith("obj/", StringComparison.OrdinalIgnoreCase)
+            || relative.StartsWith("bin/", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private void ScheduleInvalidate(string project)
+    {
+        lock (_gate)
+        {
+            if (_debounce.TryGetValue(project, out var timer))
+                timer.Change(DebounceDelay, Timeout.InfiniteTimeSpan);
+            else
+                _debounce[project] = new Timer(_ => Invalidate(project), null, DebounceDelay, Timeout.InfiniteTimeSpan);
+        }
+    }
+
+    private void Invalidate(string project)
+    {
+        lock (_gate)
+        {
+            _byProject.Remove(project);
+            if (_debounce.Remove(project, out var timer)) timer.Dispose();
+        }
+        Console.Error.WriteLine($"[auml] build output changed — type model refreshed for {Path.GetFileName(project)}");
+        ModelsChanged?.Invoke();
+    }
+
+    public void Dispose()
+    {
+        lock (_gate)
+        {
+            foreach (var watcher in _watchers.Values) watcher.Dispose();
+            _watchers.Clear();
+            foreach (var timer in _debounce.Values) timer.Dispose();
+            _debounce.Clear();
+        }
+    }
+
+    private static string? FindProjectFile(string filePath)
+    {
+        var dir = new DirectoryInfo(Path.GetDirectoryName(Path.GetFullPath(filePath))!);
+        for (; dir is not null; dir = dir.Parent)
+        {
+            var csproj = dir.GetFiles("*.csproj").FirstOrDefault();
+            if (csproj is not null) return csproj.FullName;
+        }
+        return null;
+    }
+
+    private static string? FindProjectBinDir(string csprojPath)
+    {
+        var projectDir = Path.GetDirectoryName(csprojPath)!;
+        var ownDll = Path.GetFileNameWithoutExtension(csprojPath) + ".dll";
+
+        // Candidate output roots, covering every scheme this engine has used:
+        //  - the conventional <projectDir>\bin;
+        //  - a <BaseOutputPath> redirect (older scheme, e.g. ..\..\output\Name\bin);
+        //  - a single solution-wide artifacts\bin root (current scheme — set via <OutputPath> in the root
+        //    Directory.Build.props, so individual csproj files carry no hint of it; found by walking up).
+        List<string> roots = [Path.Combine(projectDir, "bin")];
+        var baseOutput = ReadBaseOutputPath(csprojPath);
+        if (baseOutput is not null)
+            roots.Add(Path.GetFullPath(Path.Combine(projectDir, baseOutput)));
+        var artifactsBin = FindAncestorArtifactsBin(projectDir);
+        if (artifactsBin is not null)
+            roots.Add(artifactsBin);
+
+        var existing = roots.Where(Directory.Exists).ToList();
+        if (existing.Count == 0) return null;
+
+        // Prefer the leaf holding the freshest build of the project's own assembly, so a stale leftover (an
+        // old scheme, or an old target-framework leaf with a fuller dll closure) can't shadow the current
+        // build and serve months-old types that then show up as unknown/red.
+        var byOwnDll = existing
+            .SelectMany(root => Directory.EnumerateFiles(root, ownDll, SearchOption.AllDirectories))
+            .OrderByDescending(File.GetLastWriteTimeUtc)
+            .FirstOrDefault();
+        if (byOwnDll is not null) return Path.GetDirectoryName(byOwnDll);
+
+        // Fallback (e.g. a custom AssemblyName != project name): the dir with the most dlls, newest first.
+        return existing
+            .SelectMany(root => Directory.EnumerateDirectories(root, "*", SearchOption.AllDirectories).Prepend(root))
+            .Where(d => Directory.EnumerateFiles(d, "*.dll").Any())
+            .OrderByDescending(d => Directory.GetFiles(d, "*.dll").Length)
+            .ThenByDescending(Directory.GetLastWriteTimeUtc)
+            .FirstOrDefault();
+    }
+
+    // Walk up from the project looking for a solution-wide artifacts\bin (the current consolidated output root).
+    private static string? FindAncestorArtifactsBin(string startDir)
+    {
+        for (var dir = new DirectoryInfo(startDir); dir is not null; dir = dir.Parent)
+        {
+            var artifactsBin = Path.Combine(dir.FullName, "artifacts", "bin");
+            if (Directory.Exists(artifactsBin)) return artifactsBin;
+        }
+
+        return null;
+    }
+
+    private static string? ReadBaseOutputPath(string csprojPath)
+    {
+        try
+        {
+            return XDocument.Load(csprojPath).Descendants("BaseOutputPath").FirstOrDefault()?.Value?.Trim();
+        }
+        catch
+        {
+            return null;
+        }
+    }
+}

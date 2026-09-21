@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="utf-8"?>
+<StyleSet xmlns="http://adamantium/ui"
+          xmlns:x="http://adamantium/ui/xaml/extensions">
+
+    <!-- The indicator with NO class: what a control shows when nobody asked for a particular effect. Fluent's is a
+         sweeping arc over a dim ring.
+
+         This file used to hold nine class variants as well (Dots, Bar, Ripple, Arc, Ants, Shimmer, Flip, Equalizer,
+         Heartbeat). They are not this theme's opinion about anything - they are effects an application asks for BY
+         NAME, built from keys every theme answers - and they lived here AND in Editor Pro, in two copies that differed
+         by nothing but line breaks. They now live once, in Shared/BusyEffectsStyleSet, which every theme includes.
+         What is left here is the part that really is Fluent's: the plain one. -->
+
+    <Style Selector="BusyIndicator">
+        <Setter Property="Width" Value="{ResourceReference BusySize}"/>
+        <Setter Property="Height" Value="{ResourceReference BusySize}"/>
+        <Setter Property="HorizontalAlignment" Value="Center"/>
+        <Setter Property="VerticalAlignment" Value="Center"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="BusyIndicator">
+                    <Grid>
+                        <!-- The dim full ring the arc travels over. -->
+                        <Ellipse Stroke="{ResourceReference ControlFillColorTertiary}"
+                                          StrokeThickness="{ResourceReference BusyArcThickness}"
+                                          Fill="Transparent"
+                                          EllipseType="EdgeToEdge"/>
+                        <!-- The accent arc; it is the ARC that spins. RenderTransformOrigin is a FRACTION of the element's
+                             own size, so the arc turns about its centre at ANY size the control is given - an absolute
+                             pixel centre would be correct only at the one size this template happened to be written for. -->
+                        <Ellipse Stroke="{ThemeResource AccentFillColorDefault}"
+                                          StrokeThickness="{ResourceReference BusyArcThickness}"
+                                          Fill="Transparent"
+                                          EllipseType="EdgeToEdge"
+                                          StartAngle="0"
+                                          StopAngle="90"
+                                          RenderTransformOrigin="0.5,0.5">
+                            <Ellipse.RenderTransform>
+                                <Transform x:Name="RingSpin"/>
+                            </Ellipse.RenderTransform>
+                        </Ellipse>
+                    </Grid>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- The loop never ends by itself (IterationCount="Infinity"), so it is STOPPED on the way out: a looping animation
+         on a detached element is a leak. -->
+    <Style Selector="BusyIndicator">
+        <PropertyTrigger Property="IsActive" Value="True">
+            <PropertyTrigger.EnterActions>
+                <RunAnimationAction TargetName="RingSpin">
+                    <Animation Duration="0:0:1.1" IterationCount="Infinity">
+                        <KeyFrame Cue="0"><Setter Property="RotationAngle" Value="0"/></KeyFrame>
+                        <KeyFrame Cue="1"><Setter Property="RotationAngle" Value="360"/></KeyFrame>
+                    </Animation>
+                </RunAnimationAction>
+            </PropertyTrigger.EnterActions>
+            <PropertyTrigger.ExitActions>
+                <StopAnimationAction TargetName="RingSpin"/>
+            </PropertyTrigger.ExitActions>
+        </PropertyTrigger>
+    </Style>
+
+</StyleSet>

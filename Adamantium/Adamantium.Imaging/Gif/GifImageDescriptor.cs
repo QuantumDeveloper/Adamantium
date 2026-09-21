@@ -1,6 +1,6 @@
 ﻿namespace Adamantium.Imaging.Gif
 {
-    internal class GifImageDescriptor
+    public class GifImageDescriptor
     {
         public ushort OffsetLeft { get; set; }
         public ushort OffsetTop { get; set; }

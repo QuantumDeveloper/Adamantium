@@ -1,26 +1,51 @@
-﻿using System;
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Numerics;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Text;
+using Vector2 = Adamantium.Mathematics.Vector2;
+using Vector3 = Adamantium.Mathematics.Vector3;
 
 namespace Adamantium.Core
 {
     public static class Utilities
     {
+        /// <summary>
+        /// Release memory obtained from <see cref="AllocateMemory(int, int)"/> or <see cref="AllocateMemory(nuint)"/>.
+        /// <para>
+        /// Must match the allocator EXACTLY, which is why both allocate through <c>NativeMemory</c> and this frees
+        /// through it - the MODERN allocator, which is where the engine is heading. It used to free with
+        /// <c>Marshal.FreeHGlobal</c> while one of the two overloads allocated with
+        /// <c>NativeMemory.Alloc</c> - handing a block from one heap to another allocator corrupts the process heap,
+        /// and the crash surfaces later at an unrelated allocation. That is what killed the app on a DDS cube map
+        /// (STATUS_HEAP_CORRUPTION, 0xC0000374), with the pixel buffers taking the <c>nuint</c> overload.
+        /// </para>
+        /// </summary>
         public static unsafe void FreeMemory(IntPtr pointer)
         {
             if (pointer == IntPtr.Zero) return;
-            Marshal.FreeHGlobal(((IntPtr*)pointer)[-1]);
+#if NET6_0_OR_GREATER
+            NativeMemory.Free(pointer.ToPointer());
+#else
+            // netstandard2.0 has no NativeMemory, so that target allocates through Marshal below and frees the same way.
+            Marshal.FreeHGlobal(pointer);
+#endif
         }
 
         public static unsafe void ClearMemory(ref IntPtr dest, byte value, int sizeInBytesToClear)
         {
+            #if NETCORE
             Span<byte> bytes = new Span<byte>(dest.ToPointer(), sizeInBytesToClear);
             bytes.Fill(value);
+            #else
+            var bytes = new byte[sizeInBytesToClear];
+            Marshal.Copy(dest, bytes, 0, sizeInBytesToClear);
+            #endif
         }
 
         public static bool IsEnum<T>(T type)
@@ -28,13 +53,44 @@ namespace Adamantium.Core
             return type is Enum;
         }
 
+#if NET6_0_OR_GREATER
+        /// <summary>
+        /// Allocate native memory. Goes through the SAME heap as every other allocation here, because
+        /// <see cref="FreeMemory"/> is the only release path and it cannot know which allocator a pointer came from.
+        /// <para>
+        /// This used to call <c>NativeMemory.Alloc</c> while <see cref="FreeMemory"/> released with
+        /// <c>Marshal.FreeHGlobal</c>. Handing a block from one allocator to another corrupts the process heap, and the
+        /// damage only surfaces later at some unrelated allocation - which is how a dropped DDS cube map killed the app
+        /// with STATUS_HEAP_CORRUPTION (0xC0000374). Callers passing a <c>uint</c> size bound to this overload, and the
+        /// image pixel buffers do exactly that.
+        /// </para>
+        /// </summary>
+        public static unsafe IntPtr AllocateMemory(nuint sizeInBytes)
+        {
+            return new IntPtr(NativeMemory.Alloc(sizeInBytes));
+        }
+#endif
+        /// <summary>
+        /// Allocate native memory. <paramref name="align"/> is a MINIMUM the platform allocator already satisfies (it
+        /// hands back memory aligned for any primitive - 16 bytes on both x64 targets), so it needs no arithmetic here.
+        /// <para>
+        /// It used to over-allocate and return a pointer offset INTO the block to force alignment - which threw the
+        /// base address away, so the matching free released an address the allocator never handed out and corrupted the
+        /// heap. Nothing in the engine asks for more than 16.
+        /// </para>
+        /// </summary>
         public static unsafe IntPtr AllocateMemory(int sizeInBytes, int align = 1)
         {
-            int mask = align - 1;
-            var memPtr = Marshal.AllocHGlobal(sizeInBytes + mask + IntPtr.Size);
-            var ptr = (long)((byte*)memPtr + sizeof(void*) + mask) & ~mask;
-            ((IntPtr*)ptr)[-1] = memPtr;
-            return new IntPtr((void*)ptr);
+            if (align > 16)
+            {
+                throw new ArgumentOutOfRangeException(nameof(align), align,
+                    "Alignment beyond what the platform allocator guarantees needs AlignedAlloc/AlignedFree, which this pair does not use.");
+            }
+#if NET6_0_OR_GREATER
+            return AllocateMemory((nuint)sizeInBytes);
+#else
+            return Marshal.AllocHGlobal(sizeInBytes);
+#endif
         }
 
         public static byte[] ReadStream(Stream stream)
@@ -47,7 +103,7 @@ namespace Adamantium.Core
         {
             if (stream == null || !stream.CanRead)
             {
-                return new byte[0];
+                return Array.Empty<byte>();
             }
 
             long size = readLength;
@@ -61,7 +117,7 @@ namespace Adamantium.Core
 
             if (size == 0)
             {
-                return new byte[0];
+                return Array.Empty<byte>();
             }
 
             var buffer = new byte[size];
@@ -97,23 +153,78 @@ namespace Adamantium.Core
             Buffer.MemoryCopy(source.ToPointer(), destination.ToPointer(), sizeInBytesToCopy, sizeInBytesToCopy);
         }
 
-        public static void Write<T>(IntPtr destination, ref T value) where T : struct
+        /// <summary>Write one value into unmanaged memory.
+        /// <para>A BLITTABLE value - which is every shader parameter the engine writes: floats, vectors, matrices, device
+        /// addresses - goes straight in. The general path below allocates native memory, marshals the value through
+        /// reflection (<see cref="Marshal.StructureToPtr(object,IntPtr,bool)"/> takes an <c>object</c>, so a struct
+        /// BOXES), copies it and frees again - per call. Measured on an idle frame: ~37 bytes of GC garbage plus a
+        /// malloc/free for EVERY parameter write of EVERY draw, and one batched glyph draw makes nine of them.</para></summary>
+        public static unsafe void Write<T>(IntPtr destination, ref T value) where T : struct
         {
+            if (Blittable<T>.Yes)
+            {
+                Unsafe.WriteUnaligned((void*)destination, value);
+                return;
+            }
+
             var size = SizeOf<T>();
-            IntPtr source = AllocateMemory(SizeOf<T>());
+            IntPtr source = AllocateMemory(size);
             Marshal.StructureToPtr(value, source, false);
             CopyMemory(destination, source, size);
+            FreeMemory(source);   // must match AllocateMemory above - not FreeHGlobal, which is a different heap
         }
 
+        /// <summary>Asked ONCE per type (a static generic), not per write. "No GC references AND the in-memory size equals
+        /// the marshalled one" is what makes a raw write equivalent to a marshalled one: a struct carrying a <c>bool</c>
+        /// (one byte in memory, four marshalled) or a fixed buffer fails the size test and keeps the general path.</summary>
+        private static class Blittable<T> where T : struct
+        {
+            public static readonly bool Yes = Compute();
+
+            private static bool Compute()
+            {
+#if NET6_0_OR_GREATER
+                if (RuntimeHelpers.IsReferenceOrContainsReferences<T>()) return false;
+                try
+                {
+                    return Unsafe.SizeOf<T>() == Marshal.SizeOf<T>();
+                }
+                catch
+                {
+                    return false;   // no marshalled representation at all - let the general path fail the same way it did
+                }
+#else
+                // netstandard2.0 has no IsReferenceOrContainsReferences; that target keeps the marshalling path, which is
+                // where it was before. Nothing hot builds against it.
+                return false;
+#endif
+            }
+        }
+
+        /// <summary>
+        /// Copy <paramref name="count"/> elements starting at <paramref name="data"/>[<paramref name="offset"/>] to
+        /// <paramref name="destination"/>, and return the address just past what was written.
+        /// <para>
+        /// It used to ignore BOTH arguments and copy the whole array - so a caller asking for the first N elements of a
+        /// longer array wrote straight past the end of the destination allocation. That is a heap overrun: the process
+        /// dies later, at some unrelated allocation, with STATUS_HEAP_CORRUPTION. A dropped DDS cube map hit it through
+        /// the pixel-buffer flip, which allocates exactly one row-stride and passes a full-image array.
+        /// </para>
+        /// </summary>
         public static IntPtr Write<T>(IntPtr destination, T[] data, int offset, int count) where T : struct
         {
             var size = SizeOf<T>();
-            var startPos = IntPtr.Add(destination, offset);
             var source = GCHandle.Alloc(data, GCHandleType.Pinned);
-            CopyMemory(destination, source.AddrOfPinnedObject(), size * data.Length);
-            source.Free();
+            try
+            {
+                CopyMemory(destination, IntPtr.Add(source.AddrOfPinnedObject(), offset * size), (long)count * size);
+            }
+            finally
+            {
+                source.Free();
+            }
 
-            return IntPtr.Add(startPos, count * size);
+            return IntPtr.Add(destination, count * size);
         }
 
         public static T Read<T>(IntPtr source) where T : struct
@@ -157,14 +268,11 @@ namespace Adamantium.Core
 
         public static void Swap<T>(ref T elem1, ref T elem2)
         {
-            var tmp = elem1;
-            elem1 = elem2;
-            elem2 = tmp;
+            (elem1, elem2) = (elem2, elem1);
         }
 
         public static ushort ToLittleEndian(byte left, byte right)
         {
-            var res = BitConverter.ToUInt16(new byte[] { right, left }, 0);
             var result = (ushort)(right | left << 8);
             return result;
         }
@@ -186,21 +294,46 @@ namespace Adamantium.Core
 
             return (ushort)(b1 << 8 | b2 << 0);
         }
-
-        public static IEnumerable<byte> GetBytesWithReversedEndian(int value)
+        
+        #if NET9_0_OR_GREATER
+        public static IEnumerable<byte> GetBytesWithReversedEndian<T>(T value) where T : unmanaged, IBinaryInteger<T>
         {
-            return BitConverter.GetBytes(value).Reverse();
+            int size = System.Runtime.CompilerServices.Unsafe.SizeOf<T>();
+            byte[] bytes = new byte[size];
+
+            if (BitConverter.IsLittleEndian)
+            {
+                value.WriteBigEndian(bytes);
+            }
+            else
+            {
+                value.WriteLittleEndian(bytes);
+            }
+
+            return bytes;
+        }
+        #endif
+        
+        public static IEnumerable<byte> GetBytesWithReversedEndian(uint value, int size)
+        {
+            byte[] bytes = new byte[size];
+        
+            for (int i = 0; i < size; i++)
+            {
+                bytes[size - 1 - i] = (byte)(value >> (i * 8));
+            }
+
+            return bytes;
         }
 
-        public static IEnumerable<byte> GetBytesWithReversedEndian(uint value)
-        {
-            return BitConverter.GetBytes(value).Reverse();
-        }
+        public static IEnumerable<byte> GetBytesWithReversedEndian(int value) 
+            => GetBytesWithReversedEndian((uint)value, sizeof(int));
 
-        public static IEnumerable<byte> GetBytesWithReversedEndian(ushort value)
-        {
-            return BitConverter.GetBytes(value).Reverse();
-        }
+        public static IEnumerable<byte> GetBytesWithReversedEndian(uint value) 
+            => GetBytesWithReversedEndian(value, sizeof(uint));
+
+        public static IEnumerable<byte> GetBytesWithReversedEndian(ushort value) 
+            => GetBytesWithReversedEndian(value, sizeof(ushort));
 
         public static void Dispose<T>(ref T arg) where T: IDisposable
         {
@@ -368,7 +501,6 @@ namespace Adamantium.Core
 
         public static bool IsTypeInheritFrom(Type type, Type baseType)
         {
-            //var baseType = Type.GetType(baseTypeString);
             return baseType is not null && baseType.IsAssignableFrom(type);
         }
 
@@ -390,6 +522,33 @@ namespace Adamantium.Core
             hash ^= hash >> 17;
             hash += hash << 5;
             return unchecked((int)hash);
+        }
+        
+        public static Vector2[] ToVector2(IEnumerable<Vector3> array)
+        {
+            var collection = new List<Vector2>();
+            foreach (var vector in array)
+            {
+                collection.Add((Vector2)vector);
+            }
+
+            return collection.ToArray();
+        }
+
+        public static Vector3[] ToVector3(IEnumerable<Vector2> array)
+        {
+            var collection = new List<Vector3>();
+            foreach (var vector in array)
+            {
+                collection.Add((Vector3)vector);
+            }
+
+            return collection.ToArray();
+        }
+        
+        public static ulong AlignSize(ulong size, ulong alignment)
+        {
+            return (size + alignment - 1) & ~(alignment - 1);
         }
     }
 }

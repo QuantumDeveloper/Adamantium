@@ -1,0 +1,75 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<StyleSet xmlns="http://adamantium/ui"
+          xmlns:x="http://adamantium/ui/xaml/extensions">
+
+    <!-- The macOS disclosure group: NO BOX around it. On this platform a foldable section is a triangle and a bold
+         caption sitting on the page, with its content indented under them - not a bordered card. That is the whole
+         difference from Fluent's set, and it is why this file exists rather than a BasedOn.
+
+         The triangle sits BEFORE the caption and turns down when open, exactly as it does in Finder and in the
+         inspectors of every Apple application. -->
+
+    <Style Selector="Expander">
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="Foreground" Value="{ObservableResource TextFillColorPrimary}"/>
+        <Setter Property="FontSize" Value="{ResourceReference FontSizeBody}"/>
+        <Setter Property="Padding" Value="0 4"/>
+        <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Expander">
+                    <Grid RowDefinitions="Auto,Auto">
+                        <Border Grid.Row="0" x:Name="PART_Header"
+                                Background="Transparent"
+                                CornerRadius="{ResourceReference CornerRadiusDefault}"
+                                Padding="{TemplateBinding Padding}"
+                                Cursor="Hand">
+                            <Grid ColumnDefinitions="Auto,*">
+                                <Image Grid.Column="0" x:Name="Glyph"
+                                       Source="{ResourceReference ChevronRightIcon}"
+                                       Width="9" Height="9" Margin="0 0 6 0"
+                                       VerticalAlignment="Center"/>
+                                <ContentPresenter Grid.Column="1"
+                                        x:Name="PART_HeaderPresenter"
+                                        VerticalAlignment="Center"
+                                        TextTrimming="CharEllipses"
+                                        Foreground="{TemplateBinding Foreground}"
+                                        FontSize="{TemplateBinding FontSize}"
+                                        Content="{TemplateBinding Header}"
+                                        ContentTemplate="{TemplateBinding HeaderTemplate}"/>
+                            </Grid>
+                        </Border>
+
+                        <!-- Indented under the triangle, not boxed: the indent is what says "this belongs to that". -->
+                        <Border Grid.Row="1" x:Name="PART_Content"
+                                Visibility="Collapsed"
+                                Margin="15 2 0 6">
+                            <ContentPresenter
+                                    x:Name="PART_ContentPresenter"
+                                    HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                    VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
+                                    Content="{TemplateBinding Content}"
+                                    ContentTemplate="{TemplateBinding ContentTemplate}"/>
+                        </Border>
+                    </Grid>
+                    <ControlTemplate.Triggers>
+                        <PropertyTrigger Property="IsExpanded" Value="true">
+                            <Setter TargetName="PART_Content" Property="Visibility" Value="Visible"/>
+                            <Setter TargetName="Glyph" Property="Source" Value="{ResourceReference ChevronDownIcon}"/>
+                        </PropertyTrigger>
+                        <PropertyTrigger Property="IsMouseOver" Value="true">
+                            <Setter TargetName="PART_Header" Property="Background"
+                                    Value="{ResourceReference SubtleFillColorSecondary}"/>
+                        </PropertyTrigger>
+                        <PropertyTrigger Property="IsEnabled" Value="false">
+                            <Setter TargetName="PART_HeaderPresenter" Property="Foreground"
+                                    Value="{ObservableResource TextFillColorDisabled}"/>
+                        </PropertyTrigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+</StyleSet>

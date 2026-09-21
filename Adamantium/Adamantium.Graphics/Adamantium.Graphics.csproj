@@ -1,0 +1,38 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+	<PropertyGroup>
+		<TargetFramework>net10.0</TargetFramework>
+		<Platforms>x64</Platforms>
+		<LangVersion>latestmajor</LangVersion>
+		<Configurations>Debug;Release</Configurations>
+		<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+		<OutputType>Library</OutputType>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<ProjectReference Include="..\..\..\AdamantiumVulkan\Adamantium.Vulkan\Adamantium.Vulkan.csproj" />
+		<ProjectReference Include="..\..\..\QuantumBinding\QuantumBinding.Utils\QuantumBinding.Utils.csproj" />
+		<ProjectReference Include="..\Adamantium.Engine.Compiler\Adamantium.Engine.Compiler.csproj" />
+		<ProjectReference Include="..\Adamantium.FX\Adamantium.FX.csproj" />
+		<ProjectReference Include="..\Adamantium.Graphics.Core\Adamantium.Graphics.Core.csproj" />
+		<ProjectReference Include="..\Adamantium.Fonts\Adamantium.Fonts.csproj" />
+		<ProjectReference Include="..\Adamantium.Imaging\Adamantium.Imaging.csproj" />
+		<ProjectReference Include="..\Adamantium.Win32\Adamantium.Win32.csproj" />
+		<ProjectReference Include="..\Adamantium.Core\Adamantium.Core.csproj" />
+		<ProjectReference Include="..\Adamantium.Mathematics\Adamantium.Mathematics.csproj" />
+		<ProjectReference Include="..\Adamantium.EffectsCompiler\Adamantium.EffectsCompiler.csproj" />
+	</ItemGroup>
+
+	<ItemGroup>
+	  <Compile Remove="obj\**" />
+	</ItemGroup>
+
+	<ItemGroup>
+	  <EmbeddedResource Remove="obj\**" />
+	</ItemGroup>
+
+	<ItemGroup>
+	  <None Remove="obj\**" />
+	</ItemGroup>
+
+</Project>

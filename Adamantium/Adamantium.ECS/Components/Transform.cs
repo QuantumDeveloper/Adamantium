@@ -1,0 +1,557 @@
+﻿using System;
+using System.Collections.Generic;
+using Adamantium.Mathematics;
+
+namespace Adamantium.ECS.Components
+{
+    public sealed class Transform : ActivatableComponent
+    {
+        public Transform()
+        {
+            InitialPosition = Vector3.Zero;
+            Position = Vector3.Zero;
+            Rotation = QuaternionF.Identity;
+            PivotRotation = QuaternionF.Identity;
+            baseScale = Vector3F.One;
+            scaleFactor = Vector3F.One;
+            TransformData = new Dictionary<CameraBase, TransformMetaData>();
+        }
+
+        private Vector3 initialPosition;
+        private Vector3 position;
+        private QuaternionF rotation;
+        private Vector3F baseScale;
+        private Vector3F scaleFactor;
+        private Vector3 pivot;
+        private QuaternionF pivotRotation;
+
+        private readonly Dictionary<CameraBase, TransformMetaData> TransformData;
+
+        public Vector3F GetRelativePosition(Vector3 offset)
+        {
+            return WorldPosition - offset;
+        }
+
+        /// <summary>Where this entity is IN THE WORLD: its own position composed through its parents. <see cref="Position"/>
+        /// is relative to the parent, so for anything below a root the two differ. Camera-independent, unlike
+        /// <see cref="TransformMetaData.AbsoluteWorld"/>, which the render pass records per camera.</summary>
+        public Vector3 WorldPosition
+        {
+            get
+            {
+                var world = Matrix4x4F.Translation((Vector3F)Position);
+
+                for (var at = Owner?.Owner; at != null; at = at.Owner)
+                {
+                    var t = at.Transform;
+                    world *= Matrix4x4F.Scaling(t.Scale)
+                             * Matrix4x4F.RotationQuaternion(t.Rotation)
+                             * Matrix4x4F.Translation((Vector3F)t.Position);
+                }
+
+                return (Vector3)world.TranslationVector;
+            }
+        }
+
+        public void RemoveMetadata(CameraBase camera)
+        {
+            if (TransformData.ContainsKey(camera))
+            {
+                TransformData.Remove(camera);
+            }
+        }
+
+        public TransformMetaData GetMetadata(CameraBase camera)
+        {
+            TransformMetaData metaData;
+            TransformData.TryGetValue(camera, out metaData);
+            if (metaData == null)
+            {
+                metaData = TransformMetaData.New();
+                metaData.Camera = camera;
+                TransformData.Add(camera, metaData);
+            }
+            return metaData;
+        }
+
+        public void SetMetadata(CameraBase camera, TransformMetaData metadata)
+        {
+            //Make sure metadata contains correct camera instance
+            metadata.Camera = camera;
+            if (TransformData.ContainsKey(camera))
+            {
+                TransformData[camera] = metadata;
+            }
+            else
+            {
+                TransformData.Add(camera, metadata);
+            }
+        }
+
+        public void SetEnableForCamera(CameraBase camera, bool enabled)
+        {
+            GetMetadata(camera).Enabled = enabled;
+        }
+
+        public Vector3 Pivot
+        {
+            get => pivot + Position;
+            set
+            {
+                if (SetProperty(ref pivot, value))
+                {
+                    pivot = value - Position;
+                    IsWorldDirty = true;
+                }
+            }
+        }
+
+        public QuaternionF PivotRotation
+        {
+            get => pivotRotation;
+            set
+            {
+                if (SetProperty(ref pivotRotation, value))
+                {
+                    IsWorldDirty = true;
+                }
+            }
+        }
+
+        public Vector3 InitialPosition
+        {
+            get => initialPosition;
+            set => SetProperty(ref initialPosition, value);
+        }
+
+        public Vector3 Position
+        {
+            get => position;
+            set
+            {
+                if (SetProperty(ref position, value))
+                {
+                    IsWorldDirty = true;
+                }
+            }
+        }
+
+        public QuaternionF Rotation
+        {
+            get => rotation;
+            set
+            {
+                if (SetProperty(ref rotation, value))
+                {
+                    IsWorldDirty = true;
+                }
+            }
+        }
+
+        public Vector3F BaseScale
+        {
+            get => baseScale;
+            set
+            {
+                if (SetProperty(ref baseScale, value))
+                {
+                    IsWorldDirty = true;
+                    RaisePropertyChanged(nameof(Scale));
+                }
+            }
+        }
+
+        public Vector3F ScaleFactor
+        {
+            get => scaleFactor;
+            set
+            {
+                if (SetProperty(ref scaleFactor, value))
+                {
+                    IsWorldDirty = true;
+                    RaisePropertyChanged(nameof(Scale));
+                }
+            }
+        }
+
+        public Vector3F Scale => baseScale * scaleFactor;
+
+        /// <summary>Set by the world-matrix input setters (position/rotation/scale/pivot). TransformService recomputes the
+        /// cached world matrix only for entities whose flag is set (or whose camera/parent moved), so a static subtree
+        /// costs nothing. Starts true so the first frame computes.</summary>
+        public bool IsWorldDirty { get; set; } = true;
+
+        public void Move(Vector3 direction, Double distance)
+        {
+            lock (this)
+            {
+                var distanceVector = Vector3.Multiply(direction, distance);
+                if (IsEnabled)
+                {
+                    Position = distanceVector;
+                }
+            }
+        }
+
+        public void Move(Vector3 direction, Vector3 distance)
+        {
+            lock (this)
+            {
+                var distanceVector = Vector3.Multiply(direction, distance);
+                if (IsEnabled)
+                {
+                    Position = distanceVector;
+                }
+            }
+        }
+
+        public void Translate(Vector3 direction, Double distance)
+        {
+            lock (this)
+            {
+                var distanceVector = Vector3.Multiply(direction, distance);
+                if (IsEnabled)
+                {
+                    Position += distanceVector;
+                }
+            }
+        }
+
+        public void TranslateRight(Double distance)
+        {
+            lock (this)
+            {
+                var distanceVector = Vector3.Multiply((Vector3)GetRotationMatrixF().Right, distance);
+                if (IsEnabled)
+                {
+                    Position += distanceVector;
+                }
+            }
+        }
+
+        public void TranslateUp(Double distance)
+        {
+            lock (this)
+            {
+                var distanceVector = Vector3.Multiply((Vector3)GetRotationMatrixF().Up, distance);
+                if (IsEnabled)
+                {
+                    Position += distanceVector;
+                }
+            }
+        }
+
+        public void TranslateForward(Double distance)
+        {
+            lock (this)
+            {
+                var distanceVector = Vector3.Multiply((Vector3)GetRotationMatrixF().Forward, distance);
+                if (IsEnabled)
+                {
+                    Position += distanceVector;
+                }
+            }
+        }
+
+        public void Translate(Vector3 direction, Vector3 distance)
+        {
+            lock (this)
+            {
+                var distanceVector = Vector3.Multiply(direction, distance);
+                if (IsEnabled)
+                {
+                    Position += distanceVector;
+                }
+            }
+        }
+
+        public void TranslatePivot(Vector3 direction, Double distance)
+        {
+            lock (this)
+            {
+                var distanceVector = Vector3.Multiply(direction, distance);
+                if (IsEnabled)
+                {
+                    Pivot += distanceVector;
+                }
+            }
+        }
+
+        public void TranslatePivot(Vector3 direction, Vector3 distance)
+        {
+            lock (this)
+            {
+                var distanceVector = Vector3.Multiply(direction, distance);
+                if (IsEnabled)
+                {
+                    Pivot += distanceVector;
+                }
+            }
+        }
+
+        private float EnsureAngle(float angle, RotationUnits units)
+        {
+            if (units == RotationUnits.Degrees)
+            {
+                angle = MathHelper.DegreesToRadians(angle);
+            }
+            return angle;
+        }
+
+        public Matrix4x4F GetRotationMatrixF()
+        {
+            return Matrix4x4F.RotationQuaternion(Rotation);
+        }
+
+        public Matrix4x4F GetPivotRotationMatrixF()
+        {
+            return Matrix4x4F.RotationQuaternion(PivotRotation);
+        }
+        
+        public Matrix4x4 GetRotationMatrix()
+        {
+            return Matrix4x4.RotationQuaternion(Rotation);
+        }
+
+        public Matrix4x4 GetPivotRotationMatrix()
+        {
+            return Matrix4x4.RotationQuaternion(PivotRotation);
+        }
+
+        public void ResetPosition()
+        {
+            if (IsEnabled)
+            {
+                Position = InitialPosition;
+            }
+        }
+
+        public void ResetScale()
+        {
+            if (IsEnabled)
+            {
+                ScaleFactor = Vector3F.One;
+            }
+        }
+
+        public void ResetRotation()
+        {
+            if (IsEnabled)
+            {
+                Rotation = QuaternionF.Identity;
+            }
+        }
+
+        public void ResetPivotPosition()
+        {
+            if (IsEnabled)
+            {
+                Pivot = Position;
+            }
+        }
+
+        public void ResetPivotRotation()
+        {
+            if (IsEnabled)
+            {
+                PivotRotation = QuaternionF.Identity;
+            }
+        }
+
+        public void Rotate(Vector3F axis, float angle, RotationUnits units = RotationUnits.Radians)
+        {
+            angle = EnsureAngle(angle, units);
+            if (IsEnabled)
+            {
+                Rotation = QuaternionF.Multiply(QuaternionF.RotationAxis(axis, angle), Rotation);
+            }
+        }
+
+        public void RotateRight(float angle, RotationUnits units = RotationUnits.Radians)
+        {
+            angle = EnsureAngle(angle, units);
+            if (IsEnabled)
+            {
+                Rotation = QuaternionF.Multiply(QuaternionF.RotationAxis(GetRotationMatrixF().Right, angle), Rotation);
+            }
+        }
+
+        public void RotateUp(float angle, RotationUnits units = RotationUnits.Radians)
+        {
+            angle = EnsureAngle(angle, units);
+            if (IsEnabled)
+            {
+                Rotation = QuaternionF.Multiply(QuaternionF.RotationAxis(GetRotationMatrixF().Up, angle), Rotation);
+            }
+        }
+
+        public void RotateForward(float angle, RotationUnits units = RotationUnits.Radians)
+        {
+            angle = EnsureAngle(angle, units);
+            if (IsEnabled)
+            {
+                Rotation = QuaternionF.Multiply(QuaternionF.RotationAxis(GetRotationMatrixF().Forward, angle), Rotation);
+            }
+        }
+
+        public void RotatePivot(Vector3F axis, float angle, RotationUnits units = RotationUnits.Radians)
+        {
+            angle = EnsureAngle(angle, units);
+            if (IsEnabled)
+            {
+                PivotRotation = QuaternionF.Multiply(QuaternionF.RotationAxis(axis, angle), PivotRotation);
+            }
+        }
+
+        public void RotatePivotRight(float angle, RotationUnits units = RotationUnits.Radians)
+        {
+            angle = EnsureAngle(angle, units);
+            if (IsEnabled)
+            {
+                PivotRotation = QuaternionF.Multiply(QuaternionF.RotationAxis(GetPivotRotationMatrixF().Right, angle), PivotRotation);
+            }
+        }
+
+        public void RotatePivotUp(float angle, RotationUnits units = RotationUnits.Radians)
+        {
+            angle = EnsureAngle(angle, units);
+            if (IsEnabled)
+            {
+                PivotRotation = QuaternionF.Multiply(QuaternionF.RotationAxis(GetPivotRotationMatrixF().Up, angle), PivotRotation);
+            }
+        }
+
+        public void RotatePivotForward(float angle, RotationUnits units = RotationUnits.Radians)
+        {
+            angle = EnsureAngle(angle, units);
+            if (IsEnabled)
+            {
+                PivotRotation = QuaternionF.Multiply(QuaternionF.RotationAxis(GetPivotRotationMatrixF().Forward, angle), PivotRotation);
+            }
+        }
+
+        ///<summary>
+        ///Sync entity orientation with camera forward axis for left handed coordinate system
+        ///</summary>
+        public void SyncOrientationWithCameraForwardLH(CameraBase camera)
+        {
+            var rotMatr = camera.RotationMatrix;
+            var quat = QuaternionF.RotationLookAtLH(rotMatr.Forward, rotMatr.Up);
+            Owner.Transform.Rotation = quat;
+        }
+
+        ///<summary>
+        ///Sync entity orientation with camera backward axis for left handed coordinate system
+        ///</summary>
+        public void SyncOrientationWithCameraBackwardLH(CameraBase camera)
+        {
+            var rotMatr = camera.RotationMatrix;
+            var quat = QuaternionF.RotationLookAtLH(rotMatr.Backward, rotMatr.Up);
+            Owner.Transform.Rotation = quat;
+        }
+
+        public void SetScaleFactor(float factor)
+        {
+            SetScaleFactor(new Vector3F(factor));
+        }
+
+        public void SetScaleFactor(Vector3F factor)
+        {
+            if (IsEnabled)
+            {
+                ScaleFactor = factor;
+            }
+        }
+
+        public void SetBaseScale(Vector3F scale)
+        {
+            if (IsEnabled)
+            {
+                BaseScale = scale;
+            }
+        }
+
+        public void SetBaseScale(float scale)
+        {
+            SetBaseScale(new Vector3F(scale));
+        }
+
+        public void DivideScale(float scale)
+        {
+            DivideScale(new Vector3F(scale));
+        }
+
+
+        public void DivideScale(Vector3F scale)
+        {
+            if (IsEnabled)
+            {
+                ScaleFactor /= scale;
+            }
+        }
+
+        public void MultiplyScale(float scale)
+        {
+            MultiplyScale(new Vector3F(scale));
+        }
+
+        public void MultiplyScale(Vector3F scale)
+        {
+            if (IsEnabled)
+            {
+                ScaleFactor *= scale;
+            }
+        }
+
+        public Matrix4x4F CalculateFinalTransform(CameraBase camera, Vector3F pivotCorrection, Matrix4x4F parentWorld)
+        {
+            var scaling = Scale;
+            // LOCAL position (relative to the parent), NOT camera-relative: the camera shift is applied once, at the end,
+            // to the composed world - otherwise it would be subtracted once per level of the hierarchy.
+            var localPosition = (Vector3F)Position;
+            var finalPivot = (Vector3F)pivot + pivotCorrection;
+            var scalingCenter = finalPivot;
+
+            Matrix4x4F.Transformation(ref scalingCenter, ref pivotRotation, ref scaling, ref finalPivot, ref rotation, ref localPosition, out var localMatrix);
+
+            // THE hierarchical fix: compose through the parent (row-vector convention -> local * parent). The parent's
+            // absolute world was computed earlier this frame (TransformService walks the tree top-down), so a parent
+            // transform now flows into its children. For a root, parentWorld is identity and this leaves the matrix as-is.
+            var absoluteWorld = localMatrix * parentWorld;
+
+            // Camera-relative render matrix: the view is rotation-only, so shift the world by the camera's WORLD
+            // position - Transform.Position is relative to a parent, which a third-person camera has.
+            var cameraWorld = camera.WorldPosition;
+            var cameraPosition = (Vector3F)cameraWorld;
+            var renderWorld = absoluteWorld * Matrix4x4F.Translation(-cameraPosition);
+
+            var metadata = GetMetadata(camera);
+            metadata.AbsoluteWorld = absoluteWorld;
+            metadata.RelativePosition = GetRelativePosition(cameraWorld);
+            metadata.Pivot = finalPivot;
+            metadata.WorldMatrixF = renderWorld;
+            metadata.WorldMatrix = (Matrix4x4)renderWorld;
+            metadata.Rotation = Rotation;
+            metadata.Scale = Scale;
+            // Record the inputs so TransformService can skip this (camera, node) next frame if none of them changed.
+            metadata.LastCameraPosition = cameraWorld;
+            metadata.LastPivotCorrection = pivotCorrection;
+            metadata.Computed = true;
+            return renderWorld;
+        }
+
+        public override void CloneValues(IComponent component)
+        {
+            if (component is Transform transform)
+            {
+                transform.Rotation = Rotation;
+                transform.BaseScale = BaseScale;
+                transform.ScaleFactor = ScaleFactor;
+                transform.InitialPosition = InitialPosition;
+                transform.Position = Position;
+                transform.Pivot = pivot;
+                transform.PivotRotation = PivotRotation;
+            }
+        }
+    }
+}

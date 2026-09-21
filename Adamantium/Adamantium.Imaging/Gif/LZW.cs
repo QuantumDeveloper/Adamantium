@@ -3,16 +3,16 @@ using System.Collections.Generic;
 
 namespace Adamantium.Imaging.Gif
 {
-    internal class LZW
+    internal static class LZW
     {
-        private int EOF = -1;
-        private int MAXBITS = 12;
-        private int HSIZE = 5003; // 80% occupancy
-        private int[] masks = {0x0000, 0x0001, 0x0003, 0x0007, 0x000F, 0x001F,
+        private static int EOF = -1;
+        private static int MAXBITS = 12;
+        private static int HSIZE = 5003; // 80% occupancy
+        private static int[] masks = {0x0000, 0x0001, 0x0003, 0x0007, 0x000F, 0x001F,
                      0x003F, 0x007F, 0x00FF, 0x01FF, 0x03FF, 0x07FF,
                      0x0FFF, 0x1FFF, 0x3FFF, 0x7FFF, 0xFFFF };
 
-        public byte[] Compress(int[] indexData, int colorDepth)
+        public static byte[] Compress(int[] indexData, int colorDepth)
         {
             var outData = new List<byte>();
             int[] htab = new int[HSIZE];
@@ -194,7 +194,7 @@ namespace Adamantium.Imaging.Gif
             return outData.ToArray();
         }
 
-        public int[] Decompress(byte[] compressedData, int minimumCodeSize)
+        public static int[] Decompress(byte[] compressedData, int minimumCodeSize)
         {
             uint mask = 0x01;
             int inputLength = compressedData.Length;

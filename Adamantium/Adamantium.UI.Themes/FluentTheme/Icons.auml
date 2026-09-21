@@ -1,0 +1,72 @@
+<ResourceDictionary xmlns:x="http://adamantium/ui/xaml/extensions"
+        xmlns="http://adamantium/ui">
+
+    <!-- Close: two crossing strokes. Stroked, not filled - it IS a stroke, and saying so keeps it honest at any size. -->
+    <DrawingImage x:Key="CloseIcon">
+        <GeometryDrawing Geometry="M0,0 L10,10 M10,0 L0,10"
+                         Stroke="{ResourceReference TextFillColorSecondary}"
+                         StrokeThickness="1"/>
+    </DrawingImage>
+
+    <!-- Chevrons: a filled triangle, one shape rotated by where it points. Kept as geometry rather than the SDF
+         RegularPolygon they used to be, so the whole set is one kind of thing. -->
+    <DrawingImage x:Key="ChevronDownIcon">
+        <GeometryDrawing Geometry="M0,3 L10,3 L5,9 Z"
+                         Brush="{ResourceReference TextFillColorSecondary}"/>
+    </DrawingImage>
+
+    <DrawingImage x:Key="ChevronUpIcon">
+        <GeometryDrawing Geometry="M0,7 L5,1 L10,7 Z"
+                         Brush="{ResourceReference TextFillColorSecondary}"/>
+    </DrawingImage>
+
+    <DrawingImage x:Key="ChevronRightIcon">
+        <GeometryDrawing Geometry="M3,0 L9,5 L3,10 Z"
+                         Brush="{ResourceReference TextFillColorSecondary}"/>
+    </DrawingImage>
+
+    <DrawingImage x:Key="ChevronLeftIcon">
+        <GeometryDrawing Geometry="M7,0 L1,5 L7,10 Z"
+                         Brush="{ResourceReference TextFillColorSecondary}"/>
+    </DrawingImage>
+
+    <!-- The chevron ending against a WALL: "as far as this goes", which is a different statement from "one more step"
+         and has to look different at a glance, or a pager's four arrows read as two pairs of the same button. Both
+         shapes in one geometry rather than a bar drawn beside an icon - the pair is one glyph, and splitting it would
+         let the two halves drift apart in every template that used them. -->
+    <DrawingImage x:Key="FirstPageIcon">
+        <GeometryDrawing Geometry="M0,0 L1.5,0 L1.5,10 L0,10 Z M9.5,0 L3.5,5 L9.5,10 Z"
+                         Brush="{ResourceReference TextFillColorSecondary}"/>
+    </DrawingImage>
+
+    <DrawingImage x:Key="LastPageIcon">
+        <GeometryDrawing Geometry="M8.5,0 L10,0 L10,10 L8.5,10 Z M0.5,0 L6.5,5 L0.5,10 Z"
+                         Brush="{ResourceReference TextFillColorSecondary}"/>
+    </DrawingImage>
+
+    <!-- The funnel: a table's filter, drawn as the thing a filter IS. Filled, like the chevrons, so the header strip
+         reads as one family of small solid marks rather than a mix of outlines and fills.
+         ONE funnel, not two: an "active" variant tinted with the accent would have to name it here, and the accent is a
+         THEME PROPERTY rather than a keyed resource - the lookup resolves to nothing and the icon simply disappears,
+         which is exactly what a filtered column did. A filtered column is marked by its BUTTON, in the style set. -->
+    <DrawingImage x:Key="FilterIcon">
+        <GeometryDrawing Geometry="M0,0 L10,0 L6,4.5 L6,10 L4,8.5 L4,4.5 Z"
+                         Brush="{ResourceReference TextFillColorSecondary}"/>
+    </DrawingImage>
+
+    <!-- Put it back: an arrow going BACK around, not a return key. Segments rather than an arc - the path parser reads
+         lines - and the head at the left end, pointing the way it travels. Stroked, like the close glyph. -->
+    <DrawingImage x:Key="RevertIcon">
+        <GeometryDrawing Geometry="M8.6,6.4 L8.4,4.4 L7.3,2.8 L5.4,2 L3.5,2.4 L2.2,3.7 L1.7,5.4 M0.2,4.4 L1.7,6.3 L3.4,4.7"
+                         Stroke="{ResourceReference TextFillColorSecondary}"
+                         StrokeThickness="1"/>
+    </DrawingImage>
+
+    <!-- Which columns are shown: three bars of a table, the middle one dropped out - the whole of what the chooser
+         does, said in the shape rather than in a word that would need translating. -->
+    <DrawingImage x:Key="ColumnsIcon">
+        <GeometryDrawing Geometry="M0,0 L2.5,0 L2.5,10 L0,10 Z M7.5,0 L10,0 L10,10 L7.5,10 Z"
+                         Brush="{ResourceReference TextFillColorSecondary}"/>
+    </DrawingImage>
+
+</ResourceDictionary>

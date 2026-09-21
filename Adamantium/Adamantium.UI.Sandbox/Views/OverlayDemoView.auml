@@ -1,0 +1,19 @@
+<View xmlns="http://adamantium/ui">
+    <!-- DataContext is OverlayDemoViewModel (resolved by the FooViewModel->FooView convention). The window chrome (title
+         bar, drag, resize, pin, close) is the hosting OverlayWindow; this view is just the content. X/Y are the window's
+         live Left/Top (two-way bound), so they change as you drag it and jump when "Move (VM)" moves it from the VM. -->
+    <StackPanel Orientation="Vertical">
+        <TextBlock Text="{Binding Message}" MarginBottom="10" TextWrapping="WrapByWords"/>
+        <StackPanel Orientation="Horizontal" MarginBottom="14">
+            <TextBlock Text="X:" MarginRight="4"/>
+            <TextBlock Text="{Binding Left}" MarginRight="14"/>
+            <TextBlock Text="Y:" MarginRight="4"/>
+            <TextBlock Text="{Binding Top}"/>
+        </StackPanel>
+        <StackPanel Orientation="Horizontal">
+            <Button Content="Rename title" Command="{Binding RenameCommand}" Height="32" MarginRight="8"/>
+            <Button Content="Move (VM)" Command="{Binding MoveFromVmCommand}" Height="32" MarginRight="8"/>
+            <Button Content="Close from VM" Command="{Binding CloseSelfCommand}" Height="32"/>
+        </StackPanel>
+    </StackPanel>
+</View>

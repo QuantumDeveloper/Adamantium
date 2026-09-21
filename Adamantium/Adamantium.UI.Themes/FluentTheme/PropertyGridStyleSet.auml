@@ -1,0 +1,230 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<StyleSet xmlns="http://adamantium/ui"
+          xmlns:x="http://adamantium/ui/xaml/extensions">
+
+    <!-- The inspector. Two halves and a grip between them; the grip is per ROW but the width is the GRID's, so the line
+         reads as one continuous rule down the whole panel.
+
+         The row's layout is a three-column Grid whose FIRST column the control sets (PART_Layout): binding a column
+         width to an ancestor's property is not something a template can say, and one number written into every row is
+         both simpler and impossible to get out of step. -->
+
+    <Style Selector="PropertyGrid">
+        <Setter Property="Background" Value="{ObservableResource SolidBackgroundFillColorBase}"/>
+        <Setter Property="Foreground" Value="{ObservableResource TextFillColorPrimary}"/>
+        <Setter Property="FontSize" Value="{ResourceReference FontSizeBody}"/>
+        <!-- Shorter than a standalone field (ControlHeight): an inspector shows two dozen of these at once, and a form
+             row is not a button. One number for every editor in it. -->
+        <Setter Property="EditorHeight" Value="24"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="PropertyGrid">
+                    <Border Background="{TemplateBinding Background}"
+                            BorderBrush="{ObservableResource ControlStrokeColorDefault}"
+                            BorderThickness="{ResourceReference StrokeControl}"
+                            ClipToBounds="True">
+                        <Grid RowDefinitions="Auto,*">
+                            <!-- The search field stands OUTSIDE the viewer, so it stays put while the rows scroll
+                                 under it. Auto: off, it costs the rows nothing.
+
+                                 The cross sits ON the field rather than beside it - beside it, the field would end
+                                 short of the panel and read as two controls. Hence the field's right padding: typed
+                                 text must not run under it. -->
+                            <Grid Grid.Row="0" Margin="6 6 6 4">
+                                <TextBox x:Name="PART_Search"
+                                         Height="26" Padding="6 0 24 0"
+                                         Placeholder="Search properties"
+                                         Visibility="Collapsed"/>
+                                <!-- The theme's DRAWN cross, not a character: the shipped face has no glyph for one,
+                                     and a button with a missing glyph is a button with nothing on it. -->
+                                <Button x:Name="PART_ClearSearch"
+                                        Visibility="Collapsed"
+                                        Width="18" Height="18" MinWidth="0" MinHeight="0"
+                                        Padding="0" Margin="0 0 5 0"
+                                        HorizontalAlignment="Right" VerticalAlignment="Center"
+                                        ToolTipService.ToolTip="Clear the search (Esc)">
+                                    <Image Source="{ResourceReference CloseIcon}" Width="8" Height="8"
+                                           HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                </Button>
+                            </Grid>
+
+                            <!-- Pixel scrolling, NOT item scrolling: an inspector's rows are not virtualized, so item
+                                 scrolling buys nothing - and it costs the control its size. Measured unbounded (which
+                                 is what a stack panel or an Auto row asks), an item-scrolling viewer reports its
+                                 viewport, which is nothing yet, and the whole inspector came out two pixels tall. -->
+                            <ScrollViewer Grid.Row="1"
+                                          CanContentScroll="False"
+                                          HorizontalScrollBarVisibility="Disabled"
+                                          VerticalScrollBarVisibility="Auto">
+                                <StackPanel x:Name="PART_Sections" Orientation="Vertical"/>
+                            </ScrollViewer>
+                        </Grid>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <PropertyTrigger Property="ShowSearch" Value="true">
+                            <Setter TargetName="PART_Search" Property="Visibility" Value="Visible"/>
+                        </PropertyTrigger>
+                        <!-- Only while there IS a search: a cross on an empty field offers to undo nothing. -->
+                        <MultiTrigger>
+                            <MultiTrigger.Conditions>
+                                <Condition Property="ShowSearch" Value="true"/>
+                                <Condition Property="HasSearchText" Value="true"/>
+                            </MultiTrigger.Conditions>
+                            <Setter TargetName="PART_ClearSearch" Property="Visibility" Value="Visible"/>
+                        </MultiTrigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- A section is an Expander, so it inherits that set and only says what differs: no card around it (the inspector
+         is the card), and the rows sit flush under the header. -->
+    <Style Selector="PropertySection" BasedOn="Expander">
+        <Setter Property="BorderThickness" Value="0 0 0 1"/>
+        <Setter Property="CornerRadius" Value="0"/>
+        <Setter Property="Padding" Value="10 6"/>
+    </Style>
+
+    <Style Selector="PropertyRow">
+        <Setter Property="Foreground" Value="{ObservableResource TextFillColorPrimary}"/>
+        <Setter Property="FontSize" Value="{ResourceReference FontSizeBody}"/>
+        <!-- The editor's height plus its margin: a row that was shorter would squeeze what it holds. It must also
+             clear PART_Action below, or the lines that offer the button would stand taller than the rest. -->
+        <Setter Property="MinHeight" Value="28"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="PropertyRow">
+                    <Border x:Name="RowBorder" Background="Transparent">
+                        <!-- A fourth column for the "..." button, and it is Auto: off, it costs nothing, so a grid of
+                             rows where one line offers an action does not lose a strip of width on all the others. -->
+                        <Grid x:Name="PART_Layout" ColumnDefinitions="140,7,*,Auto">
+                            <Grid Grid.Column="0" ColumnDefinitions="Auto,*" Margin="10 0 0 0">
+                                <!-- The strip that opens a composite row. Reserved on every row, so the names of one
+                                     level line up whether or not that row has children. -->
+                                <Border Grid.Column="0" x:Name="PART_Expander"
+                                        Width="14" Background="Transparent" Cursor="Hand">
+                                    <Image x:Name="Glyph"
+                                           Source="{ResourceReference ChevronRightIcon}"
+                                           Width="8" Height="8"
+                                           HorizontalAlignment="Center" VerticalAlignment="Center"
+                                           Visibility="Collapsed"/>
+                                </Border>
+                                <ContentPresenter Grid.Column="1"
+                                        x:Name="PART_Name"
+                                        VerticalAlignment="Center"
+                                        TextTrimming="CharEllipses"
+                                        Foreground="{TemplateBinding Foreground}"
+                                        FontSize="{TemplateBinding FontSize}"/>
+                            </Grid>
+
+                            <!-- The grip is its own column, and it is GRABBABLE: the whole strip takes the press while
+                                 only the hairline inside it is drawn. A one-pixel target is a target nobody hits. -->
+                            <Border Grid.Column="1" x:Name="PART_Grip" Background="Transparent">
+                                <Border Width="1" HorizontalAlignment="Center"
+                                        Background="{ObservableResource ControlStrokeColorDefault}"
+                                        IsHitTestVisible="False"/>
+                            </Border>
+
+                            <!-- The value half STRETCHES, so every editor in the inspector is the row's height - a
+                                 field as tall as one line beside a spinner as tall as its buttons is not a form. -->
+                            <ContentPresenter Grid.Column="2"
+                                    x:Name="PART_Value"
+                                    Margin="8 2 8 2"
+                                    VerticalAlignment="Stretch"
+                                    HorizontalAlignment="Stretch"
+                                    TextTrimming="CharEllipses"
+                                    Foreground="{TemplateBinding Foreground}"
+                                    FontSize="{TemplateBinding FontSize}"/>
+
+                            <!-- SQUARE, and the same height as every editor in the column (EditorHeight above), so a
+                                 line that offers the button is no taller than the lines around it. MinWidth/MinHeight
+                                 are zeroed on purpose: the theme's Button carries MinHeight="ControlHeight", and a
+                                 minimum beats an explicit Height - leaving it would stretch this one into a rectangle
+                                 and push the whole row past its MinHeight. Collapsed unless the definition asks. -->
+                            <StackPanel Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Center">
+                                <!-- Put the default back. Only on a row holding something else - a revert arrow on an
+                                     untouched row offers to undo nothing, and a column of them would say the whole
+                                     object had been edited. Square and the editors' height, like the button beside
+                                     it. -->
+                                <!-- ALWAYS THERE, and DISABLED until there is something to put back. Collapsed, the
+                                     button's column grew the moment a value stopped being the default, the editor
+                                     beside it narrowed by that much, and everything in the editor slid - so the second
+                                     press of a stepper landed on the reset that had just appeared under the hand. A
+                                     line must not change shape because somebody typed in it.
+                                     Greyed rather than invisible: a button that is there and dim says what it would do
+                                     and why it cannot yet, where a blank gap says nothing at all. -->
+                                <!-- THE RESET IS THE LAST THING IN THE ROW, so it stands the same distance from the
+                                     edge on every line. Put first, it slid left on the few lines that also offer "..."
+                                     and the column of buttons read as ragged. -->
+                                <Button x:Name="PART_Action"
+                                        Content="..." Visibility="Collapsed"
+                                        Width="24" Height="24" MinWidth="0" MinHeight="0"
+                                        Padding="0" Margin="0 0 2 0"
+                                        FontSize="{ResourceReference FontSizeCaption}"
+                                        ToolTipService.ToolTip="More"/>
+
+                                <Button x:Name="PART_Reset"
+                                        IsEnabled="False"
+                                        Width="24" Height="24" MinWidth="0" MinHeight="0"
+                                        Padding="0" Margin="0 0 6 0"
+                                        ToolTipService.ToolTip="Reset to the default">
+                                    <Image Source="{ResourceReference RevertIcon}" Width="10" Height="10"
+                                           HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                </Button>
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <PropertyTrigger Property="ShowActionButton" Value="true">
+                            <Setter TargetName="PART_Action" Property="Visibility" Value="Visible"/>
+                        </PropertyTrigger>
+                        <!-- The button STANDS THERE and wakes up for an edited line. That is the panel's default
+                             manner; the two triggers under it are the other two it can be asked for. -->
+                        <PropertyTrigger Property="IsModified" Value="true">
+                            <Setter TargetName="PART_Reset" Property="IsEnabled" Value="True"/>
+                        </PropertyTrigger>
+
+                        <!-- OFFERED ONLY WHERE IT DOES SOMETHING: tidier, at the cost of the line moving as it is
+                             used, which is the whole reason the default is the other way round. -->
+                        <MultiTrigger>
+                            <MultiTrigger.Conditions>
+                                <Condition Property="ResetButton" Value="WhenModified"/>
+                                <Condition Property="IsModified" Value="false"/>
+                            </MultiTrigger.Conditions>
+                            <Setter TargetName="PART_Reset" Property="Visibility" Value="Collapsed"/>
+                        </MultiTrigger>
+
+                        <PropertyTrigger Property="ResetButton" Value="Never">
+                            <Setter TargetName="PART_Reset" Property="Visibility" Value="Collapsed"/>
+                        </PropertyTrigger>
+
+                        <!-- ...AND NEVER ON THE LINE THAT OPENS A GROUP. A group is not a value: it holds the lines
+                             that are, and each of those carries its own button. One on the header offers to put back
+                             something that was never there, and a person reading the panel has to work out what a
+                             revert arrow beside the word "Position" would even mean. -->
+                        <PropertyTrigger Property="HasChildren" Value="true">
+                            <Setter TargetName="Glyph" Property="Visibility" Value="Visible"/>
+                            <Setter TargetName="PART_Reset" Property="Visibility" Value="Collapsed"/>
+                        </PropertyTrigger>
+                        <PropertyTrigger Property="IsExpanded" Value="true">
+                            <Setter TargetName="Glyph" Property="Source" Value="{ResourceReference ChevronDownIcon}"/>
+                        </PropertyTrigger>
+                        <!-- ...AND NO RESET ON A LINE NOBODY CAN WRITE TO. Putting a default back where there is no
+                             way to move off it is a button that can never do anything. -->
+                        <PropertyTrigger Property="IsReadOnly" Value="true">
+                            <Setter TargetName="PART_Value" Property="Foreground"
+                                    Value="{ObservableResource TextFillColorDisabled}"/>
+                            <Setter TargetName="PART_Reset" Property="Visibility" Value="Collapsed"/>
+                        </PropertyTrigger>
+                        <PropertyTrigger Property="IsMouseOver" Value="true">
+                            <Setter TargetName="RowBorder" Property="Background"
+                                    Value="{ResourceReference SubtleFillColorSecondary}"/>
+                        </PropertyTrigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+</StyleSet>

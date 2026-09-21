@@ -1954,6 +1954,34 @@ namespace Adamantium.Mathematics
             BillboardRH(ref objectPosition, ref cameraPosition, ref cameraUpVector, ref cameraForwardVector, out result);
             return result;
         }
+        
+        public static Matrix4x4F BillboardForOrthoProjection(Vector3F position, Vector3F cameraUp, Vector3F cameraRight, Vector3F cameraForward)
+        {
+            Matrix4x4F billboardMatrix = new Matrix4x4F
+            {
+                M11 = cameraRight.X,
+                M12 = cameraRight.Y,
+                M13 = cameraRight.Z,
+                M14 = 0.0f,
+
+                M21 = cameraUp.X,
+                M22 = cameraUp.Y,
+                M23 = cameraUp.Z,
+                M24 = 0.0f,
+
+                M31 = cameraForward.X,
+                M32 = cameraForward.Y,
+                M33 = cameraForward.Z,
+                M34 = 0.0f,
+
+                M41 = position.X,
+                M42 = position.Y,
+                M43 = position.Z,
+                M44 = 1.0f
+            };
+
+            return billboardMatrix;
+        }
 
         /// <summary>
         /// Creates a left-handed, look-at matrix.
@@ -3242,6 +3270,48 @@ namespace Adamantium.Mathematics
         public static bool operator !=(Matrix4x4F left, Matrix4x4F right)
         {
             return !left.Equals(ref right);
+        }
+
+        public static explicit operator Matrix4x4(Matrix4x4F matrixF)
+        {
+            return new Matrix4x4(
+                matrixF.M11,
+                matrixF.M12,
+                matrixF.M13,
+                matrixF.M14,
+                matrixF.M21,
+                matrixF.M22,
+                matrixF.M23,
+                matrixF.M24,
+                matrixF.M31,
+                matrixF.M32,
+                matrixF.M33,
+                matrixF.M34,
+                matrixF.M41,
+                matrixF.M42,
+                matrixF.M43,
+                matrixF.M44);
+        }
+
+        public static explicit operator Matrix4x4F(Matrix4x4 matrix)
+        {
+            return new Matrix4x4F(
+                (float)matrix.M11,
+                (float)matrix.M12,
+                (float)matrix.M13,
+                (float)matrix.M14,
+                (float)matrix.M21,
+                (float)matrix.M22,
+                (float)matrix.M23,
+                (float)matrix.M24,
+                (float)matrix.M31,
+                (float)matrix.M32,
+                (float)matrix.M33,
+                (float)matrix.M34,
+                (float)matrix.M41,
+                (float)matrix.M42,
+                (float)matrix.M43,
+                (float)matrix.M44);
         }
 
         /// <summary>

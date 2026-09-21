@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
+<StyleSet xmlns="http://adamantium/ui"
+          xmlns:x="http://adamantium/ui/xaml/extensions">
+
+    <!-- The drag-drop insertion cue: a slim accent capsule showing where a dragged item will land. A real templated control,
+         so the drop cue restyles PURELY here - the drag engine only creates it, sets its Orientation/IsFrame, and sizes it to
+         the insertion span. Default = a HORIZONTAL bar (caret between stacked rows). Orientation=Vertical -> a VERTICAL bar
+         (between side-by-side items, a WrapPanel). IsFrame -> a rounded OUTLINE around the target (the "drop INTO this node"
+         cue of the hybrid tree-drop). -->
+    <Style Selector="DropInsertionIndicator">
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="DropInsertionIndicator">
+                    <Grid>
+                        <Border x:Name="BarH" Height="3" CornerRadius="1.5"
+                                         Background="{ThemeResource AccentFillColorDefault}"
+                                         VerticalAlignment="Center" HorizontalAlignment="Stretch"/>
+                        <Border x:Name="BarV" Width="3" CornerRadius="1.5"
+                                         Background="{ThemeResource AccentFillColorDefault}"
+                                         VerticalAlignment="Stretch" HorizontalAlignment="Center"
+                                         Visibility="Collapsed"/>
+                        <Border x:Name="Frame" BorderThickness="2" CornerRadius="3"
+                                         BorderBrush="{ThemeResource AccentFillColorDefault}"
+                                         Background="{ThemeResource AccentFillColorDefault}"
+                                         Opacity="0.28"
+                                         Visibility="Collapsed"/>
+                    </Grid>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style Selector="DropInsertionIndicator">
+        <!-- Vertical caret: hide the horizontal bar, show the vertical one. -->
+        <PropertyTrigger Property="Orientation" Value="Vertical">
+            <Setter TargetName="BarH" Property="Visibility" Value="Collapsed"/>
+            <Setter TargetName="BarV" Property="Visibility" Value="Visible"/>
+        </PropertyTrigger>
+    </Style>
+
+    <Style Selector="DropInsertionIndicator">
+        <!-- Frame (drop-into) mode: hide both caret bars, show the outline. -->
+        <PropertyTrigger Property="IsFrame" Value="True">
+            <Setter TargetName="BarH" Property="Visibility" Value="Collapsed"/>
+            <Setter TargetName="BarV" Property="Visibility" Value="Collapsed"/>
+            <Setter TargetName="Frame" Property="Visibility" Value="Visible"/>
+        </PropertyTrigger>
+    </Style>
+</StyleSet>

@@ -258,7 +258,7 @@ namespace Adamantium.Fonts.Parsers.CFF
                     glyphs.Add(glyph);
                     
                 }
-                catch (Exception e)
+                catch (Exception)
                 {
                     glyphs.Add(new Glyph((uint)i, OutlineType.CompactFontFormat){IsInvalid = true });
                     exceptions++;

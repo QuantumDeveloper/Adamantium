@@ -1,0 +1,332 @@
+﻿using Adamantium.UI.Controls.Base;
+using Adamantium.UI.Controls.Text;
+using Adamantium.UI.Core;
+using Adamantium.UI.Core.Graphics;
+using Adamantium.UI.Core.RoutedEvents;
+using Adamantium.UI.Core.Templates;
+
+namespace Adamantium.UI.Controls;
+
+public class ContentControl : Control, IContentControl
+{
+   private IUIComponent _currentVisualChild;
+   private IUIComponent _outgoingVisualChild;
+   private bool _transitionPending;
+
+   private ContentPresenter _contentPresenter;
+   private bool _contentChanged;
+
+   public static readonly AdamantiumProperty ContentProperty = AdamantiumProperty.Register(nameof(Content),
+      typeof(object), typeof(ContentControl), new PropertyMetadata(null, PropertyMetadataOptions.AffectsMeasure, ContentChangedCallback));
+   
+   public static readonly AdamantiumProperty HorizontalContentAlignmentProperty = AdamantiumProperty.Register(nameof(HorizontalContentAlignment),
+      typeof(HorizontalAlignment), typeof(MeasurableUIComponent), new PropertyMetadata(HorizontalAlignment.Stretch, PropertyMetadataOptions.AffectsArrange));
+
+   public static readonly AdamantiumProperty VerticalContentAlignmentProperty = AdamantiumProperty.Register(nameof(VerticalContentAlignment),
+      typeof(VerticalAlignment), typeof(MeasurableUIComponent), new PropertyMetadata(VerticalAlignment.Stretch, PropertyMetadataOptions.AffectsArrange));
+   
+   public static readonly AdamantiumProperty ContentTemplateProperty = AdamantiumProperty.Register(nameof(ContentTemplate),
+      typeof(DataTemplate), typeof(ContentControl), new PropertyMetadata(null, OnContentTemplateChanged));
+    
+   public static readonly AdamantiumProperty ContentTemplateSelectorProperty = AdamantiumProperty.Register(nameof(ContentTemplateSelector),
+      typeof(DataTemplateSelector), typeof(ContentControl), new PropertyMetadata(null, OnContentTemplateSelectorChanged));
+
+   public static readonly AdamantiumProperty ContentTransitionProperty = AdamantiumProperty.Register(nameof(ContentTransition),
+      typeof(ContentTransition), typeof(ContentControl), new PropertyMetadata(ContentTransition.None));
+
+   public static readonly AdamantiumProperty TransitionDurationProperty = AdamantiumProperty.Register(nameof(TransitionDuration),
+      typeof(Double), typeof(ContentControl), new PropertyMetadata(0.25));
+
+   private static void ContentChangedCallback(AdamantiumComponent a, AdamantiumPropertyChangedEventArgs e)
+   {
+      if (a is ContentControl o)
+      {
+         o.OnContentChangedInternal(e.OldValue, e.NewValue);
+      }
+   }
+    
+   private static void OnContentTemplateChanged(AdamantiumComponent a, AdamantiumPropertyChangedEventArgs e)
+   {
+      if (a is ContentControl o)
+      {
+         o.OnContentChangedInternal(e.OldValue, e.NewValue);
+      }
+   }
+    
+   private static void OnContentTemplateSelectorChanged(AdamantiumComponent a, AdamantiumPropertyChangedEventArgs e)
+   {
+      if (a is ContentControl o)
+      {
+         o.OnContentChangedInternal(e.OldValue, e.NewValue);
+      }
+   }
+    
+   [Content]
+   public object Content
+   {
+      get => GetValue(ContentProperty);
+      set => SetValue(ContentProperty, value);
+   }
+   
+   public DataTemplate ContentTemplate
+   {
+      get => GetValue<DataTemplate>(ContentTemplateProperty);
+      set => SetValue(ContentTemplateProperty, value);
+   }
+
+   public DataTemplateSelector ContentTemplateSelector
+   {
+      get => GetValue<DataTemplateSelector>(ContentTemplateSelectorProperty);
+      set => SetValue(ContentTemplateSelectorProperty, value);
+   }
+   
+   public VerticalAlignment VerticalContentAlignment
+   {
+      get => GetValue<VerticalAlignment>(VerticalContentAlignmentProperty);
+      set => SetValue(VerticalContentAlignmentProperty, value);
+   }
+
+   public HorizontalAlignment HorizontalContentAlignment
+   {
+      get => GetValue<HorizontalAlignment>(HorizontalContentAlignmentProperty);
+      set => SetValue(HorizontalContentAlignmentProperty, value);
+   }
+
+   /// <summary>The animation played when <see cref="Content"/> is replaced. Defaults to <see cref="ContentTransition.None"/>.</summary>
+   public ContentTransition ContentTransition
+   {
+      get => GetValue<ContentTransition>(ContentTransitionProperty);
+      set => SetValue(ContentTransitionProperty, value);
+   }
+
+   /// <summary>Duration of the content transition, in seconds. Defaults to 0.25.</summary>
+   public Double TransitionDuration
+   {
+      get => GetValue<Double>(TransitionDurationProperty);
+      set => SetValue(TransitionDurationProperty, value);
+   }
+
+   public override void OnApplyTemplate()
+   {
+      base.OnApplyTemplate();
+      _contentPresenter = (ContentPresenter)GetTemplateChild("PART_ContentPresenter");
+      _contentChanged = true;
+   }
+
+   private void OnContentChangedInternal(object oldContent, object newContent)
+   {
+      _contentChanged = true;
+      OnContentChanged(oldContent, newContent);
+   }
+
+   protected virtual void OnContentChanged(object oldContent, object newContent)
+   {
+
+   }
+
+   /// <summary>Whether this control shows its <see cref="Content"/> ITSELF while it has no template. True for an
+   /// ordinary content control: a button with no style should still show its label.
+   /// <para>False where the content is somebody else's to draw. A tab container is the case that named this: its
+   /// Content is the PAGE, which the TabControl's body presenter shows - the container itself only ever draws a header
+   /// in the strip. A theme swap re-styles the tree over several frames, so every templated control spends a moment
+   /// without one; for a tab that moment put an entire page inside a header card, and the strip measured itself to it
+   /// (a 480,000-pixel-tall tab strip with the page drawn across it).</para></summary>
+   protected virtual bool HostsContentWithoutTemplate => true;
+   
+   private void UpdateVisualsForContent(object content)
+   {
+      if (!_contentChanged)
+         return;
+      // Mark the change consumed up-front so a clean measure does not re-run the detach/re-attach below.
+      // A later Content/Template change sets _contentChanged = true again (OnContentChangedInternal / OnApplyTemplate).
+      _contentChanged = false;
+
+      // A new swap supersedes one still mid-flight: finish the previous transition instantly first.
+      RemoveOutgoing();
+
+      // Templated path: PART_ContentPresenter hosts the content (and runs its own transition). Drop any direct child.
+      // ...and the same for a control whose content is NOT its to show (see HostsContentWithoutTemplate): being between
+      // templates is not a reason to put it on screen anyway.
+      if (Template != null || !HostsContentWithoutTemplate)
+      {
+         if (_currentVisualChild != null)
+         {
+            RemoveVisualChild(_currentVisualChild);
+            RemoveLogicalChild(_currentVisualChild);
+            _currentVisualChild = null;
+         }
+         return;
+      }
+
+      // Animate when a transition is selected and there is new content - including the FIRST content (slides in from
+      // the side and settles, MahApps-style). NEVER in the designer (live or one-shot): a content transition fires on
+      // content replacement, which in the previewer only happens on initial load / a live-reconcile re-apply (not a
+      // real swap), so it would slide the content off-screen and capture a blank frame (the white-screen). The designer
+      // shows the settled content instead, like the WPF designer.
+      var animate = ContentTransition != ContentTransition.None && content != null
+                    && !Design.IsDesignMode;
+
+      if (animate && _currentVisualChild != null)
+      {
+         _outgoingVisualChild = _currentVisualChild;   // keep the old child to slide it out
+      }
+      else if (_currentVisualChild != null)
+      {
+         RemoveVisualChild(_currentVisualChild);
+         RemoveLogicalChild(_currentVisualChild);
+      }
+      _currentVisualChild = null;
+
+      if (content != null)
+      {
+         _currentVisualChild = content as IUIComponent ?? new TextBlock { FontSize = 28, Text = content.ToString() };
+         AddVisualChild(_currentVisualChild);
+         AddLogicalChild(_currentVisualChild);
+      }
+
+      _transitionPending = animate && _currentVisualChild != null;
+   }
+
+   private void RemoveOutgoing()
+   {
+      if (_outgoingVisualChild == null)
+         return;
+      RemoveVisualChild(_outgoingVisualChild);
+      RemoveLogicalChild(_outgoingVisualChild);
+      _outgoingVisualChild = null;
+   }
+
+   protected override Size MeasureOverride(Size availableSize)
+   {
+      UpdateVisualsForContent(Content);
+      
+      return base.MeasureOverride(availableSize);
+   }
+
+   protected override Size ArrangeOverride(Size finalSize)
+   {
+      foreach (var visual in VisualChildren)
+      {
+         var child = (IMeasurableComponent)visual;
+            
+         // A templated control's root fills the whole control; HorizontalContentAlignment is NOT consumed here - it
+         // flows through the template (to the ContentPresenter) to position the actual content. Only the untemplated
+         // path (hosting content directly) positions that content by the content alignment.
+         var childRect = Template != null
+            ? new Rect(finalSize)
+            : CalculateChildArrangeRect(finalSize, child.DesiredSize, HorizontalContentAlignment, VerticalContentAlignment);
+                
+         child.Arrange(childRect);
+      }
+
+      if (_transitionPending)
+      {
+         // Start the slide now that both children are arranged at their final rects (size known here). Sliding content
+         // can extend past the control while it moves; clip it (enforcement depends on renderer clip support).
+         _transitionPending = false;
+         ClipToBounds = true;
+         ContentTransitions.Run(ContentTransition, TransitionDuration, finalSize, _currentVisualChild, _outgoingVisualChild, RemoveOutgoing);
+      }
+
+      return finalSize;
+   }
+
+   /// <summary>Arranges the template/content at its own desired (content) size instead of filling the slot, and reports
+   /// that size. For a control whose visual can't grow - a CheckBox's box+glyph+label, a RadioButton's ring+label - this
+   /// keeps ActualWidth/RenderSize/ClipRectangle equal to what is actually drawn, and the template's own centring then
+   /// anchors to that real box, not to the whole slot. The base ArrangeOverride fills the slot, which is correct only
+   /// for a control whose chrome stretches to match (a Button: its visible border == its size).</summary>
+   protected Size ArrangeContentSize(Size finalSize)
+   {
+      foreach (var visual in VisualChildren)
+      {
+         if (visual is not IMeasurableComponent child) continue;
+         var size = new Size(Math.Min(child.DesiredSize.Width, finalSize.Width),
+                             Math.Min(child.DesiredSize.Height, finalSize.Height));
+
+         // THE CONTENT IS NOT THE ONLY THING THAT SETS THIS CONTROL'S SIZE. Width/Height/Min*/Max* are what the element
+         // itself asked to be; measure already applied them to its DesiredSize, and dropping them here made the two
+         // disagree - the control desired one size and then drew at another. A radio wearing a toggle template is the
+         // case that found it: its MinWidth widened it in measure and this collapsed it back onto the digit, so a row of
+         // page buttons hugged its numbers however wide the theme said they were.
+         // Still never PAST the slot - not filling the slot is the whole point of this method, and the clamp below is
+         // what keeps that true when a constraint asks for more than there is room for.
+         size = this.ApplyLayoutConstraints(size);
+         size = new Size(Math.Min(size.Width, finalSize.Width), Math.Min(size.Height, finalSize.Height));
+
+         child.Arrange(new Rect(size));
+         return size;
+      }
+      return finalSize;
+   }
+
+   protected static Rect CalculateChildArrangeRect(
+      Size parentFinalSize,
+      Size childDesiredSize,
+      HorizontalAlignment horizontalAlignment,
+      VerticalAlignment verticalAlignment)
+   {
+      double x = 0;
+      double y = 0;
+      double width = childDesiredSize.Width;
+      double height = childDesiredSize.Height;
+        
+      if (horizontalAlignment == HorizontalAlignment.Center)
+      {
+         x = (parentFinalSize.Width - childDesiredSize.Width) / 2;
+      }
+      else if (horizontalAlignment == HorizontalAlignment.Right)
+      {
+         x = parentFinalSize.Width - childDesiredSize.Width;
+      }
+      else if (horizontalAlignment == HorizontalAlignment.Stretch)
+      {
+         width = parentFinalSize.Width;
+      }
+
+      if (verticalAlignment == VerticalAlignment.Center)
+      {
+         y = (parentFinalSize.Height - childDesiredSize.Height) / 2;
+      }
+      else if (verticalAlignment == VerticalAlignment.Bottom)
+      {
+         y = parentFinalSize.Height - childDesiredSize.Height;
+      }
+      else if (verticalAlignment == VerticalAlignment.Stretch)
+      {
+         height = parentFinalSize.Height;
+      }
+
+      return new Rect(x, y, width, height);
+   }
+
+   void IContainer.AddOrSetChildComponent(object component)
+   {
+      Content = component;
+   }
+
+   void IContainer.RemoveAllChildComponents()
+   {
+      Content = null;
+   }
+
+   IReadOnlyList<object> IContainer.GetChildComponents() =>
+      Content != null ? new[] { Content } : System.Array.Empty<object>();
+
+   void IContainer.InsertChildComponent(int index, object component) => Content = component;
+
+   void IContainer.RemoveChildComponentAt(int index) => Content = null;
+   
+   protected override void OnRender(IDrawingContext context)
+   {
+      // A templated control's chrome is its template (e.g. a Border draws the rounded background/border). Filling a
+      // square Background here too would double-render under the template - the square's corners show through a rounded
+      // template Border. Only the untemplated convenience path paints the background directly.
+      if (Template != null) return;
+
+      var size = new Size(ActualWidth, ActualHeight);
+
+      context.ForControl(this)
+         .DrawRectangle(Background, new Rect(size));
+   }
+}

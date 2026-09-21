@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="utf-8"?>
+<StyleSet xmlns="http://adamantium/ui"
+          xmlns:x="http://adamantium/ui/xaml/extensions">
+
+    <!-- A thin rail with a draggable thumb. The Track (reused from the scrollbar) owns thumb sizing/positioning and
+         pixel-to-value mapping (ViewportSize=0 -> a fixed-size handle); this style is just the rail + the Track.
+         Per the small-styles convention each concern is its own <Style Selector="Slider">. -->
+
+    <Style Selector="Slider">
+        <Setter Property="MinHeight" Value="{ResourceReference ControlHeightCompact}"/>
+        <Setter Property="MinWidth" Value="{ResourceReference ControlMinWidth}"/>
+    </Style>
+
+    <Style Selector="Slider">
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Slider">
+                    <Grid>
+                        <Border x:Name="Rail" Height="4" CornerRadius="2"
+                                Background="{ResourceReference ControlFillColorTertiary}"
+                                VerticalAlignment="Center"/>
+                        <!-- The accent fill (start..thumb). The control sets its Width on every Value change (like the
+                             ProgressBar fill) so it recomputes live - a part sized only by the Track's arrange does not
+                             repaint on a width change. -->
+                        <Border x:Name="PART_SelectionRange" Height="4" CornerRadius="2"
+                                Background="{ThemeResource AccentFillColorDefault}"
+                                HorizontalAlignment="Left" VerticalAlignment="Center" Width="0"/>
+                        <Track x:Name="PART_Track"
+                                Orientation="{TemplateBinding Orientation}"
+                                Minimum="{TemplateBinding Minimum}"
+                                Maximum="{TemplateBinding Maximum}"
+                                Value="{TemplateBinding Value}"
+                                ViewportSize="0">
+                            <!-- Both page areas are invisible + hit-testable (click the trough to page); the visible
+                                 accent is PART_SelectionRange above. -->
+                            <Track.DecreaseRepeatButton>
+                                <ScrollBarPageButton Focusable="false"/>
+                            </Track.DecreaseRepeatButton>
+                            <!-- The handle: a 20px accent circle. Its Width/Height drive the Track's slider-mode sizing
+                                 (centred across the rail); the inline template overrides the shared grey Thumb style at
+                                 Local priority. -->
+                            <Track.Thumb>
+                                <Thumb Width="20" Height="20">
+                                    <Thumb.Template>
+                                        <ControlTemplate TargetType="Thumb">
+                                            <Border CornerRadius="10"
+                                                    Background="{ThemeResource AccentFillColorDefault}"/>
+                                        </ControlTemplate>
+                                    </Thumb.Template>
+                                </Thumb>
+                            </Track.Thumb>
+                            <!-- Increase side stays empty so the grey rail shows through past the thumb. -->
+                            <Track.IncreaseRepeatButton>
+                                <ScrollBarPageButton Focusable="false"/>
+                            </Track.IncreaseRepeatButton>
+                        </Track>
+                    </Grid>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- Vertical orientation: the base template lays the rail + fill out horizontally; flip them to vertical (the Track
+         already gets Orientation via TemplateBinding, so the thumb moves correctly - only the rail chrome needs swapping).
+         Height="Auto" (the parser maps it to NaN) clears the horizontal 4px height so VerticalAlignment=Stretch spans full height. -->
+    <Style Selector="Slider">
+        <PropertyTrigger Property="Orientation" Value="Vertical">
+            <!-- MinWidth=120 (the base) is a horizontal min-LENGTH. On a vertical slider it would instead force the
+                 control 120px WIDE - a huge dead hit area beside the ~4-20px rail (it swallowed clicks left/right of,
+                 and above, the thin vertical track). Clear it and move the min length onto the vertical axis. -->
+            <Setter Property="MinWidth" Value="0"/>
+            <Setter Property="MinHeight" Value="{ResourceReference ControlMinLength}"/>
+            <Setter TargetName="Rail" Property="Width" Value="{ResourceReference SliderTrackThickness}"/>
+            <Setter TargetName="Rail" Property="Height" Value="Auto"/>
+            <Setter TargetName="Rail" Property="HorizontalAlignment" Value="Center"/>
+            <Setter TargetName="Rail" Property="VerticalAlignment" Value="Stretch"/>
+            <Setter TargetName="PART_SelectionRange" Property="Width" Value="{ResourceReference SliderTrackThickness}"/>
+            <Setter TargetName="PART_SelectionRange" Property="Height" Value="0"/>
+            <Setter TargetName="PART_SelectionRange" Property="HorizontalAlignment" Value="Center"/>
+            <!-- Bottom-anchored: with the Track reversed (Minimum at the bottom) the accent fills UPWARD from the bottom to
+                 meet the thumb (its top edge tracks the thumb). -->
+            <Setter TargetName="PART_SelectionRange" Property="VerticalAlignment" Value="Bottom"/>
+            <!-- Standard slider direction: Minimum at the BOTTOM, value grows UP (Up-arrow/drag-up increase). The Track
+                 itself defaults to top=min for scrollbars, so a vertical slider must opt into the reversal. -->
+            <Setter TargetName="PART_Track" Property="IsDirectionReversed" Value="true"/>
+        </PropertyTrigger>
+    </Style>
+
+</StyleSet>

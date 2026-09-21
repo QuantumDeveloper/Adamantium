@@ -394,20 +394,22 @@ namespace Adamantium.Fonts.Parsers.CFF
                     // this is token - remove this byte from byte stream
                     GetFirstByteAndRemove(byteArray);
 
-                    if ((DictOperatorsType) token == DictOperatorsType.blend)
+                    if ((DictOperatorsType)token == DictOperatorsType.blend)
                     {
-                        var blendedOperandsCount =  rawOperands[^1].AsInt();
+
+                        var blendedOperandsCount = rawOperands.Last().AsInt();
                         var regionCount = font.VariationStore.VariationRegionList.RegionCount;
                         var overallBlendOperandsCount = blendedOperandsCount * (regionCount + 1) + 1;
 
                         var startIndexOfBlendOperands = rawOperands.Count - overallBlendOperandsCount;
 
-                        var blendOperands = rawOperands.ToArray()[(int)startIndexOfBlendOperands..].ToList();
+                        var blendOperands = rawOperands.Skip(startIndexOfBlendOperands).ToList();
 
                         rawOperands = rawOperands.GetRange(0, (int)startIndexOfBlendOperands);
 
-                        var blendedOperands = blendOperands.GetRange(0, (int) blendedOperandsCount);
-                        var deltas = blendOperands.ToArray()[(int)(blendedOperandsCount)..^1];
+                        var blendedOperands = blendOperands.GetRange(0, (int)blendedOperandsCount);
+                        //var deltas = blendOperands.ToArray()[(int)(blendedOperandsCount)..^1];
+                        var deltas = blendOperands.Skip((int)blendedOperandsCount).Take(blendOperands.Count - (int)blendedOperandsCount - 1).ToList();
 
                         for (var op = 0; op < blendedOperands.Count; ++op)
                         {
@@ -424,6 +426,7 @@ namespace Adamantium.Fonts.Parsers.CFF
                         }
 
                         rawOperands.AddRange(blendedOperands);
+
                     }
                     else
                     {

@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8"?>
+<StyleSet xmlns="http://adamantium/ui"
+          xmlns:x="http://adamantium/ui/xaml/extensions">
+
+    <!-- Editor Pro's tooltip is a LABEL, not a card. Fluent's is a rounded panel on the card ground - an object that
+         arrives on top of your work. In an editor the tip fires on every toolbar button and every property row, so it
+         appears constantly and must cost nothing to dismiss with the eye.
+
+         So: square, hairline, one line, and the ground goes DARKER than the panel rather than lighter. That last part
+         is the actual structural choice - a card lifts toward the viewer and reads as a surface, while a recess reads
+         as annotation, and annotation is what a tip is. It also separates it from the panel underneath without needing
+         a shadow, which an editor cannot afford to paint on every hover.
+
+         Content is left- and top-aligned rather than centred: a tip that grows to two lines should grow DOWNWARD from
+         the same first line, not re-centre the text the eye has already started reading. -->
+
+    <Style Selector="ToolTip">
+        <Setter Property="Background" Value="{ResourceReference SolidBackgroundFillColorSecondary}"/>
+        <Setter Property="BorderBrush" Value="{ResourceReference ControlStrokeColorSecondary}"/>
+        <Setter Property="Foreground" Value="{ObservableResource TextFillColorPrimary}"/>
+        <Setter Property="BorderThickness" Value="{ResourceReference StrokeThin}"/>
+        <Setter Property="CornerRadius" Value="0"/>
+        <Setter Property="Padding" Value="{ResourceReference ToolTipPadding}"/>
+        <Setter Property="FontSize" Value="{ResourceReference FontSizeCaption}"/>
+        <Setter Property="HorizontalContentAlignment" Value="Left"/>
+        <Setter Property="VerticalContentAlignment" Value="Top"/>
+    </Style>
+
+    <Style Selector="ToolTip">
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ToolTip">
+                    <Border Background="{TemplateBinding Background}"
+                            BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}"
+                            CornerRadius="{TemplateBinding CornerRadius}"
+                            Padding="{TemplateBinding Padding}">
+                        <ContentPresenter
+                                x:Name="PART_ContentPresenter"
+                                HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
+                                Foreground="{TemplateBinding Foreground}"
+                                FontSize="{TemplateBinding FontSize}"
+                                Content="{TemplateBinding Content}"
+                                ContentTemplate="{TemplateBinding ContentTemplate}"
+                                ContentTemplateSelector="{TemplateBinding ContentTemplateSelector}"/>
+                    </Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+</StyleSet>

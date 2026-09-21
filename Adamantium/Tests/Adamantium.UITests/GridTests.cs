@@ -1,11 +1,16 @@
 using System;
 using System.Diagnostics;
-using Adamantium.UI;
+using Adamantium.Mathematics;
+using Adamantium.ProceduralGeometry;
 using Adamantium.UI.Controls;
+using Adamantium.UI.Controls.Decorators;
+using Adamantium.UI.Controls.Panels;
 using Adamantium.UI.Controls.Primitives;
-using Adamantium.UI.Media;
+using Adamantium.UI.Controls.Shapes;
+using Adamantium.UI.Core;
+using Adamantium.UI.Core.Media;
 using NUnit.Framework;
-using Rectangle = Adamantium.UI.Controls.Rectangle;
+using Rectangle = Adamantium.UI.Controls.Shapes.Rectangle;
 
 namespace Adamantium.UITests
 {
@@ -13,10 +18,10 @@ namespace Adamantium.UITests
    {
       private class LayoutPoker : Panel
       {
-         public Size MeasureResult = new Size(0, 0);
-         public Size MeasureArg = new Size(0, 0);
-         public Size ArrangeResult = new Size(0, 0);
-         public Size ArrangeArg = new Size(0, 0);
+         public Size MeasureResult = Size.Zero;
+         public Size MeasureArg = Size.Zero;
+         public Size ArrangeResult = Size.Zero;
+         public Size ArrangeArg = Size.Zero;
          public Func<Size> ArrangeFunc;
          public Func<Size> MeasureFunc;
 
@@ -35,6 +40,34 @@ namespace Adamantium.UITests
             Debug.WriteLine($"Panel final size is {finalSize}");
             return ArrangeResult;
          }
+      }
+
+      // StackPanel's default Orientation is Vertical (WPF-aligned; the old default was a non-standard Horizontal).
+      // Vertical stacks children DOWN -> desired = (max child width, sum of child heights); explicit Horizontal swaps
+      // the axes. ComplexSpanMeasuredTest covers the horizontal case (now with an EXPLICIT Orientation.Horizontal).
+      [Test]
+      public void StackPanel_DefaultOrientation_IsVertical()
+      {
+         Rectangle[] Kids() =>
+         [
+            new Rectangle { Width = 150, Height = 50 },
+            new Rectangle { Width = 100, Height = 70 },
+            new Rectangle { Width = 200, Height = 30 },
+         ];
+
+         var vertical = new StackPanel();   // no Orientation set -> the default
+         foreach (var r in Kids()) vertical.Children.Add(r);
+         vertical.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+
+         var horizontal = new StackPanel { Orientation = Orientation.Horizontal };
+         foreach (var r in Kids()) horizontal.Children.Add(r);
+         horizontal.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+
+         Assert.Multiple(() =>
+         {
+            Assert.AreEqual(new Size(200, 150), vertical.DesiredSize, "default (Vertical): max width, sum of heights");
+            Assert.AreEqual(new Size(450, 70), horizontal.DesiredSize, "Horizontal: sum of widths, max height");
+         });
       }
 
       [Test]
@@ -81,7 +114,7 @@ namespace Adamantium.UITests
          rectangle2.VerticalAlignment = VerticalAlignment.Stretch;
 
 
-         Ellipse el = new Ellipse();
+         var el = new Ellipse();
          el.Name = "el";
          el.Width = 350;
          el.Height = 350;
@@ -95,7 +128,7 @@ namespace Adamantium.UITests
 
          Grid grid = new Grid();
          grid.Name = "grid1";
-         StackPanel stackpanel = new StackPanel();
+         StackPanel stackpanel = new StackPanel { Orientation = Orientation.Horizontal };
          grid.Background = Brushes.CornflowerBlue;
          grid.RowDefinitions.Add(new RowDefinition() { Height = new GridLength(1, GridUnitType.Star) });
          grid.RowDefinitions.Add(new RowDefinition() { Height = new GridLength(0, GridUnitType.Auto), MinHeight = 10 });
@@ -185,7 +218,7 @@ namespace Adamantium.UITests
          thumb.HorizontalAlignment = HorizontalAlignment.Right;
          Grid.SetRow(thumb, 1);
 
-         StackPanel stackpanel2 = new StackPanel();
+         StackPanel stackpanel2 = new StackPanel { Orientation = Orientation.Horizontal };
          stackpanel2.VerticalAlignment = VerticalAlignment.Top;
          stackpanel2.Children.Add(new Rectangle() { Width = 150, Height = 50, Fill = Brushes.Teal });
          stackpanel2.Children.Add(new Rectangle() { Width = 150, Height = 70, Fill = Brushes.Yellow });
@@ -203,7 +236,7 @@ namespace Adamantium.UITests
          Grid.SetColumn(stackpanel2, 2);
          Grid.SetColumnSpan(stackpanel2, 2);
 
-         StackPanel stackpanel3 = new StackPanel();
+         StackPanel stackpanel3 = new StackPanel { Orientation = Orientation.Horizontal };
          stackpanel3.Background = Brushes.DarkOrchid;
          stackpanel3.Name = "Stack3";
          stackpanel3.Height = 200;
@@ -429,6 +462,34 @@ namespace Adamantium.UITests
 
       }
       
+      /// <summary>What a SPANNED child is offered when it is MEASURED. CalculatesColSpanCorrectly below covers the
+      /// arrangement, but its children are fixed-size, so it cannot see this: a child whose desired size depends on the
+      /// width it is given - any wrapping panel - is measured with the wrong one and answers for a width it will never
+      /// have.
+      /// <para>Measured in the tab strip: a pinned row spanning three columns of an "Auto,*,Auto" grid was offered the
+      /// FIRST column's width (empty, so 0), wrapped every tab onto its own line and asked for three lines of height;
+      /// the arrange then gave it the full width and laid everything out in one. The difference showed as a band of
+      /// empty strip.</para></summary>
+      [Test]
+      public void ASpannedChild_IsMeasuredWithTheWidthOfEveryColumnItCovers()
+      {
+         var grid = new Grid { Width = 300, Height = 100 };
+         grid.ColumnDefinitions.Add(new ColumnDefinition(GridLength.Auto));
+         grid.ColumnDefinitions.Add(new ColumnDefinition(1, GridUnitType.Star));
+         grid.ColumnDefinitions.Add(new ColumnDefinition(GridLength.Auto));
+         grid.RowDefinitions.Add(new RowDefinition(GridLength.Auto));
+
+         var spanned = new LayoutPoker { MeasureResult = new Size(10, 10) };
+         Grid.SetColumnSpan(spanned, 3);
+         grid.Children.Add(spanned);
+
+         grid.Measure(new Size(300, 100));
+         grid.Arrange(new Rect(0, 0, 300, 100));
+
+         Assert.AreEqual(300, spanned.MeasureArg.Width,
+            "a child covering all three columns must be measured with the grid's whole width");
+      }
+
       [Test]
       public void CalculatesColSpanCorrectly()
       {
@@ -458,10 +519,43 @@ namespace Adamantium.UITests
          Assert.AreEqual(150, grid.ColumnDefinitions[0].ActualWidth);
          Assert.AreEqual(4, grid.ColumnDefinitions[1].ActualWidth);
          Assert.AreEqual(50, grid.ColumnDefinitions[2].ActualWidth);
-         Assert.AreEqual(new Rect(52, 0, 100, 25), grid.Children[0].Bounds);
+         // Default Stretch anchors a fixed-size child at the START of its (spanned) slot, not centred.
+         Assert.AreEqual(new Rect(0, 0, 100, 25), grid.Children[0].Bounds);
          Assert.AreEqual(new Rect(0, 25, 150, 25), grid.Children[1].Bounds);
          Assert.AreEqual(new Rect(154, 25, 50, 25), grid.Children[2].Bounds);
 
+      }
+
+      // A '*' + 'Auto' split with a fixed-width child in the Auto column: Auto takes exactly the child's width, '*' takes
+      // the rest, and the Auto child sits flush against the right edge. This is the tab strip's overflow-button row; a
+      // FRESH measure (no stale-cache confound) pins the grid math itself - the reflow-after-a-visibility-toggle case is a
+      // layout-loop concern (a bare re-Measure early-returns; see CalculatesColSpanCorrectly's explicit InvalidateMeasure),
+      // NOT a grid-math bug.
+      [Test]
+      public void StarPlusAutoColumns_SplitByChildWidth()
+      {
+         Grid grid = new Grid();
+         grid.ColumnDefinitions.Add(new ColumnDefinition(new GridLength(1, GridUnitType.Star)));
+         grid.ColumnDefinitions.Add(new ColumnDefinition(GridLength.Auto));
+
+         var star = new Border { Height = 30 };
+         var auto = new Border { Width = 28, Height = 30 };
+         Grid.SetColumn(star, 0);
+         Grid.SetColumn(auto, 1);
+         grid.Children.Add(star);
+         grid.Children.Add(auto);
+
+         grid.Measure(new Size(300, 30));
+         grid.Arrange(new Rect(0, 0, 300, 30));
+
+         Assert.Multiple(() =>
+         {
+            Assert.AreEqual(28, grid.ColumnDefinitions[1].ActualWidth, "Auto column = child width");
+            Assert.AreEqual(272, grid.ColumnDefinitions[0].ActualWidth, "Star column = the remainder");
+            Assert.AreEqual(272, star.Bounds.Width, 0.5, "star child fills its column");
+            Assert.AreEqual(272, auto.Bounds.X, 0.5, "Auto child starts flush at the right edge");
+            Assert.AreEqual(28, auto.Bounds.Width, 0.5, "Auto child keeps its own width");
+         });
       }
 
       [Test]
@@ -1644,7 +1738,8 @@ namespace Adamantium.UITests
 
          g.Arrange(new Rect(0, 0, g.DesiredSize.Width, g.DesiredSize.Height));
 
-         Assert.AreEqual(new Rect(85, 0, 200, 200), child1.Bounds);
+         // Default Stretch anchors a fixed-size child at the START of its (spanned) slot, not centred.
+         Assert.AreEqual(new Rect(0, 0, 200, 200), child1.Bounds);
          Assert.AreEqual(new Rect(0, 210, 150, 200), child2.Bounds);
          Assert.AreEqual(new Rect(170, 210, 200, 200), child3.Bounds);
 
@@ -1713,7 +1808,8 @@ namespace Adamantium.UITests
 
          g.Arrange(new Rect(0, 0, g.DesiredSize.Width, g.DesiredSize.Height));
 
-         Assert.AreEqual(new Rect(95, 0, 200, 200), child1.Bounds);
+         // Default Stretch anchors a fixed-size child at the START of its (spanned) slot, not centred.
+         Assert.AreEqual(new Rect(0, 0, 200, 200), child1.Bounds);
          Assert.AreEqual(new Rect(0, 210, 150, 200), child2.Bounds);
          Assert.AreEqual(new Rect(190, 210, 200, 200), child3.Bounds);
 
@@ -1833,6 +1929,141 @@ namespace Adamantium.UITests
 
          g.Measure(new Size(Double.PositiveInfinity, Double.PositiveInfinity));
          Assert.AreEqual(new Size(350, 440), g.DesiredSize);
+      }
+
+      // Moving a child to another CELL must move it on screen. The cell index is read by the grid during its own measure,
+      // so the change has to invalidate the GRID - invalidating only the child leaves the grid measure-valid at an
+      // unchanged constraint, early-returning, and the child stays exactly where it was last put. That is what made a
+      // trigger which re-cells a template part (a folded tab strip moving to the edge column) appear to do nothing.
+      [Test]
+      public void MovingAChildToAnotherCell_MovesIt()
+      {
+         var grid = new Grid();
+         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(100, GridUnitType.Pixel) });
+         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(100, GridUnitType.Pixel) });
+         grid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(50, GridUnitType.Pixel) });
+         grid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(50, GridUnitType.Pixel) });
+
+         var child = new Canvas();
+         grid.Children.Add(child);
+
+         var slot = new Rect(0, 0, 200, 100);
+         grid.Measure(slot.Size);
+         grid.Arrange(slot);
+         Assert.That(child.Bounds.X, Is.EqualTo(0).Within(0.5), "starts in the first cell");
+
+         Grid.SetColumn(child, 1);
+         Grid.SetRow(child, 1);
+
+         grid.Measure(slot.Size);      // the SAME constraint - only the cell changed
+         grid.Arrange(slot);
+
+         Assert.Multiple(() =>
+         {
+            Assert.That(child.Bounds.X, Is.EqualTo(100).Within(0.5), "moved to the second column");
+            Assert.That(child.Bounds.Y, Is.EqualTo(50).Within(0.5), "and the second row");
+         });
+      }
+
+      /// <summary>
+      /// A child COLLAPSED and shown again gives its Auto track its height back on the next pass.
+      /// <para>Measured on a docking panel: a tab strip hidden while the panel was alone in a window stayed invisible
+      /// after it was docked back with three tabs - the row said Visible and measured zero. The strip is a child of an
+      /// Auto row, and hiding it left that row with a height nothing put back.</para>
+      /// </summary>
+      [Test]
+      public void AChildShownAgain_GivesItsAutoTrackItsHeightBack()
+      {
+         var grid = new Grid();
+         grid.RowDefinitions.Add(new RowDefinition(GridLength.Auto));
+         grid.RowDefinitions.Add(new RowDefinition(GridLength.Star));
+
+         var strip = new Border { Height = 36 };
+         var body = new Border();
+         grid.Children.Add(strip);
+         grid.Children.Add(body);
+         Grid.SetRow(body, 1);
+
+         var slot = new Rect(0, 0, 400, 300);
+
+         grid.Measure(slot.Size);
+         grid.Arrange(slot);
+         Assert.That(strip.RenderSize.Height, Is.EqualTo(36).Within(0.5), "the row starts at the strip's height");
+
+         // The grid is told to measure again explicitly: it caches a pass over the same size, and whether a child's
+         // visibility REACHES it is the layout manager's business, not this test's.
+         strip.Visibility = Visibility.Collapsed;
+         grid.InvalidateMeasure();
+         grid.Measure(slot.Size);
+         grid.Arrange(slot);
+         Assert.That(body.Bounds.Y, Is.EqualTo(0).Within(0.5), "hidden, it gives the row up entirely");
+
+         strip.Visibility = Visibility.Visible;
+         grid.InvalidateMeasure();
+         grid.Measure(slot.Size);
+         grid.Arrange(slot);
+
+         Assert.Multiple(() =>
+         {
+            Assert.That(strip.RenderSize.Height, Is.EqualTo(36).Within(0.5), "and shown again it takes it back");
+            Assert.That(body.Bounds.Y, Is.EqualTo(36).Within(0.5), "so the body moves down for it");
+         });
+      }
+
+      // Guards the INVARIANT a zero-sized pass must keep: no throw, and no non-finite track left behind. It is not a
+      // reproduction of the bug that prompted it - see the note below - so it passes with or without that fix.
+      //
+      // The bug: CalculateFinalGridSize's overflow branch computes totalTakenSize/finalSize, which is 0/0 = NaN when a
+      // grid is arranged into zero space while holding nothing, and divides every Auto track by it. Nothing recomputes
+      // those tracks afterwards (later passes only rewrite STAR tracks), so the NaN reaches the track offset and then a
+      // child's arrange rect - and Arrange REJECTS a non-finite rect by throwing, unwinding the whole layout pass. Every
+      // element after the offending one keeps its default slot, which is why a second window rendered with its content
+      // piled at the origin. Found by driving that window from code and reading its layout trace; reproducing it from a
+      // bare Grid did not work - a standalone grid measured at zero height leaves its rows out of the Auto set, so the
+      // guilty branch is never entered. Reproducing it needs the real template's path into that branch.
+      [Test]
+      public void ZeroSizedArrange_DoesNotPoisonAutoTracks()
+      {
+         // The shape of the tab strip's own grid, which is where this was found.
+         var grid = new Grid();
+         grid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(0, GridUnitType.Auto) });
+         grid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(0, GridUnitType.Auto) });
+         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(0, GridUnitType.Auto) });
+         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(0, GridUnitType.Auto) });
+         var top = new Rectangle { Height = 36, Stretch = Stretch.Fill };
+         var bottom = new Rectangle { Height = 64, Stretch = Stretch.Fill };
+         Grid.SetRow(top, 0);
+         Grid.SetColumn(top, 1);
+         Grid.SetRow(bottom, 1);
+         Grid.SetColumn(bottom, 1);
+         grid.Children.Add(top);
+         grid.Children.Add(bottom);
+
+         // The pass that poisoned it: a real width but ZERO height, which is what a window's strip gets while the client
+         // height is still unknown (measured off the app as Width 866 / Height 0).
+         grid.Measure(new Size(866, 0));
+         Assert.DoesNotThrow(() => grid.Arrange(new Rect(0, 0, 866, 0)), "a zero-height slot must not throw");
+         Assert.That(double.IsFinite(grid.RowDefinitions[0].ActualHeight), Is.True,
+            "the zero-height pass must not leave a NaN in the track");
+
+         // ...and the grid must still lay out normally afterwards, i.e. the zero pass left no NaN behind.
+         grid.InvalidateMeasure();
+         grid.Measure(new Size(200, 200));
+         Assert.DoesNotThrow(() => grid.Arrange(new Rect(0, 0, 200, 200)), "and must not poison the next real pass");
+
+         Assert.Multiple(() =>
+         {
+            Assert.That(double.IsFinite(top.Bounds.Y), Is.True, "the first Auto row keeps a finite offset");
+            Assert.That(double.IsFinite(top.Bounds.Height), Is.True, "and a finite height");
+            Assert.That(double.IsFinite(bottom.Bounds.Y), Is.True, "and so does the second");
+            Assert.That(double.IsFinite(bottom.Bounds.Height), Is.True, "and so does its height");
+            // The leftover height is shared out among the Auto rows, so the exact offset is the engine's business; what
+            // this test is about is that the second row still lands BELOW the first instead of on top of it.
+            Assert.That(bottom.Bounds.Y, Is.EqualTo(grid.RowDefinitions[0].ActualHeight).Within(0.5),
+               "the second row starts where the first one ends");
+            Assert.That(bottom.Bounds.Y, Is.GreaterThan(0), "it is not piled at the origin");
+         });
       }
    }
 }

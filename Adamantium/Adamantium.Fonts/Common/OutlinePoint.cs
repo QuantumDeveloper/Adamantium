@@ -2,7 +2,7 @@
 
 namespace Adamantium.Fonts.Common
 {
-    internal struct OutlinePoint
+    public struct OutlinePoint
     {
         public double X { get; set; }
         public double Y { get; set; }
@@ -12,6 +12,13 @@ namespace Adamantium.Fonts.Common
         {
             X = x;
             Y = y;
+            IsControl = control;
+        }
+
+        public OutlinePoint(Vector2 point, bool control = false)
+        {
+            X = point.X;
+            Y = point.Y;
             IsControl = control;
         }
 

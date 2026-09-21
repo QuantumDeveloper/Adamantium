@@ -14,7 +14,7 @@ namespace Adamantium.Imaging.Png.Chunks
 
         public uint RepeatCout { get; set; }
 
-        internal override byte[] GetChunkBytes(PNGState state)
+        internal override byte[] GetChunkBytes(PngState state)
         {
             var bytes = new List<byte>();
             bytes.AddRange(GetNameAsBytes());
@@ -24,7 +24,7 @@ namespace Adamantium.Imaging.Png.Chunks
             return bytes.ToArray();
         }
 
-        internal static acTL FromState(PNGState state)
+        internal static acTL FromState(PngState state)
         {
             var actl = new acTL();
             actl.FramesCount = state.InfoPng.FramesCount;

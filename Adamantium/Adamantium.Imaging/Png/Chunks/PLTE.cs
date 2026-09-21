@@ -13,7 +13,7 @@ namespace Adamantium.Imaging.Png.Chunks
 
         public byte[] Palette { get; set; }
 
-        internal override byte[] GetChunkBytes(PNGState state)
+        internal override byte[] GetChunkBytes(PngState state)
         {
             var bytes = new List<byte>();
 
@@ -32,7 +32,7 @@ namespace Adamantium.Imaging.Png.Chunks
             return bytes.ToArray();
         }
 
-        internal static PLTE FromState(PNGState state)
+        internal static PLTE FromState(PngState state)
         {
             var plte = new PLTE();
             plte.Palette = state.ColorModeRaw.Palette;

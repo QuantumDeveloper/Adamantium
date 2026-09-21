@@ -3,9 +3,9 @@ using System.Collections.Generic;
 using System.IO;
 using Adamantium.Engine.Compiler.Converter.Configs;
 using Adamantium.Engine.Compiler.Converter.Containers;
-using Adamantium.Engine.Core.Models;
-using Adamantium.Engine.Compiler.Converter.ConversionUtils;
 using Adamantium.Engine.Compiler.Converter.Parsers;
+using Adamantium.Engine.Compiler.Models.ConversionUtils;
+using Adamantium.Graphics.Core.Models;
 
 namespace Adamantium.Engine.Compiler.Converter.Converters
 {
@@ -21,7 +21,7 @@ namespace Adamantium.Engine.Compiler.Converter.Converters
 
       protected override void Convert()
       {
-         dataContainer = (ObjDataContainer) Parser.ParseDataAsync(Config).Result;
+         dataContainer = (ObjDataContainer) Parser.ParseData(Config);
          if (!dataContainer.IsFileValid)
          {
             IsCancelled = true;
@@ -43,7 +43,7 @@ namespace Adamantium.Engine.Compiler.Converter.Converters
       private void ParseData(ObjMeshData meshData)
       {
          List<IndicesContainer> indicesContainers = new List<IndicesContainer>();
-         //Получаем индексы вершин
+         //Vertex indices
          foreach (var indices in meshData.GeometrySemantic)
          {
             indicesContainers.Add(executor.DistributeIndices(indices));

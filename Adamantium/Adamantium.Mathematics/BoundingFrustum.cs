@@ -7,7 +7,7 @@ namespace Adamantium.Mathematics
    {
       #region Private Fields
 
-      private Matrix4x4F matrix;
+      private Matrix4x4F viewProjection;
       private readonly Vector3F[] corners = new Vector3F[CornerCount];
       private readonly Plane[] planes = new Plane[PlaneCount];
 
@@ -23,38 +23,38 @@ namespace Adamantium.Mathematics
 
       public BoundingFrustum(Matrix4x4F value, bool enableFarPlaneCheck = false)
       {
-         this.matrix = value;
+         viewProjection = value;
          EnableFarPlaneCheck = enableFarPlaneCheck;
-         this.CreatePlanes();
-         this.CreateCorners();
+         CreatePlanes();
+         CreateCorners();
       }
 
       #endregion Public Constructors
 
       #region Public Properties
 
-      public Matrix4x4F Matrix4x4F
+      public Matrix4x4F ViewProjection
       {
-         get { return this.matrix; }
+         get => viewProjection;
          set
          {
-            this.matrix = value;
-            this.CreatePlanes();    // FIXME: The odds are the planes will be used a lot more often than the matrix
-            this.CreateCorners();   // is updated, so this should help performance. I hope ;)
+            viewProjection = value;
+            CreatePlanes();    // FIXME: The odds are the planes will be used a lot more often than the matrix
+            CreateCorners();   // is updated, so this should help performance. I hope ;)
          }
       }
 
-      public Plane Near => this.planes[0];
+      public Plane Near => planes[0];
 
-      public Plane Far => this.planes[1];
+      public Plane Far => planes[1];
 
-      public Plane Left => this.planes[2];
+      public Plane Left => planes[2];
 
-      public Plane Right => this.planes[3];
+      public Plane Right => planes[3];
 
-      public Plane Top => this.planes[4];
+      public Plane Top => planes[4];
 
-      public Plane Bottom => this.planes[5];
+      public Plane Bottom => planes[5];
 
       public Boolean EnableFarPlaneCheck { get; set; }
 
@@ -64,13 +64,13 @@ namespace Adamantium.Mathematics
 
       public static bool operator ==(BoundingFrustum a, BoundingFrustum b)
       {
-         if (object.Equals(a, null))
-            return (object.Equals(b, null));
+         if (Equals(a, null))
+            return (Equals(b, null));
 
-         if (object.Equals(b, null))
-            return (object.Equals(a, null));
+         if (Equals(b, null))
+            return (Equals(a, null));
 
-         return a.matrix == (b.matrix);
+         return a.viewProjection == (b.viewProjection);
       }
 
       public static bool operator !=(BoundingFrustum a, BoundingFrustum b)
@@ -81,7 +81,7 @@ namespace Adamantium.Mathematics
       public ContainmentType Contains(BoundingBox box)
       {
          var result = default(ContainmentType);
-         this.Contains(ref box, out result);
+         Contains(ref box, out result);
          return result;
       }
 
@@ -161,7 +161,7 @@ namespace Adamantium.Mathematics
       public ContainmentType Contains(BoundingSphere sphere)
       {
          ContainmentType result;
-         this.Contains(ref sphere, out result);
+         Contains(ref sphere, out result);
          return result;
       }
 
@@ -253,12 +253,12 @@ namespace Adamantium.Mathematics
       public override bool Equals(object obj)
       {
          BoundingFrustum f = obj as BoundingFrustum;
-         return (!object.Equals(f, null)) && (this == f);
+         return (!Equals(f, null)) && (this == f);
       }
 
       public Vector3F[] GetCorners()
       {
-         return (Vector3F[])this.corners.Clone();
+         return (Vector3F[])corners.Clone();
       }
 
       public void GetCorners(Vector3F[] corners)
@@ -271,13 +271,13 @@ namespace Adamantium.Mathematics
 
       public override int GetHashCode()
       {
-         return this.matrix.GetHashCode();
+         return viewProjection.GetHashCode();
       }
 
       public bool Intersects(BoundingBox box)
       {
          var result = false;
-         this.Intersects(ref box, out result);
+         Intersects(ref box, out result);
          return result;
       }
 
@@ -296,14 +296,14 @@ namespace Adamantium.Mathematics
       public bool Intersects(BoundingSphere sphere)
       {
          bool result;
-         this.Intersects(ref sphere, out result);
+         Intersects(ref sphere, out result);
          return result;
       }
 
       public void Intersects(ref BoundingSphere sphere, out bool result)
       {
          ContainmentType containment;
-         this.Contains(ref sphere, out containment);
+         Contains(ref sphere, out containment);
          result = containment != ContainmentType.Disjoint;
       }
 
@@ -326,17 +326,17 @@ namespace Adamantium.Mathematics
       {
          StringBuilder sb = new StringBuilder(256);
          sb.Append("{Near:");
-         sb.Append(this.planes[0].ToString());
+         sb.Append(planes[0].ToString());
          sb.Append(" Far:");
-         sb.Append(this.planes[1].ToString());
+         sb.Append(planes[1].ToString());
          sb.Append(" Left:");
-         sb.Append(this.planes[2].ToString());
+         sb.Append(planes[2].ToString());
          sb.Append(" Right:");
-         sb.Append(this.planes[3].ToString());
+         sb.Append(planes[3].ToString());
          sb.Append(" Top:");
-         sb.Append(this.planes[4].ToString());
+         sb.Append(planes[4].ToString());
          sb.Append(" Bottom:");
-         sb.Append(this.planes[5].ToString());
+         sb.Append(planes[5].ToString());
          sb.Append("}");
          return sb.ToString();
       }
@@ -347,52 +347,52 @@ namespace Adamantium.Mathematics
 
       private void CreateCorners()
       {
-         IntersectionPoint(ref this.planes[0], ref this.planes[2], ref this.planes[4], out this.corners[0]);
-         IntersectionPoint(ref this.planes[0], ref this.planes[3], ref this.planes[4], out this.corners[1]);
-         IntersectionPoint(ref this.planes[0], ref this.planes[3], ref this.planes[5], out this.corners[2]);
-         IntersectionPoint(ref this.planes[0], ref this.planes[2], ref this.planes[5], out this.corners[3]);
-         IntersectionPoint(ref this.planes[1], ref this.planes[2], ref this.planes[4], out this.corners[4]);
-         IntersectionPoint(ref this.planes[1], ref this.planes[3], ref this.planes[4], out this.corners[5]);
-         IntersectionPoint(ref this.planes[1], ref this.planes[3], ref this.planes[5], out this.corners[6]);
-         IntersectionPoint(ref this.planes[1], ref this.planes[2], ref this.planes[5], out this.corners[7]);
+         IntersectionPoint(ref planes[0], ref planes[2], ref planes[4], out corners[0]);
+         IntersectionPoint(ref planes[0], ref planes[3], ref planes[4], out corners[1]);
+         IntersectionPoint(ref planes[0], ref planes[3], ref planes[5], out corners[2]);
+         IntersectionPoint(ref planes[0], ref planes[2], ref planes[5], out corners[3]);
+         IntersectionPoint(ref planes[1], ref planes[2], ref planes[4], out corners[4]);
+         IntersectionPoint(ref planes[1], ref planes[3], ref planes[4], out corners[5]);
+         IntersectionPoint(ref planes[1], ref planes[3], ref planes[5], out corners[6]);
+         IntersectionPoint(ref planes[1], ref planes[2], ref planes[5], out corners[7]);
       }
 
       private void CreatePlanes()
       {
-         planes[0][0] = matrix.M14 + matrix.M13;
-         planes[0][1] = matrix.M24 + matrix.M23;
-         planes[0][2] = matrix.M34 + matrix.M33;
-         planes[0][3] = matrix.M44 + matrix.M43;
+         planes[0][0] = viewProjection.M14 + viewProjection.M13;
+         planes[0][1] = viewProjection.M24 + viewProjection.M23;
+         planes[0][2] = viewProjection.M34 + viewProjection.M33;
+         planes[0][3] = viewProjection.M44 + viewProjection.M43;
          planes[0].Normalize();
 
-         planes[1][0] = matrix.M14 - matrix.M13;
-         planes[1][1] = matrix.M24 - matrix.M23;
-         planes[1][2] = matrix.M34 - matrix.M33;
-         planes[1][3] = matrix.M44 - matrix.M43;
+         planes[1][0] = viewProjection.M14 - viewProjection.M13;
+         planes[1][1] = viewProjection.M24 - viewProjection.M23;
+         planes[1][2] = viewProjection.M34 - viewProjection.M33;
+         planes[1][3] = viewProjection.M44 - viewProjection.M43;
          planes[1].Normalize();
 
-         planes[2][0] = matrix.M14 + matrix.M11;
-         planes[2][1] = matrix.M24 + matrix.M21;
-         planes[2][2] = matrix.M34 + matrix.M31;
-         planes[2][3] = matrix.M44 + matrix.M41;
+         planes[2][0] = viewProjection.M14 + viewProjection.M11;
+         planes[2][1] = viewProjection.M24 + viewProjection.M21;
+         planes[2][2] = viewProjection.M34 + viewProjection.M31;
+         planes[2][3] = viewProjection.M44 + viewProjection.M41;
          planes[2].Normalize();
 
-         planes[3][0] = matrix.M14 - matrix.M11;
-         planes[3][1] = matrix.M24 - matrix.M21;
-         planes[3][2] = matrix.M34 - matrix.M31;
-         planes[3][3] = matrix.M44 - matrix.M41;
+         planes[3][0] = viewProjection.M14 - viewProjection.M11;
+         planes[3][1] = viewProjection.M24 - viewProjection.M21;
+         planes[3][2] = viewProjection.M34 - viewProjection.M31;
+         planes[3][3] = viewProjection.M44 - viewProjection.M41;
          planes[3].Normalize();
 
-         planes[4][0] = matrix.M14 - matrix.M12;
-         planes[4][1] = matrix.M24 - matrix.M22;
-         planes[4][2] = matrix.M34 - matrix.M32;
-         planes[4][3] = matrix.M44 - matrix.M42;
+         planes[4][0] = viewProjection.M14 - viewProjection.M12;
+         planes[4][1] = viewProjection.M24 - viewProjection.M22;
+         planes[4][2] = viewProjection.M34 - viewProjection.M32;
+         planes[4][3] = viewProjection.M44 - viewProjection.M42;
          planes[4].Normalize();
 
-         planes[5][0] = matrix.M14 + matrix.M12;
-         planes[5][1] = matrix.M24 + matrix.M22;
-         planes[5][2] = matrix.M34 + matrix.M32;
-         planes[5][3] = matrix.M44 + matrix.M42;
+         planes[5][0] = viewProjection.M14 + viewProjection.M12;
+         planes[5][1] = viewProjection.M24 + viewProjection.M22;
+         planes[5][2] = viewProjection.M34 + viewProjection.M32;
+         planes[5][3] = viewProjection.M44 + viewProjection.M42;
          planes[5].Normalize();
 
       }

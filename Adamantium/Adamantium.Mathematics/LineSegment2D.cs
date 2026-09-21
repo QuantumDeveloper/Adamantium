@@ -1,4 +1,5 @@
 ﻿using System;
+using Adamantium.Mathematics.Triangulation;
 
 namespace Adamantium.Mathematics
 {
@@ -11,7 +12,11 @@ namespace Adamantium.Mathematics
 
         public override int GetHashCode()
         {
-            return HashCode.Combine(Start, End, Direction, DirectionNormalized);
+            #if NETCORE
+            return HashCode.Combine(Start, End);
+            #else
+            return Start.GetHashCode() + End.GetHashCode();
+            #endif
         }
 
         public Vector2 Start { get; }
@@ -30,7 +35,7 @@ namespace Adamantium.Mathematics
             DirectionNormalized = Vector2.Normalize(Direction);
         }
         
-        public LineSegment2D(Vector3F start, Vector3F end)
+        public LineSegment2D(Vector3 start, Vector3 end)
         {
             Start = (Vector2)start;
             End = (Vector2)end;
@@ -38,6 +43,14 @@ namespace Adamantium.Mathematics
             DirectionNormalized = Vector2.Normalize(Direction);
         }
 
+        public LineSegment2D(GeometrySegment segment)
+        {
+            Start = segment.Start;
+            End = segment.End;
+            Direction = End - Start;
+            DirectionNormalized = Vector2.Normalize(Direction);
+        }
+        
         public bool Equals(LineSegment2D other)
         {
             return MathHelper.WithinEpsilon(Start, other.Start, Polygon.Epsilon) && MathHelper.WithinEpsilon(End, other.End, Polygon.Epsilon);

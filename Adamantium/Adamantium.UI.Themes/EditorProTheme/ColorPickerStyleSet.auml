@@ -1,0 +1,194 @@
+<?xml version="1.0" encoding="utf-8"?>
+<StyleSet xmlns="http://adamantium/ui"
+          xmlns:x="http://adamantium/ui/xaml/extensions">
+
+    <!-- Saturation/value square, hue bar, alpha bar, a preview and the numbers. The pure-hue backdrop, the alpha ramp
+         and the preview are set from code (they follow the picked colour); the overlays and the rainbow are here.
+
+         STACKED, not laid out in a row. Fluent puts the fields in a column beside the square, which makes the whole
+         thing about 480 wide - a dialog. This one drops out of a swatch in a properties column, so it is as wide as
+         the square and everything else goes underneath. That is the difference between a picker you open over your
+         work and one that belongs to the row you are editing.
+
+         The markers are hairline squares rather than fat white rings, for the same reason as on the wheel: a ring three
+         units thick covers the very neighbourhood of colours you are choosing between. Two hairlines, black outside
+         and white inside, so the mark survives on any hue. -->
+
+    <Style Selector="ColorPicker">
+        <Setter Property="Foreground" Value="{ObservableResource TextFillColorPrimary}"/>
+        <Setter Property="FontSize" Value="{ResourceReference FontSizeCaption}"/>
+    </Style>
+
+    <Style Selector="ColorPicker">
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ColorPicker">
+                    <Border Background="{ResourceReference SolidBackgroundFillColorSecondary}"
+                            BorderBrush="{ResourceReference ControlStrokeColorSecondary}"
+                            BorderThickness="{ResourceReference StrokeThin}"
+                            CornerRadius="0"
+                            Padding="{ResourceReference PaddingPanel}">
+                        <StackPanel Orientation="Vertical">
+
+                            <!-- Saturation across, value down. Background is the pure hue (from code); over it a
+                                 white-to-clear horizontal and a clear-to-black vertical. -->
+                            <StackPanel Orientation="Horizontal">
+                                <Border x:Name="PART_SVArea"
+                                        Width="{ResourceReference ColorAreaSize}"
+                                        Height="{ResourceReference ColorAreaSize}"
+                                        CornerRadius="0"
+                                        ClipToBounds="True">
+                                    <Grid>
+                                        <Border>
+                                            <Border.Background>
+                                                <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
+                                                    <GradientStop Color="#FFFFFFFF" Offset="0"/>
+                                                    <GradientStop Color="#00FFFFFF" Offset="1"/>
+                                                </LinearGradientBrush>
+                                            </Border.Background>
+                                        </Border>
+                                        <Border>
+                                            <Border.Background>
+                                                <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                                                    <GradientStop Color="#00000000" Offset="0"/>
+                                                    <GradientStop Color="#FF000000" Offset="1"/>
+                                                </LinearGradientBrush>
+                                            </Border.Background>
+                                        </Border>
+                                        <Border x:Name="PART_SVThumb"
+                                                Width="{ResourceReference ColorThumbSize}"
+                                                Height="{ResourceReference ColorThumbSize}"
+                                                CornerRadius="0"
+                                                BorderThickness="{ResourceReference StrokeThin}"
+                                                BorderBrush="Black"
+                                                HorizontalAlignment="Left"
+                                                VerticalAlignment="Top">
+                                            <Border BorderThickness="{ResourceReference StrokeThin}" BorderBrush="White"/>
+                                        </Border>
+                                    </Grid>
+                                </Border>
+
+                                <!-- Hue, 0..360 top to bottom. -->
+                                <Border x:Name="PART_HueArea"
+                                        Width="{ResourceReference ColorBarWidth}"
+                                        Height="{ResourceReference ColorAreaSize}"
+                                        CornerRadius="0"
+                                        ClipToBounds="True"
+                                        MarginLeft="{ResourceReference GapSmall}">
+                                    <Grid>
+                                        <Border>
+                                            <Border.Background>
+                                                <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                                                    <GradientStop Color="#FFFF0000" Offset="0"/>
+                                                    <GradientStop Color="#FFFFFF00" Offset="0.1667"/>
+                                                    <GradientStop Color="#FF00FF00" Offset="0.3333"/>
+                                                    <GradientStop Color="#FF00FFFF" Offset="0.5"/>
+                                                    <GradientStop Color="#FF0000FF" Offset="0.6667"/>
+                                                    <GradientStop Color="#FFFF00FF" Offset="0.8333"/>
+                                                    <GradientStop Color="#FFFF0000" Offset="1"/>
+                                                </LinearGradientBrush>
+                                            </Border.Background>
+                                        </Border>
+                                        <Border x:Name="PART_HueThumb"
+                                                Height="{ResourceReference ColorBarThumbHeight}"
+                                                CornerRadius="0"
+                                                BorderThickness="{ResourceReference StrokeThin}"
+                                                BorderBrush="Black"
+                                                HorizontalAlignment="Stretch"
+                                                VerticalAlignment="Top">
+                                            <Border BorderThickness="{ResourceReference StrokeThin}" BorderBrush="White"/>
+                                        </Border>
+                                    </Grid>
+                                </Border>
+
+                                <!-- Alpha, opaque to clear, over a checkerboard so the transparency reads truthfully. -->
+                                <Border x:Name="PART_AlphaArea"
+                                        Width="{ResourceReference ColorBarWidth}"
+                                        Height="{ResourceReference ColorAreaSize}"
+                                        CornerRadius="0"
+                                        ClipToBounds="True"
+                                        MarginLeft="{ResourceReference GapSmall}">
+                                    <Border.Background>
+                                        <PatternBrush Pattern="Checkerboard" Color1="#FFFFFFFF" Color2="#FFCCCCCC"
+                                                CellSize="{ResourceReference ColorCheckerCell}"/>
+                                    </Border.Background>
+                                    <Grid>
+                                        <Border x:Name="PART_AlphaGradient"/>
+                                        <Border x:Name="PART_AlphaThumb"
+                                                Height="{ResourceReference ColorBarThumbHeight}"
+                                                CornerRadius="0"
+                                                BorderThickness="{ResourceReference StrokeThin}"
+                                                BorderBrush="Black"
+                                                HorizontalAlignment="Stretch"
+                                                VerticalAlignment="Top">
+                                            <Border BorderThickness="{ResourceReference StrokeThin}" BorderBrush="White"/>
+                                        </Border>
+                                    </Grid>
+                                </Border>
+                            </StackPanel>
+
+                            <!-- The preview, full width under the square: the colour is what this whole thing is for,
+                                 so it gets the widest band available rather than a corner of a side column.
+                                 The checkerboard is INSET inside the preview so the colour layer always covers the
+                                 pattern's antialiased fringe. -->
+                            <Border Height="{ResourceReference ColorPreviewHeight}"
+                                    Margin="{ResourceReference ColorStackGap}">
+                                <Grid>
+                                    <Border Margin="{ResourceReference StrokeThin}">
+                                        <Border.Background>
+                                            <PatternBrush Pattern="Checkerboard" Color1="#FFFFFFFF" Color2="#FFCCCCCC"
+                                                    CellSize="{ResourceReference ColorCheckerCell}"/>
+                                        </Border.Background>
+                                    </Border>
+                                    <Border x:Name="PART_Preview" CornerRadius="0"/>
+                                    <Border BorderThickness="{ResourceReference StrokeThin}"
+                                            BorderBrush="{ResourceReference ControlStrokeColorDefault}"/>
+                                </Grid>
+                            </Border>
+
+                            <!-- LABELLED, and inline rather than above: four bare numbers in a row cannot be told
+                                 apart, and stacking a caption over each would cost four rows in a panel whose whole
+                                 point is to be short. Fixed field widths with MinWidth=0 - the field style's minimum
+                                 is meant for a form and would push these off the panel. -->
+                            <StackPanel Orientation="Horizontal" Margin="{ResourceReference ColorStackGap}">
+                                <TextBlock Text="Hex" Width="{ResourceReference ColorLabelWidth}"
+                                        VerticalAlignment="Center"
+                                        Foreground="{ObservableResource TextFillColorTertiary}"/>
+                                <TextBox Text="{Ancestor ColorPicker, Hex, Mode=TwoWay}" MinWidth="0"/>
+                            </StackPanel>
+
+                            <StackPanel Orientation="Horizontal" Margin="{ResourceReference ColorStackGap}">
+                                <TextBlock Text="R" Width="{ResourceReference ColorLabelWidth}"
+                                        VerticalAlignment="Center"
+                                        Foreground="{ObservableResource TextFillColorTertiary}"/>
+                                <TextBox Text="{Ancestor ColorPicker, Red, Mode=TwoWay}"
+                                        Width="{ResourceReference ColorFieldWidth}" MinWidth="0"/>
+                                <TextBlock Text="G" Width="{ResourceReference ColorLabelWidth}"
+                                        VerticalAlignment="Center"
+                                        MarginLeft="{ResourceReference GapSmall}"
+                                        Foreground="{ObservableResource TextFillColorTertiary}"/>
+                                <TextBox Text="{Ancestor ColorPicker, Green, Mode=TwoWay}"
+                                        Width="{ResourceReference ColorFieldWidth}" MinWidth="0"/>
+                            </StackPanel>
+
+                            <StackPanel Orientation="Horizontal" Margin="{ResourceReference ColorStackGap}">
+                                <TextBlock Text="B" Width="{ResourceReference ColorLabelWidth}"
+                                        VerticalAlignment="Center"
+                                        Foreground="{ObservableResource TextFillColorTertiary}"/>
+                                <TextBox Text="{Ancestor ColorPicker, Blue, Mode=TwoWay}"
+                                        Width="{ResourceReference ColorFieldWidth}" MinWidth="0"/>
+                                <TextBlock Text="A" Width="{ResourceReference ColorLabelWidth}"
+                                        VerticalAlignment="Center"
+                                        MarginLeft="{ResourceReference GapSmall}"
+                                        Foreground="{ObservableResource TextFillColorTertiary}"/>
+                                <TextBox Text="{Ancestor ColorPicker, Alpha, Mode=TwoWay}"
+                                        Width="{ResourceReference ColorFieldWidth}" MinWidth="0"/>
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+</StyleSet>

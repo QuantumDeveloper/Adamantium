@@ -1,6 +1,6 @@
 ﻿using System;
 using System.Runtime.InteropServices;
-using AdamantiumVulkan.Core;
+using Adamantium.Vulkan.Core;
 
 namespace Adamantium.Imaging
 {
@@ -32,6 +32,11 @@ namespace Adamantium.Imaging
         {
             Value = format;
         }
+        
+        /// <summary>
+        /// Size in bytes of current Surface format
+        /// </summary>
+        public int SizeInBits => FormatHelper.SizeOfInBits(this);
 
         /// <summary>
         /// Size in bytes of current Surface format

@@ -1,20 +1,29 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
-  <PropertyGroup>
-    <TargetFramework>net6.0</TargetFramework>
-    <Platforms>x64</Platforms>
-    <Configurations>Debug;Release</Configurations>
-    <LangVersion>latestmajor</LangVersion>
-  </PropertyGroup>
-  <ItemGroup>
-    <Folder Include="Models\" />
-  </ItemGroup>
+	<PropertyGroup>
+		<TargetFramework>net10.0</TargetFramework>
+		<Platforms>x64</Platforms>
+		<Configurations>Debug;Release</Configurations>
+		<LangVersion>latest</LangVersion>
+	</PropertyGroup>
+	<ItemGroup>
+		<Folder Include="Models\" />
+	</ItemGroup>
 
-  <ItemGroup>
-    <ProjectReference Include="..\..\..\AdamantiumVulkan\AdamantiumVulkan.Shaders\AdamantiumVulkan.Shaders.csproj" />
-    <ProjectReference Include="..\..\..\AdamantiumVulkan\AdamantiumVulkan.SPIRV.Reflection\AdamantiumVulkan.SPIRV.Reflection.csproj" />
-    <ProjectReference Include="..\Adamantium.Engine.Core\Adamantium.Engine.Core.csproj" />
-    <ProjectReference Include="..\Adamantium.Win32\Adamantium.Win32.csproj" />
-  </ItemGroup>
+	<ItemGroup>
+		<ProjectReference Include="..\Adamantium.Graphics.Core\Adamantium.Graphics.Core.csproj" />
+	</ItemGroup>
+
+	<ItemGroup>
+	  <Compile Remove="obj\**" />
+	</ItemGroup>
+
+	<ItemGroup>
+	  <EmbeddedResource Remove="obj\**" />
+	</ItemGroup>
+
+	<ItemGroup>
+	  <None Remove="obj\**" />
+	</ItemGroup>
 
 </Project>

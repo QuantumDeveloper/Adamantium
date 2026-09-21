@@ -12,7 +12,7 @@ namespace Adamantium.Core.Collections
     /// </summary>
     /// <remarks>Implements <see cref="INotifyPropertyChanged"/> and <see cref="INotifyPropertyChanged"/> interfaces</remarks>
     /// <typeparam name="T"></typeparam>
-    public class AdamantiumCollection<T> : IList<T>, IReadOnlyCollection<T>
+    public class AdamantiumCollection<T> : IList<T>, IReadOnlyList<T>
     {
         private T[] items;
         private int currentIndex;
@@ -24,6 +24,9 @@ namespace Adamantium.Core.Collections
             get => items.Length;
             set
             {
+                if (IsFixedSize)
+                    throw new InvalidOperationException("Cannot add items to a fixed-size collection.");
+                
                 if (value != items.Length)
                 {
                     if (value > 0)
@@ -37,7 +40,7 @@ namespace Adamantium.Core.Collections
                     }
                     else
                     {
-                        items = Array.Empty<T>();
+                        items = [];
                     }
                 }
             }
@@ -48,7 +51,7 @@ namespace Adamantium.Core.Collections
         /// </summary>
         public AdamantiumCollection()
         {
-            items = Array.Empty<T>();
+            items = new T[defaultCapacity];
         }
 
         /// <summary>
@@ -116,7 +119,7 @@ namespace Adamantium.Core.Collections
         /// Returns <see cref="ReadOnlyCollection{T}"/> of the <see cref="AdamantiumCollection{T}"/>
         /// </summary>
         /// <returns></returns>
-        public ReadOnlyCollection<T> AsReadOnly()
+        public IReadOnlyCollection<T> AsReadOnly()
         {
             lock (SyncRoot)
             {
@@ -131,11 +134,19 @@ namespace Adamantium.Core.Collections
         {
             lock (SyncRoot)
             {
-                if (currentIndex > 0)
-                {
-                    ClearItems();
-                    OnClear();
-                }
+                if (currentIndex == 0) return;
+
+                // OnClearing sees exactly the items that are about to leave, while they are still HERE - a window onto the
+                // live storage, no copy, and nothing beyond them. Whoever must remember them takes their own snapshot there
+                // (only a collection with listeners does); everyone else pays nothing at all.
+                //
+                // This used to hand the backing array to OnClear, which runs AFTER it has been zeroed - so a listener could
+                // learn that "something" was cleared but never WHAT. Everything a removal has to unwind per item (a visual
+                // child's parent link, a mirror collection's state, a behaviour's attachment) was then silently skipped, and
+                // the item lived on believing it still belonged here.
+                OnClearing(new ArraySegment<T>(items, 0, currentIndex));
+                ClearItems();
+                OnCleared();
             }
         }
 
@@ -144,6 +155,9 @@ namespace Adamantium.Core.Collections
         /// </summary>
         protected virtual void ClearItems()
         {
+            if (IsFixedSize)
+                throw new InvalidOperationException("Cannot add items to a fixed-size collection.");
+            
             Array.Clear(items, 0, currentIndex);
             Capacity = 0;
             currentIndex = 0;
@@ -156,6 +170,9 @@ namespace Adamantium.Core.Collections
         /// <param name="range"><see cref="IEnumerable{T}"/> of items to insert</param>
         public void InsertRange(int index, IEnumerable<T> range)
         {
+            if (IsFixedSize)
+                throw new InvalidOperationException("Cannot add items to a fixed-size collection.");
+            
             lock (SyncRoot)
             {
                 var enumerable = range as T[] ?? range.ToArray();
@@ -212,9 +229,18 @@ namespace Adamantium.Core.Collections
         {
             lock (SyncRoot)
             {
-                for (int i = arrayIndex; i < array.Length; ++i)
+                if (array == null)
+                    throw new ArgumentNullException(nameof(array));
+
+                if (arrayIndex < 0)
+                    throw new ArgumentOutOfRangeException(nameof(arrayIndex), "Index must be non-negative.");
+
+                if (array.Length - arrayIndex < Count)
+                    throw new ArgumentException("Destination array is not large enough to copy all the items.");
+
+                lock (SyncRoot)
                 {
-                    array[i] = items[i];
+                    Array.Copy(items, 0, array, arrayIndex, Count);
                 }
             }
         }
@@ -230,7 +256,9 @@ namespace Adamantium.Core.Collections
         {
             lock (SyncRoot)
             {
-                int index = Array.IndexOf(items, item);
+                // Search only the LIVE range [0, currentIndex): the backing array's trailing slots are stale/default
+                // and must not be matched.
+                int index = Array.IndexOf(items, item, 0, currentIndex);
 
                 if (index != -1)
                 {
@@ -265,12 +293,15 @@ namespace Adamantium.Core.Collections
         {
             lock (SyncRoot)
             {
-                if (index <= currentIndex && count > 0)
+                if (index < 0 || index >= currentIndex || count <= 0) return;
+
+                // Remove at the SAME index `count` times: each RemoveInternal shifts the rest down, so `index` is always
+                // the next item to drop. (The old `RemoveInternal(i)` for i in [index, index+count) removed every other
+                // element and could run off the end as currentIndex shrank.)
+                count = Math.Min(count, currentIndex - index);
+                for (var i = 0; i < count; i++)
                 {
-                    for (int i = index; i < index + count; i++)
-                    {
-                        RemoveInternal(i);
-                    }
+                    RemoveInternal(index);
                 }
             }
         }
@@ -286,6 +317,9 @@ namespace Adamantium.Core.Collections
             {
                 return;
             }
+            
+            if (IsFixedSize)
+                throw new InvalidOperationException("Cannot add items to a fixed-size collection.");
 
             lock (SyncRoot)
             {
@@ -306,6 +340,10 @@ namespace Adamantium.Core.Collections
         /// <filterpriority>2</filterpriority>
         public int Count => currentIndex;
 
+        /// <summary>The live contents as a span, so a caller that only READS them does not have to copy them out with
+        /// ToArray() first. It is a view over the backing array: do not add, remove or clear while holding it.</summary>
+        public ReadOnlySpan<T> AsSpan() => new(items, 0, currentIndex);
+
         /// <summary>
         /// Gets an object that can be used to synchronize access to the <see cref="T:System.Collections.ICollection"/>.
         /// </summary>
@@ -314,6 +352,11 @@ namespace Adamantium.Core.Collections
         /// </returns>
         /// <filterpriority>2</filterpriority>
         public object SyncRoot => syncObject;
+
+        /// <summary>The live items as a span over [0, <see cref="Count"/>). MUST be read under a <see cref="SyncRoot"/>
+        /// lock (the backing array is replaced on grow) - it exists for the collection's own lock-holding scan helpers,
+        /// so they can walk the storage once instead of paying the per-element lock in the indexer.</summary>
+        protected System.ReadOnlySpan<T> ItemsSpan => new System.ReadOnlySpan<T>(items, 0, currentIndex);
 
         /// <summary>
         /// Gets a value indicating whether access to the <see cref="AdamantiumCollection{T}"/> is synchronized (thread safe).
@@ -339,7 +382,8 @@ namespace Adamantium.Core.Collections
         {
             lock (SyncRoot)
             {
-                return Array.IndexOf(items, item);
+                // Only the live range [0, currentIndex); trailing slots are stale/default.
+                return Array.IndexOf(items, item, 0, currentIndex);
             }
         }
 
@@ -352,6 +396,9 @@ namespace Adamantium.Core.Collections
         /// <exception cref="T:System.NotSupportedException">The <see cref="T:System.Collections.Generic.IList`1"/> is read-only.</exception>
         public void Insert(int index, T item)
         {
+            if (IsFixedSize)
+                throw new InvalidOperationException("Cannot add items to a fixed-size collection.");
+            
             lock (SyncRoot)
             {
                 InsertItem(index, item);
@@ -372,13 +419,48 @@ namespace Adamantium.Core.Collections
             }
         }
 
+        /// <summary>
+        /// Moves the item at <paramref name="from"/> to <paramref name="to"/>, keeping everything else in order.
+        /// <para>ONE change and not a removal followed by an insertion: whoever mirrors this collection - a list of
+        /// containers, a set of bindings taken by position - would otherwise see a state in which the item does not
+        /// exist at all, and rebuild itself against it.</para>
+        /// </summary>
+        public void Move(int from, int to)
+        {
+            if (IsFixedSize)
+                throw new InvalidOperationException("Cannot move items in a fixed-size collection.");
+
+            lock (SyncRoot)
+            {
+                if (from < 0 || from >= currentIndex) throw new ArgumentOutOfRangeException(nameof(from));
+                if (to < 0 || to >= currentIndex) throw new ArgumentOutOfRangeException(nameof(to));
+                if (from == to) return;
+
+                var item = items[from];
+
+                if (from < to) Array.Copy(items, from + 1, items, from, to - from);
+                else Array.Copy(items, to, items, to + 1, from - to);
+
+                items[to] = item;
+
+                OnMove(from, to, item);
+            }
+        }
+
+        protected virtual void OnMove(int from, int to, T item) { }
+
         protected virtual void OnInsert(int index, T item) { }
 
         protected virtual void OnSet(int index, T oldItem, T newItem) { }
 
         protected virtual void OnRemoveItem(int index, T item) { }
+        
+        /// <summary>About to be cleared: <paramref name="items"/> is exactly the elements that are leaving, still in place.
+        /// It is a window onto the live storage and does not outlive this call - copy anything that must.</summary>
+        protected virtual void OnClearing(ArraySegment<T> items) { }
 
-        protected virtual void OnClear() { }
+        /// <summary>Cleared. The items are gone; whatever was needed of them was taken in <see cref="OnClearing"/>.</summary>
+        protected virtual void OnCleared() { }
 
         /// <summary>
         /// Removes the item at the specified index.
@@ -392,11 +474,18 @@ namespace Adamantium.Core.Collections
         protected virtual void InsertItem(int index, T item)
         {
             CheckCapacity(currentIndex);
+
+            // Past the end APPENDS: storing at the raw index left every slot between the old end and it empty.
+            if (index > currentIndex) index = currentIndex;
+
             if (index < currentIndex)
             {
+                // Shift [index, currentIndex) right by one to open a slot AT index, then store there. (Storing at
+                // currentIndex - the end - was the bug: an insert-in-the-middle put the item last and duplicated the
+                // element that was at index. Surfaced as a tab dragged to a middle slot "flying to the end".)
                 Array.Copy(items, index, items, index + 1, currentIndex - index);
             }
-            items[currentIndex] = item;
+            items[index] = item;
             currentIndex++;
         }
 

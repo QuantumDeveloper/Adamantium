@@ -1,0 +1,1336 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Runtime.InteropServices;
+using Adamantium.Graphics.Core;
+using Adamantium.Graphics.Core.Extensions;
+using Adamantium.Graphics.Core.Models;
+using Adamantium.Mathematics;
+using Adamantium.ProceduralGeometry;
+using Adamantium.ProceduralGeometry.Shapes;
+using Adamantium.UI.Core;
+using Adamantium.UI.Core.Graphics;
+using Adamantium.UI.Core.Media;
+using Adamantium.UI.Core.Media.Imaging;
+using Adamantium.UI.FX;
+using Adamantium.UI.Rendering.Payloads;
+using Adamantium.UI.Rendering.Retained;
+
+namespace Adamantium.UI.Rendering.RenderUnits;
+
+/// <summary>How many times ANY unit has gained or lost a piece of out-of-pass machinery (a geometry, fringe or stroke
+/// renderer). A cache that keeps a list of the units needing a pre-render rebuilds it when this moves and iterates it
+/// otherwise - so a frame in which no unit changed shape costs the length of that list, not the size of the scene.
+/// <para>Its own non-generic type on purpose: a static on <see cref="RenderUnit{TPayload}"/> would be one counter PER
+/// PAYLOAD TYPE, and readers would each miss every change made through a different one.</para></summary>
+public static class RenderUnitMachinery
+{
+    private static long _version;
+
+    public static long Version => System.Threading.Interlocked.Read(ref _version);
+
+    internal static void Bump() => System.Threading.Interlocked.Increment(ref _version);
+}
+
+public abstract class RenderUnit<TPayload> : DeferredDisposableObject, IRenderUnit, IInstanceableFill where TPayload : class
+{
+    protected RenderUnit(IDrawCommand command, RenderUnitContext context) : base(context.GraphicsDevice)
+    {
+        Context = context;
+        DrawCommand = command;
+        Payload = DrawCommand.Payload as TPayload;
+    }
+
+    // All the shared services (device, effects, resource factory, buffer manager) live here, so adding a new one is a
+    // one-line change to RenderUnitContext instead of a new parameter on every unit constructor and the factory.
+    protected RenderUnitContext Context { get; }
+
+    public TPayload Payload { get; protected set; }
+
+    public UIBasicEffect UIBasicEffect => Context.UIBasicEffect;
+
+    // Global toggle: lets the stroke fall back to the CPU path on the fly if anything is wrong with the GPU path.
+    public static bool UseGpuStroke { get; set; } = true;
+
+    protected StrokeEffect StrokeEffect => Context.StrokeEffect;
+
+    // Analytic-AA fill fringe (GPU coverage edge). On like UseGpuStroke; toggle off to A/B against MSAA.
+    public static bool UseGpuFill { get; set; } = true;
+
+    protected FillFringeEffect FillFringeEffect => Context.FillFringeEffect;
+
+    protected GpuBufferManager BufferManager => Context.BufferManager;
+
+    // WHY THESE THREE HAVE BODIES. Together they answer NeedsPreRender, and the pre-render sweep used to find that out
+    // by walking every unit of every group, every frame - measured at 0.6 ms on a screen of a few thousand tiles, spent
+    // almost entirely on units that have none of them. A reader can keep the short list instead, but only if it is told
+    // when the list changes: these are assigned and cleared from a dozen places over a unit's life, so the notice has to
+    // live where the value does. One increment on an assignment that actually changes something; nothing on a read.
+    private UIRenderComponent _strokeRenderer, _fillFringeRenderer, _geometryRenderer;
+
+    public UIRenderComponent StrokeRenderer
+    {
+        get => _strokeRenderer;
+        set => Set(ref _strokeRenderer, value);
+    }
+
+    // The analytic-AA coverage fringe around a solid fill's contour (drawn on top of the body). Null = no fill AA.
+    public UIRenderComponent FillFringeRenderer
+    {
+        get => _fillFringeRenderer;
+        set => Set(ref _fillFringeRenderer, value);
+    }
+
+    public UIRenderComponent GeometryRenderer
+    {
+        get => _geometryRenderer;
+        set => Set(ref _geometryRenderer, value);
+    }
+
+    // Only a change from "has one" to "has none" or back moves the version: swapping one renderer for another leaves
+    // the unit in the list it was already in.
+    private static void Set(ref UIRenderComponent field, UIRenderComponent value)
+    {
+        var had = field != null;
+        field = value;
+        if (had != (value != null)) RenderUnitMachinery.Bump();
+    }
+
+    /// <summary>This unit still draws something PER-UNIT once its fill has been batched - a fringe the instanced path
+    /// doesn't cover, or a stroke. Those bake their transform from <c>RenderData</c> at record time, so a motion node
+    /// carrying such a unit can't move by writing its slot alone (see MarkNodeNotAware).</summary>
+    public bool HasPerUnitOverlay => FillFringeRenderer != null || StrokeRenderer != null;
+
+    // --- retained geometry-instancing (IInstanceableFill) -------------------------------------------------------------
+    public bool FillInstanced { get; set; }
+
+    // Not instanceable by default (a unit draws its fill body per-unit). GeometryRenderUnit overrides this for solid
+    // arbitrary geometry so N identical shapes collapse to one instanced draw.
+    public virtual bool TryGetInstancedFill(out GeometryKey key, out object mesh, out Vector4F color)
+    {
+        key = default;
+        mesh = null;
+        color = default;
+        return false;
+    }
+
+    protected void ProcessStrokeData(Pen pen, Geometry geometry)
+    {
+        // No pen (thickness -> 0, or no/transparent stroke brush): DROP any existing stroke so it vanishes, rather than
+        // leaving the last-built stroke on screen (or - the bug - letting TryRepoint deref a null pen and NRE the frame).
+        if (pen == null)
+        {
+            StrokeRenderer?.DeferDispose();
+            StrokeRenderer = null;
+            return;
+        }
+
+        StrokeRenderer?.DeferDispose();
+
+        // The GPU path handles any solid-colour stroke: one OR many contours (combined/group geometry, shapes with
+        // holes), open or closed, with dashes/trim and every cap/join - all as real geometry. Only a non-solid brush
+        // (e.g. a gradient stroke) still falls back to the CPU StrokeGeometry path.
+        if (UseGpuStroke && StrokeEffect != null && TryGetSolidContours(pen, geometry, out var contours))
+        {
+            StrokeRenderer = new GpuStrokeRenderComponent(GraphicsDevice, UIBasicEffect, StrokeEffect, contours, pen, BufferManager);
+        }
+        else
+        {
+            var strokeGeometry = new StrokeGeometry(pen, geometry);
+            StrokeRenderer = new StrokeRenderComponent(GraphicsDevice, UIBasicEffect, strokeGeometry.Mesh, pen, BufferManager);
+        }
+        StrokeRenderer.RenderData = DrawCommand.RenderData;
+    }
+
+    // Every outline contour of a solid-colour stroke (combined/group geometry yields several), each as its raw points
+    // plus whether it is a closed loop. False (CPU fallback) only for a non-solid brush or a geometry with no contour.
+    private static bool TryGetSolidContours(Pen pen, Geometry geometry, out List<(Adamantium.Mathematics.Vector2[] Points, bool IsClosed)> contours)
+    {
+        contours = null;
+        if (pen.Brush is not SolidColorBrush) return false;
+
+        var mesh = geometry?.Mesh;
+        if (mesh == null || mesh.Contours.Count == 0) return false;
+
+        List<(Adamantium.Mathematics.Vector2[], bool)> list = [];
+        foreach (var contour in mesh.Contours)
+        {
+            if (contour.Points is not { Length: >= 2 }) continue;
+            var pts = DedupPoints(contour.Points, contour.IsGeometryClosed);
+            if (pts.Length >= 2)
+                list.Add((pts, contour.IsGeometryClosed));
+        }
+
+        if (list.Count == 0) return false;
+        contours = list;
+        return true;
+    }
+
+    // Drop consecutive coincident points (within ~1e-3 px). A zero-length segment makes the GPU stroke expander take a
+    // normalize(0) -> a garbage segment normal -> a random miter direction, i.e. a spike. The mesh/flattener can emit these
+    // (a closing point repeating the start, a curve sampled down to a near-cusp). A closed loop also drops a trailing point
+    // coincident with the first (the wrap is implicit).
+    private static Adamantium.Mathematics.Vector2[] DedupPoints(Adamantium.Mathematics.Vector2[] pts, bool closed)
+    {
+        const double epsSq = 1e-6;
+        List<Adamantium.Mathematics.Vector2> outv = [pts[0]];
+        for (var i = 1; i < pts.Length; i++)
+        {
+            var d = pts[i] - outv[^1];
+            if (d.X * d.X + d.Y * d.Y > epsSq) outv.Add(pts[i]);
+        }
+        if (closed && outv.Count > 2)
+        {
+            var d = outv[^1] - outv[0];
+            if (d.X * d.X + d.Y * d.Y <= epsSq) outv.RemoveAt(outv.Count - 1);
+        }
+        return [.. outv];
+    }
+
+    // On a geometry change, try to rewrite the existing GPU stroke's points in place (same topology + size-compatible
+    // pen) instead of rebuilding it - the resize fast path. False (caller rebuilds via ProcessStrokeData) for the CPU
+    // stroke, the dash/cut path, or a topology/pen-size change.
+    protected bool TryUpdateStroke(Pen pen, Geometry geometry)
+    {
+        if (pen == null || StrokeRenderer is not GpuStrokeRenderComponent gpuStroke) return false;
+        if (!TryGetSolidContours(pen, geometry, out var contours)) return false;
+        if (!gpuStroke.TryUpdateGeometry(contours, pen)) return false;
+
+        gpuStroke.RenderData = DrawCommand.RenderData;
+        return true;
+    }
+
+    // Analytic AA: build a GPU coverage fringe around a SOLID fill's CLOSED contours, drawn over the body for a soft
+    // ~1px edge. Only a solid-colour fill with a real closed contour gets it; otherwise no fringe (no fill AA).
+    /// <summary>True when this unit's fringe is drawn by the INSTANCED path (one shared ring per mesh, drawn with the
+    /// body's instance buffer), so building a per-unit one would draw it twice. See InstancedFillCollector.</summary>
+    protected virtual bool FringeInstanced => false;
+
+    protected void ProcessFillFringe(Geometry geometry, Brush brush)
+    {
+        FillFringeRenderer?.DeferDispose();
+        FillFringeRenderer = null;
+        if (FringeInstanced) return;
+        // A solid/gradient/pattern/noise fill gets an analytic-AA fringe (the ring is coloured by the gradient, or a flat
+        // representative colour for a procedural pattern/noise - so a tessellated procedural shape no longer has aliased
+        // edges). Image/null fills still don't.
+        if (!UseGpuFill || FillFringeEffect == null || brush is not (SolidColorBrush or GradientBrush or PatternBrush or NoiseBrush)) return;
+
+        // Feather the RESOLVED fill boundary (outer outline + holes, extracted from the fill mesh) so self-intersecting /
+        // holed shapes get their inner edges AA'd too; fall back to the raw path contours if extraction finds nothing.
+        var contours = FillBoundary.ExtractLoops(geometry?.Mesh) ?? BuildFillContours(geometry);
+        if (contours == null) return;
+
+        FillFringeRenderer = new GpuFillRenderComponent(GraphicsDevice, UIBasicEffect, FillFringeEffect, contours, brush, BufferManager);
+        FillFringeRenderer.RenderData = DrawCommand.RenderData;
+    }
+
+    // The closed contours (>= 3 points) of a solid fill that get an analytic-AA fringe. Null when there are none.
+    private static List<(Adamantium.Mathematics.Vector2[] Points, bool IsClosed)> BuildFillContours(Geometry geometry)
+    {
+        var mesh = geometry?.Mesh;
+        if (mesh == null || mesh.Contours.Count == 0) return null;
+
+        List<(Adamantium.Mathematics.Vector2[] Points, bool IsClosed)> contours = [];
+        foreach (var contour in mesh.Contours)
+            if (contour.IsGeometryClosed && contour.Points is { Length: >= 3 })
+                contours.Add((contour.Points, true));
+        return contours.Count == 0 ? null : contours;
+    }
+
+    // Keep the analytic-AA fringe in sync on a hot update. A geometry change (rebuild) already re-tessellated `geometry`,
+    // so rebuild the fringe from it. A brush/colour change is a CHEAP update (RequiresBufferRebuild excludes the brush):
+    // the existing fringe just repoints its brush (read live at Render - no contour re-upload, and a solid<->non-solid
+    // flip simply stops/starts it drawing); only a fill that never had a fringe yet became solid needs a build (it
+    // tessellates on demand). No-op when nothing relevant changed.
+    protected void UpdateFillFringe(Geometry geometry, Brush brush, bool rebuild, bool brushChanged)
+    {
+        if (FringeInstanced)
+        {
+            // The fill just became instance-drawn (e.g. a gradient turned solid): drop the per-unit fringe so the shared
+            // ring isn't doubled by it.
+            FillFringeRenderer?.DeferDispose();
+            FillFringeRenderer = null;
+            return;
+        }
+        if (rebuild)
+        {
+            // Same-topology resize -> rewrite the fringe contours in place (no new component / allocation); otherwise
+            // (contour count or a contour's point count changed) rebuild it.
+            if (brush is SolidColorBrush solid && FillFringeRenderer is GpuFillRenderComponent existingFringe)
+            {
+                var contours = FillBoundary.ExtractLoops(geometry?.Mesh) ?? BuildFillContours(geometry);
+                if (contours != null && existingFringe.TryUpdateContours(contours, solid))
+                {
+                    FillFringeRenderer.RenderData = DrawCommand.RenderData;
+                    return;
+                }
+            }
+            ProcessFillFringe(geometry, brush);
+            return;
+        }
+        if (!brushChanged) return;
+        if (FillFringeRenderer is GpuFillRenderComponent fringe)
+        {
+            fringe.Brush = brush;
+        }
+        else if (UseGpuFill && FillFringeEffect != null && brush is (SolidColorBrush or GradientBrush or PatternBrush or NoiseBrush))
+        {
+            // A brush swap does not change the geometry, and re-tessellating here would put that write back on the
+            // render thread - the payload already tessellated on the record thread.
+            ProcessFillFringe(geometry, brush);
+        }
+    }
+
+    protected IResourceFactory ResourceFactory => Context.ResourceFactory;
+    protected IDrawCommand DrawCommand { get; set; }
+    /// <summary>The record-time state of the command this unit draws - see IRenderUnit.RenderData.</summary>
+    public RenderData RenderData => DrawCommand?.RenderData;
+    protected IGraphicsDevice GraphicsDevice => Context.GraphicsDevice;
+
+    public IUIComponent Component => DrawCommand.Component;
+
+    // Overwrites the record-time opacity with the element's OWN alpha from the frozen snapshot (RenderCache) - every
+    // consumer (batch FillOpacity, the per-unit fill/stroke/fringe) reads RenderData.Opacity, so one write covers them
+    // all. What an ANCESTOR contributes does not come through here: that is the fade chain, read from the slot table at
+    // draw time, so fading a container costs one float instead of a re-bake of its whole subtree.
+    public void SetEffectiveOpacity(float opacity)
+    {
+        if (DrawCommand?.RenderData is { } rd) rd.Opacity = opacity;
+    }
+
+    public int FadeSlot { get; private set; } = -1;
+
+    public void SetFadeSlot(int slot) => FadeSlot = slot;
+
+    public virtual void Update(Matrix4x4F transform, Matrix4x4F projection, double renderScale)
+    {
+        // Keep ALL of the unit's renderers pointed at the CURRENT RenderData. UpdateWithDrawCommand repoints the body
+        // unconditionally but the fringe/stroke only on a geometry/brush/pen change - so an OPACITY-only change (a
+        // fading container) left the analytic-AA fringe + stroke on their old RenderData, i.e. their old opacity: a
+        // bright ~1px rim lingered around a thumb whose body had already faded out. Re-share the RenderData every frame
+        // (it also carries the viewport zoom the fringe reads in PreRender for its ~1 device-px width).
+        var renderData = DrawCommand?.RenderData;
+        if (renderData != null)
+        {
+            renderData.RenderScale = renderScale;
+            if (GeometryRenderer != null) GeometryRenderer.RenderData = renderData;
+            if (FillFringeRenderer != null) FillFringeRenderer.RenderData = renderData;
+            if (StrokeRenderer != null) StrokeRenderer.RenderData = renderData;
+        }
+        // Place() FIRST, then hand the result to every renderer: a draw carrying its own placement must move its body,
+        // its AA fringe and its stroke together, and this is the only spot all three pass through. RenderData cannot
+        // hold the composed matrix instead - Update overwrites TransformMatrix from the visual walk on every draw, so
+        // anything folded in at record time is gone by the first frame.
+        var placed = Place(transform);
+        GeometryRenderer?.Update(placed, projection);
+        FillFringeRenderer?.Update(placed, projection);
+        StrokeRenderer?.Update(placed, projection);
+    }
+
+    /// <summary>Where this unit's draw sits ON TOP of the element's world transform. Identity for every ordinary unit;
+    /// a geometry drawn by a <see cref="Adamantium.UI.Core.Media.Drawings.Drawing"/> carries its own placement.</summary>
+    public virtual Matrix4x4F Place(Matrix4x4F world) => world;
+
+    /// <summary>Has this unit anything to do out of the render pass at all? The sweep below runs on EVERY frame over
+    /// every unit of every group, and for a batched rect - which is most of a scene - all three of these are null, so it
+    /// was three virtual calls to do nothing. Asked as a field read instead.</summary>
+    public bool NeedsPreRender => _geometryRenderer != null || _fillFringeRenderer != null || _strokeRenderer != null;
+
+    public virtual void PreRender()
+    {
+        GeometryRenderer?.PreRender();
+        FillFringeRenderer?.PreRender();
+        StrokeRenderer?.PreRender();
+    }
+
+    public virtual void Render()
+    {
+        // Body first, then its analytic-AA fringe on top of the edge, then the stroke over the fill. The body is SKIPPED
+        // when it went to the retained instanced renderer (FillInstanced) - its fringe/stroke still draw over the instance.
+        if (!FillInstanced) GeometryRenderer?.Render();
+        FillFringeRenderer?.Render();
+        StrokeRenderer?.Render();
+    }
+
+    public abstract void UpdateWithDrawCommand(IDrawCommand drawCommand);
+    public virtual bool Match(IDrawCommand drawCommand)
+    {
+        return DrawCommand.Payload.GetType() == drawCommand.Payload.GetType();
+    }
+
+    protected override void Dispose(bool disposeManagedResources)
+    {
+        // The unit owns its renderers (their vertex/index buffers and text render targets), so dispose them too.
+        // The unit itself is disposed via the deferred queue (after the frame fence), so disposing them now is safe.
+        GeometryRenderer?.Dispose();
+        FillFringeRenderer?.Dispose();
+        StrokeRenderer?.Dispose();
+        base.Dispose(disposeManagedResources);
+    }
+}
+
+public class GeometryRenderUnit : RenderUnit<GeometryPayload>
+{
+    public GeometryRenderUnit(IDrawCommand command, RenderUnitContext context) : base(command, context)
+    {
+        // No ProcessGeometry here: the payload tessellated on the RECORD thread (see GeometryPayload). The applier only
+        // freezes a copy of the result.
+        _frozenMesh = FrozenMesh.From(Payload.Geometry.Mesh, Payload.Geometry.Bounds);   // freeze the tessellated mesh for the instanced path
+        GeometryRenderer = new GeometryRenderComponent(GraphicsDevice, UIBasicEffect, Payload.Geometry.Mesh, Payload.LiveBrush, BufferManager, ResourceFactory);
+        GeometryRenderer.RenderData = DrawCommand.RenderData;
+        GeometryRenderer.Owner = DrawCommand.Component;
+        ProcessFillFringe(Payload.Geometry, Payload.Brush);
+        ProcessStrokeData(Payload.Pen, Payload.Geometry);
+    }
+
+    public override Matrix4x4F Place(Matrix4x4F world) => Payload.LocalTransform * world;
+
+    // Solid arbitrary geometry is instanceable: N identical Paths share one mesh + one instanced draw. A gradient/image
+    // fill (or a mesh with no vertices) falls back to the per-unit body. The instanced applier reads the FROZEN mesh
+    // snapshot (captured at record after ProcessGeometry), never the live Geometry.Mesh - so it is render-thread safe.
+    private FrozenMesh _frozenMesh;
+
+    // A fill the instanced path draws BODY AND FRINGE for builds no per-unit fringe at all: every brush that has an
+    // instanced fringe pass, on a mesh that has a ring. What is left per-unit is a mesh with no closed boundary, or a
+    // fill kind with no instanced pass at all (an image fill).
+    protected override bool FringeInstanced => HasInstancedFringe;
+
+    /// <summary>This unit's AA edge rides the instanced flush, where it is drawn AFTER every pending fill - so it is the
+    /// one that can land on a later shape's fill (see the overlap flush in the draw loop).</summary>
+    public bool HasInstancedFringe =>
+        InstancedFillCollector.Enabled && _frozenMesh is { Ring.Length: > 0 } &&
+        Payload.Brush is SolidColorBrush or GradientBrush or PatternBrush or NoiseBrush;
+
+    public override bool TryGetInstancedFill(out GeometryKey key, out object mesh, out Vector4F color)
+    {
+        key = default; mesh = null; color = default;
+        if (Payload.Brush is not SolidColorBrush solid) return false;
+        // Instanceable if the frozen mesh has drawable vertices - an indexed OR a non-indexed triangle list. UI shape
+        // fills tessellate to a NON-indexed list; the retained renderer picks DrawIndexed vs Draw off the topology.
+        if (_frozenMesh is not { HasPoints: true } fm) return false;
+
+        key = fm.Key;
+        mesh = fm;
+        var c = solid.Color.ToVector4();
+        // same bake as the per-unit fill: colour x brush opacity x element opacity
+        c.W *= (float)(solid.Opacity * (DrawCommand?.RenderData?.Opacity ?? 1.0f));
+        color = c;
+        return true;
+    }
+
+    // Gradient sibling of TryGetInstancedFill: a GRADIENT fill on arbitrary geometry batches through the gradient
+    // instanced-fill path. Returns the shared-mesh key (same fingerprint, so identical shapes still merge), the frozen
+    // mesh, the (frozen) gradient brush, and the shape's LOCAL bounds (the shader maps a fragment's local pos to a uv).
+    public bool TryGetInstancedGradientFill(out GeometryKey key, out object mesh, out GradientBrush brush,
+        out Rect localBounds, out double opacity)
+    {
+        key = default; mesh = null; brush = null; localBounds = default; opacity = 1.0;
+        if (Payload.Brush is not GradientBrush g) return false;
+        if (_frozenMesh is not { HasPoints: true } fm) return false;
+
+        key = fm.Key;
+        mesh = fm;
+        brush = g;
+        localBounds = fm.Bounds;
+        opacity = DrawCommand?.RenderData?.Opacity ?? 1.0;
+        return true;
+    }
+
+    // Pattern/noise sibling of TryGetInstancedGradientFill: a PatternBrush/NoiseBrush fill on arbitrary geometry batches
+    // through the pattern instanced-fill path - the SAME procedural brushes the SDF rect batch handles, now on any shape.
+    // Returns the shared-mesh key, the frozen mesh, the brush, and the shape's LOCAL bounds (the shader maps a fragment's
+    // local pos to the pattern origin).
+    /// <summary>The distance field a halo on this geometry reads, baked once per SHAPE and shared by every element that
+    /// wears it. Null when the mesh has no boundary to measure from - then the element simply wears no band.</summary>
+    internal ITexture HaloField(out Rect localBounds, out double range)
+    {
+        localBounds = default;
+        range = 0;
+        if (_frozenMesh is not { HasPoints: true } fm) return null;
+
+        localBounds = fm.Bounds;
+        return Context.HaloFields.GetOrCreate(fm, ResourceFactory, out range);
+    }
+
+    /// <summary>This geometry's fill as one TEXTURED instance: the shared mesh, its local box, and the texture to bind.
+    /// False for anything but an ImageBrush, or while its source is still decoding (the next re-render picks it up).</summary>
+    public bool TryGetInstancedTexturedFill(out GeometryKey key, out object mesh, out TileBrush brush,
+        out Rect localBounds, out double opacity, out ITexture texture)
+    {
+        key = default; mesh = null; brush = null; localBounds = default; opacity = 1.0; texture = null;
+        if (Payload.Brush is not TileBrush image) return false;
+        if (_frozenMesh is not { HasPoints: true } fm) return false;
+        // Baked at the SAME box the shader maps its UVs from (localBounds below) - the geometry's own bounds are a
+        // different box, and the picture then sampled at a shifted scale and spilled past the shape.
+        texture = TextureBatchCollector.BrushTexture(image, ResourceFactory, fm.Bounds.Size, DrawCommand.Component);
+        if (texture == null) return false;
+
+        key = fm.Key;
+        mesh = fm;
+        brush = image;
+        localBounds = fm.Bounds;
+        opacity = DrawCommand?.RenderData?.Opacity ?? 1.0;
+        return true;
+    }
+
+    /// <summary>The picture this geometry's brush names, if it names one. Baked at the MESH's box rather than at a
+    /// destination rect: a tessellated shape has no rectangle of its own.</summary>
+    internal ITexture BrushTexture() => TextureBatchCollector.BrushTexture(Payload.Brush, ResourceFactory,
+        _frozenMesh?.Bounds.Size ?? default, DrawCommand?.Component);
+
+    /// <summary>This geometry's fill as one BACKDROP MATERIAL instance. The material carries no picture of its own - it
+    /// is bound at draw time - so only the shared mesh and the brush are reported here.</summary>
+    public bool TryGetInstancedMaterialFill(out GeometryKey key, out object mesh, out MaterialBrush brush,
+        out Rect localBounds, out double opacity)
+    {
+        key = default; mesh = null; brush = null; localBounds = default; opacity = 1.0;
+        if (Payload.Brush is not MaterialBrush material) return false;
+        if (_frozenMesh is not { HasPoints: true } fm) return false;
+
+        key = fm.Key;
+        mesh = fm;
+        brush = material;
+        localBounds = fm.Bounds;
+        opacity = DrawCommand?.RenderData?.Opacity ?? 1.0;
+        return true;
+    }
+
+    public bool TryGetInstancedPatternFill(out GeometryKey key, out object mesh, out Brush brush,
+        out Rect localBounds, out double opacity)
+    {
+        key = default; mesh = null; brush = null; localBounds = default; opacity = 1.0;
+        if (Payload.Brush is not (PatternBrush or NoiseBrush)) return false;
+        if (_frozenMesh is not { HasPoints: true } fm) return false;
+
+        key = fm.Key;
+        mesh = fm;
+        brush = Payload.Brush;
+        localBounds = fm.Bounds;
+        opacity = DrawCommand?.RenderData?.Opacity ?? 1.0;
+        return true;
+    }
+
+    public override void UpdateWithDrawCommand(IDrawCommand drawCommand)
+    {
+        if (drawCommand.Payload is not GeometryPayload inputPayload) return;
+
+        // Capture the old pen/brush BEFORE reassigning Payload, otherwise the comparisons below are always equal.
+        var oldPen = Payload.Pen;
+        var oldBrush = Payload.Brush;
+        var rebuild = Payload.RequiresBufferRebuild(inputPayload);
+
+        // Geometry change: rewrite the body's buffers in place (no new component / no Vulkan allocation - the resize/
+        // animation fast path). The brush is a cheap repoint, applied either way.
+        if (rebuild)
+        {
+            // Tessellated already, on the record thread that built inputPayload - the applier must not rebuild it here.
+            _frozenMesh = FrozenMesh.From(inputPayload.Geometry.Mesh, inputPayload.Geometry.Bounds);   // re-freeze the re-tessellated mesh
+            ((GeometryRenderComponent)GeometryRenderer).UpdateGeometry(inputPayload.Geometry.Mesh);
+        }
+        ((GeometryRenderComponent)GeometryRenderer).Background = inputPayload.LiveBrush;
+
+        DrawCommand = drawCommand;
+        Payload = inputPayload;
+        if (GeometryRenderer != null)
+        {
+            GeometryRenderer.RenderData = DrawCommand.RenderData;
+            GeometryRenderer.Owner = DrawCommand.Component;
+        }
+
+        // Analytic-AA fringe follows the fill: cheap brush/colour change repoints it, a geometry change rebuilds it.
+        UpdateFillFringe(inputPayload.Geometry, inputPayload.Brush, rebuild, !Equals(oldBrush, inputPayload.Brush));
+
+        // Stroke: geometry change -> full rebuild; pen-only change -> try a cheap uniform repoint (dash offset /
+        // thickness / colour / trim animation) on the existing GPU stroke, rebuilding only if the buffer sizes change.
+        if (rebuild)
+        {
+            if (!TryUpdateStroke(inputPayload.Pen, inputPayload.Geometry)) ProcessStrokeData(inputPayload.Pen, inputPayload.Geometry);
+        }
+        else if (!Equals(oldPen, inputPayload.Pen))
+        {
+            if (StrokeRenderer is not GpuStrokeRenderComponent gs || !gs.TryRepoint(inputPayload.Pen)) ProcessStrokeData(inputPayload.Pen, inputPayload.Geometry);
+        }
+    }
+}
+
+public class LineRenderUnit : RenderUnit<LinePayload>
+{
+    public LineRenderUnit(IDrawCommand command, RenderUnitContext context) : base(command, context)
+    {
+        var geometry = new LineGeometry(Payload.LineStart, Payload.LineEnd);
+        geometry.ProcessGeometry(GeometryType.Both);
+        ProcessStrokeData(Payload.Pen, geometry);
+    }
+    
+    public override void UpdateWithDrawCommand(IDrawCommand drawCommand)
+    {
+        if (drawCommand.Payload is not LinePayload inputPayload) return;
+
+        var oldPayload = Payload;
+        DrawCommand = drawCommand;
+        Payload = inputPayload;
+
+        // A line is pure stroke. RequiresBufferRebuild bundles endpoints AND pen, which would rebuild the buffers every
+        // frame of a dash-offset animation. Split them: only an ENDPOINT move changes the ribbon geometry (rebuild);
+        // a pen-only change (offset/thickness/colour/trim) tries a cheap uniform repoint, rebuilding only on a size change.
+        var geometryChanged = !oldPayload.LineStart.Equals(inputPayload.LineStart)
+                              || !oldPayload.LineEnd.Equals(inputPayload.LineEnd);
+
+        if (geometryChanged)
+        {
+            var geometry = new LineGeometry(inputPayload.LineStart, inputPayload.LineEnd);
+            geometry.ProcessGeometry(GeometryType.Both);
+            if (!TryUpdateStroke(inputPayload.Pen, geometry))
+                ProcessStrokeData(inputPayload.Pen, geometry);
+        }
+        else if (!Equals(oldPayload.Pen, inputPayload.Pen) &&
+                 !(StrokeRenderer is GpuStrokeRenderComponent gs && gs.TryRepoint(inputPayload.Pen)))
+        {
+            var geometry = new LineGeometry(inputPayload.LineStart, inputPayload.LineEnd);
+            geometry.ProcessGeometry(GeometryType.Both);
+            ProcessStrokeData(inputPayload.Pen, geometry);
+        }
+    }
+}
+
+public class RectangleRenderUnit : RenderUnit<RectanglePayload>
+{
+    // The item-background batch (RectBatchCollector) reads the rect's brush/rect/corners/pen through this to bake it
+    // into the instanced draw. See RectBatchEffect.fx.
+    public RectanglePayload RectPayload => Payload;
+
+    /// <summary>The GPU texture this rect's brush samples, or null - either the brush is not a textured one, or its
+    /// source is still decoding (in which case the next re-render picks it up, the way ImageRenderUnit does).
+    /// <para>Lives here because the resource factory does: the textured batch needs the texture but has no business
+    /// holding a factory.</para></summary>
+    internal ITexture BrushTexture() => TextureBatchCollector.BrushTexture(Payload.Brush, ResourceFactory,
+        Payload.DestinationRect.Size, DrawCommand.Component);
+
+    // Whether a batch will draw this rect - ASKED OF THE BATCH, never re-stated here. "The batch draws it" means this
+    // unit builds ZERO machinery: no tessellation, no geometry/fringe/stroke, no GPU buffers, which is what makes a big
+    // virtualized tile grid cheap. Re-stating the rules here is exactly how they drifted: the ellipse collector learned
+    // about a stopless mesh brush and its twin here did not, and the mismatch drew garbage.
+    private static bool IsSdfBatchable(RectanglePayload p) =>
+        RectBatchCollector.WantsBatch(p) || MaterialRectCollector.WantsBatch(p) || CanvasGridCollector.WantsBatch(p) ||
+        InkCollector.WantsBatch(p) || CanvasArrowCollector.WantsBatch(p);
+
+    // A rect the GRADIENT SDF batch (GradientRectCollector) will draw: a linear/radial gradient fill, a batchable pen,
+    // uniform corners. Like IsSdfBatchable it means "build ZERO per-unit machinery" - the batch's pixel shader draws the
+    // gradient + self-AAs. Mirrors GradientRectCollector.CanBatch.
+    private static bool IsGradientBatchable(RectanglePayload p) => GradientRectCollector.WantsBatch(p);
+
+    public RectangleRenderUnit(IDrawCommand command, RenderUnitContext context) : base(command, context)
+    {
+        // A batchable rect (solid fill, a pen the SDF draws, corners rounded any which way) is drawn ENTIRELY by the item-background SDF batch, which
+        // self-AAs - so build ZERO per-unit machinery: no tessellation, no geometry/fringe/stroke, no GPU buffers. This
+        // is what makes a big virtualized tile grid cheap: a slider shrink that realizes hundreds of tiles no longer
+        // tessellates + allocates per tile (that was the 1-fps freeze and the resize OOM). The rare rejected case
+        // (rotated/sheared world, or per-frame overflow) builds its body lazily in Render via EnsureMachinery. A gradient
+        // fill routes to the gradient SDF batch, also machinery-free.
+        if (IsSdfBatchable(Payload) || IsGradientBatchable(Payload)) return;
+        BuildMachinery(Payload);
+    }
+
+    /// <summary>The BORDER ring, when this rect carries a per-side border and the batch would not take it (a rotated or
+    /// sheared world). Its own renderer because a ring and a fill are two meshes in two brushes; the batch draws both
+    /// from one instance, and only this fallback has to split them.</summary>
+    public UIRenderComponent FrameRenderer { get; private set; }
+
+    // The ring joins the unit's own lifecycle: placed with the body, drawn OVER it (a border sits on top of its own
+    // fill), and disposed with it. Missing any of the four is a renderer that draws at last frame's place, or leaks.
+    public override void Update(Matrix4x4F transform, Matrix4x4F projection, double renderScale)
+    {
+        base.Update(transform, projection, renderScale);
+        if (FrameRenderer == null) return;
+        FrameRenderer.RenderData = DrawCommand?.RenderData ?? FrameRenderer.RenderData;
+        FrameRenderer.Update(Place(transform), projection);
+    }
+
+    public override void PreRender()
+    {
+        base.PreRender();
+        FrameRenderer?.PreRender();
+    }
+
+    public override void Render()
+    {
+        base.Render();
+        FrameRenderer?.Render();
+    }
+
+    protected override void Dispose(bool disposeManagedResources)
+    {
+        FrameRenderer?.Dispose();
+        FrameRenderer = null;
+        base.Dispose(disposeManagedResources);
+    }
+
+    // The per-unit fill/fringe/stroke renderers for a NON-batched rect. Tessellates once here; the buffers themselves are
+    // still allocated lazily on first draw (see UIRenderComponent.SetMesh).
+    private void BuildMachinery(RectanglePayload payload)
+    {
+        // A framed rect fills only what the border leaves, and the ring is drawn over it.
+        var fillRect = payload.HasFrame ? payload.FrameInnerRect : payload.DestinationRect;
+        var fillCorners = payload.HasFrame ? payload.FrameInnerCorners : payload.CornerRadius;
+        var g = new RectangleGeometry(fillRect, fillCorners);
+        g.ProcessGeometry(GeometryType.Both);
+        // The LIVE brush, not its snapshot - see GeometryRenderComponent.Render, which dereferences it on every draw.
+        GeometryRenderer = new GeometryRenderComponent(GraphicsDevice, UIBasicEffect, g.Mesh, payload.LiveBrush, BufferManager, ResourceFactory);
+        GeometryRenderer.RenderData = DrawCommand.RenderData;
+        GeometryRenderer.Owner = DrawCommand.Component;
+        ProcessFillFringe(g, payload.Brush);
+        ProcessStrokeData(payload.Pen, g);
+        BuildFrame(payload);
+    }
+
+    // The ring itself: the outline minus what the fill occupies. Only for the fallback - the batch needs no geometry.
+    private void BuildFrame(RectanglePayload payload)
+    {
+        if (!payload.HasFrame || payload.BorderBrush is null) return;
+
+        var ring = new CombinedGeometry
+        {
+            GeometryCombineMode = GeometryCombineMode.Exclude,
+            Geometry1 = new RectangleGeometry(payload.DestinationRect, payload.CornerRadius),
+            Geometry2 = new RectangleGeometry(payload.FrameInnerRect, payload.FrameInnerCorners)
+        };
+        ring.ProcessGeometry(GeometryType.Both);
+        FrameRenderer = new GeometryRenderComponent(GraphicsDevice, UIBasicEffect, ring.Mesh, payload.LiveBorderBrush, BufferManager, ResourceFactory)
+        {
+            RenderData = DrawCommand.RenderData,
+            Owner = DrawCommand.Component
+        };
+    }
+
+    // The item-background batch reads the fill opacity here: a batchable rect has no GeometryRenderer to carry RenderData.
+    public double FillOpacity => DrawCommand?.RenderData?.Opacity ?? 1.0;
+
+    /// <summary>The body exists but no longer describes the payload, because the rect went back to being batchable and
+    /// its updates stopped maintaining it. Not disposed - the retained op stream may still name it, and freeing a
+    /// renderer out from under a frame in flight is a class of bug we have paid for before - just left behind until
+    /// something actually needs to draw it again.</summary>
+    private bool _machineryStale;
+
+    // A batchable rect the batch REJECTED this frame (rotated/sheared world, or the instance buffer overflowed) must draw
+    // itself, so build its BODY on demand. No fringe: it would need a PreRender we've already passed this frame; the body
+    // self-fills its buffer in Render.
+    public void EnsureMachinery()
+    {
+        if (GeometryRenderer != null && !_machineryStale) return;
+
+        var fillRect = Payload.HasFrame ? Payload.FrameInnerRect : Payload.DestinationRect;
+        var fillCorners = Payload.HasFrame ? Payload.FrameInnerCorners : Payload.CornerRadius;
+        var g = new RectangleGeometry(fillRect, fillCorners);
+        g.ProcessGeometry(GeometryType.Both);
+
+        // Refresh in place when a body is already there: the same mesh update the non-batchable path does, so a rect that
+        // comes back to this path after a spell in the batch draws its CURRENT shape rather than the one it wore when it
+        // was last rejected.
+        if (GeometryRenderer is GeometryRenderComponent existing)
+        {
+            existing.UpdateGeometry(g.Mesh);
+            existing.Background = Payload.LiveBrush;
+        }
+        else
+        {
+            GeometryRenderer = new GeometryRenderComponent(GraphicsDevice, UIBasicEffect, g.Mesh, Payload.Brush, BufferManager, ResourceFactory);
+        }
+
+        GeometryRenderer.RenderData = DrawCommand.RenderData;
+        GeometryRenderer.Owner = DrawCommand.Component;
+        BuildFrame(Payload);
+        _machineryStale = false;
+    }
+
+    public override void UpdateWithDrawCommand(IDrawCommand drawCommand)
+    {
+        if (drawCommand.Payload is not RectanglePayload inputPayload) return;
+
+        // Fast path: the rect is one the SDF batch draws. Just repoint payload/command - NO tessellation, NO buffers - so
+        // resizing a virtualized grid stays cheap.
+        //
+        // Taken whether or not a body exists. A body is NOT a verdict about the rect: the batch also rejects on a full
+        // instance buffer, which says nothing about the rect and everything about how many were on screen that frame -
+        // and one such frame used to hand the rect a body for the rest of the session, after which every size change
+        // re-tessellated and re-uploaded it. Measured on the tile grid's size slider: single updates of 14-36ms, tens of
+        // them per second, while the thousands of tiles beside them cost microseconds. The body is kept (the retained op
+        // stream may still name it) but marked stale, so EnsureMachinery refreshes it if the batch ever turns the rect
+        // away again.
+        if (IsSdfBatchable(inputPayload) || IsGradientBatchable(inputPayload))
+        {
+            DrawCommand = drawCommand;
+            Payload = inputPayload;
+            if (GeometryRenderer != null) _machineryStale = true;
+
+            // The fringe is the batch's job now (it self-AAs), and a per-tile fringe rebuilt on every resize was the OOM.
+            FillFringeRenderer?.DeferDispose();
+            FillFringeRenderer = null;
+            return;
+        }
+
+        // Not batchable and no body yet: build one.
+        if (GeometryRenderer == null)
+        {
+            DrawCommand = drawCommand;
+            Payload = inputPayload;
+            BuildMachinery(inputPayload);
+            return;
+        }
+
+        // Machinery exists and the rect genuinely needs it: update it incrementally. Whatever staleness it carried from a
+        // spell in the batch is settled here, since everything below is written from the CURRENT payload.
+        _machineryStale = false;
+        var oldPen = Payload.Pen;
+        var oldBrush = Payload.Brush;
+        var rebuild = Payload.RequiresBufferRebuild(inputPayload);
+
+        var rectangleGeometry = new RectangleGeometry(inputPayload.DestinationRect, inputPayload.CornerRadius);
+        if (rebuild)
+        {
+            rectangleGeometry.ProcessGeometry(GeometryType.Both);
+            ((GeometryRenderComponent)GeometryRenderer).UpdateGeometry(rectangleGeometry.Mesh);
+        }
+        ((GeometryRenderComponent)GeometryRenderer).Background = inputPayload.LiveBrush;
+        DrawCommand = drawCommand;
+        Payload = inputPayload;
+        GeometryRenderer.RenderData = DrawCommand.RenderData;
+        GeometryRenderer.Owner = DrawCommand.Component;
+
+        // Fringe: skip for a batchable rect (the batch self-AAs, and a per-tile fringe rebuilt on resize is the OOM);
+        // drop a stale one. Otherwise follow the fill.
+        if (IsSdfBatchable(inputPayload) || IsGradientBatchable(inputPayload))
+        {
+            FillFringeRenderer?.DeferDispose();
+            FillFringeRenderer = null;
+        }
+        else
+        {
+            UpdateFillFringe(rectangleGeometry, inputPayload.Brush, rebuild, !Equals(oldBrush, inputPayload.Brush));
+        }
+
+        // Stroke: geometry change -> full rebuild; pen-only change -> try a cheap uniform repoint (animation), else
+        // rebuild (process the geometry first, since it wasn't processed in the non-rebuild branch).
+        if (rebuild)
+        {
+            if (!TryUpdateStroke(inputPayload.Pen, rectangleGeometry))
+                ProcessStrokeData(inputPayload.Pen, rectangleGeometry);
+        }
+        else if (!Equals(oldPen, inputPayload.Pen) &&
+                 !(StrokeRenderer is GpuStrokeRenderComponent gs && gs.TryRepoint(inputPayload.Pen)))
+        {
+            rectangleGeometry.ProcessGeometry(GeometryType.Both);
+            ProcessStrokeData(inputPayload.Pen, rectangleGeometry);
+        }
+    }
+}
+
+public class EllipseRenderUnit : RenderUnit<EllipsePayload>
+{
+    // The ellipse SDF batch (EllipseBatchCollector) reads the payload through this to bake it into the instanced draw.
+    public EllipsePayload EllipsePayload => Payload;
+
+    // The batch reads the fill opacity here: a batchable ellipse has no GeometryRenderer to carry RenderData.
+    public double FillOpacity => DrawCommand?.RenderData?.Opacity ?? 1.0;
+
+    /// <summary>The GPU texture this ellipse's brush samples, or null - see the rect's twin; both defer to the batch.</summary>
+    internal ITexture BrushTexture() => TextureBatchCollector.BrushTexture(Payload.Brush, ResourceFactory,
+        Payload.DestinationRect.Size, DrawCommand.Component);
+
+    // An ellipse the SDF batch will draw (solid fill, no pen, FULL ellipse): the batch shader reconstructs it from an
+    // implicit field and self-anti-aliases, so this unit needs NO tessellated body and NO AA fringe. Building them per
+    // ellipse is pure waste (and their per-unit GPU buffers are exactly what strained device memory). Mirrors
+    // EllipseBatchCollector.CanBatch so "no machinery built" == "the batch will draw it".
+    private static bool IsSdfBatchable(EllipsePayload p) =>
+        EllipseBatchCollector.WantsBatch(p) || MaterialRectCollector.WantsBatchEllipse(p);
+
+    // A full ellipse the GRADIENT ellipse SDF batch will draw (linear/radial gradient fill). Like IsSdfBatchable it means
+    // "build ZERO per-unit machinery". Mirrors GradientEllipseCollector.CanBatch.
+    private static bool IsGradientBatchable(EllipsePayload p) => GradientEllipseCollector.WantsBatch(p);
+
+    // A full ellipse with a PROCEDURAL pattern/noise fill routes into the pattern SDF batch (self-AA) - like the solid/
+    // gradient cases, build ZERO per-unit machinery. Mirrors PatternRectCollector.CanBatchEllipse.
+    private static bool IsPatternBatchable(EllipsePayload p) => PatternRectCollector.WantsBatchEllipse(p);
+
+    // A full ellipse whose fill is SAMPLED from a texture routes into the textured SDF batch - again, ZERO per-unit
+    // machinery. Mirrors TextureBatchCollector.CanBatchEllipse.
+    private static bool IsTexBatchable(EllipsePayload p) => TextureBatchCollector.WantsBatchEllipse(p);
+
+    public EllipseRenderUnit(IDrawCommand command, RenderUnitContext context) : base(command, context)
+    {
+        // A batchable ellipse is drawn ENTIRELY by the SDF batch (resolution-independent, self-AA) - build ZERO per-unit
+        // machinery: no tessellation, no geometry/fringe/stroke, no GPU buffers. The rare rejected case (rotated/sheared
+        // world, or per-frame overflow) builds its body lazily in Render via EnsureMachinery. A gradient fill routes to
+        // the gradient ellipse batch, also machinery-free.
+        if (IsSdfBatchable(Payload) || IsGradientBatchable(Payload) || IsPatternBatchable(Payload) || IsTexBatchable(Payload)) return;
+        BuildMachinery(Payload);
+    }
+
+    // The per-unit tessellated fill/fringe/stroke for a NON-batched ellipse (a sector/arc, a stroked or gradient ellipse).
+    private void BuildMachinery(EllipsePayload payload)
+    {
+        var g = EllipseShape(payload);
+        g.ProcessGeometry(GeometryType.Both);
+        // The LIVE brush, not its snapshot - see GeometryRenderComponent.Render, which dereferences it on every draw.
+        GeometryRenderer = new GeometryRenderComponent(GraphicsDevice, UIBasicEffect, g.Mesh, payload.LiveBrush, BufferManager, ResourceFactory);
+        GeometryRenderer.RenderData = DrawCommand.RenderData;
+        GeometryRenderer.Owner = DrawCommand.Component;
+        ProcessFillFringe(g, payload.Brush);
+        ProcessStrokeData(payload.Pen, g);
+    }
+
+    // A batchable ellipse the batch REJECTED this frame (rotated/sheared world, or overflow) must draw itself, so build
+    // its BODY on demand. No fringe (its PreRender is already past this frame); the body self-fills its buffer in Render.
+    public void EnsureMachinery()
+    {
+        if (GeometryRenderer != null) return;
+        var g = EllipseShape(Payload);
+        g.ProcessGeometry(GeometryType.Both);
+        GeometryRenderer = new GeometryRenderComponent(GraphicsDevice, UIBasicEffect, g.Mesh, Payload.Brush, BufferManager, ResourceFactory);
+        GeometryRenderer.RenderData = DrawCommand.RenderData;
+        GeometryRenderer.Owner = DrawCommand.Component;
+    }
+
+    /// <summary>The shape this ellipse actually is. A RING is the outer shape with the inner one taken out of it - the
+    /// tessellated twin of what the batch does by subtracting the field's own inward offset. Both cut a band with RADIAL
+    /// ends (see EllipseBatchCollector's cut bake), which is the one closing where the two constructions agree exactly.</summary>
+    private static Geometry EllipseShape(EllipsePayload payload)
+    {
+        var outer = new EllipseGeometry(payload.DestinationRect, payload.StartAngle, payload.SweepAngle, payload.EllipseType);
+        if (!payload.HasRing) return outer;
+
+        var t = payload.RingThickness;
+        var inner = payload.DestinationRect.Deflate(new Thickness(t));
+        // A band thicker than the shape leaves no hole at all - and an inner rect turned inside out would tessellate to
+        // nonsense, so it is the solid shape that answers there.
+        if (inner.Width <= 0 || inner.Height <= 0) return outer;
+
+        return new CombinedGeometry
+        {
+            GeometryCombineMode = GeometryCombineMode.Exclude,
+            Geometry1 = outer,
+            Geometry2 = new EllipseGeometry(inner, payload.StartAngle, payload.SweepAngle, EllipseType.Sector)
+        };
+    }
+
+    public override void UpdateWithDrawCommand(IDrawCommand drawCommand)
+    {
+        if (drawCommand.Payload is not EllipsePayload inputPayload) return;
+
+        // Fast path: no machinery (a batchable ellipse). Just repoint payload/command - NO tessellation, NO buffers.
+        // Build machinery only if it is now non-batchable (gained a pen, a gradient fill, or became a sector).
+        if (GeometryRenderer == null)
+        {
+            DrawCommand = drawCommand;
+            Payload = inputPayload;
+            if (!IsSdfBatchable(inputPayload) && !IsGradientBatchable(inputPayload)
+                && !IsPatternBatchable(inputPayload) && !IsTexBatchable(inputPayload)) BuildMachinery(inputPayload);
+            return;
+        }
+
+        // Machinery exists (a non-batchable ellipse, or a kept fallback body): update it incrementally.
+        var oldPen = Payload.Pen;
+        var oldBrush = Payload.Brush;
+        var rebuild = Payload.RequiresBufferRebuild(inputPayload);
+
+        var ellipseGeometry = new EllipseGeometry(inputPayload.DestinationRect, inputPayload.StartAngle, inputPayload.SweepAngle,
+            inputPayload.EllipseType);
+        if (rebuild)
+        {
+            ellipseGeometry.ProcessGeometry(GeometryType.Both);
+            ((GeometryRenderComponent)GeometryRenderer).UpdateGeometry(ellipseGeometry.Mesh);
+        }
+        ((GeometryRenderComponent)GeometryRenderer).Background = inputPayload.LiveBrush;
+        DrawCommand = drawCommand;
+        Payload = inputPayload;
+        GeometryRenderer.RenderData = drawCommand.RenderData;
+
+        // Fringe: skip for a batchable ellipse (the batch self-AAs); drop a stale one. Otherwise follow the fill.
+        if (IsSdfBatchable(inputPayload) || IsGradientBatchable(inputPayload))
+        {
+            FillFringeRenderer?.DeferDispose();
+            FillFringeRenderer = null;
+        }
+        else
+        {
+            UpdateFillFringe(ellipseGeometry, inputPayload.Brush, rebuild, !Equals(oldBrush, inputPayload.Brush));
+        }
+
+        // Stroke: geometry change -> full rebuild; pen-only change -> try a cheap uniform repoint (animation), else
+        // rebuild (process the geometry first, since it wasn't processed in the non-rebuild branch).
+        if (rebuild)
+        {
+            if (!TryUpdateStroke(inputPayload.Pen, ellipseGeometry))
+                ProcessStrokeData(inputPayload.Pen, ellipseGeometry);
+        }
+        else if (!Equals(oldPen, inputPayload.Pen) &&
+                 !(StrokeRenderer is GpuStrokeRenderComponent gs && gs.TryRepoint(inputPayload.Pen)))
+        {
+            ellipseGeometry.ProcessGeometry(GeometryType.Both);
+            ProcessStrokeData(inputPayload.Pen, ellipseGeometry);
+        }
+    }
+}
+
+public class ImageRenderUnit : RenderUnit<ImagePayload>
+{
+    public ImageRenderUnit(IDrawCommand command, RenderUnitContext context) : base(command, context)
+    {
+        // ITS CORNERS TOO. They were left off here and applied only by UpdateWithDrawCommand, so a picture with
+        // rounded corners was built square and stayed square until something else made it rebuild - which for a
+        // picture that is placed once and never touched is never.
+        var rectangleGeometry = new RectangleGeometry(Payload.DestinationRect, Payload.CornerRadius);
+        // Generate the quad's vertices (every other render unit does this in its ctor too). Without it the mesh is
+        // empty -> the component's VertexBuffer is null -> UIRenderComponent.Render early-returns and the image is
+        // never drawn (this is why images never appeared while text/solid shapes did).
+        rectangleGeometry.ProcessGeometry(GeometryType.Solid);
+        RemapSourceUv(rectangleGeometry.Mesh, Payload.SourceUv);
+        if (Payload.Image is BitmapSource bitmapImage)
+        {
+            // Null when the image's async decode hasn't produced pixels yet - the unit draws nothing this frame and
+            // UpdateWithDrawCommand retries on the next re-render (Render() itself is null-tolerant).
+            GeometryRenderer = CreateImageRenderer(rectangleGeometry.Mesh, bitmapImage);
+            if (GeometryRenderer != null) GeometryRenderer.RenderData = DrawCommand.RenderData;
+        }
+    }
+
+    // A mosaic tile samples just its normalised sub-rect of the shared photo: squeeze the quad's 0..1 UVs into it.
+    private static void RemapSourceUv(Adamantium.Graphics.Core.Models.Mesh mesh, Rect? sourceUv)
+    {
+        if (sourceUv is not { } src || mesh?.UV0 == null || mesh.UV0.Length == 0) return;
+        var uvs = new Vector2F[mesh.UV0.Length];
+        for (var i = 0; i < uvs.Length; i++)
+        {
+            var uv = mesh.UV0[i];
+            uvs[i] = new Vector2F((float)(src.X + uv.X * src.Width), (float)(src.Y + uv.Y * src.Height));
+        }
+        mesh.SetUVs(0, uvs);
+    }
+
+    // BitmapSource (not just BitmapImage) so SharedSurfaceImage / RenderTargetImage also render. A live shared
+    // surface (game→panel) is sampled directly and synchronised via its Produce/Consume timeline (see
+    // ImageRenderComponent.SharedSource/PreRender); a regular bitmap is sampled directly.
+    private ImageRenderComponent CreateImageRenderer(Adamantium.Graphics.Core.Models.Mesh mesh, BitmapSource image)
+    {
+        // An animated source draws from its FRAME-ARRAY texture (all frames as layers, built once); the payload says
+        // which layer. The array is built OFF this thread, so until it exists the animation draws its current frame the
+        // single-image way - a frame late at worst, instead of a frozen app while ~400 MB is decoded and uploaded here.
+        var layer = Payload.FrameLayer;
+        ITexture texture = null;
+        if (layer.HasValue && image is BitmapImage animated)
+        {
+            animated.RequestFrameArrayTexture(ResourceFactory);
+            texture = animated.FrameArrayTexture;
+            if (texture == null) layer = null;
+        }
+        texture ??= image.GetOrCreateTexture(ResourceFactory);
+        if (texture == null) return null;   // decode still pending - no texture yet, draw nothing until a re-render
+        var component = new ImageRenderComponent(GraphicsDevice, UIBasicEffect, mesh, texture, BufferManager)
+        {
+            Sampler = GraphicsDevice.SamplerStates.LinearClampToEdge,
+            FrameLayer = layer
+        };
+        // A live shared surface (game→panel): sample it directly, and drive the producer/consumer timeline so the
+        // sample never races the producer's write (see ImageRenderComponent.PreRender). Composited with the default
+        // AlphaBlend so the panel's Opacity controls translucency; the producer now publishes an opaque frame
+        // (alpha=1, see RenderingService.BeginDraw) so at Opacity=1 it is fully solid.
+        if (texture is Adamantium.Graphics.SharedSurface shared)
+        {
+            component.SharedSource = shared;
+        }
+        return component;
+    }
+
+    public override void UpdateWithDrawCommand(IDrawCommand drawCommand)
+    {
+        if (drawCommand.Payload is not ImagePayload inputPayload) return;
+
+        var rectangleGeometry = new RectangleGeometry(inputPayload.DestinationRect, inputPayload.CornerRadius);
+        if (Payload.RequiresBufferRebuild(inputPayload))
+        {
+            rectangleGeometry.ProcessGeometry(GeometryType.Both);
+            RemapSourceUv(rectangleGeometry.Mesh, inputPayload.SourceUv);
+            GeometryRenderer?.DeferDispose();
+            if (inputPayload.Image is BitmapSource bitmapImage)
+            {
+                GeometryRenderer = CreateImageRenderer(rectangleGeometry.Mesh, bitmapImage);
+            }
+        }
+        else if (GeometryRenderer == null && inputPayload.Image is BitmapSource pendingImage)
+        {
+            // The unit was built while the image's async decode was still running (no texture -> no renderer).
+            // The pixels are usually in by the time the tile re-renders - build the renderer now.
+            rectangleGeometry.ProcessGeometry(GeometryType.Both);
+            RemapSourceUv(rectangleGeometry.Mesh, inputPayload.SourceUv);
+            GeometryRenderer = CreateImageRenderer(rectangleGeometry.Mesh, pendingImage);
+        }
+
+        DrawCommand = drawCommand;
+        Payload = inputPayload;
+
+        // A new animation frame is ONLY this: the layer the shader samples. No rebuild, no upload - which is the whole
+        // point of keeping the frames as layers of one texture.
+        if (GeometryRenderer is ImageRenderComponent imageComponent)
+        {
+            // The layer number may only be handed to a component that actually HOLDS the frame array - its presence is
+            // what selects the array pass. Setting it on a component built over a single texture made that texture be
+            // drawn as if it were an array, which wedged the GPU. Switching between the two means rebuilding: either the
+            // array has just finished building (the animation was on the single-image fallback), or it is gone again.
+            var componentOnArray = imageComponent.FrameLayer.HasValue;
+            var wantsArray = inputPayload.FrameLayer.HasValue
+                             && inputPayload.Image is BitmapImage { FrameArrayTexture: not null };
+
+            if (componentOnArray == wantsArray)
+            {
+                if (componentOnArray) imageComponent.FrameLayer = inputPayload.FrameLayer;   // same texture, new frame
+            }
+            else
+            {
+                rectangleGeometry.ProcessGeometry(GeometryType.Both);
+                RemapSourceUv(rectangleGeometry.Mesh, inputPayload.SourceUv);
+                GeometryRenderer.DeferDispose();
+                GeometryRenderer = CreateImageRenderer(rectangleGeometry.Mesh, (BitmapSource)inputPayload.Image);
+            }
+        }
+
+        GeometryRenderer?.RenderData = drawCommand.RenderData;
+    }
+}
+
+public class TextRenderUnit : RenderUnit<TextPayload>
+{
+    // The text batch aggregator (RenderCache) reaches the block's TextLayout / params / foreground / FontRenderer
+    // through this. Null only transiently before the component is built. See docs/TEXT_GLYPH_BATCH_PLAN.md §9.
+    public TextRenderComponent TextComponent => GeometryRenderer as TextRenderComponent;
+
+    public override Matrix4x4F Place(Matrix4x4F world) => Payload.LocalTransform * world;
+
+    /// <summary>Letters this block was waiting on have landed in the atlas: lay its quads out again and re-freeze the
+    /// glyph run the batch bakes from. Costs nothing for a block whose glyphs were all there (the version check), which
+    /// is every block after the first frames of a new tab.</summary>
+    /// <returns>Whether letters actually landed - the caller has to know, because a frame that replays the recorded
+    /// stream would draw the run as it was: empty.</returns>
+    public bool RefreshGlyphsIfArrived()
+    {
+        if (Payload?.TextLayout is not { NeedsGlyphRefresh: true } layout) return false;
+
+        layout.RefreshGlyphs(GraphicsDevice);
+        if (TextComponent != null) TextComponent.GlyphRun = layout.SnapshotGlyphs();
+        // The frozen run is what the batch reads, so the element has to be re-recorded for the new one to be drawn.
+        DrawCommand?.Component?.InvalidateRender(false);
+        return true;
+    }
+
+    /// <summary>Re-dereference the block's brushes before a PAINT patch bakes it.
+    /// <para>A recolour that reaches a block by INHERITANCE never re-records it: the block does not own the brush, so
+    /// nothing hands it a new payload, and <see cref="UpdateWithDrawCommand"/> - the only caller of UpdateColors - never
+    /// runs. The component would then still hold the snapshot it dereferenced when the block was RECORDED, and the patch
+    /// would faithfully re-bake the glyphs in the previous variant's colour. The payload holds the LIVE brush and
+    /// dereferences its current snapshot on every read (see <see cref="Brush.Snapshot"/>), so reading it here is what the
+    /// recolour actually is. Same mechanism as the record path, so the private text target is re-rastered too - not only
+    /// the batched glyphs.</para></summary>
+    internal void RefreshColors()
+    {
+        if (TextComponent is not { } tc) return;
+
+        var background = Payload.Background;
+        var foreground = Payload.Foreground;
+        var stroke = Payload.Stroke;
+        // Between changes a brush hands out the SAME snapshot instance, so an unchanged block costs three reference
+        // compares - and never a needless re-rasterization of its render target.
+        if (Equals(tc.Background, background) && Equals(tc.Foreground, foreground) && Equals(tc.Stroke, stroke)) return;
+
+        tc.UpdateColors(background, foreground, stroke);
+    }
+
+    public TextRenderUnit(IDrawCommand command, RenderUnitContext context) : base(command, context)
+    {
+        Payload.TextLayout.Update(GraphicsDevice);
+        // Pad the text quad/RT so glyph effects (outline/glow) that reach beyond the body aren't clipped at
+        // the block edges. The body stays put: the rect is grown symmetrically (origin shifted by -pad), so
+        // its centre - and thus mesh-local (0,0) where the text is anchored - is unchanged.
+        var pad = Payload.TextLayout.EffectPadding;
+        var ds = Payload.DesiredSize;
+        var rectangleGeometry = new RectangleGeometry(new Rect(-pad, -pad, ds.Width + 2 * pad, ds.Height + 2 * pad));
+        rectangleGeometry.ProcessGeometry(GeometryType.Solid);
+        GeometryRenderer = new TextRenderComponent(GraphicsDevice,
+            UIBasicEffect,
+            rectangleGeometry.Mesh,
+            ResourceFactory.GetFontRenderer(GraphicsDevice), 
+            Payload.TextLayout,
+            Payload.TextRenderingParameters, 
+            Payload.Background,
+            Payload.Foreground,
+            Payload.Stroke,
+            BufferManager);
+        GeometryRenderer.RenderData = DrawCommand.RenderData;
+        GeometryRenderer.Owner = DrawCommand.Component;
+        TextComponent.GlyphRun = Payload.TextLayout.SnapshotGlyphs();   // freeze the shaped glyphs for the render-thread batch bake
+    }
+
+    public override void UpdateWithDrawCommand(IDrawCommand drawCommand)
+    {
+        if (drawCommand.Payload is not TextPayload inputPayload) return;
+        
+        if (Payload.RequiresBufferRebuild(inputPayload))
+        {
+            inputPayload.TextLayout.Update(GraphicsDevice);   // re-upload the (re-shaped) glyph buffer either way
+
+            // Same size, same params, same (re-shaped-in-place) layout instance: only the text content changed, so the
+            // render target is the same size - reuse it and just re-rasterize, instead of disposing the component and
+            // allocating a fresh render target. The live-text (counters/clocks) + recycled-list-row fast path; the RT
+            // allocation it skips is the dominant per-change cost. Mirrors the colour-only UpdateColors path below.
+            if (GeometryRenderer is TextRenderComponent reuse
+                && Payload.DesiredSize == inputPayload.DesiredSize
+                && Payload.TextLayout == inputPayload.TextLayout
+                && Equals(Payload.TextRenderingParameters, inputPayload.TextRenderingParameters))
+            {
+                reuse.UpdateText(inputPayload.Background, inputPayload.Foreground, inputPayload.Stroke);
+            }
+            else
+            {
+                var pad = inputPayload.TextLayout.EffectPadding;
+                var ds = inputPayload.DesiredSize;
+                var rectangleGeometry = new RectangleGeometry(new Rect(-pad, -pad, ds.Width + 2 * pad, ds.Height + 2 * pad));
+                rectangleGeometry.ProcessGeometry(GeometryType.Both);
+                GeometryRenderer?.DeferDispose();
+                GeometryRenderer = new TextRenderComponent(GraphicsDevice,
+                    UIBasicEffect,
+                    rectangleGeometry.Mesh,
+                    ResourceFactory.GetFontRenderer(GraphicsDevice),
+                    inputPayload.TextLayout,
+                    inputPayload.TextRenderingParameters,
+                    inputPayload.Background,
+                    inputPayload.Foreground,
+                    inputPayload.Stroke,
+                    BufferManager);
+            }
+            // Glyphs were re-shaped in place (reuse) or a new component was built - refresh the frozen snapshot either way.
+            TextComponent.GlyphRun = inputPayload.TextLayout.SnapshotGlyphs();
+        }
+        else if (!Equals(Payload.Background, inputPayload.Background) ||
+                 !Equals(Payload.Foreground, inputPayload.Foreground) ||
+                 !Equals(Payload.Stroke, inputPayload.Stroke))
+        {
+            // Geometry/layout unchanged - only the colours differ. Swap brushes and force a re-raster,
+            // reusing the existing render target (RequiresBufferRebuild ignores colours, so without this
+            // a colour-only change would never repaint). Compared against the old Payload, before reassign.
+            ((TextRenderComponent)GeometryRenderer).UpdateColors(
+                inputPayload.Background, inputPayload.Foreground, inputPayload.Stroke);
+        }
+
+        DrawCommand = drawCommand;
+        Payload = inputPayload;
+        GeometryRenderer.RenderData = drawCommand.RenderData;
+    }
+}
+/// <summary>The render unit for a REGULAR POLYGON. Batchable ones build NOTHING - the SDF pass reconstructs the shape
+/// from its distance field and self-anti-aliases - so a board full of chevrons costs one draw and no GPU buffers. The
+/// rejected case (a rotated or sheared world, or a per-frame overflow) tessellates on demand, exactly as the rect and
+/// ellipse units do.</summary>
+public class RegularPolygonRenderUnit : RenderUnit<RegularPolygonPayload>
+{
+    public RegularPolygonPayload PolygonPayload => Payload;
+
+    public double FillOpacity => DrawCommand?.RenderData?.Opacity ?? 1.0;
+
+    private FrozenMesh _haloMesh;
+
+    private static bool IsSdfBatchable(RegularPolygonPayload p) =>
+        RegularPolygonCollector.WantsBatch(p) || GradientRectCollector.WantsBatchPolygon(p) ||
+        PatternRectCollector.WantsBatchPolygon(p) || TextureBatchCollector.WantsBatchPolygon(p) ||
+        MaterialRectCollector.WantsBatchPolygon(p);
+
+    internal ITexture BrushTexture() => TextureBatchCollector.BrushTexture(Payload.Brush, ResourceFactory,
+        Payload.DestinationRect.Size, DrawCommand.Component);
+
+    /// <summary>The distance field an AURA or a SHADOW on this polygon reads, baked once per shape and shared by every
+    /// element wearing the same one. The band is the one thing here that wants a mesh - a batched polygon has none, the
+    /// pass reconstructs it from its field - so the shape is tessellated ON DEMAND and only for the polygons that
+    /// actually wear a band. Null when there is no boundary to measure from; the element then wears no band at all
+    /// rather than a wrong one.</summary>
+    internal ITexture HaloField(out Rect localBounds, out double range)
+    {
+        localBounds = default;
+        range = 0;
+
+        if (_haloMesh == null)
+        {
+            var g = PolygonShape(Payload);
+            g.ProcessGeometry(GeometryType.Both);
+            _haloMesh = FrozenMesh.From(g.Mesh, g.Bounds);
+        }
+
+        if (_haloMesh is not { HasPoints: true }) return null;
+
+        localBounds = _haloMesh.Bounds;
+        return Context.HaloFields.GetOrCreate(_haloMesh, ResourceFactory, out range);
+    }
+
+    public RegularPolygonRenderUnit(IDrawCommand command, RenderUnitContext context) : base(command, context)
+    {
+        if (IsSdfBatchable(Payload)) return;
+        BuildMachinery(Payload);
+    }
+
+    private void BuildMachinery(RegularPolygonPayload payload)
+    {
+        var g = PolygonShape(payload);
+        g.ProcessGeometry(GeometryType.Both);
+        // The LIVE brush, not its snapshot - see GeometryRenderComponent.Render, which dereferences it on every draw.
+        GeometryRenderer = new GeometryRenderComponent(GraphicsDevice, UIBasicEffect, g.Mesh, payload.LiveBrush, BufferManager, ResourceFactory);
+        GeometryRenderer.RenderData = DrawCommand.RenderData;
+        GeometryRenderer.Owner = DrawCommand.Component;
+        ProcessFillFringe(g, payload.Brush);
+        ProcessStrokeData(payload.Pen, g);
+    }
+
+    private static Geometry PolygonShape(RegularPolygonPayload payload) =>
+        RegularPolygonGeometry.Build(payload.DestinationRect, payload.Corners, payload.StartAngle, payload.RingThickness);
+
+    // A batchable polygon the batch REJECTED this frame must draw itself, so build its BODY on demand.
+    public void EnsureMachinery()
+    {
+        if (GeometryRenderer != null) return;
+        var g = PolygonShape(Payload);
+        g.ProcessGeometry(GeometryType.Both);
+        GeometryRenderer = new GeometryRenderComponent(GraphicsDevice, UIBasicEffect, g.Mesh, Payload.Brush, BufferManager, ResourceFactory);
+        GeometryRenderer.RenderData = DrawCommand.RenderData;
+        GeometryRenderer.Owner = DrawCommand.Component;
+    }
+
+    public override void UpdateWithDrawCommand(IDrawCommand drawCommand)
+    {
+        if (drawCommand.Payload is not RegularPolygonPayload inputPayload) return;
+
+        // A different shape is a different field: drop the baked one so a band re-reads the polygon it now wraps.
+        if (Payload.RequiresBufferRebuild(inputPayload)) _haloMesh = null;
+
+        // Fast path: no machinery (a batchable polygon) - just repoint payload/command, no tessellation, no buffers.
+        if (GeometryRenderer == null)
+        {
+            DrawCommand = drawCommand;
+            Payload = inputPayload;
+            if (!IsSdfBatchable(inputPayload)) BuildMachinery(inputPayload);
+            return;
+        }
+
+        var rebuild = Payload.RequiresBufferRebuild(inputPayload);
+        var geometry = PolygonShape(inputPayload);
+        if (rebuild)
+        {
+            geometry.ProcessGeometry(GeometryType.Both);
+            ((GeometryRenderComponent)GeometryRenderer).UpdateGeometry(geometry.Mesh);
+        }
+
+        ((GeometryRenderComponent)GeometryRenderer).Background = inputPayload.LiveBrush;
+        DrawCommand = drawCommand;
+        Payload = inputPayload;
+        GeometryRenderer.RenderData = drawCommand.RenderData;
+
+        if (rebuild || !Equals(Payload.Pen, inputPayload.Pen))
+        {
+            geometry.ProcessGeometry(GeometryType.Both);
+            ProcessStrokeData(inputPayload.Pen, geometry);
+        }
+    }
+}
