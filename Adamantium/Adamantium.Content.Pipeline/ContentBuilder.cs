@@ -131,23 +131,33 @@ public sealed class ContentBuilder
             }
 
             log($"  [cook] {asset.Source} -> {cookedRelative}");
+            var companions = new List<(string From, string To)>();
             var context = new ContentBuildContext
             {
                 ProjectDirectory = projectDirectory,
                 OutputDirectory = outputDirectory,
                 IntermediateDirectory = intermediateDirectory,
                 Parameters = asset.Parameters,
-                Log = log
+                Log = log,
+                CopyAlongside = (from, to) => companions.Add((from, to))
             };
 
             try
             {
                 var content = importer.Import(sourceFull, context);
 
-                Directory.CreateDirectory(Path.GetDirectoryName(cookedFull)!);
+                var cookedDirectory = Path.GetDirectoryName(cookedFull)!;
+                Directory.CreateDirectory(cookedDirectory);
                 using (var stream = File.Create(cookedFull))
                 {
                     writer.Write(stream, content);
+                }
+
+                foreach (var (from, to) in companions)
+                {
+                    var destination = Path.GetFullPath(Path.Combine(cookedDirectory, to));
+                    Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
+                    File.Copy(from, destination, true);
                 }
 
                 cache.Update(asset.Source, sourceFull, asset.Parameters, cookedRelative);

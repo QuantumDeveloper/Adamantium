@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Threading;
 using Adamantium.Core;
 using Adamantium.Engine.Compiler.Converter;
@@ -11,14 +12,10 @@ namespace Adamantium.Engine.Compiler.Models
     {
         #region Variables
 
-        private CancellationTokenSource cancellationToken;
+        private readonly CancellationTokenSource cancellation = new CancellationTokenSource();
 
-        private Int32 currentParsingProgress;
-        private Int32 maximumParsingProgress;
         private Boolean convertationInProgress;
         private Boolean convertationFinished = true;
-        private Boolean indeterminateLoadingState;
-        private int convertFilesCount;
 
         #endregion
 
@@ -45,58 +42,48 @@ namespace Adamantium.Engine.Compiler.Models
             }
         }
 
-        public Int32 CurrentParsingProgressValue
-        {
-            get => currentParsingProgress;
-            set
-            {
-                currentParsingProgress = value;
-                RaisePropertyChanged();
-            }
-        }
-
-        public Int32 MaximumParsingProgressValue
-        {
-            get => maximumParsingProgress;
-            set
-            {
-                maximumParsingProgress = value;
-                RaisePropertyChanged();
-            }
-        }
-
-        public Boolean IndeterminateLoadingState
-        {
-            get => indeterminateLoadingState;
-            set
-            {
-                indeterminateLoadingState = value;
-                RaisePropertyChanged();
-            }
-        }
-
         #endregion
 
 
-        public ModelConverter()
+        /// <summary>What the imported file had that we could not understand. Empty until an import has run.</summary>
+        public IReadOnlyList<String> UnsupportedFeatures { get; private set; } = Array.Empty<String>();
+
+        //The parse is synchronous; the former name ImportFileAsync promised otherwise
+        public SceneData ImportFile(string path, CancellationToken cancellationToken = default)
         {
-            cancellationToken = new CancellationTokenSource();
+            using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellation.Token, cancellationToken);
+            var converter = ModelConverterFactory.GetConverter(path, new ConversionConfig(true));
+
+            ConvertationInProgress = true;
+            ConvertationFinished = false;
+            try
+            {
+                return converter.StartConversion(linked.Token);
+            }
+            catch (OperationCanceledException)
+            {
+                IsConvertationCancelled = true;
+                return null;
+            }
+            finally
+            {
+                // In a finally on purpose: when the import threw is exactly when this list matters most
+                UnsupportedFeatures = converter.UnsupportedFeatures;
+                ConvertationInProgress = false;
+                ConvertationFinished = true;
+            }
         }
 
-        public SceneData ImportFileAsync(string path)
-        {
-            return ModelConverterFactory.GetConverter(path, new ConversionConfig(true)).StartConversion();
-        }
-
-        #region Методы по обработке файлов
+        #region Cancellation
 
         public Boolean IsConvertationCancelled { get; private set; }
 
+        /// <summary>Asks a running import to stop. Cancellation is checked between libraries and on every geometry,
+        /// so it does not take effect instantly - but it does take effect: this method used to only clear flags
+        /// while the parse ran happily to the end.</summary>
         public void CancelConvertation()
         {
-            cancellationToken.Cancel();
-            ConvertationInProgress = false;
-            ConvertationFinished = !ConvertationInProgress;
+            cancellation.Cancel();
             IsConvertationCancelled = true;
         }
 

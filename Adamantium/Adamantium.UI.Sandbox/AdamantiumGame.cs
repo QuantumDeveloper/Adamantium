@@ -49,8 +49,12 @@ namespace Adamantium.UI.Sandbox
         protected override void LoadContent()
         {
             base.LoadContent();
-            LoadModels();
+            // Kept, not dropped: the task is what anyone waiting for the startup model has to hold on to, and it is
+            // also what keeps this from starting a second load - LoadContent runs again when the device is recreated.
+            _startupLoad ??= LoadModels();
         }
+
+        private Task _startupLoad;
 
         private void InitializeGameResources()
         {
@@ -78,9 +82,18 @@ namespace Adamantium.UI.Sandbox
             return await ImportModel(scene);
         }
 
-        private async void LoadModels()
+        /// <summary>Returns a Task rather than being async void. A void one cannot be awaited and cannot hand its
+        /// exception anywhere - a broken model file would have taken the process down without a word.</summary>
+        private async Task LoadModels()
         {
-            await LoadAndAddModel(SandboxAssets.Models.F15C.F_15C_Eagle_dae);
+            try
+            {
+                await LoadAndAddModel(SandboxAssets.Models.F15C.F_15C_Eagle_dae);
+            }
+            catch (Exception exception)
+            {
+                Console.WriteLine($"Failed to load the startup model: {exception}");
+            }
         }
 
         /// <summary>Loads a model file and adds it to the scene - the runtime "load model" path the game menu uses. The

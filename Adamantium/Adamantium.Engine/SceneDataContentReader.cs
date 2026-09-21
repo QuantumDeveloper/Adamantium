@@ -28,32 +28,33 @@ public class SceneDataContentReader : IContentReader
         }
         else
         {
-            scene = new ModelConverter().ImportFileAsync(parameters.AssetPath);
+            scene = new ModelConverter().ImportFile(parameters.AssetPath);
         }
 
         if (scene != null)
         {
             scene.Name = parameters.AssetName;
-            PointImagesAtTheModel(scene, parameters.AssetName);
+            PointImagesAtTheModel(scene, parameters.AssetPath);
         }
 
         return Task.FromResult((object)scene);
     }
 
-    // A baked scene carries the ABSOLUTE texture paths of the machine that baked it, so another checkout - or a
-    // renamed folder - leaves a model silently untextured. Where the model itself was asked for is the authority.
-    private static void PointImagesAtTheModel(SceneData scene, string assetName)
+    // A baked scene stores only the RELATIVE reference the model file wrote (Image.FilePath is not persisted - an
+    // absolute path of the baking machine points nowhere after the first move). Resolving it is this reader's job,
+    // and the anchor is the file we ACTUALLY opened, not the logical asset name: a cooked artifact lives in the
+    // output folder with its textures copied beside it, which the logical name knows nothing about.
+    private static void PointImagesAtTheModel(SceneData scene, string assetPath)
     {
-        if (scene.Images == null || string.IsNullOrEmpty(assetName)) return;
+        if (scene.Images == null || string.IsNullOrEmpty(assetPath)) return;
 
-        var beside = Path.GetDirectoryName(assetName.Replace('/', Path.DirectorySeparatorChar)) ?? string.Empty;
+        var beside = Path.GetDirectoryName(Path.GetFullPath(assetPath)) ?? string.Empty;
 
         foreach (var image in scene.Images.Values)
         {
             if (string.IsNullOrEmpty(image?.ImageName)) continue;
 
-            var near = Path.GetFullPath(Path.Combine(beside, image.ImageName));
-            if (File.Exists(near)) image.FilePath = near;
+            image.FilePath = Path.GetFullPath(Path.Combine(beside, image.ImageName));
         }
     }
 }

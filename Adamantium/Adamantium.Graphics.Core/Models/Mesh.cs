@@ -636,6 +636,7 @@ public class Mesh
 
         int uniqueIndex = 0;
         var optimizedPositions = new List<Vector3>();
+        var optimizedNormals = new List<Vector3F>();
         var optimizedUV0 = new List<Vector2F>();
         var optimizedUV1 = new List<Vector2F>();
         var optimizedUV2 = new List<Vector2F>();
@@ -655,6 +656,7 @@ public class Mesh
             }
 
             var position = Points[index];
+            var normal = Normals != null && Normals.Length - 1 >= index ? Normals[index] : Vector3F.Zero;
             var uv0 = UV0 != null && UV0.Length - 1 >= index ? UV0[index] : Vector2F.Zero;
             var uv1 = UV1 != null && UV1.Length - 1 >= index ? UV1[index] : Vector2F.Zero;
             var uv2 = UV2 != null && UV2.Length - 1 >= index ? UV2[index] : Vector2F.Zero;
@@ -662,14 +664,18 @@ public class Mesh
             Color color = Colors != null && Colors.Length - 1 >= index ? Colors[index] : Mathematics.Colors.White;
             Vector4F jointIndex = JointIndices != null && JointIndices.Length - 1 >= index ? JointIndices[index] : Vector4F.Zero;
             Vector4F jointWeight = JointWeights != null && JointWeights.Length - 1 >= index ? JointWeights[index] : Vector4F.Zero;
-            var vertex = new Vertex(position, uv0, uv1, uv2, uv3, color, jointIndex, jointWeight);
-                
+            var vertex = new Vertex(position, normal, uv0, uv1, uv2, uv3, color, jointIndex, jointWeight);
+
             if (!vertexDict.ContainsKey(vertex))
             {
                 vertexDict.Add(vertex, uniqueIndex);
                 optimizedPositions.Add(position);
                 indices.Add(uniqueIndex);
                 uniqueIndex++;
+                if (Semantic.HasFlag(VertexSemantic.Normal))
+                {
+                    optimizedNormals.Add(vertex.Normal);
+                }
                 if (Semantic.HasFlag(VertexSemantic.UV0))
                 {
                     optimizedUV0.Add(vertex.UV0);
@@ -711,6 +717,11 @@ public class Mesh
         Points = optimizedPositions.ToArray();
         Indices = indices.ToArray();
 
+        // Normals used not to be carried over: the array stayed on the OLD vertex numbering, i.e. plain garbage.
+        if (Semantic.HasFlag(VertexSemantic.Normal))
+        {
+            Normals = optimizedNormals.ToArray();
+        }
         if (Semantic.HasFlag(VertexSemantic.UV0))
         {
             UV0 = optimizedUV0.ToArray();
@@ -805,7 +816,9 @@ public class Mesh
 
     public Mesh CalculateTangentsAndBinormals(int uvChannel = 0)
     {
-        if (MeshTopology == PrimitiveType.TriangleList && Semantic.HasFlag(VertexSemantic.UV0) && Semantic.HasFlag(VertexSemantic.Position))
+        // Multiple of three, as in CalculateNormals: on a malformed index array the loop read past the end
+        if (MeshTopology == PrimitiveType.TriangleList && Semantic.HasFlag(VertexSemantic.UV0)
+            && Semantic.HasFlag(VertexSemantic.Position) && Indices.Length % 3 == 0)
         {
             Vector3F[] tan1 = new Vector3F[Points.Length];
             Vector3F[] tan2 = new Vector3F[Points.Length];
@@ -968,14 +981,41 @@ public class Mesh
         var assembledBoneWeights = new List<Vector4F>();
         for (int i = 0; i < positionIndices.Count; i++)
         {
-            assembledBoneIndices.Add(JointIndices[positionIndices[i]]);
-            assembledBoneWeights.Add(JointWeights[positionIndices[i]]);
+            // A skin with fewer weights than the mesh has vertices is a broken file. A vertex without a weight is
+            // left unbound, which beats an IndexOutOfRange from deep inside the assembly.
+            var index = positionIndices[i];
+            var known = index >= 0 && index < JointIndices.Length && index < JointWeights.Length;
+            assembledBoneIndices.Add(known ? JointIndices[index] : Vector4F.Zero);
+            assembledBoneWeights.Add(known ? JointWeights[index] : Vector4F.Zero);
         }
 
         JointIndices = assembledBoneIndices.ToArray();
         JointWeights = assembledBoneWeights.ToArray();
         IsModified = true;
             
+        return this;
+    }
+
+    /// <summary>Reorders the normals the way the face indices name them, as the other Assemble* do. A format that
+    /// indexes normals separately from positions says a vertex has DIFFERENT normals in different faces - that is what
+    /// a hard edge is - and re-deriving them from the triangles afterwards averages exactly that away.</summary>
+    public Mesh AssembleNormals(List<int> normalIndices)
+    {
+        if (normalIndices == null || normalIndices.Count == 0 || Normals.Length == 0)
+        {
+            return this;
+        }
+
+        var assembled = new Vector3F[normalIndices.Count];
+        for (int i = 0; i < normalIndices.Count; i++)
+        {
+            assembled[i] = Normals[normalIndices[i]];
+        }
+
+        Normals = assembled;
+        Semantic |= VertexSemantic.Normal;
+        IsModified = true;
+
         return this;
     }
 
@@ -1032,7 +1072,7 @@ public class Mesh
     public Mesh ReverseWinding()
     {
         Vector3F temp = new Vector3F();
-        if (MeshTopology == PrimitiveType.TriangleList)
+        if (MeshTopology == PrimitiveType.TriangleList && Indices.Length % 3 == 0)
         {
             for (int i = 0; i < Indices.Length; i += 3)
             {
@@ -1044,6 +1084,16 @@ public class Mesh
         }
 
         return this;
+    }
+
+    // The same axis change the points get. A normal is a direction, so it takes the rotation and nothing else - but it
+    // must take it, or a mesh that brought its own normals would be lit by the source format's axes.
+    private void TurnNormals(System.Func<Vector3F, Vector3F> turn)
+    {
+        for (int i = 0; i < Normals.Length; i++)
+        {
+            Normals[i] = turn(Normals[i]);
+        }
     }
 
     public Mesh ChangeCoordinateSystem(UpAxis destinationUpAxis)
@@ -1072,7 +1122,7 @@ public class Mesh
 
                             ConvertUVs(i);
                         }
-                        ReverseWinding();
+                        TurnNormals(n => new Vector3F(n.X, n.Z, -n.Y));
                         break;
 
                     case UpAxis.Y_UP_LH:
@@ -1085,7 +1135,7 @@ public class Mesh
 
                             ConvertUVs(i);
                         }
-                        ReverseWinding();
+                        TurnNormals(n => new Vector3F(n.X, n.Z, n.Y));
                         break;
                     case UpAxis.Y_DOWN_RH:
                         for (int i = 0; i < Points.Length; i++)
@@ -1095,10 +1145,10 @@ public class Mesh
 
                             (position.Y, position.Z) = (position.Z, position.Y);
                             Points[i] = position;
-                                
+
                             ConvertUVs(i);
                         }
-                        ReverseWinding();
+                        TurnNormals(n => new Vector3F(n.X, n.Z, n.Y));
                         break;
                 }
                 break;
@@ -1116,7 +1166,7 @@ public class Mesh
 
                             ConvertUVs(i);
                         }
-                        ReverseWinding();
+                        TurnNormals(n => new Vector3F(n.X, n.Y, -n.Z));
                         break;
                     case UpAxis.Y_DOWN_RH:
                         for (int i = 0; i < Points.Length; i++)
@@ -1125,14 +1175,22 @@ public class Mesh
                             //Меняем позиции вершин
                             position.Y = -position.Y;
                             Points[i] = position;
-                        
+
                             ConvertUVs(i);
                         }
-
-                        //ReverseWinding();
+                        TurnNormals(n => new Vector3F(n.X, -n.Y, n.Z));
                         break;
                 }
                 break;
+        }
+
+        // Re-wind the faces only when the change MIRRORS the mesh, which negating or swapping an axis does and a
+        // plain rotation does not. Every branch used to do it unconditionally, so on Z_UP -> Y_UP_RH - a proper
+        // rotation - every triangle came out facing backwards. Nothing caught it while normals were re-derived
+        // from that same winding: both were wrong together, and nothing culls back faces here.
+        if (AxisConversion.MirrorsHandedness(AxisConversion.Between(UpAxis, destinationUpAxis)))
+        {
+            ReverseWinding();
         }
 
         return this;

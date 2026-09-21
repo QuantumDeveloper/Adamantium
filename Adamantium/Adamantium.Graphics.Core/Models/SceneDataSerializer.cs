@@ -30,7 +30,8 @@ public static class SceneDataSerializer
                     new DictionarySubclassFormatter<SceneData.SkeletonCollection, string, List<SceneData.Joint>>(),
                     new ListSubclassFormatter<SceneData.FrameCollection, SceneData.KeyFrame>()
                 ],
-                [ContractlessStandardResolver.Instance]));
+                [ContractlessStandardResolver.Instance]))
+            .WithCompression(MessagePackCompression.Lz4BlockArray);
 
     public static byte[] Serialize(SceneData scene) => MessagePackSerializer.Serialize(scene, Options);
 

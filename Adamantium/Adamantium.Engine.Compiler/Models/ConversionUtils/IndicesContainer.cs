@@ -5,13 +5,13 @@ using Adamantium.Graphics.Core.Models;
 
 namespace Adamantium.Engine.Compiler.Models.ConversionUtils
 {
-   //Класс используется для хранения индексов строк вершин, нормалей и текстурных координат 
-   //для использования их при сборке геометрии в правильном порядке
+   //Holds the per-semantic index arrays the geometry is assembled from, each in face order
    internal class IndicesContainer
    {
       public IndicesContainer()
       {
          Positions = new List<int>();
+         Normals = new List<int>();
          UV0 = new List<int>();
          UV1 = new List<int>();
          UV2 = new List<int>();
@@ -20,6 +20,8 @@ namespace Adamantium.Engine.Compiler.Models.ConversionUtils
       }
 
       public List<int> Positions { get; set; }
+
+      public List<int> Normals { get; set; }
 
       public List<int> UV0 { get; set; }
 

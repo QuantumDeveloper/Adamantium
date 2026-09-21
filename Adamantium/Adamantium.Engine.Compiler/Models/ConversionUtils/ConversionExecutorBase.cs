@@ -12,19 +12,7 @@ namespace Adamantium.Engine.Compiler.Models.ConversionUtils
       protected ConversionConfig config;
       protected UpAxis upAxis;
 
-      //Матрица перевода осей Zup->Yup
-      protected static Matrix4x4F ZupYup;
-
-      static ConversionExecutorBase()
-      {
-         ZupYup = new Matrix4x4F();
-         ZupYup.M11 = 1;
-         ZupYup.M23 = 1;
-         ZupYup.M32 = 1;
-         ZupYup.M44 = 1;
-
-         //logger = LogManager.GetLogger("ConversionHelper");
-      }
+      //AssembleModel changes the axes through AxisConversion - meshes, nodes, bones and key frames at once
 
       protected ConversionExecutorBase(ConversionConfig config, UpAxis upAxis)
       {
@@ -32,29 +20,19 @@ namespace Adamantium.Engine.Compiler.Models.ConversionUtils
          this.upAxis = upAxis;
       }
 
-      //загружаем индексы
       internal IndicesContainer DistributeIndices(RawIndicesSemanticData rawIndices)
       {
-         IndicesContainer indicesContainer = null;
-         try
-         {
-            //Заполняем массивы индексов
-            indicesContainer = SplitRawIndices(rawIndices);
+         var indicesContainer = SplitRawIndices(rawIndices);
 
-            //проверяем нужна ли триангуляция и выполняем её если нужно
-            if (IsTriangulationRequired(rawIndices.VertexType))
-            {
-               indicesContainer = Triangulate(rawIndices.Semantic, indicesContainer, rawIndices.VertexType);
-            }
-         }
-         catch (Exception ex)
+         //Triangulate when the faces need it
+         if (IsTriangulationRequired(rawIndices.VertexType))
          {
-            throw;
+            indicesContainer = Triangulate(rawIndices.Semantic, indicesContainer, rawIndices.VertexType);
          }
          return indicesContainer;
       }
 
-      //Заполнение массива индексов для COLLADA 1.4.0 (1.4.1)/.obj
+      //Splits the interleaved index stream of COLLADA 1.4.0/1.4.1 and .obj into one array per semantic
       internal IndicesContainer SplitRawIndices(RawIndicesSemanticData rawIndices)
       {
          IndicesContainer indicesContainer = new IndicesContainer();
@@ -71,10 +49,11 @@ namespace Adamantium.Engine.Compiler.Models.ConversionUtils
                   indicesContainer.Positions.Add(rawIndices.RawIndices[j]);
                }
 
-               if (rawIndices.Offset.Normal != null && j - i == (int)rawIndices.Offset.Normal)
+               // Normal indices used to be thrown away, and the mesh then re-derived normals by averaging - losing
+               // the very hard edges those indices describe.
+               else if (rawIndices.Offset.Normal != null && j - i == (int)rawIndices.Offset.Normal)
                {
-                  //indicesContainer.Positions.Add(rawIndices.RawIndices[j]);
-                  //skip this step
+                  indicesContainer.Normals.Add(rawIndices.RawIndices[j]);
                }
 
                else if (rawIndices.Offset.UV0 != null && j - i == (int)rawIndices.Offset.UV0)
@@ -108,7 +87,7 @@ namespace Adamantium.Engine.Compiler.Models.ConversionUtils
          return indicesContainer;
       }
 
-      //Этот метод определяет нужна ли мешу триангуляция
+      //A face with more than three vertices has to be triangulated
       public bool IsTriangulationRequired(IEnumerable<int> vertexType)
       {
          bool triangulationNeeded = false;
@@ -122,32 +101,20 @@ namespace Adamantium.Engine.Compiler.Models.ConversionUtils
          return triangulationNeeded;
       }
 
-      //Триангуляция меша
       internal IndicesContainer Triangulate(VertexSemantic semantic, IndicesContainer indicesContainer,
          List<int> vertexType)
       {
          List<int> triangulatedPositionList = new List<int>();
+         List<int> triangulatedNormalList = new List<int>();
          List<int> triangulatedUV0List = new List<int>();
          List<int> triangulatedUV1List = new List<int>();
          List<int> triangulatedUV2List = new List<int>();
          List<int> triangulatedUV3List = new List<int>();
          List<int> triangulatedColorList = new List<int>();
 
-         /*
-          * Переделываем массив индексов для вершин, нормалей и текстурных координат,
-          * триангулируя полигоны, которые содержат больше 3 вершин
-          * 
-          * 1. Проходимся по коллекции, описывающей нетриангулированные данные
-          * 2. Внутри цикла стартуем второй цикл, в котором проходимся от нуля до значния ячейки
-          * 3. Пока значение в цикле меньше 3, просто прибавляем это число к переменной, 
-          * которая накапливает суммарный индекс (то есть её конечное значение должно равняться сумме
-          * значений внтури коллекции vertexType и добавляем новый индекс из коллекции нетриангулированных индексов 
-          * во временную коллекцию индексов (уже триангулированных)
-          * 4. Если значение в цикле больше 2, тогда прибавляем к текущему суммарному индексу 0, j-1 и j-2
-          * соответственно, доставая по этим значениям данные из нетриангулированного массива индексов
-          * 5. Прибавляем число из коллекции vertexType к накапливаемому значению и переходим на новую итерацию цикла
-         */
-
+         // A fan: the first three corners of a face make one triangle, and every corner after that makes another
+         // with the face's first corner and the previous one. vertexType says how many corners each face has, and
+         // n walks the untriangulated stream face by face.
          int n = 0;
          for (int i = 0; i < vertexType.Count; i++)
          {
@@ -156,6 +123,11 @@ namespace Adamantium.Engine.Compiler.Models.ConversionUtils
                if (j < 3)
                {
                   triangulatedPositionList.Add(indicesContainer.Positions[n + j]);
+                  if (semantic.HasFlag(VertexSemantic.Normal))
+                  {
+                     triangulatedNormalList.Add(indicesContainer.Normals[n + j]);
+                  }
+
                   if (semantic.HasFlag(VertexSemantic.UV0))
                   {
                      triangulatedUV0List.Add(indicesContainer.UV0[n + j]);
@@ -186,6 +158,13 @@ namespace Adamantium.Engine.Compiler.Models.ConversionUtils
                   triangulatedPositionList.Add(indicesContainer.Positions[n]);
                   triangulatedPositionList.Add(indicesContainer.Positions[n + j - 1]);
                   triangulatedPositionList.Add(indicesContainer.Positions[n + j]);
+
+                  if (semantic.HasFlag(VertexSemantic.Normal))
+                  {
+                     triangulatedNormalList.Add(indicesContainer.Normals[n]);
+                     triangulatedNormalList.Add(indicesContainer.Normals[n + j - 1]);
+                     triangulatedNormalList.Add(indicesContainer.Normals[n + j]);
+                  }
 
                   if (semantic.HasFlag(VertexSemantic.UV0))
                   {
@@ -228,6 +207,7 @@ namespace Adamantium.Engine.Compiler.Models.ConversionUtils
          }
          indicesContainer.Positions.Clear();
          indicesContainer.Positions = triangulatedPositionList;
+         indicesContainer.Normals = triangulatedNormalList;
          indicesContainer.UV0 = triangulatedUV0List;
          indicesContainer.UV1 = triangulatedUV1List;
          indicesContainer.UV2 = triangulatedUV2List;

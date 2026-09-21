@@ -122,7 +122,16 @@ public partial class GameViewModel : TabPageViewModel
         }
 
         Status = $"Loading {name}…";
-        await _game.LoadAndAddModel(path);
-        Status = name;
+        try
+        {
+            await _game.LoadAndAddModel(path);
+            Status = name;
+        }
+        catch (Exception exception)
+        {
+            // Otherwise the line would sit at "Loading …" while the cause went into an unobserved Task
+            Status = $"{name}: failed to load — {exception.GetBaseException().Message}";
+            Console.WriteLine(exception);
+        }
     }
 }

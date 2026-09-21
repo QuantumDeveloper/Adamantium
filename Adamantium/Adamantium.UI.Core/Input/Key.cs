@@ -68,7 +68,7 @@ public enum Key : uint
    /// <summary>
    /// CLEAR key
    /// </summary>
-   /// <remarks>Virtual key code: 0x0С (12)</remarks>
+   /// <remarks>Virtual key code: 0x0C (12)</remarks>
    Clear = 0x0C,
 
    /// <summary>

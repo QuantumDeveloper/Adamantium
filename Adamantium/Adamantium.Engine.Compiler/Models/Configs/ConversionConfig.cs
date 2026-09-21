@@ -18,9 +18,8 @@ namespace Adamantium.Engine.Compiler.Converter.Configs
          }
       }
 
-      #region Объявление переменных
+      #region Fields
 
-      //устанавливает значение будет ли модель записана в бинарный файл или в текстовый, true - бинарный
       private bool individualSettingsEnabled;
       private bool geometryEnabled;
       private bool animationEnabled;
@@ -46,9 +45,9 @@ namespace Adamantium.Engine.Compiler.Converter.Configs
       private bool isClockWise;
       private static string fileName = "ConvertationConfig.aecc"; //adamantium engine covertation config
 
-      #endregion //Объявление переменных
+      #endregion //Fields
 
-      #region Свойства
+      #region Properties
 
       public static String FileName
       {
@@ -292,7 +291,7 @@ namespace Adamantium.Engine.Compiler.Converter.Configs
       }
 
 
-      #endregion //Свойства
+      #endregion //Properties
 
       public void SetDefaults()
       {

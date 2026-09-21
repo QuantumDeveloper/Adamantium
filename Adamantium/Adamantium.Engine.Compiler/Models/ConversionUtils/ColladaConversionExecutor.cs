@@ -12,10 +12,44 @@ using LightType = Adamantium.Graphics.Core.Models.LightType;
 
 namespace Adamantium.Engine.Compiler.Models.ConversionUtils
 {
-    internal class ColladaConversionExecutor : ConversionExecutorBase
+    internal partial class ColladaConversionExecutor : ConversionExecutorBase
     {
-        private String _debugMessage;
         private const String PositionSemantic = "VERTEX";
+        private const String RawPositionSemantic = "POSITION";
+
+        private static readonly char[] WhiteSpace = { ' ', '\t', '\r', '\n' };
+
+        /// <summary>What the file has that the parse cannot do - so the loss does not pass in silence.</summary>
+        public List<String> UnsupportedFeatures { get; } = new();
+
+        //Geometries are parsed in parallel and all of them write here
+        private void ReportUnsupported(String feature)
+        {
+            lock (UnsupportedFeatures) UnsupportedFeatures.Add(feature);
+        }
+
+        private static int MaxOffset(InputLocalOffset[] inputs)
+        {
+            var max = 0;
+            if (inputs != null)
+            {
+                foreach (var input in inputs)
+                {
+                    if ((int)input.offset > max) max = (int)input.offset;
+                }
+            }
+            return max;
+        }
+
+        /// <summary>The id out of a "#id" reference. A reference into another document ("file.dae#id") is beyond
+        /// us, but silently chopping its first character is not the answer either.</summary>
+        private static String Source(String url)
+        {
+            if (String.IsNullOrEmpty(url)) return String.Empty;
+
+            var hash = url.LastIndexOf('#');
+            return hash >= 0 ? url.Substring(hash + 1) : url;
+        }
         private const String NormalSemantic = "NORMAL";
         private const String UVSemantic = "TEXCOORD";
         private const String ColorSemantic = "COLOR";
@@ -28,14 +62,11 @@ namespace Adamantium.Engine.Compiler.Models.ConversionUtils
         private const String ControllerWeightSemantic = "WEIGHT";
         private const String ControllerInvBindMatrixSemantic = "INV_BIND_MATRIX";
 
-        private String Separator = ":";
-        private String Separator2 = "_";
-
         public ColladaConversionExecutor(ConversionConfig config, UpAxis upAxis) : base(config, upAxis)
         {
         }
 
-        #region Работа с геометрией
+        #region Geometry
 
         internal SceneData.Model ConstructMesh(SceneData container, List<IndicesContainer> indicesContainers, Mesh mesh, String meshId, String meshName)
         {
@@ -48,17 +79,25 @@ namespace Adamantium.Engine.Compiler.Models.ConversionUtils
             
             foreach (var indicesContainer in indicesContainers)
             {
-                var finalMesh = mesh.Clone();
-                //присваиваем настоящему мешу правильную топологию
-                finalMesh.MeshTopology = indicesContainer.MeshTopology;
-                //присваиваем настоящему мешу семантику временного
-                var semantic = indicesContainer.Semantic;
-                //Собираем вершины в таком порядке, в котором они должны идти
-                //то есть достаём из tempMesh.Vertices координаты вершин не по порядку как они записаны в файле,
-                //а в том порядке, в котором они записаны в IndicesContainer.Vertices (в таком случае наборы коодинат могут повторяться)
+                // Without indices there is nothing to assemble. AssemblePoints on an empty list used to silently
+                // leave the RAW vertex set from <source>, and a triangle soup of every point arrived in the scene.
+                if (indicesContainer.Positions.Count == 0)
+                {
+                    continue;
+                }
 
+                var finalMesh = mesh.Clone();
+                finalMesh.MeshTopology = indicesContainer.MeshTopology;
+                var semantic = indicesContainer.Semantic;
+                //Vertices are reordered the way the faces name them, not the way the file stores them - so a
+                //coordinate set may well repeat
                 finalMesh.AssemblePoints(indicesContainer.Positions);
                 finalMesh.GenerateBasicIndices();
+
+                if (semantic.HasFlag(VertexSemantic.Normal))
+                {
+                    finalMesh.AssembleNormals(indicesContainer.Normals);
+                }
 
                 if (semantic.HasFlag(VertexSemantic.UV0))
                 {
@@ -95,121 +134,18 @@ namespace Adamantium.Engine.Compiler.Models.ConversionUtils
             return constructedMesh;
         }
 
-        //Выводить в виде геометрии, а не всего меша!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! 
-        //Семантика не нужна! 
-        //На выходе будет ИД меша и список геометрии
-        //Парсит геометрию из файла и сортирует её по вершинам, нормалям и текстурным координатам
-        public SceneData.GeometryData GetRawGeometryFromCollada(geometry geometry, Dictionary<String, VertexSemantic> semanticIdMapping, out String meshId, out String name)
-        {
-            SceneData.GeometryData rawGeometryData = new SceneData.GeometryData();
-            var tmp = new Vector3();
-            Vector2F tmpTexture = new Vector2F();
-            //Получаем его ID
-            meshId = geometry.id;
-            name = geometry.name;
-            var mesh = geometry.Item as mesh;
-
-            if (mesh != null)
-            {
-                // Считываем данные из элемента mesh
-                foreach (var source in mesh.source)
-                {
-                    var floatArray = source.Item as float_array;
-                    if (floatArray != null)
-                    {
-                        if (semanticIdMapping.ContainsKey(source.id))
-                        {
-                            VertexSemantic tempSemantic = semanticIdMapping[source.id];
-                            int stride = (int)source.technique_common.accessor.stride;
-                            //достаём вершины
-                            if (tempSemantic == VertexSemantic.Position)
-                            {
-                                int index = 0;
-                                for (int i = 0; i < floatArray.Values.Length; i += stride)
-                                {
-                                    tmp.X = (float)floatArray.Values[i];
-                                    tmp.Y = (float)floatArray.Values[i + 1];
-                                    tmp.Z = (float)floatArray.Values[i + 2];
-                                    rawGeometryData.Positions.Add(tmp);
-                                    index++;
-                                }
-                            }
-                            //достаём первый набор текстурных координат (uv - для 3DsMax, map - Blender)
-                            else if (tempSemantic == VertexSemantic.UV0)
-                            {
-                                for (int i = 0; i < floatArray.Values.Length; i += stride)
-                                {
-                                    tmpTexture.X = (float)floatArray.Values[i];
-                                    tmpTexture.Y = (float)floatArray.Values[i + 1];
-                                    rawGeometryData.UV0.Add(tmpTexture);
-                                }
-                            }
-                            //достаём второй набор текстурных координат (uv - для 3DsMax, map - Blender)
-                            else if (tempSemantic == VertexSemantic.UV1)
-                            {
-                                for (int i = 0; i < floatArray.Values.Length; i += stride)
-                                {
-                                    tmpTexture.X = (float)floatArray.Values[i];
-                                    tmpTexture.Y = (float)floatArray.Values[i + 1];
-                                    rawGeometryData.UV1.Add(tmpTexture);
-                                }
-                            }
-
-                            else if (tempSemantic == VertexSemantic.UV2)
-                            {
-                                for (int i = 0; i < floatArray.Values.Length; i += stride)
-                                {
-                                    tmpTexture.X = (float)floatArray.Values[i];
-                                    tmpTexture.Y = (float)floatArray.Values[i + 1];
-                                    rawGeometryData.UV2.Add(tmpTexture);
-                                }
-                            }
-
-                            else if (tempSemantic == VertexSemantic.UV3)
-                            {
-                                for (int i = 0; i < floatArray.Values.Length; i += stride)
-                                {
-                                    tmpTexture.X = (float)floatArray.Values[i];
-                                    tmpTexture.Y = (float)floatArray.Values[i + 1];
-                                    rawGeometryData.UV3.Add(tmpTexture);
-                                }
-                            }
-
-                            else if (tempSemantic == VertexSemantic.Color)
-                            {
-                                for (int i = 0; i < floatArray.Values.Length; i += stride)
-                                {
-                                    var color = new Vector4F(
-                                       (float)floatArray.Values[i],
-                                       (float)floatArray.Values[i + 1],
-                                       (float)floatArray.Values[i + 2],
-                                       (float)floatArray.Values[i + 3]);
-                                    rawGeometryData.Colors.Add(new Color(color));
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            return rawGeometryData;
-        }
-
-
         public Mesh GetRawMesh(geometry geometry, Dictionary<String, VertexSemantic> semanticIdMapping, out String meshId, out String name)
         {
             var rawMesh = new Mesh();
             SceneData.GeometryData rawGeometryData = new SceneData.GeometryData();
             var tmp = new Vector3();
             Vector2F tmpTexture = new Vector2F();
-            //Получаем его ID
             meshId = geometry.id;
             name = geometry.name;
             var mesh = geometry.Item as mesh;
 
             if (mesh != null)
             {
-                // Считываем данные из элемента mesh
                 foreach (var source in mesh.source)
                 {
                     var floatArray = source.Item as float_array;
@@ -219,7 +155,6 @@ namespace Adamantium.Engine.Compiler.Models.ConversionUtils
                         {
                             VertexSemantic tempSemantic = semanticIdMapping[source.id];
                             int stride = (int)source.technique_common.accessor.stride;
-                            //достаём вершины
                             switch (tempSemantic)
                             {
                                 case VertexSemantic.Position:
@@ -232,6 +167,17 @@ namespace Adamantium.Engine.Compiler.Models.ConversionUtils
                                             tmp.Z = (float)floatArray.Values[i + 2];
                                             rawGeometryData.Positions.Add(tmp);
                                         }
+                                    }
+                                    break;
+                                // Normals from the file. They were not read at all, and the mesh then re-derived
+                                // them by averaging - erasing the hard edges they were authored for.
+                                case VertexSemantic.Normal:
+                                    for (int i = 0; i < floatArray.Values.Length; i += stride)
+                                    {
+                                        rawGeometryData.Normals.Add(new Vector3F(
+                                           (float)floatArray.Values[i],
+                                           (float)floatArray.Values[i + 1],
+                                           (float)floatArray.Values[i + 2]));
                                     }
                                     break;
                                 case VertexSemantic.UV0:
@@ -282,12 +228,16 @@ namespace Adamantium.Engine.Compiler.Models.ConversionUtils
                     }
                 }
 
+                // Only what the file ACTUALLY has: an empty Set still raised the semantic flag, so a positions-only
+                // mesh claimed normals, four UV sets and colors. Tangents were then computed off those flags - over
+                // empty arrays.
                 rawMesh.SetPoints(rawGeometryData.Positions);
-                rawMesh.SetUVs(0, rawGeometryData.UV0);
-                rawMesh.SetUVs(1, rawGeometryData.UV1);
-                rawMesh.SetUVs(2, rawGeometryData.UV2);
-                rawMesh.SetUVs(3, rawGeometryData.UV3);
-                rawMesh.SetColors(rawGeometryData.Colors);
+                if (rawGeometryData.Normals.Count > 0) rawMesh.SetNormals(rawGeometryData.Normals);
+                if (rawGeometryData.UV0.Count > 0) rawMesh.SetUVs(0, rawGeometryData.UV0);
+                if (rawGeometryData.UV1.Count > 0) rawMesh.SetUVs(1, rawGeometryData.UV1);
+                if (rawGeometryData.UV2.Count > 0) rawMesh.SetUVs(2, rawGeometryData.UV2);
+                if (rawGeometryData.UV3.Count > 0) rawMesh.SetUVs(3, rawGeometryData.UV3);
+                if (rawGeometryData.Colors.Count > 0) rawMesh.SetColors(rawGeometryData.Colors);
             }
 
             return rawMesh;
@@ -302,21 +252,21 @@ namespace Adamantium.Engine.Compiler.Models.ConversionUtils
             {
                 var rawDataList = new List<RawIndicesSemanticData>();
                 InputLocalOffset[] inputs = null;
-                InputLocal[] vertexInput = null;
                 String positionId = String.Empty;
-                vertices vertices = null;
-                //Разбор элемента vertices
-                vertices = mesh.vertices;
-                vertexInput = vertices.input;
-                //Преобразовываем массив индексов из строки в Int32
-                if (vertexInput.Length > 1)
+
+                // A <mesh> with no <vertices>, or with an empty input list, is a mesh without positions. NRE before.
+                var vertices = mesh.vertices;
+                var vertexInput = vertices?.input;
+                if (vertexInput == null || vertexInput.Length == 0 || mesh.Items == null)
                 {
-                    //logger.Warn("В геометрии " + geometry.id + "присутствует больше одного подмеша");
+                    return rawDataList;
                 }
-                else
-                {
-                    positionId = vertexInput[0].source.Substring(1);
-                }
+
+                // Positions are the input with the POSITION semantic. The first one used to be taken blindly, and
+                // with several inputs (<vertices> may carry NORMAL too) none was, leaving the mapping silently empty.
+                var positionInput = System.Array.Find(vertexInput, x => x.semantic == RawPositionSemantic)
+                                    ?? vertexInput[0];
+                positionId = Source(positionInput.source);
 
                 foreach (var meshItem in mesh.Items)
                 {
@@ -332,24 +282,39 @@ namespace Adamantium.Engine.Compiler.Models.ConversionUtils
                         rawData.RawIndices = new List<int>(COLLADA.ConvertToIntArray(lines.p));
                     }
                     //from version 1.4.0
-                    else if (meshItem is polygons)
+                    else if (meshItem is polygons polygons)
                     {
-                        var triangles = meshItem as polygons;
-                        String materialId = triangles.material;
-                        inputs = triangles.input;
-                        //Преобразовываем массив индексов из строки в Int32
-                        List<int> indices = new List<int>();
-                        for (int i = 0; i < triangles.Items.Length; i++)
+                        // Each <p> is ONE polygon, and only it knows how many vertices it has. Every <p> used to be
+                        // merged into one list and declared triangles: any quad broke. Now each one's size goes to
+                        // vcount and triangulation does its job.
+                        var indices = new List<int>();
+                        var counts = new List<int>();
+                        var stride = System.Math.Max(1, MaxOffset(polygons.input) + 1);
+
+                        foreach (var item in polygons.Items)
                         {
-                            var strs = ((string)triangles.Items[i]).Split(' ');
-                            for (int j = 0; j < strs.Length; j++)
+                            // <ph> is a polygon WITH A HOLE. We cannot parse one, and taking just the outer contour
+                            // would fill the hole in silence.
+                            if (item is not string text)
                             {
-                                indices.Add(int.Parse(strs[j]));
+                                ReportUnsupported($"{geometry.id}: <ph> (polygon with a hole) skipped");
+                                continue;
                             }
+
+                            var before = indices.Count;
+                            foreach (var part in text.Split(WhiteSpace, StringSplitOptions.RemoveEmptyEntries))
+                            {
+                                if (int.TryParse(part, out var index)) indices.Add(index);
+                            }
+
+                            counts.Add((indices.Count - before) / stride);
                         }
-                        rawData.MaterialId = materialId;
+
+                        rawData.MaterialId = polygons.material;
+                        inputs = polygons.input;
                         rawData.MeshTopology = PrimitiveType.TriangleList;
                         rawData.RawIndices = indices;
+                        rawData.VertexType = counts;
                     }
                     //Version 1.4.1
                     else if (meshItem is triangles)
@@ -382,57 +347,69 @@ namespace Adamantium.Engine.Compiler.Models.ConversionUtils
                     {
                         foreach (var input in inputs)
                         {
+                            // Even an input we do not read takes a slot in every vertex - see Offset.Observe.
+                            rawData.Offset.Observe(input.offset);
+
                             if (input.semantic == PositionSemantic)
                             {
                                 rawData.Offset.Position = input.offset;
-                                if (vertices.id == input.source.Substring(1))
+                                if (vertices.id == Source(input.source))
                                 {
-                                    rawData.SemanticIdMapping.Add(positionId, VertexSemantic.Position);
+                                    rawData.MapSource(positionId, VertexSemantic.Position);
                                 }
                                 rawData.Semantic |= VertexSemantic.Position;
                             }
                             else if (input.semantic == NormalSemantic)
                             {
                                 rawData.Offset.Normal = input.offset;
-                                rawData.SemanticIdMapping.Add(input.source.Substring(1), VertexSemantic.Normal);
+                                rawData.MapSource(Source(input.source), VertexSemantic.Normal);
+                                rawData.Semantic |= VertexSemantic.Normal;
                             }
                             else if (input.semantic == UVSemantic)
                             {
                                 if (input.set == 0)
                                 {
                                     rawData.Offset.UV0 = input.offset;
-                                    rawData.SemanticIdMapping.Add(input.source.Substring(1), VertexSemantic.UV0);
+                                    rawData.MapSource(Source(input.source),VertexSemantic.UV0);
                                     rawData.Semantic |= VertexSemantic.UV0;
                                 }
                                 else if (input.set == 1)
                                 {
                                     rawData.Offset.UV1 = input.offset;
-                                    rawData.SemanticIdMapping.Add(input.source.Substring(1), VertexSemantic.UV1);
+                                    rawData.MapSource(Source(input.source),VertexSemantic.UV1);
                                     rawData.Semantic |= VertexSemantic.UV1;
                                 }
                                 else if (input.set == 2)
                                 {
                                     rawData.Offset.UV2 = input.offset;
-                                    rawData.SemanticIdMapping.Add(input.source.Substring(1), VertexSemantic.UV2);
+                                    rawData.MapSource(Source(input.source),VertexSemantic.UV2);
                                     rawData.Semantic |= VertexSemantic.UV2;
                                 }
                                 else if (input.set == 3)
                                 {
                                     rawData.Offset.UV3 = input.offset;
-                                    rawData.SemanticIdMapping.Add(input.source.Substring(1), VertexSemantic.UV3);
+                                    rawData.MapSource(Source(input.source),VertexSemantic.UV3);
                                     rawData.Semantic |= VertexSemantic.UV3;
+                                }
+                                else
+                                {
+                                    ReportUnsupported($"{geometry.id}: TEXCOORD set={input.set} skipped - " +
+                                                      "a mesh has only four coordinate sets");
                                 }
                             }
 
                             else if (input.semantic == ColorSemantic)
                             {
                                 rawData.Offset.Color = input.offset;
-                                rawData.SemanticIdMapping.Add(input.source.Substring(1), VertexSemantic.Color);
+                                rawData.MapSource(Source(input.source), VertexSemantic.Color);
                                 rawData.Semantic |= VertexSemantic.Color;
                             }
-                            _debugMessage = "Semantic " + input.semantic + " Source " + input.source +
-                                            " Offset " + input.offset;
-                            //logger.Info(_debugMessage);
+                            else
+                            {
+                                // TANGENT, TEXBINORMAL and the rest take up a slot in every vertex (Observe above
+                                // accounted for that) but we read no data from them. Saying so beats guessing later.
+                                ReportUnsupported($"{geometry.id}: input {input.semantic} is not read");
+                            }
                         }
                     }
                     rawDataList.Add(rawData);
@@ -446,14 +423,14 @@ namespace Adamantium.Engine.Compiler.Models.ConversionUtils
         #endregion
 
 
-        #region Работа с текстурами
+        #region Textures
 
         public SceneData.Image GetImage(String filePath, image img)
         {
             SceneData.Image images = new SceneData.Image();
             images.ID = img.id;
             images.ImageName = Uri.UnescapeDataString(img.Item.ToString());
-            //Присваиваем реальный путь к файлу текстуры
+            //Where the texture sits on this machine; the artifact keeps only ImageName
             images.FilePath = Path.Combine(Path.GetDirectoryName(filePath), images.ImageName);
             return images;
         }
@@ -461,54 +438,44 @@ namespace Adamantium.Engine.Compiler.Models.ConversionUtils
         #endregion
 
 
-        #region Работа с контроллерами и анимацией
+        #region Controllers and animation
 
-        //метод вытягивает имена костей из файла, так как автосгенерированные классы этого
-        //почему-то не делают
-        public String[] GetStringArrayById(String id, String path)
-        {
-            XDocument doc = new XDocument();
-            doc = XDocument.Load(path);
-            XElement field = doc.Descendants().FirstOrDefault(x => (string)x.Attribute("id") == id);
-            string[] names = null;
-            if (field != null)
-            {
-                names = COLLADA.ConvertStringArray(field.Value);
-            }
-            return names;
-        }
-
-        //Вытягиваем из сырых данных контроллер анимации
         public SceneData.Controller GetControllerData(controller controller, String filepath)
         {
             skin skin = controller.Item as skin;
             if (skin != null)
             {
                 SceneData.Controller animationController = new SceneData.Controller();
-                //Получаем ID меша, которому принадлежит контроллер
-                animationController.MeshId = skin.source1.Substring(1);
+                animationController.MeshId = Source(skin.source1);
                 animationController.ControllerId = controller.id;
-                //Try to get controller
                 animationController.Name = controller.name;
                 Dictionary<String, ControllerSemantic> controllerMapping = new Dictionary<string, ControllerSemantic>();
-                foreach (InputLocalOffset inputLocalOffset in skin.vertex_weights.input)
+                foreach (InputLocalOffset inputLocalOffset in skin.vertex_weights?.input ?? Array.Empty<InputLocalOffset>())
                 {
                     if (inputLocalOffset.semantic == ControllerJointSemantic)
                     {
-                        controllerMapping.Add(inputLocalOffset.source.Substring(1), ControllerSemantic.Joint);
+                        controllerMapping[Source(inputLocalOffset.source)] = ControllerSemantic.Joint;
                     }
                     else if (inputLocalOffset.semantic == ControllerWeightSemantic)
                     {
-                        controllerMapping.Add(inputLocalOffset.source.Substring(1), ControllerSemantic.Weight);
+                        controllerMapping[Source(inputLocalOffset.source)] = ControllerSemantic.Weight;
                     }
                 }
 
-                foreach (var inputLocal in skin.joints.input)
+                foreach (var inputLocal in skin.joints?.input ?? Array.Empty<InputLocal>())
                 {
                     if (inputLocal.semantic == ControllerInvBindMatrixSemantic)
                     {
-                        controllerMapping.Add(inputLocal.source.Substring(1), ControllerSemantic.InverseBindMatrix);
+                        controllerMapping[Source(inputLocal.source)] = ControllerSemantic.InverseBindMatrix;
                     }
+                }
+
+                // The neighbouring inputs got their null check, these two lines did not - a skin without
+                // <vertex_weights> is legal (the mesh is simply bound to nothing) and gave an NRE here.
+                if (skin.vertex_weights?.vcount == null || skin.vertex_weights.v == null)
+                {
+                    ReportUnsupported($"{controller.id}: skin without <vertex_weights> - no bone weights were read");
+                    return null;
                 }
 
                 List<int> vcountList = new List<int>(COLLADA.ConvertToIntArray(skin.vertex_weights.vcount));
@@ -523,13 +490,21 @@ namespace Adamantium.Engine.Compiler.Models.ConversionUtils
                 animationController.BindShapeMatrix = new Matrix4x4F(Array.ConvertAll(bindShape, x => (float)x));
                 foreach (source source in sources)
                 {
-                    ControllerSemantic semantic = controllerMapping[source.id];
+                    // On a source no <input> references, the indexer used to throw KeyNotFound
+                    if (!controllerMapping.TryGetValue(source.id, out var semantic))
+                    {
+                        continue;
+                    }
+
                     if (semantic == ControllerSemantic.Joint)
                     {
-                        Name_array nameArray = source.Item as Name_array;
-                        if (nameArray != null)
+                        // In 1.4 bone names legally arrive as <IDREF_array> too - this stayed null then, and the
+                        // loop below threw on jointNames.Length.
+                        jointNames = (source.Item as Name_array)?.Values;
+                        var references = (source.Item as IDREF_array)?.Value;
+                        if (jointNames == null && !String.IsNullOrWhiteSpace(references))
                         {
-                            jointNames = GetStringArrayById(nameArray.id, filepath);
+                            jointNames = references.Split(WhiteSpace, StringSplitOptions.RemoveEmptyEntries);
                         }
                     }
                     else if (semantic == ControllerSemantic.InverseBindMatrix)
@@ -551,11 +526,7 @@ namespace Adamantium.Engine.Compiler.Models.ConversionUtils
                                 {
                                     matrix = Matrix4x4F.Transpose(matrix);
                                 }
-                                if (upAxis == UpAxis.Z_UP)
-                                {
-                                    matrix = ZupYup * matrix * ZupYup;
-                                }
-                                //добавляем их в массив матриц
+                                //AssembleModel changes the coordinate system - meshes, bones and key frames at once
                                 jointsMatrices.Add(matrix);
                             }
                         }
@@ -575,9 +546,18 @@ namespace Adamantium.Engine.Compiler.Models.ConversionUtils
                     }
                 }
 
+                if (jointNames == null)
+                {
+                    ReportUnsupported($"{controller.id}: bone names could not be read - skin skipped");
+                    return null;
+                }
+
                 for (int i = 0; i < jointNames.Length; i++)
                 {
-                    animationController.JointDictionary.Add(/*animationController.SkeletonId+"_"+*/jointNames[i], jointsMatrices[i]);
+                    // There may be fewer matrices than names: before this check such a file gave IndexOutOfRange,
+                    // and a repeated bone name threw on Add.
+                    if (i >= jointsMatrices.Count) break;
+                    animationController.JointDictionary[jointNames[i]] = jointsMatrices[i];
                 }
                 animationController.JointNames.AddRange(jointNames);
                 animationController.JointMatrices.AddRange(jointsMatrices);
@@ -595,163 +575,69 @@ namespace Adamantium.Engine.Compiler.Models.ConversionUtils
                 }
 
                 int offset = 0;
-                /*
-                <v> - это массив индексов костей-весов
-                То есть - каждый первый элемент - это индекс в массиве костей,
-                а каждый второй - индекс в массиве весов
-                */
+                int trimmedVertices = 0;
+                var influences = new List<(int Bone, float Weight)>();
+                //<v> pairs up bone and weight indices: every first element indexes the bone array, every second
+                //the weight array. <vcount> says how many bones influence the vertex currently being walked.
                 for (int i = 0; i < vcountList.Count; i++)
                 {
-                    //массив vcountList <vcount> определяет количество костей, влияющих на конкретную вершину, 
-                    //по которой мы в данный момент проходим
+                    influences.Clear();
+                    for (int j = 0; j < vcountList[i] && offset < bonesIndices.Count && offset < weightIndices.Count; j++)
+                    {
+                        var weightIndex = weightIndices[offset];
+                        var weight = weightsValues != null && weightIndex >= 0 && weightIndex < weightsValues.Length
+                            ? weightsValues[weightIndex]
+                            : 0f;
+                        influences.Add((bonesIndices[offset], weight));
+                        offset++;
+                    }
+
+                    // A vertex may be bound to more than four bones. Dropping the extras is not enough - the
+                    // HEAVIEST ones must be kept and the weights renormalized, or they sum to less than one and
+                    // skinning drags that vertex towards the origin.
+                    if (influences.Count > 4)
+                    {
+                        influences.Sort((a, b) => b.Weight.CompareTo(a.Weight));
+                        influences.RemoveRange(4, influences.Count - 4);
+                        trimmedVertices++;
+                    }
+
+                    var total = influences.Sum(x => x.Weight);
                     Vector4F indices = new Vector4F();
                     Vector4F weights = new Vector4F();
-                    for (int j = 0; j < vcountList[i]; j++)
+                    for (int j = 0; j < influences.Count; j++)
                     {
-                        /*
-                        * Заполняем JointWeightCollection для каждой из вершин.
-                        * То есть в итоге получится коллекция коллекций костей.
-                        * Первая коллеция должна быть равна количеству вершин,
-                        * а вторая - уже будет зависеть от количества костей, 
-                        * прикреплённых к каждой из вершин (рекомендовано ограничиваться 4 костями на вершину) 
-                        */
-                        if (j == 0)
+                        var normalized = total > 0 ? influences[j].Weight / total : 0f;
+                        switch (j)
                         {
-                            indices.X = bonesIndices[offset];
-                            weights.X = weightsValues[weightIndices[offset]];
+                            case 0: indices.X = influences[j].Bone; weights.X = normalized; break;
+                            case 1: indices.Y = influences[j].Bone; weights.Y = normalized; break;
+                            case 2: indices.Z = influences[j].Bone; weights.Z = normalized; break;
+                            case 3: indices.W = influences[j].Bone; weights.W = normalized; break;
                         }
-                        else if (j == 1)
-                        {
-                            indices.Y = bonesIndices[offset];
-                            weights.Y = weightsValues[weightIndices[offset]];
-                        }
-                        else if (j == 2)
-                        {
-                            indices.Z = bonesIndices[offset];
-                            weights.Z = weightsValues[weightIndices[offset]];
-                        }
-                        else if (j == 3)
-                        {
-                            indices.W = bonesIndices[offset];
-                            weights.W = weightsValues[weightIndices[offset]];
-                        }
-                        offset++;
                     }
                     animationController.BoneIndices.Add(indices);
                     animationController.BoneWeights.Add(weights);
+                }
+
+                if (trimmedVertices > 0)
+                {
+                    ReportUnsupported($"{controller.id}: {trimmedVertices} vertices had more than 4 bones - the four " +
+                                      "heaviest were kept and the weights renormalized");
                 }
                 return animationController;
             }
             return null;
         }
 
-        public SceneData.FrameCollection GetAnimation(animation animation, String filepath)
-        {
-            object[] items = animation.Items;
-            sampler sampler = (sampler)items[items.Length - 2];
-            InputLocal[] inputs = sampler.input;
-            Dictionary<String, AnimationSemantic> animationMapping = new Dictionary<string, AnimationSemantic>();
-            foreach (InputLocal inputLocal in inputs)
-            {
-                if (inputLocal.semantic == AnimationInputSemantic)
-                {
-                    animationMapping.Add(inputLocal.source.Substring(1), AnimationSemantic.Input);
-                }
-                else if (inputLocal.semantic == AnimationOutputSemantic)
-                {
-                    animationMapping.Add(inputLocal.source.Substring(1), AnimationSemantic.Output);
-                }
-                else if (inputLocal.semantic == AnimationInterpolationSemantic)
-                {
-                    animationMapping.Add(inputLocal.source.Substring(1), AnimationSemantic.Interpolation);
-                }
-            }
-
-            SceneData.FrameCollection collection = new SceneData.FrameCollection();
-            channel ch = (channel)items[items.Length - 1];
-            int index = ch.target.IndexOf('/');
-            collection.JointId = ch.target.Substring(0, index);
-            foreach (var item in items)
-            {
-                if (item is source)
-                {
-                    source source = item as source;
-                    AnimationSemantic semantic;
-                    animationMapping.TryGetValue(source.id, out semantic);
-                    //AnimationSemantic semantic =  animationMapping[source.id];
-                    if (semantic.HasFlag(AnimationSemantic.Input))
-                    {
-                        float_array array = source.Item as float_array;
-                        if (array != null)
-                        {
-                            for (int i = 0; i < array.Values.Length; i++)
-                            {
-                                collection.Add(new SceneData.KeyFrame() { TimeStamp = array.Values[i] });
-                            }
-                        }
-                    }
-                    else if (semantic.HasFlag(AnimationSemantic.Output))
-                    {
-                        //Проверяем что внутри массива. Нам нужны матрицы 4х4
-                        if (source.technique_common.accessor.param[0].type == "float4x4")
-                        {
-                            float_array array = source.Item as float_array;
-                            var values = COLLADA.ConvertToFloatArray(array._Text_);
-                            if (values != null)
-                            {
-                                List<float> tempList = new List<float>();
-                                int count = 0;
-                                for (int i = 0; i < values.Length; i++)
-                                {
-                                    tempList.Add(values[i]);
-                                    if (tempList.Count == 16)
-                                    {
-                                        Matrix4x4F matrix = new Matrix4x4F(tempList.ToArray());
-                                        if (config.MatrixTransposeNeeded)
-                                        {
-                                            matrix = Matrix4x4F.Transpose(matrix);
-                                        }
-                                        if (upAxis == UpAxis.Z_UP)
-                                        {
-                                            matrix = ZupYup * matrix * ZupYup;
-                                        }
-                                        Vector3F scale;
-                                        Vector3F position;
-                                        QuaternionF rotation;
-                                        matrix.Decompose(out scale, out rotation, out position);
-                                        collection[count].Position = position;
-                                        collection[count].Scale = scale;
-                                        collection[count].Rotation = rotation;
-                                        tempList.Clear();
-                                        count++;
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    else if (semantic.HasFlag(AnimationSemantic.Interpolation))
-                    {
-                        string[] array = GetStringArrayById(source.id, filepath);
-                        if (array != null)
-                        {
-                            for (int i = 0; i < array.Length; i++)
-                            {
-                                collection[i].Interpolation =
-                                   ((InterpolationType)Enum.Parse(typeof(InterpolationType), array[i], true));
-                            }
-                        }
-                    }
-                }
-            }
-            return collection;
-        }
+        //library_animations is parsed in ColladaConversionExecutor.Animation.cs
 
         #endregion
 
 
-        #region Работа с визуальными сценами
+        #region Visual scenes
 
-        //Универсальный метод. Достаёт и собирает матрицу объекта из узла визуальной сцены
+        //Builds an object's transform from a visual-scene node, whichever form the node uses
         internal MatrixParams GetObjectMatrix(node node)
         {
             bool matrixTransposeNeeded = config.MatrixTransposeNeeded;
@@ -826,10 +712,8 @@ namespace Adamantium.Engine.Compiler.Models.ConversionUtils
                 //                 Matrix4x4F.Translation(translation);
 
             }
-            if (upAxis == UpAxis.Z_UP)
-            {
-                result = ZupYup * result * ZupYup;
-            }
+            //AssembleModel changes the coordinate system - meshes, nodes, bones and key frames at once. Here it was
+            //changed for Z_UP only, and only in the single-matrix branch: a component-wise pose was never converted.
             result.Decompose(out parameters.Scale, out parameters.Rotation, out parameters.Translation);
             return parameters;
         }
@@ -921,7 +805,10 @@ namespace Adamantium.Engine.Compiler.Models.ConversionUtils
             {
                 var current = stack.Pop();
 
-                if (current.Dependencies.Count == 0 && String.IsNullOrEmpty(current.ID))
+                // The root is not a dead-end mesh but the scene's container. Without Parent != null, a scene of
+                // joints alone (or of lights and cameras) took away the ROOT, RemoveMesh nulled Models, and
+                // assembly threw.
+                if (current.Dependencies.Count == 0 && String.IsNullOrEmpty(current.ID) && current.Parent != null)
                 {
                     meshesToRemove.Add(current);
                 }
@@ -959,16 +846,16 @@ namespace Adamantium.Engine.Compiler.Models.ConversionUtils
                 string geometryId = String.Empty;
                 if (rootNode.instance_geometry != null)
                 {
-                    geometryId = rootNode.instance_geometry[0].url.Substring(1);
+                    geometryId = Source(rootNode.instance_geometry[0].url);
                 }
                 else if (rootNode.instance_controller != null)
                 {
-                    var controllerId = rootNode.instance_controller[0].url.Substring(1);
+                    var controllerId = Source(rootNode.instance_controller[0].url);
                     foreach (var controller in controllers)
                     {
                         if (controllerId == controller.id)
                         {
-                            geometryId = ((skin)controller.Item).source1.Substring(1);
+                            geometryId = Source(((skin)controller.Item).source1);
                             break;
                         }
                     }
@@ -1013,12 +900,10 @@ namespace Adamantium.Engine.Compiler.Models.ConversionUtils
                 return;
             }
 
-            //достаём из элемента instance_light его ID
             InstanceWithExtra[] nodeIds = rootNode.instance_light;
             if (nodeIds != null && config.LightsEnabled)
             {
-                //достаём id освещения
-                string lightId = nodeIds[0].url.Substring(1);
+                string lightId = Source(nodeIds[0].url);
                 foreach (var light in dataContainer.LightData)
                 {
                     if (light.Value.ID == lightId)
@@ -1032,13 +917,10 @@ namespace Adamantium.Engine.Compiler.Models.ConversionUtils
                 }
             }
 
-            //достаём из элемента instance_camera его ID
             nodeIds = rootNode.instance_camera;
             if (nodeIds != null && config.CamerasEnabled)
             {
-                //достаём id меша
-                string cameraId = nodeIds[0].url.Substring(1);
-                //Если ID совпадает с cameraId
+                string cameraId = Source(nodeIds[0].url);
                 foreach (var camera in dataContainer.CameraData)
                 {
                     if (camera.Value.ID == cameraId)
@@ -1079,21 +961,15 @@ namespace Adamantium.Engine.Compiler.Models.ConversionUtils
                 {
                     matrix = Matrix4x4F.Transpose(matrix);
                 }
-                if (upAxis == UpAxis.Z_UP)
-                {
-                    joint.LocalMatrix = ZupYup * matrix * ZupYup;
-                }
-                else
-                {
-                    joint.LocalMatrix = matrix;
-                }
+                //AssembleModel changes the coordinate system - meshes, bones and key frames at once
+                joint.LocalMatrix = matrix;
             }
 
             return joint;
         }
 
 
-        //Достаём привязку материалов из визуальных сцен
+        //Reads the material bindings out of the visual scenes
         public void ResolveMaterialsBinding(SceneData sceneData, visual_scene visualScene)
         {
             if (visualScene != null)
@@ -1114,13 +990,10 @@ namespace Adamantium.Engine.Compiler.Models.ConversionUtils
                 while (stack.Count > 0)
                 {
                     var root = stack.Pop();
-                    //достаём из элемента instance_geometry его ID
                     instance_geometry[] nodeId = root.instance_geometry;
                     if (nodeId != null)
                     {
-                        //достаём id меша
-                        string meshId = nodeId[0].url.Substring(1);
-                        //Если MeshID совпадает с geometryId
+                        string meshId = Source(nodeId[0].url);
                         var mesh = sceneData.GetModelByID(meshId);
                         if (mesh != null)
                         {
@@ -1129,7 +1002,7 @@ namespace Adamantium.Engine.Compiler.Models.ConversionUtils
                             {
                                 foreach (var materialInstance in nodeId[0].bind_material.technique_common)
                                 {
-                                    mesh.Meshes[i].MaterialID = materialInstance.target.Substring(1);
+                                    mesh.Meshes[i].MaterialID = Source(materialInstance.target);
                                     i++;
                                 }
                             }
@@ -1149,9 +1022,9 @@ namespace Adamantium.Engine.Compiler.Models.ConversionUtils
         #endregion
 
 
-        #region Работа с материалами
+        #region Materials
 
-        //Преобразовываем внутренний enum типа поверхности в наш тип, чтобы знать, какую именно текстуру создавать в последствии
+        //Maps the format's surface-type enum onto ours, so the right kind of texture gets created later
         private TextureDimension ResolveTextureDimension(fx_surface_type_enum surfaceType)
         {
             switch (surfaceType)
@@ -1572,7 +1445,7 @@ namespace Adamantium.Engine.Compiler.Models.ConversionUtils
         #endregion
 
 
-        #region Работа со светом
+        #region Lights
 
         public SceneData.Light GetLight(light light)
         {
@@ -1616,7 +1489,7 @@ namespace Adamantium.Engine.Compiler.Models.ConversionUtils
         #endregion
 
 
-        #region Работа с камерами
+        #region Cameras
 
         public SceneData.Camera GetCamera(camera camera)
         {

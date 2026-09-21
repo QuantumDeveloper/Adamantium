@@ -24,6 +24,13 @@ namespace Adamantium.Engine.Compiler.Models.ConversionUtils
 
         public Dictionary<String, VertexSemantic> SemanticIdMapping { get; set; }
 
+        /// <summary>Records whose data a source holds. Records, not Add: two inputs may point at one source
+        /// (TEXCOORD with several sets is routine), and Add threw on that.</summary>
+        internal void MapSource(String sourceId, VertexSemantic semantic)
+        {
+            if (!String.IsNullOrEmpty(sourceId)) SemanticIdMapping[sourceId] = semantic;
+        }
+
         public Offset Offset { get; set; }
 
         public List<int> VertexType { get; set; }

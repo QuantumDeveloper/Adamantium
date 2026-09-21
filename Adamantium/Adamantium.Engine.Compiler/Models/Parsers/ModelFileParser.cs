@@ -1,5 +1,4 @@
-﻿using System;
-using System.Threading.Tasks;
+using System;
 using Adamantium.Engine.Compiler.Converter.Configs;
 using Adamantium.Engine.Compiler.Converter.Containers;
 
@@ -16,11 +15,9 @@ namespace Adamantium.Engine.Compiler.Converter.Parsers
          FilePath = filePath;
       }
 
-      public Task<DataContainer> ParseDataAsync(ConversionConfig config)
-      {
-         return Task.Run(() => ParseData(config));
-      }
-
-      protected abstract DataContainer ParseData(ConversionConfig config);
+      /// <summary>The parse is synchronous. The Task.Run wrapper was here only for all three callers to block on
+      /// .Result: the work was awaited on the spot anyway, and the price was a thread hop plus an
+      /// AggregateException in place of the real exception.</summary>
+      public abstract DataContainer ParseData(ConversionConfig config);
    }
 }

@@ -2,7 +2,7 @@
 
 namespace Adamantium.Engine.Compiler.Models.ConversionUtils
 {
-   //Класс для хранения данных оффсета геометрии
+   //Where each semantic sits within one vertex of the index stream
    public class Offset
    {
       public ulong? Position { get; set; }
@@ -13,11 +13,21 @@ namespace Adamantium.Engine.Compiler.Models.ConversionUtils
       public ulong? UV3 { get; set; }
       public ulong? Color { get; set; }
 
+      /// <summary>The highest offset of ANY input, including the ones we do not read. The stride is that plus one, so
+      /// leaving out a TANGENT or TEXBINORMAL - which Blender and Maya both write - made the stride too small and
+      /// shifted every index after it.</summary>
+      public void Observe(ulong offset)
+      {
+         if (offset > highest) highest = offset;
+      }
+
+      private ulong highest;
+
       public int CommonOffset
       {
          get
          {
-            int offset = -1;
+            int offset = (int)highest;
             if (Position != null)
             {
                offset = Math.Max((int) Position, offset);

@@ -395,12 +395,12 @@ namespace Adamantium.Imaging.Png
 
         private void ConvertColorsIfNeeded(PngFrame frame, PngState state)
         {
-            if (!state.DecoderSettings.ColorСonvert || state.ColorModeRaw == state.InfoPng.ColorMode)
+            if (!state.DecoderSettings.ColorConvert || state.ColorModeRaw == state.InfoPng.ColorMode)
             {
                 /*same color type, no copying or converting of data needed*/
                 /*store the info_png color settings on the info_raw so that the info_raw still reflects what colortype
                 the raw image has to the end user*/
-                if (!state.DecoderSettings.ColorСonvert)
+                if (!state.DecoderSettings.ColorConvert)
                 {
                     state.ColorModeRaw = state.InfoPng.ColorMode;
                 }

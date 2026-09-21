@@ -4,7 +4,7 @@
     {
         public PngDecoderSettings()
         {
-            ColorСonvert = true;
+            ColorConvert = true;
             ReadTextChunks = true;
         }
 
@@ -17,14 +17,14 @@
         /*ignore issues at end of file if possible (missing IEND chunk, too large chunk, ...)*/
         public bool IgnoreEnd { get; set; }
         /*whether to convert the PNG to the color type you want. Default: yes*/
-        public bool ColorСonvert { get; set; }
+        public bool ColorConvert { get; set; }
 
         public bool ReadTextChunks { get; set; }
 
         public static bool operator ==(PngDecoderSettings left, PngDecoderSettings right)
         {
             if (left.IgnoreAdler32 == right.IgnoreAdler32 && left.IgnoreCrc == right.IgnoreCrc
-                && left.IgnoreCritical == right.IgnoreCritical && left.ColorСonvert == right.ColorСonvert)
+                && left.IgnoreCritical == right.IgnoreCritical && left.ColorConvert == right.ColorConvert)
             {
                 return true;
             }

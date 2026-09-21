@@ -1,12 +1,11 @@
-﻿using System;
-
 namespace Adamantium.Graphics.Core.Models
 {
-   [Flags]
+   /// <summary>Whose data a skin source holds. Not flags: a source carries EXACTLY ONE role, and the former
+   /// [Flags] with Joint = 0 meant HasFlag(Joint) was always true.</summary>
    public enum ControllerSemantic
    {
-      Joint = 0,
-      Weight = 1,
-      InverseBindMatrix = 2
+      Joint,
+      Weight,
+      InverseBindMatrix
    }
 }

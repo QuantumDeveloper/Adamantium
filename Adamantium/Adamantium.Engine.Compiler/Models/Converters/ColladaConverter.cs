@@ -20,11 +20,18 @@ namespace Adamantium.Engine.Compiler.Models.Converters
          Parser = new ColladaFileParser(filePath);
       }
 
+      /// <summary>Reading indices, triangulating and building the raw mesh never touch the scene tree, so they run
+      /// in parallel. Attaching to the tree is sequential and in file order: otherwise the order of meshes in the
+      /// model would depend on which thread got there first.</summary>
       private void ParseData(List<geometry> geometrys)
       {
-         foreach (var geom in geometrys)
+         var prepared = new GeometryParts[geometrys.Count];
+         var options = new ParallelOptions { CancellationToken = CancellationToken };
+         Parallel.For(0, geometrys.Count, options, i => prepared[i] = PrepareGeometry(geometrys[i]));
+
+         foreach (var parts in prepared)
          {
-            ParseData(geom);
+            AttachGeometry(parts);
          }
       }
 
@@ -41,14 +48,6 @@ namespace Adamantium.Engine.Compiler.Models.Converters
          foreach (var controller in controllers)
          {
             ParseData(controller);
-         }
-      }
-
-      private void ParseData(List<animation> animations)
-      {
-         foreach (var animation in animations)
-         {
-            ParseData(animation);
          }
       }
 
@@ -88,94 +87,120 @@ namespace Adamantium.Engine.Compiler.Models.Converters
 
       protected override void Convert()
       {
-         ColladaDataContainer dataContainer = (ColladaDataContainer) Parser.ParseDataAsync(Config).Result;
+         ColladaDataContainer dataContainer = (ColladaDataContainer) Parser.ParseData(Config);
          if (!dataContainer.IsFileValid)
          {
             IsCancelled = true;
             return;
          }
 
+         UnsupportedFeatures.AddRange(dataContainer.UnsupportedFeatures);
+
          executor = new ColladaConversionExecutor(Config, dataContainer.Axis);
          UpAxis = dataContainer.Axis;
          SceneDataContainer.Units = dataContainer.Units;
 
+         try
+         {
+            ConvertLibraries(dataContainer);
+         }
+         finally
+         {
+            //Even when the parse threw, what it could not understand must be reported - especially then
+            UnsupportedFeatures.AddRange(executor.UnsupportedFeatures);
+         }
+      }
+
+      private void ConvertLibraries(ColladaDataContainer dataContainer)
+      {
+         CancellationToken.ThrowIfCancellationRequested();
+
          var controllerTask = Task.Run(() => ParseData(dataContainer.Controllers));
 
-         var imageTask = Task.Run(()=>ParseData(dataContainer.Images));
-
+         ParseData(dataContainer.Images);
          ParseData(dataContainer.Cameras);
          ParseData(dataContainer.Lights);
 
          SceneDataContainer.Models = SceneDataContainer.CreateMesh(null, "", dataContainer.FileName);
 
-         //Получаем древовидную стуктуру мешей, чтобы сохранить её при импорте
+         //Read the mesh tree so the import keeps the file's own hierarchy
          foreach (var visualScene in dataContainer.VisualScenes)
          {
             executor.GetMeshStructure(SceneDataContainer, visualScene, dataContainer.Geometries, dataContainer.Controllers);
          }
-         Task.WaitAll(imageTask, controllerTask);
-
-         var geometryTask = Task.Run(() => ParseData(dataContainer.Geometries)).ContinueWith(task=>ResolveMaterialsBinding(dataContainer.VisualScenes));
+         //Geometry takes bone weights from the controller table, so wait for it here
+         controllerTask.Wait();
+         CancellationToken.ThrowIfCancellationRequested();
 
          var materialsTask = Task.Run(() => ParseData(dataContainer.Materials, dataContainer.Effects));
+         //Animations read the controllers' bone lists (already built) and the visual-scene nodes, not the geometry
+         var animationTask = Task.Run(() => ParseData(dataContainer.Animations, dataContainer.VisualScenes));
 
-         var animationTask = Task.Run(() => ParseData(dataContainer.Animations));
+         ParseData(dataContainer.Geometries);
+         // Strictly after geometry: the binding looks for meshes that already exist. There used to be a ContinueWith
+         // here, which ran even when geometry threw and carried that exception away - the model arrived empty, silently.
+         ResolveMaterialsBinding(dataContainer.VisualScenes);
 
-         Task.WaitAll(materialsTask, geometryTask, animationTask);
+         Task.WaitAll(materialsTask, animationTask);
       }
 
-      #region Парсинг геометрии
+      #region Geometry
 
-      //Загружаем геометрию мешей
-      private void ParseData(geometry geometry)
+      private sealed record GeometryParts(List<IndicesContainer> Indices, Mesh Mesh, String MeshId, String MeshName);
+
+      //Reads one mesh. Nothing in here touches the scene tree, so it runs alongside the neighbouring geometries
+      private GeometryParts PrepareGeometry(geometry geometry)
       {
-         debugMessage = "Начинаю парсинг геометрии " + geometry.id + " в файле " + FileName;
-         String meshId = String.Empty;
-         String meshName = FileName;
          List<RawIndicesSemanticData> rawIndicesList = executor.GetRawIndicesCollada(geometry);
-         if (rawIndicesList != null)
+         if (rawIndicesList == null)
          {
-            List<IndicesContainer> indicesContainers = new List<IndicesContainer>();
-            //Получаем индексы вершин
-            foreach (var indices in rawIndicesList)
-            {
-               indicesContainers.Add(executor.DistributeIndices(indices));
-            }
+            return null;
+         }
 
-            //Выбираем самую полную семантику
-            Dictionary<String, VertexSemantic> semanticIdMapping = new Dictionary<string, VertexSemantic>();
-            for (int i = 0; i < indicesContainers.Count; i++)
+         List<IndicesContainer> indicesContainers = new List<IndicesContainer>();
+         foreach (var indices in rawIndicesList)
+         {
+            indicesContainers.Add(executor.DistributeIndices(indices));
+         }
+
+         //Take the richest semantic of them all
+         Dictionary<String, VertexSemantic> semanticIdMapping = new Dictionary<string, VertexSemantic>();
+         foreach (var indices in rawIndicesList)
+         {
+            foreach (var mapping in indices.SemanticIdMapping)
             {
-               var indices = rawIndicesList[i];
-               foreach (var mapping in indices.SemanticIdMapping)
+               if (!semanticIdMapping.ContainsKey(mapping.Key))
                {
-                  if (!semanticIdMapping.ContainsKey(mapping.Key))
-                  {
-                     semanticIdMapping.Add(mapping.Key, mapping.Value);
-                  }
+                  semanticIdMapping.Add(mapping.Key, mapping.Value);
                }
             }
-
-            var mesh = executor.GetRawMesh(geometry, semanticIdMapping, out meshId, out meshName);
-
-            SceneData.Controller controller;
-            if (SceneDataContainer.Controllers.TryGetValue(meshId, out controller))
-            {
-               mesh.SetJointIndices(controller.BoneIndices);
-               mesh.SetJointWeights(controller.BoneWeights);
-            }
-
-            //Собираем геометрию на основании этих индексов
-            executor.ConstructMesh(SceneDataContainer, indicesContainers, mesh, meshId, meshName);
-
-            debugMessage = "Парсинг геометрии " + geometry.id + " в файле " + FileName + " завершён";
          }
+
+         var mesh = executor.GetRawMesh(geometry, semanticIdMapping, out var meshId, out var meshName);
+         return new GeometryParts(indicesContainers, mesh, meshId, meshName);
+      }
+
+      //Hangs the parsed geometry on the scene tree. Sequentially, always
+      private void AttachGeometry(GeometryParts parts)
+      {
+         if (parts == null)
+         {
+            return;
+         }
+
+         if (SceneDataContainer.Controllers.TryGetValue(parts.MeshId, out var controller))
+         {
+            parts.Mesh.SetJointIndices(controller.BoneIndices);
+            parts.Mesh.SetJointWeights(controller.BoneWeights);
+         }
+
+         executor.ConstructMesh(SceneDataContainer, parts.Indices, parts.Mesh, parts.MeshId, parts.MeshName);
       }
 
       #endregion
 
 
-      #region Парсинг анимации и контроллеров
+      #region Animation and controllers
 
       private void ParseData(controller controller)
       {
@@ -186,51 +211,45 @@ namespace Adamantium.Engine.Compiler.Models.Converters
          }
       }
 
-      private void ParseData(animation animation)
+      /// <summary>Animations are collected across the WHOLE library at once: one joint's channels legally sit in
+      /// separate &lt;animation&gt; elements (that is how Blender exports), and parsing them one by one leaves the
+      /// joint with nothing but its last channel.</summary>
+      private void ParseData(List<animation> animations, List<visual_scene> visualScenes)
       {
-         object[] items = animation.Items;
-         if (!(items[0] is animation))
+         var nodes = ColladaConversionExecutor.IndexNodes(visualScenes);
+         foreach (var frames in executor.GetAnimations(animations, nodes))
          {
-            var anim = executor.GetAnimation(animation, FilePath);
-            lock (SceneDataContainer.Animation)
+            frames.ControllerId = ControllerFor(frames.JointId);
+            SceneDataContainer.Animation[frames.FullName] = frames;
+         }
+      }
+
+      //Whose joint this is. The controller's bone list is the authority; a substring of the name is the fallback
+      private String ControllerFor(String jointId)
+      {
+         foreach (var controller in SceneDataContainer.Controllers)
+         {
+            if (controller.Value.JointNames.Contains(jointId))
             {
-               foreach (var controller in SceneDataContainer.Controllers)
-               {
-                  if (animation.id.Contains(controller.Value.Name))
-                  {
-                     anim.ControllerId = controller.Value.Name;
-                     break;
-                  }
-               }
-               if (!SceneDataContainer.Animation.ContainsKey(anim.FullName))
-               {
-                  SceneDataContainer.Animation.Add(anim.FullName, anim);
-               }
+               return controller.Value.Name;
             }
          }
-         /*
-         if (items[0] is animation)
+
+         foreach (var controller in SceneDataContainer.Controllers)
          {
-            foreach (var item in items)
+            var name = controller.Value.Name;
+            if (!String.IsNullOrEmpty(name) && jointId.Contains(name))
             {
-               lock (SceneDataContainer.Animation)
-               {
-                  var anim = conversionHelper.GetAnimation((animation) item, data.FilePath,
-                     data.Config.MatrixTransposeNeeded, data.Axis);
-                  if (!SceneDataContainer.Animation.ContainsKey(anim.FullName))
-                  {
-                     SceneDataContainer.Animation.Add(anim.FullName, anim);
-                  }
-               }
+               return name;
             }
          }
-         */
+         return String.Empty;
       }
 
       #endregion
 
 
-      #region Парсинг материалов
+      #region Materials
 
       private void ParseData(material material, List<effect> effects)
       {
@@ -241,8 +260,8 @@ namespace Adamantium.Engine.Compiler.Models.Converters
             if (effect.id == id)
             {
                var materialComponent = executor.GetMaterial(effect);
-               //Присваиваем ссылку на материал, а не на эффект, чтобы не терять связи 
-               //между материалами в геометрии и материалом в библиотеке материалов
+               //Point at the material, not the effect, so the link between the geometry's material and the one in
+               //the material library survives
                materialComponent.ID = material.id;
                lock (SceneDataContainer.Materials)
                {
@@ -256,7 +275,7 @@ namespace Adamantium.Engine.Compiler.Models.Converters
       #endregion
 
 
-      #region Парсинг света
+      #region Lights
 
       private void ParseData(light light)
       {
@@ -270,7 +289,7 @@ namespace Adamantium.Engine.Compiler.Models.Converters
       #endregion
 
 
-      #region Парсинг камер
+      #region Cameras
 
       private void ParseData(camera camera)
       {
@@ -284,7 +303,7 @@ namespace Adamantium.Engine.Compiler.Models.Converters
       #endregion
 
 
-      #region Парсинг текстур
+      #region Textures
 
       private void ParseData(image img)
       {

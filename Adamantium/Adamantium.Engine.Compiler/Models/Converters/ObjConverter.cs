@@ -21,7 +21,7 @@ namespace Adamantium.Engine.Compiler.Converter.Converters
 
       protected override void Convert()
       {
-         dataContainer = (ObjDataContainer) Parser.ParseDataAsync(Config).Result;
+         dataContainer = (ObjDataContainer) Parser.ParseData(Config);
          if (!dataContainer.IsFileValid)
          {
             IsCancelled = true;
@@ -43,7 +43,7 @@ namespace Adamantium.Engine.Compiler.Converter.Converters
       private void ParseData(ObjMeshData meshData)
       {
          List<IndicesContainer> indicesContainers = new List<IndicesContainer>();
-         //Получаем индексы вершин
+         //Vertex indices
          foreach (var indices in meshData.GeometrySemantic)
          {
             indicesContainers.Add(executor.DistributeIndices(indices));

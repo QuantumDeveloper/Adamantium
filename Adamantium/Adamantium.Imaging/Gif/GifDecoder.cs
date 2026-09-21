@@ -43,12 +43,12 @@ namespace Adamantium.Imaging.Gif
             /* Presence of GCT (global color table) */
             if ((screenDescriptor.Fields & 0x80) != 0)
             {
-                var сolorTable = new byte[3 * gctSize];
-                stream.Read(сolorTable, 0, сolorTable.Length);
+                var colorTable = new byte[3 * gctSize];
+                stream.Read(colorTable, 0, colorTable.Length);
                 int offset = 0;
                 for (int i = 0; i < gctSize; i++)
                 {
-                    gifImage.GlobalColorTable.Add(new ColorRGB(сolorTable[offset], сolorTable[offset + 1], сolorTable[offset + 2]));
+                    gifImage.GlobalColorTable.Add(new ColorRGB(colorTable[offset], colorTable[offset + 1], colorTable[offset + 2]));
                     offset += 3;
                 }
             }
@@ -166,13 +166,13 @@ namespace Adamantium.Imaging.Gif
             {
                 var size = 1 << ((descriptor.Fields & 0x07) + 1);
                 //Read local color table
-                var сolorTable = new byte[3 * size];
-                stream.Read(сolorTable, 0, сolorTable.Length);
+                var colorTable = new byte[3 * size];
+                stream.Read(colorTable, 0, colorTable.Length);
                 int offset = 0;
                 frame.ColorTable = new ColorRGB[size];
                 for (int i = 0; i < size; i++)
                 {
-                    frame.ColorTable[i] = new ColorRGB(сolorTable[offset], сolorTable[offset + 1], сolorTable[offset + 2]);
+                    frame.ColorTable[i] = new ColorRGB(colorTable[offset], colorTable[offset + 1], colorTable[offset + 2]);
                     offset += 3;
                 }
             }
