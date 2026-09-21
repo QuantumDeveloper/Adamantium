@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Threading;
 using Adamantium.Core;
 using Adamantium.Engine.Managers;
 using Adamantium.ECS;
@@ -16,11 +15,13 @@ namespace Adamantium.Engine.EntityServices;
 
 public class RenderingService : EntityService
 {
-    private readonly AutoResetEvent pauseEvent = new AutoResetEvent(false);
-        
     public override bool IsUpdateService => false;
     public override bool IsRenderingService => true;
     public override EntityServiceType ServiceType => EntityServiceType.Render;
+
+    // Present runs on its own phase, so a skipped BeginDraw does not skip it: without this a hidden output would keep
+    // handing the panel the one frame it drew before its tab went away.
+    public override bool CanDisplayContent => Window.IsVisible;
     protected IContentManager Content { get; }
     public GameOutput Window { get; }
 
@@ -104,7 +105,9 @@ public class RenderingService : EntityService
 
     public override bool BeginDraw()
     {
-        if (!Window.IsUpToDate())
+        // Nothing to draw into while the output is off screen, and the whole sequence (Draw/EndDraw/Submit) is skipped
+        // by returning false here - which is also what keeps a hidden output from presenting a frame nobody asked for.
+        if (!Window.IsVisible || !Window.IsUpToDate())
         {
             return false;
         }
@@ -142,11 +145,6 @@ public class RenderingService : EntityService
 
     public override void Draw(AppTime gameTime)
     {
-        if (!Window.IsVisible)
-        {
-            pauseEvent.WaitOne();
-        }
-            
         AppTime = gameTime;
 
         if (InputManager.IsKeyPressed(Keys.P))

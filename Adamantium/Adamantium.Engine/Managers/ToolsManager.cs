@@ -167,6 +167,28 @@ public class ToolsManager : GameManagerBase
 
     public void Update(IEnumerable<Entity> entities, CameraManager cameraManager, LightManager lightManager)
     {
+        // The tools pick with the pointer taken in the SURFACE's own coordinates, and a surface that is off screen -
+        // a game panel whose tab is no longer the selected one - has no such point: the walk to its root finds no
+        // root. The grid below is not pointer work and still owes the cameras its transform.
+        if (inputManager.CanLocatePointer)
+        {
+            ProcessTools(entities, cameraManager, lightManager);
+        }
+
+        PlaneGridTool.TraverseInDepth(
+            current =>
+            {
+                foreach (var activeCamera in cameraManager.ActiveCameras)
+                {
+                    current.Transform.CalculateFinalTransform(activeCamera, Vector3F.Zero, Matrix4x4F.Identity);
+                }
+            });
+
+        Text = "Current selected entity: " + SelectedEntity + "\n";
+    }
+
+    private void ProcessTools(IEnumerable<Entity> entities, CameraManager cameraManager, LightManager lightManager)
+    {
         CollisionMode collisionMode = CollisionMode.IgnoreNonGeometryParts;
         var camera = cameraManager.UserControlledCamera;
         if (SelectedEntity != null && !SelectedEntity.IsEnabled)
@@ -215,16 +237,5 @@ public class ToolsManager : GameManagerBase
                 SelectedEntity = null;
             }
         }
-
-        PlaneGridTool.TraverseInDepth(
-            current =>
-            {
-                foreach (var activeCamera in cameraManager.ActiveCameras)
-                {
-                    current.Transform.CalculateFinalTransform(activeCamera, Vector3F.Zero, Matrix4x4F.Identity);
-                }
-            });
-
-        Text = "Current selected entity: " + SelectedEntity + "\n";
     }
 }

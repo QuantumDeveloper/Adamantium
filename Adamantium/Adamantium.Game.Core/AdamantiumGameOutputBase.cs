@@ -292,7 +292,10 @@ namespace Adamantium.Game.Core
         /// <summary>
         /// Defines is <see cref="GameOutput"/> currently displayed
         /// </summary>
-        public override bool IsVisible => InputComponent.Visibility == Visibility.Visible;
+        // Attachment as well as Visibility: a surface taken out of the visual tree - a game panel on a tab that is no
+        // longer the selected one - is not on screen, yet keeps reporting Visible, and nobody else ever says otherwise.
+        public override bool IsVisible =>
+            InputComponent.Visibility == Visibility.Visible && InputComponent.IsAttachedToVisualTree;
 
         internal override void Resize(uint width, uint height)
         {

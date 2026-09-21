@@ -164,6 +164,11 @@ namespace Adamantium.Game.Core.Input
 
         public bool IsWindowAvailable { get; private set; }
 
+        /// <summary>Whether <see cref="RelativePosition"/> can answer at all. It converts through the game surface's own
+        /// coordinates, and while that surface is off screen there is no such point to answer with. With no surface in
+        /// hand it converts through the window handle instead, which is always available.</summary>
+        public bool CanLocatePointer => window is null || window.IsVisible;
+
         public Vector2F RawMouseDelta { get; private set; }
 
         public Vector2F AcceleratedMouseDelta

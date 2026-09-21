@@ -1,14 +1,11 @@
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
 using Adamantium.Core;
 using Adamantium.ECS;
 using Adamantium.Game.Core;
-using Adamantium.Graphics;
 using Adamantium.Graphics.Core;
-using Adamantium.UI.Controls;
 using Adamantium.UI.Core;
 
 namespace Adamantium.Game;
@@ -77,16 +74,17 @@ public class GameService : IGameService
 
     public void CopyOutput(IGraphicsDevice graphicsDevice)
     {
-        var timer = Stopwatch.StartNew();
         foreach (var game in Games)
         {
             foreach (var gameOutput in game.Outputs)
             {
+                // A whole frame's worth of pixels into a surface nobody samples: an output off the visual tree - a game
+                // panel whose tab is not the selected one - drew nothing this frame and has no viewer for it either.
+                if (!gameOutput.IsVisible) continue;
+
                 gameOutput.CopyOutput(graphicsDevice);
             }
         }
-        timer.Stop();
-        //Debug.WriteLine($"Image Copy time: {timer.ElapsedMilliseconds}");
     }
 
     public event Action<IGame> OnGameAdded;

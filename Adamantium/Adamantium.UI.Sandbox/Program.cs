@@ -1702,6 +1702,19 @@ public class Program
                     var tabs = win?.Content is Adamantium.UI.Core.IUIComponent c ? Find<Adamantium.UI.Controls.TabControl>(c) : null;
                     var visited = new System.Text.StringBuilder();
 
+                    // Focus the game panel first: its input path reads the pointer in the PANEL's own coordinates, and
+                    // that path only runs once the panel has been focused. A sweep that never focuses it never enters
+                    // the path, so it cannot tell whether leaving the tab still breaks it.
+                    var panel = win?.Content is Adamantium.UI.Core.IUIComponent gc
+                        ? Find<Adamantium.UI.Controls.Panels.RenderTargetPanel>(gc)
+                        : null;
+                    if (panel != null)
+                    {
+                        Adamantium.UI.Threading.Dispatcher.CurrentDispatcher?.Post(() => panel.Focus());
+                        System.Threading.Thread.Sleep(1000);
+                        visited.Append("game-panel-focused ");
+                    }
+
                     if (tabs != null)
                     {
                         for (var i = 0; i < tabs.Items.Count; i++)
@@ -1710,7 +1723,19 @@ public class Program
                             Adamantium.UI.Threading.Dispatcher.CurrentDispatcher?.Post(() => tabs.SelectedIndex = index);
                             System.Threading.Thread.Sleep(1500);   // let it build, lay out and DRAW at least once
                             visited.Append(index).Append(':')
-                                   .Append(Adamantium.UI.Core.Diagnostics.RuntimeStats.PresentedFrames).Append(' ');
+                                   .Append(Adamantium.UI.Core.Diagnostics.RuntimeStats.PresentedFrames);
+                            // Found again each time, not once before the loop: leaving a tab can drop its content for
+                            // good, and a reference kept from the start would then report on a dead object for the
+                            // rest of the sweep - including on the game's own tab, where the answer matters most.
+                            // Visibility says nothing about being on screen, and that is what this shows: off its own
+                            // tab the panel still reads Visible while it is no longer in the tree at all.
+                            var live = win?.Content is Adamantium.UI.Core.IUIComponent lc
+                                ? Find<Adamantium.UI.Controls.Panels.RenderTargetPanel>(lc)
+                                : null;
+                            visited.Append(live == null
+                                ? "(no-panel)"
+                                : $"(vis={live.Visibility},tree={live.IsAttachedToVisualTree})");
+                            visited.Append(' ');
                             System.IO.File.WriteAllText(log + ".tabs.txt", visited.ToString());
                         }
                     }
