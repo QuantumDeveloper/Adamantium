@@ -71,6 +71,16 @@ public static class ShaderPrecompiler
                 return;
             }
 
+            // The child left behind the name of what it was building when it died. Writing that down is progress of
+            // its own kind - the next attempt starts past it - and without this one effect the driver will not
+            // compile holds the whole cache cold, for every launch, forever.
+            if (TakePoisoned(device) is { } poisoned)
+            {
+                Log.Logger.Warning($"Shader precompile: {poisoned} took the process down - skipping it from now on");
+                withoutProgress = 0;
+                continue;
+            }
+
             // A dead child still made progress if it persisted something new; only a run that adds NOTHING counts
             // against us, because that is the shape of a permanent failure rather than the driver's flake.
             var now = CachedCount(folder);
@@ -101,8 +111,22 @@ public static class ShaderPrecompiler
         // extra render device costs nothing.
         var target = device.MainDevice.CreateRenderDevice();
 
+        var poisonPath = PoisonFile(device);
+        var inFlightPath = InFlightFile(device);
+        var poisoned = ReadPoisoned(poisonPath);
+
         foreach (var type in EffectTypes())
         {
+            if (poisoned.Contains(type.FullName ?? type.Name))
+            {
+                skipped++;
+                continue;
+            }
+
+            // Written BEFORE the constructor, deleted after it: if the process does not come back, the parent reads
+            // this and knows which effect to stop asking for.
+            TryWrite(inFlightPath, type.FullName ?? type.Name);
+
             try
             {
                 // Generated effects all take (IGraphicsDevice, EffectPool = null) and compile their shaders in the ctor.
@@ -121,6 +145,8 @@ public static class ShaderPrecompiler
                 var cause = (e as TargetInvocationException)?.InnerException ?? e;
                 Log.Logger.Warning($"Shader precompile skipped {type.Name}: {cause.GetType().Name}: {cause.Message}");
             }
+
+            TryDelete(inFlightPath);
         }
 
         // Reaching here at all means the process survived the whole list - that is what "precompiled" means.
@@ -242,15 +268,87 @@ public static class ShaderPrecompiler
         }
     }
 
-    private static string StampFile(GraphicsDevice device)
+    private static string StampFile(GraphicsDevice device) => SideFile(device, "precompiled.stamp");
+
+    /// <summary>Effects whose construction killed the process here. Beside the cache, so it is keyed by GPU and driver
+    /// the same way - a driver update clears the verdict along with the binaries it was made against.</summary>
+    private static string PoisonFile(GraphicsDevice device) => SideFile(device, "poisoned.txt");
+
+    /// <summary>The effect the child is building right now. It survives the process that wrote it, which is the point:
+    /// after a fault that leaves no exception to catch, this is the only thing that says what was being built.</summary>
+    private static string InFlightFile(GraphicsDevice device) => SideFile(device, "compiling.txt");
+
+    private static string SideFile(GraphicsDevice device, string name)
     {
         try
         {
-            return Path.Combine(ShaderBinaryCache.DirectoryFor(device), "precompiled.stamp");
+            return Path.Combine(ShaderBinaryCache.DirectoryFor(device), name);
         }
         catch
         {
             return null;
+        }
+    }
+
+    /// <summary>Moves whatever the dead child was building into the poison list, and returns it. Null when the child
+    /// died somewhere other than a constructor - there is nothing to blame then.</summary>
+    private static string TakePoisoned(GraphicsDevice device)
+    {
+        var inFlight = InFlightFile(device);
+        var poison = PoisonFile(device);
+        if (inFlight == null || poison == null || !File.Exists(inFlight)) return null;
+
+        try
+        {
+            var name = File.ReadAllText(inFlight).Trim();
+            File.Delete(inFlight);
+            if (name.Length == 0) return null;
+
+            if (!ReadPoisoned(poison).Contains(name)) File.AppendAllText(poison, name + Environment.NewLine);
+            return name;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private static void TryWrite(string path, string text)
+    {
+        try
+        {
+            if (path == null) return;
+            Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+            File.WriteAllText(path, text);
+        }
+        catch
+        {
+            // Housekeeping. A pass that cannot leave notes still compiles shaders.
+        }
+    }
+
+    private static void TryDelete(string path)
+    {
+        try
+        {
+            if (path != null && File.Exists(path)) File.Delete(path);
+        }
+        catch
+        {
+        }
+    }
+
+    private static HashSet<string> ReadPoisoned(string path)
+    {
+        try
+        {
+            return path != null && File.Exists(path)
+                ? new HashSet<string>(File.ReadAllLines(path).Where(l => l.Length > 0), StringComparer.Ordinal)
+                : new HashSet<string>(StringComparer.Ordinal);
+        }
+        catch
+        {
+            return new HashSet<string>(StringComparer.Ordinal);
         }
     }
 
