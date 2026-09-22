@@ -226,29 +226,10 @@ namespace Adamantium.Game.Core.Input
 
         public Vector2F AbsolutePosition => absolutePosition;
 
-        public Vector2F RelativePosition
-        {
-            get
-            {
-                // Relative to the SURFACE the game draws on. A game hosted in a panel does not start at the window's
-                // client origin, so ScreenToClient(window) answered in the wrong space and every pick missed by the
-                // height of the chrome above it.
-                if ((window as AdamantiumGameOutputBase)?.InputComponent is Adamantium.UI.Core.IUIComponent surface)
-                {
-                    // Through the UI's own conversion: it divides by the DPI scale at the root and then walks the
-                    // offsets down in the SAME logical space. Subtracting the surface's screen origin by hand was
-                    // right only at 100% - on a 150% monitor every pick missed by half as much again.
-                    var point = Adamantium.UI.Core.UIExtensions.PointToClient(surface,
-                        new Adamantium.UI.Core.PixelPoint((int)absolutePosition.X, (int)absolutePosition.Y));
-
-                    return new Vector2F((float)point.X, (float)point.Y);
-                }
-
-                NativePoint point2 = new NativePoint((int)absolutePosition.X, (int)absolutePosition.Y);
-                Win32Interop.ScreenToClient(Handle, ref point2);
-                return new Vector2F(point2.X, point2.Y);
-            }
-        }
+        // No output yet means no surface to be relative to - the field is set on the first window activation, and
+        // CanLocatePointer counts that state as valid. Screen coordinates are the best answer there, which is also
+        // what the previous ScreenToClient(NULL) fallback returned.
+        public Vector2F RelativePosition => window?.PointToSurface(absolutePosition) ?? absolutePosition;
 
         public Vector2F VirtualPosition
         {
@@ -283,21 +264,10 @@ namespace Adamantium.Game.Core.Input
         {
             if (hold == isPointerHeld) return;
             isPointerHeld = hold;
-
-            if ((window as AdamantiumGameOutputBase)?.InputComponent?.RootVisual is not
-                Adamantium.UI.Controls.WindowBase root) return;
-
-            if (hold)
-            {
-                Win32Interop.GetCursorPos(out var point);
-                heldFrom = new Adamantium.UI.Core.PixelPoint(point.X, point.Y);
-            }
-
-            root.SetRelativeMouseMode(hold, hold ? default : heldFrom);
+            window?.HoldPointer(hold, absolutePosition);
         }
 
         private bool isPointerHeld;
-        private Adamantium.UI.Core.PixelPoint heldFrom;
 
         protected virtual void SetMousePosition(Vector2F position)
         {

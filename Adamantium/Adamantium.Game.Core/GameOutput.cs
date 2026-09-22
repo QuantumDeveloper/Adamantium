@@ -7,7 +7,6 @@ using Adamantium.Graphics.Core.Extensions;
 using Adamantium.Graphics.Core.Presentation;
 using Adamantium.Imaging;
 using Adamantium.Mathematics;
-using Adamantium.UI;
 using Adamantium.UI.Controls;
 using Adamantium.UI.Core;
 using Adamantium.Vulkan.Core;
@@ -363,6 +362,17 @@ namespace Adamantium.Game.Core
                 }
             }
         }
+
+        /// <summary>
+        /// Converts a point in screen coordinates into the coordinates of the surface this output draws on.
+        /// </summary>
+        public abstract Vector2F PointToSurface(Vector2F absolute);
+
+        /// <summary>
+        /// Pins the pointer where it stands and hides it, so a drag the game is running carries on past the edge of
+        /// the screen and arrives as motion rather than as a position. Released with false, which puts the cursor back.
+        /// </summary>
+        public abstract void HoldPointer(bool hold, Vector2F origin);
 
         public virtual IntPtr Handle
         {

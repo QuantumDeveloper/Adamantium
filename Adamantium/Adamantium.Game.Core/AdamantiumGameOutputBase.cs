@@ -2,6 +2,8 @@
 using Adamantium.Game.Core.Input;
 using Adamantium.Graphics.Core;
 using Adamantium.Imaging;
+using Adamantium.Mathematics;
+using Adamantium.UI.Controls;
 using Adamantium.UI.Core;
 using Adamantium.UI.Core.Input;
 using GameMouseButtons = Adamantium.Game.Core.Input.MouseButton;
@@ -18,6 +20,29 @@ namespace Adamantium.Game.Core
         /// <summary>The component the game's surface IS - a window, or the panel it is hosted in. Public because a
         /// cursor position only means something relative to it.</summary>
         public IInputComponent InputComponent { get; protected set; }
+
+        // Relative to the SURFACE, not to the window: a game hosted in a panel does not start at the client origin,
+        // so screen-to-client answered in the wrong space and every pick missed by the height of the chrome above it.
+        // Through the UI's own conversion, because it divides by the DPI scale at the root and then walks the offsets
+        // down in the SAME logical space - subtracting the surface origin by hand was right only at 100%.
+        public override Vector2F PointToSurface(Vector2F absolute)
+        {
+            var point = UIExtensions.PointToClient(InputComponent, new PixelPoint((int)absolute.X, (int)absolute.Y));
+            return new Vector2F((float)point.X, (float)point.Y);
+        }
+
+        // The same relative mode the surface's own mouse-look engages: it enters and leaves on the window's own thread
+        // (the worker posts itself a message), which is what makes it safe to ask for from the game loop.
+        public override void HoldPointer(bool hold, Vector2F origin)
+        {
+            if (InputComponent?.RootVisual is not WindowBase root) return;
+
+            if (hold) heldFrom = new PixelPoint((int)origin.X, (int)origin.Y);
+
+            root.SetRelativeMouseMode(hold, hold ? default : heldFrom);
+        }
+
+        private PixelPoint heldFrom;
 
         protected static readonly Dictionary<Key, Keys> TranslationKeys;
         protected static readonly Dictionary<MouseButtons, GameMouseButtons> MouseTranslationKeys;
