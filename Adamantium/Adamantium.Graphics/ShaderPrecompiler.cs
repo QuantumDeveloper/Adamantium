@@ -201,8 +201,12 @@ public static class ShaderPrecompiler
 
             foreach (var type in types)
             {
+                // Type only, no namespace test. There used to be one for ".Effects.Generated", and when the generator
+                // moved its output into the assembly's own namespace nothing failed - the pass simply found no effects
+                // and gave up three child processes later, every launch. A condition the compiler cannot check is a
+                // condition that goes silently stale.
+                // An effect that will not take (device, pool) throws in the ctor below and is counted as skipped.
                 if (type.IsAbstract || !typeof(Effect).IsAssignableFrom(type)) continue;
-                if (type.Namespace?.EndsWith(".Effects.Generated", StringComparison.Ordinal) != true) continue;
                 yield return type;
             }
         }
