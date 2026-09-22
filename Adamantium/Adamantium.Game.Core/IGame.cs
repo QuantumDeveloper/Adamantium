@@ -1,13 +1,13 @@
-﻿using Adamantium.Core.DependencyInjection;
+﻿using Adamantium.Core;
+using Adamantium.Core.DependencyInjection;
 using Adamantium.ECS;
 using Adamantium.Graphics;
 using Adamantium.Graphics.Core;
-using Adamantium.UI;
 using Adamantium.UI.Core;
 
 namespace Adamantium.Game.Core
 {
-    public interface IGame : IService
+    public interface IGame : IAdamantiumApplication
     {
         EntityWorld EntityWorld { get; }
         

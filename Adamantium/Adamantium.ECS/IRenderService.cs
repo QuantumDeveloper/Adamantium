@@ -38,13 +38,6 @@ public interface IRenderService : IContentable, IDisplayContent
     bool IsVisible { get; set; }
 
     /// <summary>
-    /// Gets the draw order relative to other objects. <see cref="IDrawable"/> objects with a lower value are drawn first.
-    /// </summary>
-    /// <value>The draw order.</value>
-    /// <remarks>This property is valid on if <see cref="ExecutionType"/> is <see cref="ExecutionType.Sync"/>. Otherwise priority will bw ignored</remarks>
-    int DrawPriority { get; set; }
-
-    /// <summary>
     /// Gets or sets the way how this system will be processed in Draw phase
     /// </summary>
     ExecutionType DrawExecutionType { get; set; }

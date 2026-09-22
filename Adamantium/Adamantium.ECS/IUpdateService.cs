@@ -18,13 +18,6 @@ public interface IUpdateService : IContentable
     bool Enabled { get; set; }
 
     /// <summary>
-    /// Gets the update order relative to other game components. Lower values are updated first.
-    /// </summary>
-    /// <value>The update order.</value>
-    /// <remarks>This property is valid on if <see cref="ExecutionType"/> is <see cref="ExecutionType.Sync"/>. Otherwise priority will bw ignored</remarks>
-    int UpdatePriority { get; set; }
-
-    /// <summary>
     /// Gets or sets the way how this system will be processed in Update phase
     /// </summary>
     ExecutionType UpdateExecutionType { get; set; }

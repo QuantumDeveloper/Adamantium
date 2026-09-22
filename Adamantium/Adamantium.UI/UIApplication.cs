@@ -1,6 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.IO;
+using System.Linq;
 using System.Threading;
 using System.Threading.Channels;
 using System.Threading.Tasks;
@@ -42,7 +44,7 @@ using UnhandledExceptionEventHandler = Adamantium.UI.Core.RoutedEvents.Unhandled
 
 namespace Adamantium.UI;
 
-public abstract class UIApplication : FundamentalUIComponent, IService, IUIApplication, IWindowPlatformService
+public abstract class UIApplication : FundamentalUIComponent, IAdamantiumApplication, IUIApplication, IWindowPlatformService
 {
     private readonly object applicationLocker = new object();
     
@@ -133,13 +135,44 @@ public abstract class UIApplication : FundamentalUIComponent, IService, IUIAppli
         return resourceManager;
     }
 
+    // A file per launch, capped, and only the last few kept. Rolling by day put every run of a day into one file
+    // with no ceiling: a defect repeating each frame wrote 149 MB in one sitting, and nothing said so - the run it
+    // belonged to could not even be told apart from the ones before it.
+    private const int RetainedLogRuns = 10;
+    private const long LogSizeLimitBytes = 32L * 1024 * 1024;
+
     private void ConfigureLogging()
     {
+        var directory = Path.Combine(AppContext.BaseDirectory, "logs");
+        Directory.CreateDirectory(directory);
+        SweepOldLogs(directory);
+
+        var path = Path.Combine(directory, $"adamantium_{DateTime.Now:yyyy-MM-dd_HH-mm-ss}.txt");
+
         Log.Logger = new LoggerConfiguration()
             .MinimumLevel.Debug()
             .WriteTo.Console(theme: AnsiConsoleTheme.Code)
-            .WriteTo.File("logs/uilogs.txt", rollingInterval: RollingInterval.Day)
+            // Stops at the limit rather than rolling on: past that size the file is a symptom, not a record, and the
+            // first occurrences - the ones worth reading - are already at the top.
+            .WriteTo.File(path, fileSizeLimitBytes: LogSizeLimitBytes, rollOnFileSizeLimit: false)
             .CreateLogger();
+    }
+
+    private static void SweepOldLogs(string directory)
+    {
+        try
+        {
+            var stale = new DirectoryInfo(directory)
+                .GetFiles("adamantium_*.txt")
+                .OrderByDescending(f => f.LastWriteTimeUtc)
+                .Skip(RetainedLogRuns);
+
+            foreach (var file in stale) file.Delete();
+        }
+        catch (IOException)
+        {
+            // A file another instance still holds open. Housekeeping is not worth failing a launch over.
+        }
     }
 
     public static UIApplication Current { get; private set; }
@@ -427,7 +460,7 @@ public abstract class UIApplication : FundamentalUIComponent, IService, IUIAppli
 
     private void RegisterBasicServices(IContainerRegistry containerRegistry)
     {
-        containerRegistry.RegisterInstance<IService>(this);
+        containerRegistry.RegisterInstance<IAdamantiumApplication>(this);
         containerRegistry.RegisterInstance<IUIApplication>(this);
         containerRegistry.RegisterInstance<EntityWorld>(EntityWorld);
     }

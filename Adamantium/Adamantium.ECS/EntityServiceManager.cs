@@ -2,6 +2,7 @@
 using Adamantium.Core.Collections;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Adamantium.Core.DependencyInjection;
 using Adamantium.Graphics.Core;
 
@@ -19,7 +20,7 @@ namespace Adamantium.ECS
 
         private readonly AdamantiumCollection<EntityService> services;
         
-        private IService appService;
+        private IAdamantiumApplication appService;
 
         public EntityWorld EntityWorld { get; }
         
@@ -52,15 +53,24 @@ namespace Adamantium.ECS
         //
         // The collection itself only ever changes in SyncServices (adds/removes are queued and applied there), so a snapshot
         // published on each change is all the iterators need - and they need no lock at all.
+        // Ordered by Priority, which every phase follows: priority states a dependency between services - physics
+        // before transforms, scene before the HUD - and a dependency does not invert between updating and drawing.
+        // Sorted here rather than at iteration: the set changes rarely, the frame runs constantly. The sort is stable,
+        // so equal priorities keep registration order - with every service still at the default this is exactly the
+        // order of today, and only a service that asks for a place gets one.
         private volatile EntityService[] _snapshot = [];
 
-        private void RepublishSnapshot() => _snapshot = [.. services];
+        private void RepublishSnapshot() => _snapshot = services.OrderBy(s => s.Priority).ToArray();
+
+        // A service that changes its priority while running - a physics engine added mid-flight, the case this was
+        // written for - has to be re-placed, not left where it was registered.
+        internal void OnServicePriorityChanged() => RepublishSnapshot();
 
         public Action FrameEnded;
         
         internal void InitializeResources()
         {
-            appService = Container.Resolve<IService>();
+            appService = Container.Resolve<IAdamantiumApplication>();
             appService.Started += OnServiceStarted;
             appService.ShuttingDown += OnServiceShuttingDown;
         }
@@ -142,7 +152,7 @@ namespace Adamantium.ECS
         }
 
         // No lock: iterate the published snapshot. Update runs on the loop thread and Draw/Present on the render thread, and
-        // sharing one lock made the loop wait out the whole GPU frame (see _snapshot).
+        // sharing one lock made the loop wait out the whole GPU frame (see the snapshots).
         public void Update(AppTime gameTime)
         {
             foreach (var handler in _snapshot)

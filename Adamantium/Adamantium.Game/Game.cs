@@ -106,7 +106,7 @@ public class Game : PropertyChangedBase, IGame
         Container.RegisterInstance<IContentManager>(Content);
         Container.RegisterInstance<IGamePlatform>(gamePlatform);
         Container.RegisterInstance<IGame>(this);
-        Container.RegisterInstance<IService>(this);
+        Container.RegisterInstance<IAdamantiumApplication>(this);
         Container.RegisterInstance<IGraphicsDeviceService>(GraphicsDeviceService);
         Container.RegisterInstance<EntityWorld>(EntityWorld);
             

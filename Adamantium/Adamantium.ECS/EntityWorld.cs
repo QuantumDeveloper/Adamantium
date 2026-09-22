@@ -1,11 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Threading.Tasks;
-using Adamantium.Core;
 using Adamantium.Core.DependencyInjection;
 using Adamantium.ECS.Templates;
-using Adamantium.ECS.Components;
 
 namespace Adamantium.ECS
 {

@@ -6,6 +6,12 @@ namespace Adamantium.ECS;
 public interface IEntityService : IUpdateService, IRenderService
 {
     UInt128 Uid { get; }
+
+    /// <summary>
+    /// Place of this service in the frame, lower first. States a dependency on other services, which is why it is
+    /// one value for the whole cycle rather than one per phase.
+    /// </summary>
+    int Priority { get; set; }
     
     EntityWorld EntityWorld { get; }
     

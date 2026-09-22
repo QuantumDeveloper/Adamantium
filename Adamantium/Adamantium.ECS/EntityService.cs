@@ -14,11 +14,9 @@ namespace Adamantium.ECS
     {
         private bool enabled;
         private ExecutionType updateExecutionType;
-        private int updatePriority;
-        private int previousDrawPriority;
-        private int previousUpdatePriority;
-        
-        private int drawPriority;
+        private int priority;
+        private int previousPriority;
+
         private ExecutionType drawExecutionType;
         private bool isVisible;
 
@@ -68,17 +66,17 @@ namespace Adamantium.ECS
             set => SetProperty(ref enabled, value);
         }
 
-        public int UpdatePriority
+        public int Priority
         {
-            get => updatePriority;
+            get => priority;
             set
             {
-                if (updatePriority != value)
+                if (priority != value)
                 {
-                    previousUpdatePriority = updatePriority;
+                    previousPriority = priority;
                 }
 
-                SetProperty(ref updatePriority, value);
+                SetProperty(ref priority, value);
             }
         }
 
@@ -90,20 +88,6 @@ namespace Adamantium.ECS
         { 
             get => isVisible; 
             set => SetProperty(ref isVisible, value); 
-        }
-
-        public int DrawPriority
-        {
-            get => drawPriority;
-            set
-            {
-                if (drawPriority != value)
-                {
-                    previousDrawPriority = updatePriority;
-                }
-
-                SetProperty(ref drawPriority, value);
-            }
         }
 
         public ExecutionType UpdateExecutionType
@@ -253,11 +237,9 @@ namespace Adamantium.ECS
                 case nameof(Enabled):
                     EventAggregator.GetEvent<ProcessorEnabledChangedEvent>().Publish(new ProcessorStatePayload(this, Enabled));
                     break;
-                case nameof(UpdatePriority):
-                    EventAggregator.GetEvent<ProcessorPriorityChangedEvent>().Publish(new ProcessorPriorityPayload(this, ProcessorType.Update, previousUpdatePriority, UpdatePriority));
-                    break;
-                case nameof(DrawPriority):
-                    EventAggregator.GetEvent<ProcessorPriorityChangedEvent>().Publish(new ProcessorPriorityPayload(this, ProcessorType.Draw, previousDrawPriority, DrawPriority));
+                case nameof(Priority):
+                    EntityWorld.ServiceManager.OnServicePriorityChanged();
+                    EventAggregator.GetEvent<ProcessorPriorityChangedEvent>().Publish(new ProcessorPriorityPayload(this, previousPriority, Priority));
                     break;
                 case nameof(UpdateExecutionType):
                     {
