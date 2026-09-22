@@ -23,7 +23,7 @@
 	</ItemGroup>
 
 	<ItemGroup>
-		<ProjectReference Include="..\..\..\AdamantiumVulkan\Adamantium.Vulkan\Adamantium.Vulkan.csproj" />
+		<PackageReference Include="Adamantium.Vulkan" Version="1.0.1" />
 		<ProjectReference Include="..\Adamantium.EffectsCompiler\Adamantium.EffectsCompiler.csproj" />
 		<ProjectReference Include="..\Adamantium.Imaging\Adamantium.Imaging.csproj" />
 		<ProjectReference Include="..\Adamantium.Mathematics\Adamantium.Mathematics.csproj" />

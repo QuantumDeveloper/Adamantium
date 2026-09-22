@@ -17,7 +17,7 @@
 		<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
 	</PropertyGroup>
 	<ItemGroup>
-		<ProjectReference Include="..\..\..\AdamantiumVulkan\Adamantium.Vulkan\Adamantium.Vulkan.csproj" />
+		<PackageReference Include="Adamantium.Vulkan" Version="1.0.1" />
 		<ProjectReference Include="..\Adamantium.Core\Adamantium.Core.csproj" />
 		<ProjectReference Include="..\Adamantium.Mathematics\Adamantium.Mathematics.csproj" />
 	</ItemGroup>
