@@ -1,18 +1,16 @@
 ﻿using System;
 using System.Collections.Generic;
-using Adamantium.Core.DependencyInjection;
 using Adamantium.Engine.Templates.Tools;
 using Adamantium.Engine.Tools;
 using Adamantium.ECS;
 using Adamantium.ECS.Components;
 using Adamantium.ECS.Components.Extensions;
-using Adamantium.Game.Core;
 using Adamantium.Game.Core.Input;
 using Adamantium.Mathematics;
 
 namespace Adamantium.Engine.Managers;
 
-public class ToolsManager : GameManagerBase
+public class ToolsManager
 {
     public CameraDragTool CameraDragTool { get; private set; }
 
@@ -34,8 +32,6 @@ public class ToolsManager : GameManagerBase
 
     public String Text { get; private set; }
 
-    private readonly GameInputManager inputManager;
-        
     private float limitDistance = 0.06f;
 
     private ToolBase currentTool = null;
@@ -48,9 +44,8 @@ public class ToolsManager : GameManagerBase
     private bool _isScaleToolEnabled;
     private bool _localTransformEnabled;
 
-    public ToolsManager(IGame game) : base(game)
+    public ToolsManager(EntityWorld entityWorld)
     {
-        Container.RegisterInstance<ToolsManager>(this);
         CameraDragTool = new CameraDragTool(nameof(CameraDragTool));
         MoveTool = new MoveTool(false, 1.0f, new Vector3F(2));
         RotationTool = new RotationTool(false, 2.0f, new Vector3F(2));
@@ -61,13 +56,12 @@ public class ToolsManager : GameManagerBase
 
         PlaneGridTool = new PlaneGridToolTemplate(20, 20, new Vector3F(1), 20).BuildEntity(null, "PlaneGrid");
 
-        inputManager = Container.Resolve<GameInputManager>();
-        EntityWorld.EntityManager.AddToGroup(MoveTool.Tool, "Tools");
-        EntityWorld.EntityManager.AddToGroup(PivotTool.Tool, "Tools");
-        EntityWorld.EntityManager.AddToGroup(RotationTool.Tool, "Tools");
-        EntityWorld.EntityManager.AddToGroup(ScaleTool.Tool, "Tools");
-        EntityWorld.EntityManager.AddToGroup(OrientationTool.Tool, "HUD");
-        EntityWorld.EntityManager.AddToGroup(PlaneGridTool, "Common");
+        entityWorld.EntityManager.AddToGroup(MoveTool.Tool, "Tools");
+        entityWorld.EntityManager.AddToGroup(PivotTool.Tool, "Tools");
+        entityWorld.EntityManager.AddToGroup(RotationTool.Tool, "Tools");
+        entityWorld.EntityManager.AddToGroup(ScaleTool.Tool, "Tools");
+        entityWorld.EntityManager.AddToGroup(OrientationTool.Tool, "HUD");
+        entityWorld.EntityManager.AddToGroup(PlaneGridTool, "Common");
     }
 
 
@@ -165,14 +159,19 @@ public class ToolsManager : GameManagerBase
         return collisionResult;
     }
 
-    public void Update(IEnumerable<Entity> entities, CameraManager cameraManager, LightManager lightManager)
+    /// <param name="inputManager">Input of the active output; null when no output is active.</param>
+    public void Update(IEnumerable<Entity> entities, CameraManager cameraManager, LightManager lightManager, GameInputManager inputManager)
     {
         // The tools pick with the pointer taken in the SURFACE's own coordinates, and a surface that is off screen -
         // a game panel whose tab is no longer the selected one - has no such point: the walk to its root finds no
         // root. The grid below is not pointer work and still owes the cameras its transform.
-        if (inputManager.CanLocatePointer)
+        if (inputManager is { CanLocatePointer: true })
         {
-            ProcessTools(entities, cameraManager, lightManager);
+            ProcessTools(entities, cameraManager, lightManager, inputManager);
+        }
+        else
+        {
+            OrientationTool.Process(SelectedEntity, cameraManager, null);
         }
 
         PlaneGridTool.TraverseInDepth(
@@ -187,7 +186,7 @@ public class ToolsManager : GameManagerBase
         Text = "Current selected entity: " + SelectedEntity + "\n";
     }
 
-    private void ProcessTools(IEnumerable<Entity> entities, CameraManager cameraManager, LightManager lightManager)
+    private void ProcessTools(IEnumerable<Entity> entities, CameraManager cameraManager, LightManager lightManager, GameInputManager inputManager)
     {
         CollisionMode collisionMode = CollisionMode.IgnoreNonGeometryParts;
         var camera = cameraManager.UserControlledCamera;

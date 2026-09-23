@@ -20,7 +20,6 @@ public class InputService : EntityService
     private Entity selectedEntity;
 
     public Boolean InstrumentsEnabled { get; set; }
-    private GameInputManager inputManager;
 
     private GamePlayManager gamePlayManager;
     //private AudioManager audioManager;
@@ -32,7 +31,6 @@ public class InputService : EntityService
         gamePlayManager = DependencyResolver.Resolve<GamePlayManager>();
         toolsManager = DependencyResolver.Resolve<ToolsManager>();
         EntityWorld.EntityManager.EntityRemoved += EntityManagerEntityRemoved;
-        inputManager = DependencyResolver.Resolve<GameInputManager>();
         //audioManager = new AudioManager();
         gamePlatform = world.DependencyResolver.Resolve<IGamePlatform>();
     }
@@ -64,7 +62,15 @@ public class InputService : EntityService
         {
             return;
         }
-            
+
+        // No active output, no input - but a camera following its subject keeps following it.
+        var inputManager = gamePlatform.ActiveWindow?.Input;
+        if (inputManager == null)
+        {
+            currentCamera.Update(gameTime);
+            return;
+        }
+
         //currentCamera.Velocity = 1000;
 
         //if (currentCamera.Type == CameraType.Free || currentCamera.Type == CameraType.Special)

@@ -25,7 +25,7 @@ public class RenderingService : EntityService
     protected IContentManager Content { get; }
     public GameOutput Window { get; }
 
-    protected GameInputManager InputManager { get; }
+    protected GameInputManager InputManager => Window.Input;
     protected CameraManager CameraManager { get; }
         
     //protected SpriteBatch SpriteBatch;
@@ -45,7 +45,6 @@ public class RenderingService : EntityService
         Window.ParametersChanged += Window_ParametersChanged;
         Window.StateChanged += StateChanged;
         Window.SizeChanged += WindowOnSizeChanged;
-        InputManager = world.DependencyResolver.Resolve<GameInputManager>();
         CameraManager = EntityWorld.DependencyResolver.Resolve<CameraManager>();
         //SpriteBatch = new SpriteBatch(GraphicsDevice, 80000);
     }

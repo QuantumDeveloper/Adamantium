@@ -1,109 +1,52 @@
-﻿using Adamantium.Core;
-using Adamantium.Core.Events;
-using Adamantium.Game.Core.Events;
-using Adamantium.Game.Core.Payloads;
+using Adamantium.Core;
 using Adamantium.Mathematics;
 using Adamantium.Win32;
 using Adamantium.XInput;
 
 namespace Adamantium.Game.Core.Input
 {
-    public class GameInputManager : GameManagerBase
+    /// <summary>
+    /// Input of one <see cref="GameOutput"/>: its keyboard and pointer, fed by the output directly, plus the gamepads -
+    /// which only the active output reports.
+    /// </summary>
+    public class GameInputManager
     {
-        private const int MaxGamepadsCount = 8;
-        private const float LeftThumbDeadZone = 0.2f;
-        private const float RightThumbDeadZone = 0.2f;
-        private const float TriggerThreshold = 0.11f;
-
         private readonly HashSet<Keys> downKeys;
         private readonly HashSet<Keys> pressedKeys;
         private readonly HashSet<Keys> releasedKeys;
         private readonly ButtonState[] mouseButtons;
-        private readonly HashSet<GamepadButton>[] downGamepadButtons;
-        private readonly HashSet<GamepadButton>[] pressedGamepadButtons;
-        private readonly HashSet<GamepadButton>[] releasedGamepadButtons;
-        private readonly HashSet<GamepadButton>[] currentGamepadButtons;
 
-        private readonly HashSet<GamepadButton> supportedGamepadButtons;
-        
-        private IEventAggregator eventAggregator;
-        
-        protected Rectangle Bounds { get; private set; }
+        private readonly GameOutput output;
+        private readonly Gamepads gamepads;
+
+        protected Rectangle Bounds => output.ClientBounds;
         private Vector2F absolutePosition;
         private Vector2F absolutePositionPrevious;
         private Vector2F virtualPosition;
         private Vector2F mouseDelta;
-        private IntPtr Handle;
         private Vector2F acceleratedMouseDelta;
         private Vector2F lockMousePosition;
         private bool isLockedToCenter;
-        private GameOutput window;
         private GameWindowCursor currentCursor;
-        private XBoxGamepadFactory gamepadFactory;
-        private Gamepad[] gamepads;
-        private GamepadState[] gamepadStates;
         private int virtualPositionMultiplierX = 0;
         private int virtualPositionMultiplierY = 0;
 
-        public GameInputManager(IGame game): base(game)
+        public GameInputManager(GameOutput output, Gamepads gamepads)
         {
+            this.output = output;
+            this.gamepads = gamepads;
+
             downKeys = new HashSet<Keys>();
             pressedKeys = new HashSet<Keys>();
             releasedKeys = new HashSet<Keys>();
 
-            downGamepadButtons = new HashSet<GamepadButton>[MaxGamepadsCount];
-            pressedGamepadButtons = new HashSet<GamepadButton>[MaxGamepadsCount];
-            releasedGamepadButtons = new HashSet<GamepadButton>[MaxGamepadsCount];
-            currentGamepadButtons = new HashSet<GamepadButton>[MaxGamepadsCount];
-
-            for (int i = 0; i < MaxGamepadsCount; i++)
-            {
-                downGamepadButtons[i] = new HashSet<GamepadButton>();
-                pressedGamepadButtons[i] = new HashSet<GamepadButton>();
-                releasedGamepadButtons[i] = new HashSet<GamepadButton>();
-                currentGamepadButtons[i] = new HashSet<GamepadButton>();
-            }
-            
-
             KeyboadInputs = new List<KeyboardInput>();
             MouseInputs = new List<MouseInput>();
 
-            Enabled = true;
-            Container.RegisterInstance<GameInputManager>(this);
-
             mouseButtons = new ButtonState[5];
-
-            eventAggregator = Container.Resolve<IEventAggregator>();
-            eventAggregator.GetEvent<GameOutputRemovedEvent>().Subscribe(GamePlatformWindowRemoved);
-            eventAggregator.GetEvent<GameOutputActivatedEvent>().Subscribe(GamePlatformWindowActivated);
-            eventAggregator.GetEvent<GameOutputDeactivatedEvent>().Subscribe(GamePlatformWindowDeactivated);
-            eventAggregator.GetEvent<MouseInputEvent>().Subscribe(GamePlatformMouseStateChanged);
-            eventAggregator.GetEvent<KeyboardInputEvent>().Subscribe(GamePlatformKeyboardStateChanged);
-
-            gamepadFactory = new XBoxGamepadFactory();
-            gamepads = gamepadFactory.GetConnectedGamepads();
-            gamepadStates = new GamepadState[MaxGamepadsCount];
-
-            supportedGamepadButtons = new HashSet<GamepadButton>();
-            supportedGamepadButtons.Add(GamepadButton.A);
-            supportedGamepadButtons.Add(GamepadButton.B);
-            supportedGamepadButtons.Add(GamepadButton.X);
-            supportedGamepadButtons.Add(GamepadButton.Y);
-            supportedGamepadButtons.Add(GamepadButton.Back);
-            supportedGamepadButtons.Add(GamepadButton.Start);
-            supportedGamepadButtons.Add(GamepadButton.LeftThumb);
-            supportedGamepadButtons.Add(GamepadButton.RightThumb);
-            supportedGamepadButtons.Add(GamepadButton.LeftShoulder);
-            supportedGamepadButtons.Add(GamepadButton.RightShoulder);
-            supportedGamepadButtons.Add(GamepadButton.DpadLeft);
-            supportedGamepadButtons.Add(GamepadButton.DpadRight);
-            supportedGamepadButtons.Add(GamepadButton.DpadUp);
-            supportedGamepadButtons.Add(GamepadButton.DpadDown);
-
-            //LockCursorToWindowBounds();
         }
 
-        private void GamePlatformKeyboardStateChanged(KeyboardInput e)
+        internal void OnKeyboardInput(KeyboardInput e)
         {
             lock (KeyboadInputs)
             {
@@ -111,7 +54,7 @@ namespace Adamantium.Game.Core.Input
             }
         }
 
-        private void GamePlatformMouseStateChanged(MouseInput e)
+        internal void OnMouseInput(MouseInput e)
         {
             lock (MouseInputs)
             {
@@ -119,30 +62,11 @@ namespace Adamantium.Game.Core.Input
             }
         }
 
-        private void GamePlatformWindowActivated(GameOutput output)
-        {
-            IsWindowFocused = true;
-            IsWindowAvailable = true;
-            Bounds = output.ClientBounds;
-            Handle = output.Handle;
-            window = output;
-        }
-
-        private void GamePlatformWindowDeactivated(GameOutput output)
-        {
-            IsWindowFocused = false;
-        }
-
-        private void GamePlatformWindowRemoved(GameOutput output)
-        {
-            IsWindowAvailable = false;
-        }
-
         public KeyboardInput[] GetKeyboardInputs()
         {
             return KeyboadInputs.ToArray();
         }
-        
+
         internal List<KeyboardInput> KeyboadInputs { get; private set; }
 
         internal List<MouseInput> MouseInputs { get; private set; }
@@ -153,14 +77,11 @@ namespace Adamantium.Game.Core.Input
 
         public bool HasGamePad { get; internal set; }
 
-        public bool IsWindowFocused { get; private set; }
-
-        public bool IsWindowAvailable { get; private set; }
+        public bool IsWindowFocused => output.IsActive;
 
         /// <summary>Whether <see cref="RelativePosition"/> can answer at all. It converts through the game surface's own
-        /// coordinates, and while that surface is off screen there is no such point to answer with. With no surface in
-        /// hand it converts through the window handle instead, which is always available.</summary>
-        public bool CanLocatePointer => window is null || window.IsVisible;
+        /// coordinates, and while that surface is off screen there is no such point to answer with.</summary>
+        public bool CanLocatePointer => output.IsVisible;
 
         public Vector2F RawMouseDelta { get; private set; }
 
@@ -219,10 +140,7 @@ namespace Adamantium.Game.Core.Input
 
         public Vector2F AbsolutePosition => absolutePosition;
 
-        // No output yet means no surface to be relative to - the field is set on the first window activation, and
-        // CanLocatePointer counts that state as valid. Screen coordinates are the best answer there, which is also
-        // what the previous ScreenToClient(NULL) fallback returned.
-        public Vector2F RelativePosition => window?.PointToSurface(absolutePosition) ?? absolutePosition;
+        public Vector2F RelativePosition => output.PointToSurface(absolutePosition);
 
         public Vector2F VirtualPosition
         {
@@ -239,7 +157,7 @@ namespace Adamantium.Game.Core.Input
 
         public void ScanInputDevices()
         {
-            
+
         }
 
         public bool IsMousePositionLocked { get; private set; }
@@ -257,7 +175,7 @@ namespace Adamantium.Game.Core.Input
         {
             if (hold == isPointerHeld) return;
             isPointerHeld = hold;
-            window?.HoldPointer(hold, absolutePosition);
+            output.HoldPointer(hold, absolutePosition);
         }
 
         private bool isPointerHeld;
@@ -274,20 +192,14 @@ namespace Adamantium.Game.Core.Input
             Win32Interop.GetCursorPos(out var point);
             lockMousePosition = new Vector2F(point.X, point.Y);
             SetLockedMousePosition();
-            if (window != null)
-            {
-                currentCursor = window.Cursor;
-                window.Cursor = GameWindowCursor.None;
-            }
+            currentCursor = output.Cursor;
+            output.Cursor = GameWindowCursor.None;
         }
 
         protected virtual void UnlockMousePosition()
         {
             IsMousePositionLocked = false;
-            if (window != null)
-            {
-                window.Cursor = currentCursor;
-            }
+            output.Cursor = currentCursor;
         }
 
         protected virtual void LockCursorToWindowBounds()
@@ -300,36 +212,31 @@ namespace Adamantium.Game.Core.Input
             IsLockedToWindowBounds = false;
         }
 
+        // Gamepads go only to the active output: with no active output there is no gamepad input at all.
         public bool IsGamepadButtonDown(int gamepadIndex, GamepadButton button)
         {
-            return downGamepadButtons[gamepadIndex].Contains(button);
+            return output.IsActive && gamepads.IsButtonDown(gamepadIndex, button);
         }
 
         public bool IsGamepadButtonPressed(int gamepadIndex, GamepadButton button)
         {
-            return pressedGamepadButtons[gamepadIndex].Contains(button);
+            return output.IsActive && gamepads.IsButtonPressed(gamepadIndex, button);
         }
 
         public bool IsGamepadButtonReleased(int gamepadIndex, GamepadButton button)
         {
-            return releasedGamepadButtons[gamepadIndex].Contains(button);
+            return output.IsActive && gamepads.IsButtonReleased(gamepadIndex, button);
         }
 
         public GamepadState GetGamepadState(int gamepadIndex)
         {
-            return gamepadStates[gamepadIndex];
+            return output.IsActive ? gamepads.GetState(gamepadIndex) : default;
         }
 
-        public override void Update(AppTime gameTime)
+        public void Update(AppTime gameTime)
         {
-            if (!IsWindowFocused)
-            {
-                //return;
-            }
-
             UpdateKeyboard();
             UpdateMouse();
-            UpdateGamepads();
         }
 
         private void UpdateKeyboard()
@@ -439,7 +346,7 @@ namespace Adamantium.Game.Core.Input
                     {
                         virtualPosition.X = Bounds.Width * virtualPositionMultiplierX +RelativePosition.X;
                     }
-                
+
                     if (virtualPositionMultiplierY == 0)
                     {
                         virtualPosition.Y = RelativePosition.Y;
@@ -451,116 +358,6 @@ namespace Adamantium.Game.Core.Input
                 }
             }
             absolutePositionPrevious = absolutePosition;
-        }
-
-        private void UpdateGamepads()
-        {
-            lock (gamepadStates)
-            {
-                for (int i = 0; i < MaxGamepadsCount; i++)
-                {
-                    pressedGamepadButtons[i].Clear();
-                    releasedGamepadButtons[i].Clear();
-                    currentGamepadButtons[i].Clear();
-                    gamepadStates[i].IsConnected = false;
-                }
-
-                for (var i = 0; i < gamepads.Length; i++)
-                {
-                    var gamepad = gamepads[i];
-                    var state = gamepad.GetState();
-                    ClampDeadZone(ref state);
-                    gamepadStates[i] = state;
-                }
-
-                for (int i = 0; i < gamepadStates.Length; ++i) 
-                {
-                    foreach (var supportedGamepadButton in supportedGamepadButtons)
-                    {
-                        if (!gamepadStates[i].IsConnected)
-                        {
-                            continue;
-                        }
-
-                        var state = gamepadStates[i];
-                        if (state.Buttons.HasFlag(supportedGamepadButton))
-                        {
-                            if (!downGamepadButtons[i].Contains(supportedGamepadButton))
-                            {
-                                downGamepadButtons[i].Add(supportedGamepadButton);
-                                pressedGamepadButtons[i].Add(supportedGamepadButton);
-                            }
-                            currentGamepadButtons[i].Add(supportedGamepadButton);
-                        }
-                    }
-
-                    foreach (var button in downGamepadButtons[i])
-                    {
-                        if (!currentGamepadButtons[i].Contains(button))
-                        {
-                            releasedGamepadButtons[i].Add(button);
-                        }
-                    }
-
-                    foreach (var button in releasedGamepadButtons[i])
-                    {
-                        downGamepadButtons[i].Remove(button);
-                    }
-                }
-
-            }
-        }
-
-        private void ClampDeadZone(ref GamepadState state)
-        {
-            var leftThumbNormalizedX = Math.Max(-1, state.LeftThumb.X / short.MaxValue);
-            var leftThumbNormalizedY = Math.Max(-1, state.LeftThumb.Y / short.MaxValue);
-
-            var absLeftThumbNormalizedX = Math.Abs(leftThumbNormalizedX);
-            var absLeftThumbNormalizedY = Math.Abs(leftThumbNormalizedY);
-
-            var leftThumbX = absLeftThumbNormalizedX < LeftThumbDeadZone
-                ? 0
-                : (absLeftThumbNormalizedX - LeftThumbDeadZone) * (leftThumbNormalizedX / absLeftThumbNormalizedX);
-
-            var leftThumbY = absLeftThumbNormalizedY < LeftThumbDeadZone
-                ? 0
-                : (absLeftThumbNormalizedY - LeftThumbDeadZone) * (leftThumbNormalizedY / absLeftThumbNormalizedY);
-
-            var rightThumbNormalizedX = Math.Max(-1, state.RightThumb.X / short.MaxValue);
-            var rightThumbNormalizedY = Math.Max(-1, state.RightThumb.Y / short.MaxValue);
-
-            var absRightThumbNormalizedX = Math.Abs(rightThumbNormalizedX);
-            var absRightThumbNormalizedY = Math.Abs(rightThumbNormalizedY);
-
-            var rightThumbX = absRightThumbNormalizedX < RightThumbDeadZone
-                ? 0
-                : (absRightThumbNormalizedX - RightThumbDeadZone) * (rightThumbNormalizedX / absRightThumbNormalizedX);
-
-            var rightThumbY = absRightThumbNormalizedY < RightThumbDeadZone
-                ? 0
-                : (absRightThumbNormalizedY - RightThumbDeadZone) * (rightThumbNormalizedY / absRightThumbNormalizedY);
-
-            if (LeftThumbDeadZone > 0)
-            {
-                leftThumbX *= 1 / (1 - LeftThumbDeadZone);
-                leftThumbY *= 1 / (1 - LeftThumbDeadZone);
-            }
-
-            if (RightThumbDeadZone > 0)
-            {
-                rightThumbX *= 1 / (1 - RightThumbDeadZone);
-                rightThumbY *= 1 / (1 - RightThumbDeadZone);
-            }
-
-            state.LeftThumb = new Vector2F(leftThumbX, leftThumbY);
-            state.RightThumb = new Vector2F(rightThumbX, rightThumbY);
-
-            var normalizedLeftTrigger = state.LeftTrigger / 255;
-            var normalizedRightTrigger = state.RightTrigger / 255;
-
-            state.LeftTrigger = normalizedLeftTrigger;
-            state.RightTrigger = normalizedRightTrigger;
         }
 
         private void CalculateMousePosition()

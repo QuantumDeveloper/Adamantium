@@ -1,4 +1,5 @@
-﻿using Adamantium.Core.Collections;
+﻿using Adamantium.Core;
+using Adamantium.Core.Collections;
 using Adamantium.Core.DependencyInjection;
 using Adamantium.Core.Events;
 using Adamantium.Game.Core.Events;
@@ -32,6 +33,8 @@ namespace Adamantium.Game.Core
         private AdamantiumCollection<GameOutput> outputs;
 
         private Dictionary<GameOutput, GameOutputParametersPayload> _changedOutputs;
+
+        private readonly Gamepads gamepads = new Gamepads();
 
         private object syncObject = new object();
 
@@ -155,6 +158,7 @@ namespace Adamantium.Game.Core
                     
                     var device = GraphicsDeviceService.CreateRenderDevice();
                     wnd.SetGraphicsDevice(device);
+                    wnd.Input = new GameInputManager(wnd, gamepads);
                     SubscribeToEvents(wnd);
                     
                     outputs.Add(wnd);
@@ -197,8 +201,6 @@ namespace Adamantium.Game.Core
         {
             wnd.Activated += Window_Activated;
             wnd.Deactivated += Window_Deactivated;
-            wnd.MouseInput += OnMouseInput;
-            wnd.KeyInput += OnKeyInput;
             wnd.Closed += Wnd_Closed;
         }
 
@@ -206,8 +208,6 @@ namespace Adamantium.Game.Core
         {
             wnd.Activated -= Window_Activated;
             wnd.Deactivated -= Window_Deactivated;
-            wnd.MouseInput -= OnMouseInput;
-            wnd.KeyInput -= OnKeyInput;
             wnd.Closed -= Wnd_Closed;
         }
 
@@ -290,14 +290,16 @@ namespace Adamantium.Game.Core
             //     .Publish(new GameOutputSizeChangedPayload(wnd, new Size(wnd.Width, wnd.Height)));
         }
 
-        private void OnKeyInput(KeyboardInput input)
+        /// <summary>
+        /// Polls the gamepads once, then brings every output's input up to date for this frame.
+        /// </summary>
+        public void UpdateInput(AppTime gameTime)
         {
-            _eventAggregator.GetEvent<KeyboardInputEvent>().Publish(input);
-        }
-
-        private void OnMouseInput(MouseInput input)
-        {
-            _eventAggregator.GetEvent<MouseInputEvent>().Publish(input);
+            gamepads.Update();
+            for (int i = 0; i < outputs.Count; i++)
+            {
+                outputs[i].Input.Update(gameTime);
+            }
         }
 
         private void OnWindowCreated(GameOutput output)

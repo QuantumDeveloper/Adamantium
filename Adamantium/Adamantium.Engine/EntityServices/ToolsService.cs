@@ -2,6 +2,7 @@ using System;
 using Adamantium.Core;
 using Adamantium.Engine.Managers;
 using Adamantium.ECS;
+using Adamantium.Game.Core;
 using Serilog;
 
 namespace Adamantium.Engine.EntityServices;
@@ -14,6 +15,7 @@ public class ToolsService : EntityService
     private ToolsManager tools;
     private LightManager lightManager;
     private CameraManager cameraManager;
+    private IGame game;
 
     public ToolsService(EntityWorld world)
         : base(world)
@@ -31,13 +33,14 @@ public class ToolsService : EntityService
         tools = EntityWorld.DependencyResolver.Resolve<ToolsManager>();
         lightManager = EntityWorld.DependencyResolver.Resolve<LightManager>();
         cameraManager = EntityWorld.DependencyResolver.Resolve<CameraManager>();
+        game = EntityWorld.DependencyResolver.Resolve<IGame>();
     }
 
     public override void Update(AppTime gameTime)
     {
         try
         {
-            tools.Update(Entities, cameraManager, lightManager);
+            tools.Update(Entities, cameraManager, lightManager, game.ActiveOutput?.Input);
             lightManager.Update();
         }
         catch (Exception ex)

@@ -110,7 +110,6 @@ public class Game : PropertyChangedBase, IGame
         Container.RegisterInstance<IGraphicsDeviceService>(GraphicsDeviceService);
         Container.RegisterInstance<EntityWorld>(EntityWorld);
             
-        InputManager = new GameInputManager(this);
         GamePlayManager = new GamePlayManager(Container);
         Stopped += Game_Stopped;
         drawSystems = new Dictionary<GameOutput, EntityService>();
@@ -121,8 +120,6 @@ public class Game : PropertyChangedBase, IGame
         
     public EntityWorld EntityWorld { get; }
         
-    public GameInputManager InputManager { get; private set; }
-
     public ToolsManager ToolsManager { get; private set; }
     public LightManager LightManager { get; private set; }
     public CameraManager CameraManager { get; private set; }
@@ -219,8 +216,10 @@ public class Game : PropertyChangedBase, IGame
 
     protected virtual void Initialize()
     {
-        ToolsManager = new ToolsManager(this);
-        LightManager = new LightManager(this);
+        ToolsManager = new ToolsManager(EntityWorld);
+        Container.RegisterInstance<ToolsManager>(ToolsManager);
+        LightManager = new LightManager(EntityWorld);
+        Container.RegisterInstance<LightManager>(LightManager);
         CameraManager = new CameraManager(this);
     }
         
@@ -595,7 +594,7 @@ public class Game : PropertyChangedBase, IGame
     /// <param name="gameTime">AppTime contains elapsed time, total time and FPS</param>
     protected virtual void Update(AppTime gameTime)
     {
-        InputManager.Update(gameTime);
+        gamePlatform.UpdateInput(gameTime);
         EntityWorld.ServiceManager.Update(gameTime);
     }
 

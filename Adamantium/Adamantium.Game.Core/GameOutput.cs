@@ -102,6 +102,12 @@ namespace Adamantium.Game.Core
         
         public GraphicsPresenter Presenter { get; protected set; }
 
+        /// <summary>
+        /// Keyboard, pointer and - while this output is the active one - gamepad input of this output.
+        /// Set when the platform takes the output in; until then its input goes nowhere.
+        /// </summary>
+        public GameInputManager Input { get; internal set; }
+
         public virtual void CopyOutput(IGraphicsDevice graphicsDevice)
         {
             graphicsDevice.BlitImage(GraphicsDevice.CurrentCommandBuffer, 
@@ -237,16 +243,6 @@ namespace Adamantium.Game.Core
         public event Action<GameOutputParametersPayload> ParametersChanging;
 
         /// <summary>
-        /// Occurs when key was pressed
-        /// </summary>
-        public Action<KeyboardInput> KeyInput;
-
-        /// <summary>
-        /// Occurs when mouse button was released
-        /// </summary>
-        public Action<MouseInput> MouseInput;
-
-        /// <summary>
         /// Occurs when window is closed
         /// </summary>
         public event EventHandler<EventArgs> Closed;
@@ -289,12 +285,12 @@ namespace Adamantium.Game.Core
 
         internal void OnKeyInput(KeyboardInput args)
         {
-            KeyInput?.Invoke(args);
+            Input?.OnKeyboardInput(args);
         }
 
         internal void OnMouseInput(MouseInput args)
         {
-            MouseInput?.Invoke(args);
+            Input?.OnMouseInput(args);
         }
 
         internal void OnActivated()

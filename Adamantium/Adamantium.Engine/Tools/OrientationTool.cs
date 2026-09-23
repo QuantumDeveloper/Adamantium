@@ -59,8 +59,9 @@ public class OrientationTool: ToolBase
             }
         }, true);
 
+        // Without input the gizmo is only placed; picking and dragging need a pointer.
         var userCamera = cameraManager.UserControlledCamera;
-        if (userCamera == null) return;
+        if (userCamera == null || inputManager == null) return;
 
         // While a part is HELD the pointer is pinned and hidden, so there is nothing to pick with - the grab stands
         // until the button comes up, and the highlight stays on what was grabbed.

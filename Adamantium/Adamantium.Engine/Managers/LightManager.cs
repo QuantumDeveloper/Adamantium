@@ -8,7 +8,6 @@ using Adamantium.ECS;
 using Adamantium.ECS.Components;
 using Adamantium.ECS.Components.Extensions;
 using Adamantium.Engine.Rendering;
-using Adamantium.Game.Core;
 using Adamantium.Game.Core.Input;
 using Adamantium.Graphics;
 using Adamantium.Graphics.Core.Models;
@@ -16,8 +15,10 @@ using Adamantium.Mathematics;
 
 namespace Adamantium.Engine.Managers;
 
-public class LightManager : GameManagerBase
+public class LightManager
 {
+    private readonly EntityWorld entityWorld;
+
     private List<Light> lights;
     //private Effect depthWriter;
     //private Game game;
@@ -57,14 +58,14 @@ public class LightManager : GameManagerBase
 
     private PointLightTool PointLightTool { get; set; }
 
-    public LightManager(IGame game): base(game)
+    public LightManager(EntityWorld entityWorld)
     {
-        Container.RegisterInstance<LightManager>(this);
+        this.entityWorld = entityWorld;
         //depthWriter = game.Content.Load<Effect>("Effects/DeferredShading/DepthWriter");
         lights = new List<Light>();
         _lights = new ReadOnlyCollection<Light>(lights);
         _lightsGroup = new EntityGroup("Lights");
-        EntityWorld.EntityManager.AddGroup(_lightsGroup);
+        entityWorld.EntityManager.AddGroup(_lightsGroup);
 
         SpotLightMesh = new SpotLightMeshTemplate().BuildEntity();
         PointLightMesh = new PointLightMeshTemplate().BuildEntity();
@@ -83,9 +84,9 @@ public class LightManager : GameManagerBase
         PointLightTool.Enabled = true;
         DirectionalLightTool.Enabled = true;
 
-        EntityWorld.EntityManager.AddToGroup(SpotLightTool.Tool, "Lights");
-        EntityWorld.EntityManager.AddToGroup(PointLightTool.Tool, "Lights");
-        EntityWorld.EntityManager.AddToGroup(DirectionalLightTool.Tool, "Lights");
+        entityWorld.EntityManager.AddToGroup(SpotLightTool.Tool, "Lights");
+        entityWorld.EntityManager.AddToGroup(PointLightTool.Tool, "Lights");
+        entityWorld.EntityManager.AddToGroup(DirectionalLightTool.Tool, "Lights");
 
         //Task.Run(() => CreateLightsIcons());
         //Task.Run(() => CreateLightsVisual());
@@ -177,7 +178,7 @@ public class LightManager : GameManagerBase
         }
         _lightsDirty = true;
 
-        EntityWorld.EntityManager.AddEntity(light);
+        entityWorld.EntityManager.AddEntity(light);
     }
 
     public void RemoveLight(Entity light)
