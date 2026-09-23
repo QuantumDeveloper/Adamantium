@@ -44,29 +44,33 @@ float4 CaptureBlurPS(BlurVSOutput input) : SV_Target
     float2 texel = 1.0 / max(BlurStep.yz, float2(1.0, 1.0));   // one texel of the DESTINATION = two of the source
     float2 uv = input.Uv;
 
-    // LOOPED, and [loop] is load-bearing: twelve sample instructions in one fragment shader take this driver's
-    // compiler down (measured - eleven compile, twelve die), and unrolled this is that version.
-    const float2 offsets[13] = {
-        float2(-1.0,  1.0), float2( 1.0,  1.0), float2(-1.0, -1.0), float2( 1.0, -1.0),
-        float2(-0.5,  0.5), float2( 0.5,  0.5), float2(-0.5, -0.5), float2( 0.5, -0.5),
-        float2(-1.0,  0.0), float2( 1.0,  0.0), float2( 0.0, -1.0), float2( 0.0,  1.0),
-        float2( 0.0,  0.0)
-    };
-    // The inner quad carries half the result, the corners and the axes a quarter each.
-    const float weights[13] = {
-        0.03125, 0.03125, 0.03125, 0.03125,
-        0.125,   0.125,   0.125,   0.125,
-        0.0625,  0.0625,  0.0625,  0.0625,
-        0.125
-    };
+    // The four corner quads. Each sits a whole destination texel out on a diagonal, so its bilinear fetch straddles
+    // four source texels - together they cover the 4x4 neighbourhood that stops the fold.
+    float4 a = SourceTexture.SampleLevel(SourceSampler, uv + float2(-texel.x,  texel.y), level);
+    float4 b = SourceTexture.SampleLevel(SourceSampler, uv + float2( texel.x,  texel.y), level);
+    float4 c = SourceTexture.SampleLevel(SourceSampler, uv + float2(-texel.x, -texel.y), level);
+    float4 d = SourceTexture.SampleLevel(SourceSampler, uv + float2( texel.x, -texel.y), level);
 
-    float4 sum = 0;
-    [loop]
-    for (int t = 0; t < 13; ++t)
-    {
-        sum += SourceTexture.SampleLevel(SourceSampler, uv + offsets[t] * texel, level) * weights[t];
-    }
-    return sum;
+    // The centre quad, at half a texel - the part that keeps the result from being four separate averages.
+    float2 h = texel * 0.5;
+    float4 e = SourceTexture.SampleLevel(SourceSampler, uv + float2(-h.x,  h.y), level);
+    float4 f = SourceTexture.SampleLevel(SourceSampler, uv + float2( h.x,  h.y), level);
+    float4 g = SourceTexture.SampleLevel(SourceSampler, uv + float2(-h.x, -h.y), level);
+    float4 i = SourceTexture.SampleLevel(SourceSampler, uv + float2( h.x, -h.y), level);
+
+    // The axis taps, which is what makes the shape round rather than a cross of four blobs.
+    float4 j = SourceTexture.SampleLevel(SourceSampler, uv + float2(-texel.x, 0.0), level);
+    float4 k = SourceTexture.SampleLevel(SourceSampler, uv + float2( texel.x, 0.0), level);
+    float4 l = SourceTexture.SampleLevel(SourceSampler, uv + float2(0.0, -texel.y), level);
+    float4 m = SourceTexture.SampleLevel(SourceSampler, uv + float2(0.0,  texel.y), level);
+
+    float4 centre = SourceTexture.SampleLevel(SourceSampler, uv, level);
+
+    // The weights of the pattern: the inner quad carries half the result, the corners and the axes a quarter each.
+    return (e + f + g + i) * 0.125
+         + (a + b + c + d) * 0.03125
+         + (j + k + l + m) * 0.0625
+         + centre * 0.125;
 }
 
 technique CaptureBlur
