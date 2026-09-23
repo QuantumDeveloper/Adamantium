@@ -6,7 +6,6 @@ using Adamantium.ECS;
 using Adamantium.Game;
 using Adamantium.Game.Core;
 using Adamantium.Game.Core.Events;
-using Adamantium.Graphics;
 using Adamantium.Graphics.Core;
 using Adamantium.Graphics.Core.Content;
 using Adamantium.Graphics.Core.Models;
@@ -62,6 +61,7 @@ namespace Adamantium.UI.Sandbox
             {
                 EntityWorld.CreateService<InputService>(EntityWorld);
                 EntityWorld.CreateService<TransformService>(EntityWorld);
+                EntityWorld.CreateService<ToolsService>(EntityWorld);
             }
             catch (Exception exception)
             {

@@ -21,10 +21,8 @@ public class RenderingProcessor : EntityProcessor<RenderingService>, IDisposable
     protected IContentManager Content { get; set; }
     protected GameOutput Window { get; set; }
 
-    protected LightManager LightManager { get; set; }
     protected GameInputManager InputManager { get; set; }
     protected CameraManager CameraManager { get; set; }
-    protected ToolsManager ToolsManager { get; set; }
 
     protected SpriteBatch SpriteBatch { get; set; }
 
@@ -60,10 +58,8 @@ public class RenderingProcessor : EntityProcessor<RenderingService>, IDisposable
         // Window.ParametersChanged += Window_ParametersChanged;
         //Window.StateChanged += StateChanged;
         Window.SizeChanged += WindowOnSizeChanged;
-        LightManager = EntityWorld.DependencyResolver.Resolve<LightManager>();
         InputManager = EntityWorld.DependencyResolver.Resolve<GameInputManager>();
         CameraManager = EntityWorld.DependencyResolver.Resolve<CameraManager>();
-        ToolsManager = EntityWorld.DependencyResolver.Resolve<ToolsManager>();
         //SpriteBatch = new SpriteBatch(GraphicsDevice, 80000);
         LoadContent();
     }

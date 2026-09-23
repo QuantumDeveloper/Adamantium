@@ -25,10 +25,8 @@ public class RenderingService : EntityService
     protected IContentManager Content { get; }
     public GameOutput Window { get; }
 
-    protected LightManager LightManager { get; }
     protected GameInputManager InputManager { get; }
     protected CameraManager CameraManager { get; }
-    protected ToolsManager ToolsManager { get; }
         
     //protected SpriteBatch SpriteBatch;
 
@@ -47,10 +45,8 @@ public class RenderingService : EntityService
         Window.ParametersChanged += Window_ParametersChanged;
         Window.StateChanged += StateChanged;
         Window.SizeChanged += WindowOnSizeChanged;
-        LightManager = world.DependencyResolver.Resolve<LightManager>();
         InputManager = world.DependencyResolver.Resolve<GameInputManager>();
         CameraManager = EntityWorld.DependencyResolver.Resolve<CameraManager>();
-        ToolsManager = EntityWorld.DependencyResolver.Resolve<ToolsManager>();
         //SpriteBatch = new SpriteBatch(GraphicsDevice, 80000);
     }
 

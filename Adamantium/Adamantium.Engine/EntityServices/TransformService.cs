@@ -11,8 +11,6 @@ namespace Adamantium.Engine.EntityServices;
 
 public class TransformService : EntityService
 {
-    private ToolsManager tools;
-    private LightManager lightManager;
     private CameraManager cameraManager;
 
     public Boolean IsPaused { get; set; }
@@ -29,8 +27,6 @@ public class TransformService : EntityService
 
     public override void Initialize()
     {
-        tools = EntityWorld.DependencyResolver.Resolve<ToolsManager>();
-        lightManager = EntityWorld.DependencyResolver.Resolve<LightManager>();
         cameraManager = EntityWorld.DependencyResolver.Resolve<CameraManager>();
     }
 
@@ -43,8 +39,6 @@ public class TransformService : EntityService
             {
                 Transform(entity, gameTime);
             }
-            tools.Update(entities, cameraManager, lightManager);
-            lightManager.Update();
         }
         catch (Exception ex)
         {
