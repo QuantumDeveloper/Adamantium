@@ -15,7 +15,7 @@ public class ToolsService : EntityService
     private ToolsManager tools;
     private LightManager lightManager;
     private CameraManager cameraManager;
-    private IGame game;
+    private IUniverse universe;
 
     public ToolsService(EntityWorld world)
         : base(world)
@@ -33,14 +33,14 @@ public class ToolsService : EntityService
         tools = EntityWorld.DependencyResolver.Resolve<ToolsManager>();
         lightManager = EntityWorld.DependencyResolver.Resolve<LightManager>();
         cameraManager = EntityWorld.DependencyResolver.Resolve<CameraManager>();
-        game = EntityWorld.DependencyResolver.Resolve<IGame>();
+        universe = EntityWorld.DependencyResolver.Resolve<IUniverse>();
     }
 
     public override void Update(AppTime gameTime)
     {
         try
         {
-            tools.Update(Entities, cameraManager, lightManager, game.ActiveOutput?.Input);
+            tools.Update(Entities, cameraManager, lightManager, universe.ActiveOutput?.Input);
             lightManager.Update();
         }
         catch (Exception ex)

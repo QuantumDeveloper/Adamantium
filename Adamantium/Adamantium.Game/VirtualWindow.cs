@@ -276,7 +276,7 @@ public class VirtualWindow : ContentControl, IVirtualWindow, IAdornerHost, IPopu
     public IReadOnlyList<IUIComponent> PopupRoots => PopupLayer.Roots;
     public void LayoutPopups() => PopupLayer.UpdateLayout(new Size(ClientWidth, ClientHeight));
 
-    public GameOutput RootWindow { get; set; }
+    public UniverseOutput RootWindow { get; set; }
 
     public bool ShouldDisplayWindow { get; }
 

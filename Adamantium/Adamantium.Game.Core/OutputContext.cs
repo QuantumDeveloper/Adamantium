@@ -8,23 +8,23 @@ namespace Adamantium.Game.Core
    /// <summary>
    /// Contains width, height, hwnd and Control itself, to which D3D will render its content
    /// </summary>
-   public class GameContext:IEquatable<GameContext>
+   public class OutputContext:IEquatable<OutputContext>
    {
        /// <summary>
-       /// Constructs GameContext
+       /// Constructs OutputContext
        /// </summary>
        /// <param name="context">Object that represents surface on which Graphics content will be drawn</param>
        /// <exception cref="NotSupportedException"></exception>
-       public GameContext(Object context)
+       public OutputContext(Object context)
       {
          var type = context.GetType();
          if (Utilities.IsTypeInheritFrom(type, typeof(IWindow)))
          {
-            ContextType = GameContextType.Window;
+            ContextType = OutputContextType.Window;
          }
          else if (Utilities.IsTypeInheritFrom(type, typeof(RenderTargetPanel)))
          {
-            ContextType = GameContextType.RenderTargetPanel;
+            ContextType = OutputContextType.RenderTargetPanel;
          }
          else
          {
@@ -41,7 +41,7 @@ namespace Adamantium.Game.Core
       /// <summary>
       /// Type of Game context
       /// </summary>
-      public GameContextType ContextType { get; }
+      public OutputContextType ContextType { get; }
 
       /// <summary>
       /// Determines whether the specified object is equal to the current object.
@@ -55,7 +55,7 @@ namespace Adamantium.Game.Core
          if (obj == null || obj.GetType() != GetType())
             return false;
 
-         var context = (GameContext) obj;
+         var context = (OutputContext) obj;
          return Equals(context);
       }
 
@@ -66,19 +66,19 @@ namespace Adamantium.Game.Core
       /// true if the current object is equal to the <paramref name="other"/> parameter; otherwise, false.
       /// </returns>
       /// <param name="other">An object to compare with this object.</param>
-      public bool Equals(GameContext other)
+      public bool Equals(OutputContext other)
       {
          return this == other;
       }
 
 
        /// <summary>
-       /// Deep comparing of two <see cref="GameContext"/>s
+       /// Deep comparing of two <see cref="OutputContext"/>s
        /// </summary>
-       /// <param name="context1">First <see cref="GameContext"/></param>
-       /// <param name="context2">Second <see cref="GameContext"/></param>
+       /// <param name="context1">First <see cref="OutputContext"/></param>
+       /// <param name="context2">Second <see cref="OutputContext"/></param>
        /// <returns>true if items are the same, otherwise - false</returns>
-       public static bool operator ==(GameContext context1, GameContext context2)
+       public static bool operator ==(OutputContext context1, OutputContext context2)
        {
            if ((object) context1 == null && (object) context2 == null)
            {
@@ -94,12 +94,12 @@ namespace Adamantium.Game.Core
        }
 
        /// <summary>
-       /// Deep comparing of two <see cref="GameContext"/>s
+       /// Deep comparing of two <see cref="OutputContext"/>s
        /// </summary>
-       /// <param name="context1">First <see cref="GameContext"/></param>
-       /// <param name="context2">Second <see cref="GameContext"/></param>
+       /// <param name="context1">First <see cref="OutputContext"/></param>
+       /// <param name="context2">Second <see cref="OutputContext"/></param>
        /// <returns>true if items are the same, otherwise - false</returns>
-       public static bool operator !=(GameContext context1, GameContext context2)
+       public static bool operator !=(OutputContext context1, OutputContext context2)
        {
            return !(context1 == context2);
        }

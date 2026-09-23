@@ -363,7 +363,7 @@ public class LightManager
         geometryCache.DrawMesh(device, spotLightRenderer);
     }
 
-    public bool ProcessLight(Entity lightEntity, CameraManager cameraManager, GameInputManager inputManager)
+    public bool ProcessLight(Entity lightEntity, CameraManager cameraManager, InputWormhole inputManager)
     {
         if (!Contains(lightEntity))
             return false;

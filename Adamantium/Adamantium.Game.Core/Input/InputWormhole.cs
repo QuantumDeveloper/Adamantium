@@ -6,18 +6,18 @@ using Adamantium.XInput;
 namespace Adamantium.Game.Core.Input
 {
     /// <summary>
-    /// Input of one <see cref="GameOutput"/>: its keyboard and pointer, fed by the output directly, plus the gamepads -
+    /// Input of one <see cref="UniverseOutput"/>: its keyboard and pointer, fed by the output directly, plus the gamepads -
     /// which only the active output reports.
     /// </summary>
-    public class GameInputManager
+    public class InputWormhole
     {
         private readonly HashSet<Keys> downKeys;
         private readonly HashSet<Keys> pressedKeys;
         private readonly HashSet<Keys> releasedKeys;
         private readonly ButtonState[] mouseButtons;
 
-        private readonly GameOutput output;
-        private readonly Gamepads gamepads;
+        private readonly UniverseOutput output;
+        private readonly GamepadHub gamepads;
 
         protected Rectangle Bounds => output.ClientBounds;
         private Vector2F absolutePosition;
@@ -27,11 +27,11 @@ namespace Adamantium.Game.Core.Input
         private Vector2F acceleratedMouseDelta;
         private Vector2F lockMousePosition;
         private bool isLockedToCenter;
-        private GameWindowCursor currentCursor;
+        private OutputCursor currentCursor;
         private int virtualPositionMultiplierX = 0;
         private int virtualPositionMultiplierY = 0;
 
-        public GameInputManager(GameOutput output, Gamepads gamepads)
+        public InputWormhole(UniverseOutput output, GamepadHub gamepads)
         {
             this.output = output;
             this.gamepads = gamepads;
@@ -193,7 +193,7 @@ namespace Adamantium.Game.Core.Input
             lockMousePosition = new Vector2F(point.X, point.Y);
             SetLockedMousePosition();
             currentCursor = output.Cursor;
-            output.Cursor = GameWindowCursor.None;
+            output.Cursor = OutputCursor.None;
         }
 
         protected virtual void UnlockMousePosition()
@@ -322,7 +322,7 @@ namespace Adamantium.Game.Core.Input
             if (IsMouseButtonPressed(MouseButton.Left) && IsLockedToWindowBounds)
             {
                 virtualPosition = RelativePosition;
-                //_window.Cursor = GameWindowCursor.None;
+                //_window.Cursor = OutputCursor.None;
             }
 
             if (IsMouseButtonReleased(MouseButton.Left))
@@ -330,7 +330,7 @@ namespace Adamantium.Game.Core.Input
                 virtualPosition = RelativePosition;
                 virtualPositionMultiplierX = 0;
                 virtualPositionMultiplierY = 0;
-                //_window.Cursor = GameWindowCursor.Arrow;
+                //_window.Cursor = OutputCursor.Arrow;
             }
 
             if (IsMouseButtonDown(MouseButton.Left) && (IsMousePositionLocked && RawMouseDelta != Vector2F.Zero))

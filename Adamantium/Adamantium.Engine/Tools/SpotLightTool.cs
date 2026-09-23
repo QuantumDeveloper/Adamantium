@@ -34,7 +34,7 @@ public class SpotLightTool : LightToolBase
         anchorBackward = Tool.Get("AnchorPointBackward");
     }
 
-    public override void Process(Entity targetEntity, CameraManager cameraManager, GameInputManager inputManager)
+    public override void Process(Entity targetEntity, CameraManager cameraManager, InputWormhole inputManager)
     {
         if (!CheckTargetEntity(targetEntity))
             return;

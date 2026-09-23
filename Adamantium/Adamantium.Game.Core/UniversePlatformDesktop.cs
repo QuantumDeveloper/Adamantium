@@ -3,9 +3,9 @@ using System.IO;
 
 namespace Adamantium.Game.Core
 {
-   public abstract class GamePlatformDesktop : GamePlatform
+   public abstract class UniversePlatformDesktop : UniversePlatform
    {
-      public GamePlatformDesktop(IGame game) : base(game)
+      public UniversePlatformDesktop(IUniverse universe) : base(universe)
       {
       }
 
@@ -13,7 +13,7 @@ namespace Adamantium.Game.Core
       {
          get
          {
-            var assemblyUri = new Uri(Game.GetType().Assembly.CodeBase);
+            var assemblyUri = new Uri(Universe.GetType().Assembly.CodeBase);
             return Path.GetDirectoryName(assemblyUri.LocalPath);
          }
       }

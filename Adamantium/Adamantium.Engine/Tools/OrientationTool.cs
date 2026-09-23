@@ -39,7 +39,7 @@ public class OrientationTool: ToolBase
         stepDown = Tool.Get("StepDownManipulator");
     }
 
-    public override void Process(Entity targetEntity, CameraManager cameraManager, GameInputManager inputManager)
+    public override void Process(Entity targetEntity, CameraManager cameraManager, InputWormhole inputManager)
     {
         Tool.TraverseByLayer(current =>
         {
@@ -94,7 +94,7 @@ public class OrientationTool: ToolBase
     // A grab on the gizmo ORBITS the view, the way Blender's does - which is where the cube's edge and corner views
     // went: a drag reaches any angle, not one of twenty-six. A press that never travelled is a click, so the canonical
     // views stay one tap away; that is also why the click fires on RELEASE and not on the press.
-    private void Drag(Camera camera, GameInputManager inputManager)
+    private void Drag(Camera camera, InputWormhole inputManager)
     {
         var delta = inputManager.RawMouseDelta;
 

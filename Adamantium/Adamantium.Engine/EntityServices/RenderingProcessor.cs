@@ -19,9 +19,9 @@ public class RenderingProcessor : EntityProcessor<RenderingService>, IDisposable
     protected EntityWorld EntityWorld { get; set; }
 
     protected IContentManager Content { get; set; }
-    protected GameOutput Window { get; set; }
+    protected UniverseOutput Window { get; set; }
 
-    protected GameInputManager InputManager => Window.Input;
+    protected InputWormhole InputManager => Window.Input;
     protected CameraManager CameraManager { get; set; }
 
     protected SpriteBatch SpriteBatch { get; set; }
@@ -91,7 +91,7 @@ public class RenderingProcessor : EntityProcessor<RenderingService>, IDisposable
         SpriteBatch = new SpriteBatch(GraphicsDevice, 25000);
     }
 
-    private void WindowOnSizeChanged(GameOutputSizeChangedPayload obj)
+    private void WindowOnSizeChanged(UniverseOutputSizeChangedPayload obj)
     {
     }
 

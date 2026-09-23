@@ -36,7 +36,7 @@ public class PointLightTool : LightToolBase
         anchorDown = Tool.Get("AnchorPointDown");
     }
 
-    public override void Process(Entity targetEntity, CameraManager cameraManager, GameInputManager inputManager)
+    public override void Process(Entity targetEntity, CameraManager cameraManager, InputWormhole inputManager)
     {
         if (!CheckTargetEntity(targetEntity))
             return;
@@ -94,7 +94,7 @@ public class PointLightTool : LightToolBase
         Transform(Tool, cameraManager);
     }
 
-    private void ScalePointLight(Entity lightToTransform, GameInputManager input, Vector3F rayPlaneInterPoint)
+    private void ScalePointLight(Entity lightToTransform, InputWormhole input, Vector3F rayPlaneInterPoint)
     {
         var res = input.VirtualPosition / startPosition;
             

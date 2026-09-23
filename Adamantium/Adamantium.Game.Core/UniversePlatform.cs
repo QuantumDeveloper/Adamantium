@@ -5,11 +5,8 @@ using Adamantium.Core.Events;
 using Adamantium.Game.Core.Events;
 using Adamantium.Game.Core.Input;
 using Adamantium.Game.Core.Payloads;
-using Adamantium.Graphics;
 using Adamantium.Graphics.Core;
 using Adamantium.Imaging;
-using Adamantium.UI;
-using Adamantium.UI.Controls;
 using Adamantium.UI.Controls.Panels;
 using Adamantium.UI.Core;
 using Serilog;
@@ -19,22 +16,22 @@ namespace Adamantium.Game.Core
     /// <summary>
     /// Abstract class for different game platforms
     /// </summary>
-    public abstract class GamePlatform : IGamePlatform, IDisposable
+    public abstract class UniversePlatform : IUniversePlatform, IDisposable
     {
-        private List<GameOutput> windowsToAdd;
-        private List<GameOutput> windowsToRemove;
+        private List<UniverseOutput> windowsToAdd;
+        private List<UniverseOutput> windowsToRemove;
         private readonly IEventAggregator _eventAggregator;
-        private Dictionary<GameContext, GameOutput> contextToWindow;
+        private Dictionary<OutputContext, UniverseOutput> contextToWindow;
 
         private bool graphicsDeviceChanged;
         
         internal static int WindowId = 1;
 
-        private AdamantiumCollection<GameOutput> outputs;
+        private AdamantiumCollection<UniverseOutput> outputs;
 
-        private Dictionary<GameOutput, GameOutputParametersPayload> _changedOutputs;
+        private Dictionary<UniverseOutput, UniverseOutputParametersPayload> _changedOutputs;
 
-        private readonly Gamepads gamepads = new Gamepads();
+        private readonly GamepadHub gamepads = new GamepadHub();
 
         private object syncObject = new object();
 
@@ -44,47 +41,47 @@ namespace Adamantium.Game.Core
         public abstract string DefaultAppDirectory { get; }
 
         /// <summary>
-        /// Main <see cref="GameOutput"/>
+        /// Main <see cref="UniverseOutput"/>
         /// </summary>
-        public GameOutput MainWindow { get; protected set; }
+        public UniverseOutput MainWindow { get; protected set; }
 
         /// <summary>
-        /// Current focused <see cref="GameOutput"/>
+        /// Current focused <see cref="UniverseOutput"/>
         /// </summary>
-        public GameOutput ActiveWindow { get; private set; }
+        public UniverseOutput ActiveWindow { get; private set; }
 
         /// <summary>
-        /// Read only collection of <see cref="GameOutput"/>s
+        /// Read only collection of <see cref="UniverseOutput"/>s
         /// </summary>
-        public IReadOnlyList<GameOutput> Outputs => outputs;
+        public IReadOnlyList<UniverseOutput> Outputs => outputs;
 
         public bool HasOutputs => outputs.Count > 0;
 
-        protected IGame Game { get; }
+        protected IUniverse Universe { get; }
         
         internal IGraphicsDeviceService GraphicsDeviceService { get; private set; }
         
         /// <summary>
-        /// Constructs <see cref="GamePlatform"/> from <see cref="IGame"/> instance
+        /// Constructs <see cref="UniversePlatform"/> from <see cref="IUniverse"/> instance
         /// </summary>
-        /// <param name="game"></param>
-        protected GamePlatform(IGame game)
+        /// <param name="universe"></param>
+        protected UniversePlatform(IUniverse universe)
         {
-            Game = game;
-            game.Initialized += Initialized;
-           
-            _eventAggregator = game.Container.Resolve<IEventAggregator>();
-            _eventAggregator.GetEvent<GameOutputChangesRequestedEvent>()
-                .Subscribe(OnGameOutputChangesRequested);
+            Universe = universe;
+            universe.Initialized += Initialized;
 
-            _changedOutputs = new Dictionary<GameOutput, GameOutputParametersPayload>();
-            outputs = new AdamantiumCollection<GameOutput>();
-            windowsToAdd = new List<GameOutput>();
-            windowsToRemove = new List<GameOutput>();
-            contextToWindow = new Dictionary<GameContext, GameOutput>();
+            _eventAggregator = universe.Container.Resolve<IEventAggregator>();
+            _eventAggregator.GetEvent<UniverseOutputChangesRequestedEvent>()
+                .Subscribe(OnUniverseOutputChangesRequested);
+
+            _changedOutputs = new Dictionary<UniverseOutput, UniverseOutputParametersPayload>();
+            outputs = new AdamantiumCollection<UniverseOutput>();
+            windowsToAdd = new List<UniverseOutput>();
+            windowsToRemove = new List<UniverseOutput>();
+            contextToWindow = new Dictionary<OutputContext, UniverseOutput>();
         }
 
-        private void OnGameOutputChangesRequested(GameOutputParametersPayload obj)
+        private void OnUniverseOutputChangesRequested(UniverseOutputParametersPayload obj)
         {
             lock (syncObject)
             {
@@ -94,7 +91,7 @@ namespace Adamantium.Game.Core
 
         private void Initialized(object sender, EventArgs e)
         {
-            GraphicsDeviceService = Game.Container.Resolve<IGraphicsDeviceService>();
+            GraphicsDeviceService = Universe.Container.Resolve<IGraphicsDeviceService>();
             GraphicsDeviceService.DeviceChangeEnd += DeviceChangeEnd;
         }
 
@@ -104,20 +101,20 @@ namespace Adamantium.Game.Core
         }
 
         /// <summary>
-        /// Creates <see cref="GamePlatform"/> from <see cref="IGame"/>
+        /// Creates <see cref="UniversePlatform"/> from <see cref="IUniverse"/>
         /// </summary>
-        /// <param name="game">instance of <see cref="IGame"/></param>
+        /// <param name="universe">instance of <see cref="IUniverse"/></param>
         /// <param name="resolver">instance of <see cref="IDependencyResolver"/></param>
-        /// <returns>new <see cref="GamePlatform"/> instance</returns>
-        public static GamePlatform Create(IGame game, IDependencyResolver resolver)
+        /// <returns>new <see cref="UniversePlatform"/> instance</returns>
+        public static UniversePlatform Create(IUniverse universe, IDependencyResolver resolver)
         {
             switch (Configuration.Platform)
             {
                 case Platform.Windows:
-                    return new GamePlatformWindows(game, resolver);
+                    return new UniversePlatformWindows(universe, resolver);
                 case Platform.OSX:
                     default:
-                    throw new NotImplementedException("Current GamePlatform is not implemented yet");
+                    throw new NotImplementedException("Current UniversePlatform is not implemented yet");
             }
         }
 
@@ -126,7 +123,7 @@ namespace Adamantium.Game.Core
         /// </summary>
         /// <param name="oldContext">Old control for drawing</param>
         /// <param name="newContext">New control for drawing</param>
-        public void SwitchContext(GameContext oldContext, GameContext newContext)
+        public void SwitchContext(OutputContext oldContext, OutputContext newContext)
         {
             if (contextToWindow.Remove(oldContext, out var wnd))
             {
@@ -135,15 +132,15 @@ namespace Adamantium.Game.Core
             }
         }
 
-        internal static GameContextType GetContextType(object context)
+        internal static OutputContextType GetContextType(object context)
         {
             if (context is IWindow)
             {
-                return GameContextType.Window;
+                return OutputContextType.Window;
             }
             if (context is RenderTargetPanel)
             {
-                return GameContextType.RenderTargetPanel;
+                return OutputContextType.RenderTargetPanel;
             }
             throw new NotSupportedException("this context type currently is not supported");
         }
@@ -158,7 +155,7 @@ namespace Adamantium.Game.Core
                     
                     var device = GraphicsDeviceService.CreateRenderDevice();
                     wnd.SetGraphicsDevice(device);
-                    wnd.Input = new GameInputManager(wnd, gamepads);
+                    wnd.Input = new InputWormhole(wnd, gamepads);
                     SubscribeToEvents(wnd);
                     
                     outputs.Add(wnd);
@@ -177,7 +174,7 @@ namespace Adamantium.Game.Core
 
         private void Wnd_Closed(object sender, EventArgs e)
         {
-            windowsToRemove.Add((GameOutput)sender);
+            windowsToRemove.Add((UniverseOutput)sender);
         }
 
         internal void RemoveWindowsInternal()
@@ -197,14 +194,14 @@ namespace Adamantium.Game.Core
             }
         }
 
-        private void SubscribeToEvents(GameOutput wnd)
+        private void SubscribeToEvents(UniverseOutput wnd)
         {
             wnd.Activated += Window_Activated;
             wnd.Deactivated += Window_Deactivated;
             wnd.Closed += Wnd_Closed;
         }
 
-        private void UnsubscribeFromEvents(GameOutput wnd)
+        private void UnsubscribeFromEvents(UniverseOutput wnd)
         {
             wnd.Activated -= Window_Activated;
             wnd.Deactivated -= Window_Deactivated;
@@ -251,20 +248,20 @@ namespace Adamantium.Game.Core
             }
         }
 
-        private void Window_Deactivated(GameOutput output)
+        private void Window_Deactivated(UniverseOutput output)
         {
             OnDeactivated(output);
             ActiveWindow = null;
         }
 
-        private void Window_Activated(GameOutput output)
+        private void Window_Activated(UniverseOutput output)
         {
             ActiveWindow = output;
             OnActivated(ActiveWindow);
         }
 
         // Through the same queue a closed window takes, so the output is unsubscribed and its removal announced.
-        public void RemoveOutput(GameContext context)
+        public void RemoveOutput(OutputContext context)
         {
             if (contextToWindow.Remove(context, out var window))
             {
@@ -272,22 +269,22 @@ namespace Adamantium.Game.Core
             }
         }
 
-        private void OnActivated(GameOutput output)
+        private void OnActivated(UniverseOutput output)
         {
-            _eventAggregator.GetEvent<GameOutputActivatedEvent>().Publish(output);
+            _eventAggregator.GetEvent<UniverseOutputActivatedEvent>().Publish(output);
         }
 
-        private void OnDeactivated(GameOutput output)
+        private void OnDeactivated(UniverseOutput output)
         {
-            _eventAggregator.GetEvent<GameOutputDeactivatedEvent>().Publish(output);
+            _eventAggregator.GetEvent<UniverseOutputDeactivatedEvent>().Publish(output);
         }
 
-        private void OnWindowSizeChanged(GameOutput wnd)
+        private void OnWindowSizeChanged(UniverseOutput wnd)
         {
             wnd?.OnWindowSizeChanged();
             
-            // eventAggregator.GetEvent<GameOutputSizeChanged>()
-            //     .Publish(new GameOutputSizeChangedPayload(wnd, new Size(wnd.Width, wnd.Height)));
+            // eventAggregator.GetEvent<UniverseOutputSizeChangedEvent>()
+            //     .Publish(new UniverseOutputSizeChangedPayload(wnd, new Size(wnd.Width, wnd.Height)));
         }
 
         /// <summary>
@@ -302,14 +299,14 @@ namespace Adamantium.Game.Core
             }
         }
 
-        private void OnWindowCreated(GameOutput output)
+        private void OnWindowCreated(UniverseOutput output)
         {
-            _eventAggregator.GetEvent<GameOutputCreatedEvent>().Publish(output);
+            _eventAggregator.GetEvent<UniverseOutputCreatedEvent>().Publish(output);
         }
 
-        private void OnOutputRemoved(GameOutput output)
+        private void OnOutputRemoved(UniverseOutput output)
         {
-            _eventAggregator.GetEvent<GameOutputRemovedEvent>().Publish(output);
+            _eventAggregator.GetEvent<UniverseOutputRemovedEvent>().Publish(output);
         }
 
         public void Dispose()
@@ -328,39 +325,39 @@ namespace Adamantium.Game.Core
         }
 
         public abstract void Run(CancellationToken token);
-        public GameOutput CreateOutput(uint width = 1280, uint height = 720)
+        public UniverseOutput CreateOutput(uint width = 1280, uint height = 720)
         {
-            var wnd = GameOutput.NewWindow(_eventAggregator, width, height);
+            var wnd = UniverseOutput.NewWindow(_eventAggregator, width, height);
             windowsToAdd.Add(wnd);
             return wnd;
         }
 
         /// <summary>
-        /// Creates <see cref="GameOutput"/> from <see cref="GameContext"/>
+        /// Creates <see cref="UniverseOutput"/> from <see cref="OutputContext"/>
         /// </summary>
-        /// <param name="context">Context (Control) from which <see cref="GameOutput"/> will be created</param>
-        /// <returns>new <see cref="GameOutput"/></returns>
-        public virtual GameOutput CreateOutput(GameContext context)
+        /// <param name="context">Context (Control) from which <see cref="UniverseOutput"/> will be created</param>
+        /// <returns>new <see cref="UniverseOutput"/></returns>
+        public virtual UniverseOutput CreateOutput(OutputContext context)
         {
             if (context == null)
             {
                 return null;
             }
 
-            var wnd = GameOutput.New(_eventAggregator, context);
+            var wnd = UniverseOutput.New(_eventAggregator, context);
             contextToWindow.Add(context, wnd);
             windowsToAdd.Add(wnd);
             return wnd;
         }
 
         /// <summary>
-        /// Creates <see cref="GameOutput"/> from <see cref="object"/>
+        /// Creates <see cref="UniverseOutput"/> from <see cref="object"/>
         /// </summary>
-        /// <param name="context">Context (Control) from which <see cref="GameOutput"/> will be created</param>
-        /// <returns>new <see cref="GameOutput"/></returns>
-        public GameOutput CreateOutput(object context)
+        /// <param name="context">Context (Control) from which <see cref="UniverseOutput"/> will be created</param>
+        /// <returns>new <see cref="UniverseOutput"/></returns>
+        public UniverseOutput CreateOutput(object context)
         {
-            var gameContext = new GameContext(context);
+            var gameContext = new OutputContext(context);
             return CreateOutput(gameContext);
         }
 
@@ -371,16 +368,16 @@ namespace Adamantium.Game.Core
         /// <param name="surfaceFormat">Surface format</param>
         /// <param name="depthFormat">Depth buffer format</param>
         /// <param name="msaaLevel">MSAA level</param>
-        public GameOutput CreateOutput( 
+        public UniverseOutput CreateOutput( 
             object context,
             SurfaceFormat surfaceFormat, 
             DepthFormat depthFormat = DepthFormat.Depth32Stencil8X24, 
             MSAALevel msaaLevel = MSAALevel.None)
         {
-            var gameContext = new GameContext(context);
+            var gameContext = new OutputContext(context);
             if (!contextToWindow.ContainsKey(gameContext))
             {
-                var wnd = GameOutput.New(_eventAggregator, gameContext, surfaceFormat, depthFormat, msaaLevel);
+                var wnd = UniverseOutput.New(_eventAggregator, gameContext, surfaceFormat, depthFormat, msaaLevel);
                 contextToWindow.Add(gameContext, wnd);
                 windowsToAdd.Add(wnd);
                 return wnd;
@@ -389,27 +386,27 @@ namespace Adamantium.Game.Core
         }
 
         /// <summary>
-        /// Adds <see cref="GameOutput"/> to the windows collection
+        /// Adds <see cref="UniverseOutput"/> to the windows collection
         /// </summary>
         /// <param name="window">window to add to the windows collection</param>
-        public void AddOutput(GameOutput window)
+        public void AddOutput(UniverseOutput window)
         {
             if (outputs.Contains(window)) return;
 
-            if (!contextToWindow.ContainsKey(window.GameContext) && !windowsToAdd.Contains(window))
+            if (!contextToWindow.ContainsKey(window.OutputContext) && !windowsToAdd.Contains(window))
             {
-                contextToWindow.Add(window.GameContext, window);
+                contextToWindow.Add(window.OutputContext, window);
                 windowsToAdd.Add(window);
             }
         }
 
         /// <summary>
-        /// Remove <see cref="GameOutput"/>
+        /// Remove <see cref="UniverseOutput"/>
         /// </summary>
-        /// <param name="context">UI Control for which <see cref="GameOutput"/> will be removed</param>
+        /// <param name="context">UI Control for which <see cref="UniverseOutput"/> will be removed</param>
         public void RemoveOutput(object context)
         {
-            var gameContext = new GameContext(context);
+            var gameContext = new OutputContext(context);
             RemoveOutput(gameContext);
         }
     }

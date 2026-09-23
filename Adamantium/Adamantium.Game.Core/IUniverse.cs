@@ -7,17 +7,17 @@ using Adamantium.UI.Core;
 
 namespace Adamantium.Game.Core
 {
-    public interface IGame : IAdamantiumApplication
+    public interface IUniverse : IAdamantiumApplication
     {
         EntityWorld EntityWorld { get; }
         
-        IReadOnlyList<GameOutput> Outputs { get; }
+        IReadOnlyList<UniverseOutput> Outputs { get; }
         
-        GameOutput ActiveOutput { get; }
+        UniverseOutput ActiveOutput { get; }
         
-        GameOutput MainOutput { get; }
+        UniverseOutput MainOutput { get; }
 
-        public void InitializeGame();
+        public void InitializeUniverse();
 
         public void Submit();
         
@@ -47,7 +47,7 @@ namespace Adamantium.Game.Core
         /// </summary>
         ShutDownMode ShutDownMode { get; set; }
         
-        GameMode Mode { get; }
+        UniverseMode Mode { get; }
         
         /// <summary>
         /// Title of the game to show in the window title bar

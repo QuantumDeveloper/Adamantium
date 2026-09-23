@@ -44,7 +44,7 @@ public class DeferredRenderingService : RenderingService
 //        private RenderTarget2D _albedoBufferRT;
 //        private RenderTarget2D _normalsBufferRT;
 
-    public DeferredRenderingService(EntityWorld world, GameOutput window) : base(world, window)
+    public DeferredRenderingService(EntityWorld world, UniverseOutput window) : base(world, window)
     {
     }
 

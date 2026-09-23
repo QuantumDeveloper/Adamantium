@@ -21,18 +21,16 @@ public class InputService : EntityService
 
     public Boolean InstrumentsEnabled { get; set; }
 
-    private GamePlayManager gamePlayManager;
     //private AudioManager audioManager;
     private ToolsManager toolsManager;
-    private IGamePlatform gamePlatform;
+    private IUniversePlatform gamePlatform;
 
     public InputService(EntityWorld world) : base(world)
     {
-        gamePlayManager = DependencyResolver.Resolve<GamePlayManager>();
         toolsManager = DependencyResolver.Resolve<ToolsManager>();
         EntityWorld.EntityManager.EntityRemoved += EntityManagerEntityRemoved;
         //audioManager = new AudioManager();
-        gamePlatform = world.DependencyResolver.Resolve<IGamePlatform>();
+        gamePlatform = world.DependencyResolver.Resolve<IUniversePlatform>();
     }
 
     public override void UnloadContent()
@@ -49,12 +47,16 @@ public class InputService : EntityService
     /// so an editor turns this off and decides for itself.</summary>
     public bool FollowsWholeObject { get; set; } = true;
 
+    /// <summary>The entity the application put the player in charge of - what the third-person keys follow when nothing
+    /// is selected.</summary>
+    public Entity UserControlledEntity { get; set; }
+
     public override void Update(AppTime gameTime)
     {
         // The editor's SELECTION first, then whatever the application put the player in charge of. Only the first half
         // was read, so an application that never opens a tool panel had no subject at all - and every key that follows
         // one (the third-person modes) quietly did nothing.
-        userControlledEntity = toolsManager.SelectedEntity ?? gamePlayManager.UserControlledEntity;
+        userControlledEntity = toolsManager.SelectedEntity ?? UserControlledEntity;
         var cameraController = DependencyResolver.Resolve<CameraManager>();
 
         var currentCamera = cameraController?.UserControlledCamera;

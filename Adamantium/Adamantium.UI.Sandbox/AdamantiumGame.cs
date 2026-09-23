@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Threading.Tasks;
 using Adamantium.Engine.EntityServices;
+using Adamantium.Engine.Managers;
 using Adamantium.Engine.Templates;
 using Adamantium.ECS;
 using Adamantium.Game;
@@ -13,26 +14,25 @@ using Adamantium.Mathematics;
 
 namespace Adamantium.UI.Sandbox
 {
-    // Qualified: from Adamantium.UI.Sandbox the bare name Game finds the NAMESPACE Adamantium.Game first.
-    public class AdamantiumGame : Adamantium.Game.Game
+    public class AdamantiumGame : Universe
     {
         public AdamantiumGame(
             bool enableDynamicRendering, 
             bool enableDebug) :
-            base(GameMode.Primary, enableDebug)
+            base(UniverseMode.Primary, enableDebug)
         {
-            EventAggregator.GetEvent<GameOutputCreatedEvent>().Subscribe(OnWindowCreated);
+            EventAggregator.GetEvent<UniverseOutputCreatedEvent>().Subscribe(OnWindowCreated);
         }
 
         public AdamantiumGame(
             IGraphicsDeviceService graphicsDeviceService, 
             bool enableDebug) :
-            base(GameMode.Slave, enableDebug, graphicsDeviceService)
+            base(UniverseMode.Slave, enableDebug, graphicsDeviceService)
         {
-            EventAggregator.GetEvent<GameOutputCreatedEvent>().Subscribe(OnWindowCreated);
+            EventAggregator.GetEvent<UniverseOutputCreatedEvent>().Subscribe(OnWindowCreated);
         }
 
-        private void OnWindowCreated(GameOutput output)
+        private void OnWindowCreated(UniverseOutput output)
         {
             var renderingService = EntityWorld.CreateService<RenderingService>(EntityWorld, output);
             var processor = new ForwardRenderingProcessor();
@@ -42,6 +42,9 @@ namespace Adamantium.UI.Sandbox
         protected override void Initialize()
         {
             base.Initialize();
+            // Editing tools are the demo's choice, not the game's: created before the services that resolve them.
+            Container.RegisterInstance<ToolsManager>(new ToolsManager(EntityWorld));
+            Container.RegisterInstance<LightManager>(new LightManager(EntityWorld));
             InitializeGameResources();
         }
 
@@ -55,11 +58,13 @@ namespace Adamantium.UI.Sandbox
 
         private Task _startupLoad;
 
+        private InputService _inputService;
+
         private void InitializeGameResources()
         {
             try
             {
-                EntityWorld.CreateService<InputService>(EntityWorld);
+                _inputService = EntityWorld.CreateService<InputService>(EntityWorld);
                 EntityWorld.CreateService<TransformService>(EntityWorld);
                 EntityWorld.CreateService<ToolsService>(EntityWorld);
             }
@@ -104,7 +109,7 @@ namespace Adamantium.UI.Sandbox
             var entity = await ImportModel(pathToFile);
             EntityWorld.EntityManager.AddEntity(entity);
 
-            GamePlayManager.SetUserControlled(entity);
+            _inputService.UserControlledEntity = entity;
             return entity;
         }
     }

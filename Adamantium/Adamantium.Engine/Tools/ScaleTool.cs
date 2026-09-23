@@ -56,7 +56,7 @@ public class ScaleTool : ToolBase
         centralManipulator = Tool.Get(CentralManipulatorName);
     }
 
-    public override void Process(Entity targetEntity, CameraManager cameraManager, GameInputManager inputManager)
+    public override void Process(Entity targetEntity, CameraManager cameraManager, InputWormhole inputManager)
     {
         if (!CheckTargetEntity(targetEntity))
             return;

@@ -14,7 +14,7 @@ public class DirectionalLightTool : LightToolBase
         Tool = new DirectionalLightVisualTemplate().BuildEntity(null, "Directional");
     }
 
-    public override void Process(Entity targetEntity, CameraManager cameraManager, GameInputManager inputManager)
+    public override void Process(Entity targetEntity, CameraManager cameraManager, InputWormhole inputManager)
     {
         if (!CheckTargetEntity(targetEntity))
             return;

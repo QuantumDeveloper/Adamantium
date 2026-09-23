@@ -63,7 +63,7 @@ public class PivotTool: ToolBase
         pivotPoint = Tool.Get(PivotPointName);
     }
 
-    public override void Process(Entity targetEntity, CameraManager cameraManager, GameInputManager inputManager)
+    public override void Process(Entity targetEntity, CameraManager cameraManager, InputWormhole inputManager)
     {
         if (!CheckTargetEntity(targetEntity))
             return;

@@ -8,7 +8,7 @@ namespace Adamantium.Game;
 
 public abstract class GameApplication : UIApplication
 {
-    public IGameService GameService { get; private set; }
+    public IUniverseService UniverseService { get; private set; }
 
     public GameApplication()
     {
@@ -17,19 +17,19 @@ public abstract class GameApplication : UIApplication
     protected override void OnInitialize()
     {
         base.OnInitialize();
-        GameService = new GameService();
+        UniverseService = new UniverseService();
         EntityWorld.ServiceManager.OnDrawStarted += ServiceManagerOnDrawStarted;
         EntityWorld.ServiceManager.OnDrawFinished += ServiceManagerOnOnDrawFinished;
-        GameService.OnGameAdded += GameServiceOnGameAdded;
+        UniverseService.OnUniverseAdded += UniverseServiceOnUniverseAdded;
     }
 
-    private void GameServiceOnGameAdded(IGame obj)
+    private void UniverseServiceOnUniverseAdded(IUniverse obj)
     {
     }
 
     private void ServiceManagerOnDrawStarted(IRenderService service, AppTime time)
     {
-        GameService.RunGames(service, time);
+        UniverseService.RunUniverses(service, time);
     }
 
     private void ServiceManagerOnOnDrawFinished(IRenderService arg1, AppTime arg2)
@@ -42,7 +42,7 @@ public abstract class GameApplication : UIApplication
     protected override void RegisterServices(IContainerRegistry containerRegistry)
     {
         base.RegisterServices(containerRegistry);
-        containerRegistry.RegisterSingleton<IGameService>(GameService);
+        containerRegistry.RegisterSingleton<IUniverseService>(UniverseService);
     }
 
     protected override void OnBeforeEndScene()

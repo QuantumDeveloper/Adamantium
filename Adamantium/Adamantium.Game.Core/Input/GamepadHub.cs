@@ -7,7 +7,7 @@ namespace Adamantium.Game.Core.Input
     /// Every connected gamepad, polled once per frame. A gamepad belongs to the machine, not to an output, so there is
     /// one of these per platform and each output's input reads from it.
     /// </summary>
-    public class Gamepads
+    public class GamepadHub
     {
         private const int MaxGamepadsCount = 8;
         private const float LeftThumbDeadZone = 0.2f;
@@ -24,7 +24,7 @@ namespace Adamantium.Game.Core.Input
         private Gamepad[] gamepads;
         private GamepadState[] gamepadStates;
 
-        public Gamepads()
+        public GamepadHub()
         {
             downGamepadButtons = new HashSet<GamepadButton>[MaxGamepadsCount];
             pressedGamepadButtons = new HashSet<GamepadButton>[MaxGamepadsCount];

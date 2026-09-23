@@ -3,9 +3,9 @@
 namespace Adamantium.Game
 {
     /// <summary>
-    /// Define type of <see cref="GameContext"/>
+    /// Define type of <see cref="OutputContext"/>
     /// </summary>
-    public enum GameContextType
+    public enum OutputContextType
     {
         Window,
 

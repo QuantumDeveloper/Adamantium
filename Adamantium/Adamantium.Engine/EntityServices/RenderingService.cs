@@ -23,9 +23,9 @@ public class RenderingService : EntityService
     // handing the panel the one frame it drew before its tab went away.
     public override bool CanDisplayContent => Window.IsVisible;
     protected IContentManager Content { get; }
-    public GameOutput Window { get; }
+    public UniverseOutput Window { get; }
 
-    protected GameInputManager InputManager => Window.Input;
+    protected InputWormhole InputManager => Window.Input;
     protected CameraManager CameraManager { get; }
         
     //protected SpriteBatch SpriteBatch;
@@ -33,7 +33,7 @@ public class RenderingService : EntityService
     protected Camera ActiveCamera { get; set; }
     protected bool ShowDebugOutput { get; set; }
 
-    public RenderingService(EntityWorld world, GameOutput window) : base(world)
+    public RenderingService(EntityWorld world, UniverseOutput window) : base(world)
     {
         GraphicsDeviceService = world.DependencyResolver.Resolve<IGraphicsDeviceService>();
         GraphicsDeviceService.DeviceChangeBegin += DeviceChangeBegin;
@@ -49,7 +49,7 @@ public class RenderingService : EntityService
         //SpriteBatch = new SpriteBatch(GraphicsDevice, 80000);
     }
 
-    private void WindowOnSizeChanged(GameOutputSizeChangedPayload obj)
+    private void WindowOnSizeChanged(UniverseOutputSizeChangedPayload obj)
     {
         //Window.UpdatePresenter();
     }
@@ -59,12 +59,12 @@ public class RenderingService : EntityService
             
     }
 
-    private void Window_ParametersChanged(GameOutputParametersPayload payload)
+    private void Window_ParametersChanged(UniverseOutputParametersPayload payload)
     {
         OnWindowParametersChanged(payload.Reason);
     }
 
-    private void Window_ParametersChanging(GameOutputParametersPayload payload)
+    private void Window_ParametersChanging(UniverseOutputParametersPayload payload)
     {
         OnWindowParametersChanging(payload.Reason);
     }

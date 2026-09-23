@@ -13,12 +13,12 @@ using Rectangle = Adamantium.Mathematics.Rectangle;
 namespace Adamantium.Game.Core;
 
 /// <summary>
-/// Represents a <see cref="GameOutput"/> that presents into a <see cref="RenderTargetPanel"/>. The engine renders
+/// Represents a <see cref="UniverseOutput"/> that presents into a <see cref="RenderTargetPanel"/>. The engine renders
 /// its frame, copies it into an exportable <see cref="SharedSurface"/>, and hands the panel that surface's
 /// descriptor so the panel imports it zero-copy and samples it during compositing. The surface is re-created when
 /// the panel resizes and handed off again.
 /// </summary>
-public class RenderTargetGameOutput : AdamantiumGameOutputBase
+public class RenderTargetUniverseOutput : UIUniverseOutput
 {
     private RenderTargetPanel nativeWindow;
     private SharedSurface _sharedSurface;
@@ -29,14 +29,14 @@ public class RenderTargetGameOutput : AdamantiumGameOutputBase
     private uint _surfaceHeight;
     private ulong _lastProduced;
 
-    internal RenderTargetGameOutput(IEventAggregator eventAggregator, GameContext context) : base(eventAggregator)
+    internal RenderTargetUniverseOutput(IEventAggregator eventAggregator, OutputContext context) : base(eventAggregator)
     {
         Initialize(context);
     }
 
-    internal RenderTargetGameOutput(
+    internal RenderTargetUniverseOutput(
         IEventAggregator eventAggregator,
-        GameContext context,
+        OutputContext context,
         SurfaceFormat pixelFormat,
         DepthFormat depthFormat,
         MSAALevel msaaLevel) : base(eventAggregator)
@@ -45,20 +45,20 @@ public class RenderTargetGameOutput : AdamantiumGameOutputBase
         Initialize(context, pixelFormat, depthFormat, msaaLevel);
     }
 
-    protected override void InitializeInternal(GameContext context)
+    protected override void InitializeInternal(OutputContext context)
     {
-        if (GameContext.Context is not RenderTargetPanel)
+        if (OutputContext.Context is not RenderTargetPanel)
         {
             throw new ArgumentException($"{nameof(context.Context)} should be of type RenderTargetPanel");
         }
 
-        GameContext = context;
-        nativeWindow = (RenderTargetPanel)GameContext.Context;
+        OutputContext = context;
+        nativeWindow = (RenderTargetPanel)OutputContext.Context;
         InputComponent = nativeWindow;
         nativeWindow.SizeChanged += NativeWindowOnSizeChanged;
         nativeWindow.GotFocus += NativeWindow_GotFocus;
         nativeWindow.LostFocus += NativeWindow_LostFocus;
-        Description = new GameWindowDescription(PresenterType.RenderTarget);
+        Description = new UniverseOutputDescription(PresenterType.RenderTarget);
 
         Width = (uint)nativeWindow.ActualWidth;
         Height = (uint)nativeWindow.ActualHeight;
@@ -153,14 +153,14 @@ public class RenderTargetGameOutput : AdamantiumGameOutputBase
         Height = height;
         ClientBounds = new Rectangle(0, 0, (int)width, (int)height);
         UpdateViewportAndScissor(width, height);
-        var sizePayload = new GameOutputSizeChangedPayload(this, new Adamantium.Mathematics.Size(width, height));
+        var sizePayload = new UniverseOutputSizeChangedPayload(this, new Adamantium.Mathematics.Size(width, height));
         RaiseSizeChangedEvent(sizePayload);
         // Also publish on the aggregator: CameraManager rebuilds the projection (aspect ratio) off THIS event, not the
         // local SizeChanged C# event. Width/Height are already set above, so UpdateDimensions reads the new size. Without
         // this the game's projection never re-aspects on a panel resize.
-        EventAggregator.GetEvent<GameOutputSizeChanged>().Publish(sizePayload);
+        EventAggregator.GetEvent<UniverseOutputSizeChangedEvent>().Publish(sizePayload);
         ResizeRequested = true;
-        EventAggregator.GetEvent<GameOutputChangesRequestedEvent>().Publish(new GameOutputParametersPayload(this, Description, ChangeReason.Resize));
+        EventAggregator.GetEvent<UniverseOutputChangesRequestedEvent>().Publish(new UniverseOutputParametersPayload(this, Description, ChangeReason.Resize));
         // The surface is re-created on the next CopyOutput (size mismatch) and re-handed to the control.
     }
 
@@ -174,7 +174,7 @@ public class RenderTargetGameOutput : AdamantiumGameOutputBase
         OnDeactivated();
     }
 
-    public override GameWindowDescription Description { get; protected set; }
+    public override UniverseOutputDescription Description { get; protected set; }
 
     /// <summary>
     /// Underlying control for rendering
@@ -185,12 +185,12 @@ public class RenderTargetGameOutput : AdamantiumGameOutputBase
 
     public override WindowState State { get; set; }
 
-    internal override bool CanHandle(GameContext gameContext)
+    internal override bool CanHandle(OutputContext gameContext)
     {
-        return gameContext.ContextType == GameContextType.RenderTargetPanel && nativeWindow != null;
+        return gameContext.ContextType == OutputContextType.RenderTargetPanel && nativeWindow != null;
     }
 
-    internal override void SwitchContext(GameContext context)
+    internal override void SwitchContext(OutputContext context)
     {
         if (!CanHandle(context)) return;
 

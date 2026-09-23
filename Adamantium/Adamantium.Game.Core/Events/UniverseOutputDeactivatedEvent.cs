@@ -2,7 +2,7 @@
 
 namespace Adamantium.Game.Core.Events
 {
-    public class GameOutputDeactivatedEvent : BasicAggregatorEvent<GameOutput>
+    public class UniverseOutputDeactivatedEvent : BasicAggregatorEvent<UniverseOutput>
     {
         
     }

@@ -11,16 +11,16 @@ using Rectangle = Adamantium.Mathematics.Rectangle;
 
 namespace Adamantium.Game.Core
 {
-    public class AdamantiumGameOutput : AdamantiumGameOutputBase
+    public class WindowUniverseOutput : UIUniverseOutput
     {
         private IWindow window;
 
-        public AdamantiumGameOutput(IEventAggregator eventAggregator, IWindow window) : base(eventAggregator)
+        public WindowUniverseOutput(IEventAggregator eventAggregator, IWindow window) : base(eventAggregator)
         {
-            Initialize(new GameContext(window));
+            Initialize(new OutputContext(window));
         }
 
-        public AdamantiumGameOutput(IEventAggregator eventAggregator, GameContext gameContext) : base(eventAggregator)
+        public WindowUniverseOutput(IEventAggregator eventAggregator, OutputContext gameContext) : base(eventAggregator)
         {
             Initialize(gameContext);
         }
@@ -36,20 +36,20 @@ namespace Adamantium.Game.Core
             }
         }
 
-        internal override bool CanHandle(GameContext gameContext)
+        internal override bool CanHandle(OutputContext gameContext)
         {
-            return gameContext.ContextType == GameContextType.Window && window != null;
+            return gameContext.ContextType == OutputContextType.Window && window != null;
         }
 
-        protected override void InitializeInternal(GameContext context)
+        protected override void InitializeInternal(OutputContext context)
         {
-            GameContext = context;
-            window = GameContext.Context as IWindow ?? throw new ArgumentException($"{nameof(context.Context)} should be of type {nameof(IWindow)}");
+            OutputContext = context;
+            window = OutputContext.Context as IWindow ?? throw new ArgumentException($"{nameof(context.Context)} should be of type {nameof(IWindow)}");
             InputComponent = window as IInputComponent;
             window.ClientSizeChanged += WindowOnClientSizeChanged;
             window.StateChanged += WindowOnStateChanged;
 
-            Description = new GameWindowDescription(PresenterType.Swapchain);
+            Description = new UniverseOutputDescription(PresenterType.Swapchain);
             Width = (uint)window.ClientWidth;
             Height = (uint)window.ClientHeight;
             Handle = window.Handle;
@@ -75,7 +75,7 @@ namespace Adamantium.Game.Core
             window.Arrange(new Rect(window.DesiredSize));
         }
 
-        internal override void SwitchContext(GameContext context)
+        internal override void SwitchContext(OutputContext context)
         {
             if (!CanHandle(context)) return;
             

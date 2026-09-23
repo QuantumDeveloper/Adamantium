@@ -160,7 +160,7 @@ public class ToolsManager
     }
 
     /// <param name="inputManager">Input of the active output; null when no output is active.</param>
-    public void Update(IEnumerable<Entity> entities, CameraManager cameraManager, LightManager lightManager, GameInputManager inputManager)
+    public void Update(IEnumerable<Entity> entities, CameraManager cameraManager, LightManager lightManager, InputWormhole inputManager)
     {
         // The tools pick with the pointer taken in the SURFACE's own coordinates, and a surface that is off screen -
         // a game panel whose tab is no longer the selected one - has no such point: the walk to its root finds no
@@ -186,7 +186,7 @@ public class ToolsManager
         Text = "Current selected entity: " + SelectedEntity + "\n";
     }
 
-    private void ProcessTools(IEnumerable<Entity> entities, CameraManager cameraManager, LightManager lightManager, GameInputManager inputManager)
+    private void ProcessTools(IEnumerable<Entity> entities, CameraManager cameraManager, LightManager lightManager, InputWormhole inputManager)
     {
         CollisionMode collisionMode = CollisionMode.IgnoreNonGeometryParts;
         var camera = cameraManager.UserControlledCamera;

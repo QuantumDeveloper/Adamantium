@@ -3,7 +3,7 @@ using Adamantium.Game.Core.Payloads;
 
 namespace Adamantium.Game.Core.Events
 {
-    public class GameOutputSizeChanged : BasicAggregatorEvent<GameOutputSizeChangedPayload>
+    public class UniverseOutputSizeChangedEvent : BasicAggregatorEvent<UniverseOutputSizeChangedPayload>
     {
         
     }

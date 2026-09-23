@@ -3,11 +3,11 @@ using Adamantium.UI.Platforms;
 
 namespace Adamantium.Game.Core
 {
-    public class GamePlatformWindows : GamePlatformDesktop
+    public class UniversePlatformWindows : UniversePlatformDesktop
     {
         private IApplicationPlatform applicationPlatform;
 
-        public GamePlatformWindows(IGame gameBase, IDependencyResolver resolver) : base(gameBase)
+        public UniversePlatformWindows(IUniverse universe, IDependencyResolver resolver) : base(universe)
         {
             applicationPlatform = resolver.Resolve<IApplicationPlatform>();
         }

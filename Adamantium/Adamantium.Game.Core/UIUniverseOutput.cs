@@ -11,11 +11,11 @@ using GameMouseButtons = Adamantium.Game.Core.Input.MouseButton;
 
 namespace Adamantium.Game.Core
 {
-    public abstract class AdamantiumGameOutputBase : GameOutput
+    public abstract class UIUniverseOutput : UniverseOutput
     {
-        private GameWindowCursor cursor;
+        private OutputCursor cursor;
         
-        public override GameWindowDescription Description { get; protected set; }
+        public override UniverseOutputDescription Description { get; protected set; }
 
         /// <summary>The component the game's surface IS - a window, or the panel it is hosted in. Public because a
         /// cursor position only means something relative to it.</summary>
@@ -47,7 +47,7 @@ namespace Adamantium.Game.Core
         protected static readonly Dictionary<Key, Keys> TranslationKeys;
         protected static readonly Dictionary<MouseButtons, GameMouseButtons> MouseTranslationKeys;
 
-        static AdamantiumGameOutputBase()
+        static UIUniverseOutput()
         {
             TranslationKeys = new Dictionary<Key, Keys>();
             TranslationKeys[Key.None] = Keys.None;
@@ -219,30 +219,30 @@ namespace Adamantium.Game.Core
             
         }
 
-        protected AdamantiumGameOutputBase(IEventAggregator eventAggregator) : base(eventAggregator)
+        protected UIUniverseOutput(IEventAggregator eventAggregator) : base(eventAggregator)
         {
             
         }
 
-        protected override void Initialize(GameContext context)
+        protected override void Initialize(OutputContext context)
         {
             Initialize(context, SurfaceFormat.B8G8R8A8.UNorm);
         }
 
         protected override void Initialize(
-            GameContext context, 
+            OutputContext context, 
             SurfaceFormat pixelFormat, 
             DepthFormat depthFormat = DepthFormat.Depth32Stencil8X24, 
             MSAALevel msaaLevel = MSAALevel.X4)
         {
-            GameContext = context;
+            OutputContext = context;
             InitializeInternal(context);
             Description.PixelFormat = pixelFormat;
             Description.DepthFormat = depthFormat;
             Description.MsaaLevel = msaaLevel;
         }
         
-        protected virtual void InitializeInternal(GameContext context)
+        protected virtual void InitializeInternal(OutputContext context)
         {
             InputComponent.KeyDown += WindowOnKeyDown;
             InputComponent.KeyUp += WindowOnKeyUp;
@@ -252,12 +252,12 @@ namespace Adamantium.Game.Core
             InputComponent.RawMouseMove += OnMouseMove;
         }
 
-        public override object NativeWindow => GameContext.Context;
+        public override object NativeWindow => OutputContext.Context;
 
         /// <summary>
-        /// Cursor type that will be displayed when mouse cursor will enter <see cref="GameOutput"/> 
+        /// Cursor type that will be displayed when mouse cursor will enter <see cref="UniverseOutput"/> 
         /// </summary>
-        public override GameWindowCursor Cursor
+        public override OutputCursor Cursor
         {
             get => cursor;
             set
@@ -265,49 +265,49 @@ namespace Adamantium.Game.Core
                 cursor = value;
                 switch (value)
                 {
-                    case GameWindowCursor.Arrow:
+                    case OutputCursor.Arrow:
                         InputComponent.Cursor = Cursors.Arrow;
                         break;
-                    case GameWindowCursor.AppStarting:
+                    case OutputCursor.AppStarting:
                         InputComponent.Cursor = Cursors.AppStarting;
                         break;
-                    case GameWindowCursor.CrossHair:
+                    case OutputCursor.CrossHair:
                         InputComponent.Cursor = Cursors.Crosshair;
                         break;
-                    case GameWindowCursor.Hand:
+                    case OutputCursor.Hand:
                         InputComponent.Cursor = Cursors.Hand;
                         break;
-                    case GameWindowCursor.Help:
+                    case OutputCursor.Help:
                         InputComponent.Cursor = Cursors.Help;
                         break;
-                    case GameWindowCursor.IBeam:
+                    case OutputCursor.IBeam:
                         InputComponent.Cursor = Cursors.IBeam;
                         break;
-                    case GameWindowCursor.No:
+                    case OutputCursor.No:
                         InputComponent.Cursor = Cursors.No;
                         break;
-                    case GameWindowCursor.None:
+                    case OutputCursor.None:
                         InputComponent.Cursor = Cursors.None;
                         break;
-                    case GameWindowCursor.SizeAll:
+                    case OutputCursor.SizeAll:
                         InputComponent.Cursor = Cursors.SizeAll;
                         break;
-                    case GameWindowCursor.SizeNWSE:
+                    case OutputCursor.SizeNWSE:
                         InputComponent.Cursor = Cursors.SizeNWSE;
                         break;
-                    case GameWindowCursor.SizeEWE:
+                    case OutputCursor.SizeEWE:
                         InputComponent.Cursor = Cursors.SizeEWE;
                         break;
-                    case GameWindowCursor.SizeNESW:
+                    case OutputCursor.SizeNESW:
                         InputComponent.Cursor = Cursors.SizeNESW;
                         break;
-                    case GameWindowCursor.SizeNS:
+                    case OutputCursor.SizeNS:
                         InputComponent.Cursor = Cursors.SizeNS;
                         break;
-                    case GameWindowCursor.UpArrow:
+                    case OutputCursor.UpArrow:
                         InputComponent.Cursor = Cursors.UpArrow;
                         break;
-                    case GameWindowCursor.Wait:
+                    case OutputCursor.Wait:
                         InputComponent.Cursor = Cursors.Wait;
                         break;
                 }
@@ -315,7 +315,7 @@ namespace Adamantium.Game.Core
         }
         
         /// <summary>
-        /// Defines is <see cref="GameOutput"/> currently displayed
+        /// Defines is <see cref="UniverseOutput"/> currently displayed
         /// </summary>
         // Attachment as well as Visibility: a surface taken out of the visual tree - a game panel on a tab that is no
         // longer the selected one - is not on screen, yet keeps reporting Visible, and nobody else ever says otherwise.

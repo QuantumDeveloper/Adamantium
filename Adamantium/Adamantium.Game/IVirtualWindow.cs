@@ -7,5 +7,5 @@ namespace Adamantium.Game;
 
 public interface IVirtualWindow : IWindow
 {
-    GameOutput RootWindow { get; set; }
+    UniverseOutput RootWindow { get; set; }
 }

@@ -37,7 +37,7 @@ public class RotationTool: ToolBase
         centralManipulator = Tool.Get("CentralManipulator");
     }
 
-    public override void Process(Entity targetEntity, CameraManager cameraManager, GameInputManager inputManager)
+    public override void Process(Entity targetEntity, CameraManager cameraManager, InputWormhole inputManager)
     {
         if (!CheckTargetEntity(targetEntity))
             return;
@@ -97,7 +97,7 @@ public class RotationTool: ToolBase
         }
     }
 
-    private void TransformEntityByRotationTool(Entity targetEntity, Camera camera, GameInputManager inputManager)
+    private void TransformEntityByRotationTool(Entity targetEntity, Camera camera, InputWormhole inputManager)
     {
         Vector3F start = lastCoordinates;
         Vector3F end = new Vector3F(inputManager.VirtualPosition);

@@ -16,7 +16,7 @@ public abstract class LightToolBase : ToolBase
     {
     }
 
-    public virtual bool Process(Entity targetEntity, Light light, CameraManager cameraManager, GameInputManager inputManager)
+    public virtual bool Process(Entity targetEntity, Light light, CameraManager cameraManager, InputWormhole inputManager)
     {
         CurrentLight = light;
         Process(targetEntity, cameraManager, inputManager);

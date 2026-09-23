@@ -1,9 +1,9 @@
 ﻿namespace Adamantium.Game.Core
 {
    /// <summary>
-   /// Defines cursor, which will be set as <see cref="GameOutput"/> cursor
+   /// Defines cursor, which will be set as <see cref="UniverseOutput"/> cursor
    /// </summary>
-   public enum GameWindowCursor
+   public enum OutputCursor
    {
       /// <summary>
       /// Standard arrow

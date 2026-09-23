@@ -15,7 +15,7 @@ public class CameraDragTool: ToolBase
     {
     }
 
-    public override void Process(Entity targetEntity, CameraManager cameraManager, GameInputManager inputManager)
+    public override void Process(Entity targetEntity, CameraManager cameraManager, InputWormhole inputManager)
     {
         var camera = cameraManager.UserControlledCamera;
 

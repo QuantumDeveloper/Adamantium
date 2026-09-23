@@ -51,12 +51,12 @@ public class GameHostBehavior : Behavior<RenderTargetPanel>
             var app = UIApplication.Current;
             if (app == null) return;
 
-            var gameService = app.UIContext.Resolve<IGameService>();
+            var gameService = app.UIContext.Resolve<IUniverseService>();
             var graphicsDeviceService = app.UIContext.Resolve<IGraphicsDeviceService>();
 
             // Slave-mode game sharing the designer's device service; no render service (the designer drives it
-            // directly, not via GameService.RunGames).
-            var game = gameService.CreateGame<AdamantiumGame>(
+            // directly, not via UniverseService.RunUniverses).
+            var game = gameService.CreateUniverse<AdamantiumGame>(
                 "AdamantiumGame", panel.RootVisual as IWindow, null, graphicsDeviceService, app.EnableGraphicsDebug);
             game.CreateOutputFromContext(panel);
             _gameAttached = true;
@@ -79,13 +79,13 @@ public class GameHostBehavior : Behavior<RenderTargetPanel>
         var app = UIApplication.Current;
         if (app == null || panel.RootVisual is not IWindow window) return;
 
-        var gameService = app.UIContext.Resolve<IGameService>();
+        var gameService = app.UIContext.Resolve<IUniverseService>();
         var graphicsDeviceService = app.UIContext.Resolve<IGraphicsDeviceService>();
         var renderService = app.EntityWorld.ServiceManager.GetServices<UiRenderService>()
             .Cast<WindowRenderService>()
             .FirstOrDefault(x => x.Window == window);
 
-        var game = gameService.CreateGame<AdamantiumGame>(
+        var game = gameService.CreateUniverse<AdamantiumGame>(
             "AdamantiumGame", window, renderService, graphicsDeviceService, app.EnableGraphicsDebug);
         game.CreateOutputFromContext(panel);
         _gameAttached = true;

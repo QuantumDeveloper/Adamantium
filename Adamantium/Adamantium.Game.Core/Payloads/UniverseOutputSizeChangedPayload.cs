@@ -2,13 +2,13 @@
 
 namespace Adamantium.Game.Core.Payloads
 {
-    public class GameOutputSizeChangedPayload
+    public class UniverseOutputSizeChangedPayload
     {
         public Size Size { get; }
 
-        public GameOutput Output { get; }
+        public UniverseOutput Output { get; }
 
-        public GameOutputSizeChangedPayload(GameOutput output, Size size)
+        public UniverseOutputSizeChangedPayload(UniverseOutput output, Size size)
         {
             Output = output;
             Size = size;

@@ -24,13 +24,13 @@ using Serilog;
 
 namespace Adamantium.Game;
 
-public class Game : PropertyChangedBase, IGame
+public class Universe : PropertyChangedBase, IUniverse
 {
-    private readonly Dictionary<GameOutput, EntityService> drawSystems;
+    private readonly Dictionary<UniverseOutput, EntityService> drawSystems;
 
     private readonly DisposeCollector unloadContentCollector;
         
-    private readonly GamePlatform gamePlatform;
+    private readonly UniversePlatform gamePlatform;
     private CancellationTokenSource cancellationTokenSource;
     private readonly Thread gameLoopThread;
 
@@ -52,10 +52,10 @@ public class Game : PropertyChangedBase, IGame
     private Double fpsTime;
     private Int32 fpsCounter;
 
-    private readonly Dictionary<Object, GameContext> contextsMapping;
+    private readonly Dictionary<Object, OutputContext> contextsMapping;
         
-    public Game(
-        GameMode mode,
+    public Universe(
+        UniverseMode mode,
         bool enableDebug, 
         IGraphicsDeviceService graphicsDeviceService = null, 
         IDependencyContainer container = null)
@@ -63,11 +63,11 @@ public class Game : PropertyChangedBase, IGame
         Mode = mode;
 
         Container = container ?? new AdamantiumDependencyContainer();
-        GameBuilder.Build(Container);
+        UniverseBuilder.Build(Container);
             
         appTime = new AppTime();
         gameTimer = new PreciseTimer();
-        contextsMapping = new Dictionary<Object, GameContext>();
+        contextsMapping = new Dictionary<Object, OutputContext>();
         IsFixedTimeStep = false;
         DesiredFPS = 60;
         Content = new ContentManager(Container);
@@ -85,10 +85,10 @@ public class Game : PropertyChangedBase, IGame
         ShutDownMode = ShutDownMode.OnMainWindowClosed;
             
         EventAggregator = Container.Resolve<IEventAggregator>();
-        EventAggregator.GetEvent<GameOutputRemovedEvent>().Subscribe(OnOutputRemoved);
+        EventAggregator.GetEvent<UniverseOutputRemovedEvent>().Subscribe(OnOutputRemoved);
         var factory = Container.Resolve<IGraphicsDeviceFactory>();
 
-        if (mode is GameMode.Standalone or GameMode.Primary)
+        if (mode is UniverseMode.Standalone or UniverseMode.Primary)
         {
             GraphicsDeviceService = new GraphicsDeviceService(factory, enableDebug);
             //GraphicsDeviceService.CreateMainDevice("Game", enableDynamicRendering);
@@ -99,20 +99,19 @@ public class Game : PropertyChangedBase, IGame
             GraphicsDeviceService = graphicsDeviceService;
         }
             
-        gamePlatform = GamePlatform.Create(this, Container);
+        gamePlatform = UniversePlatform.Create(this, Container);
         EntityWorld = new EntityWorld(Container);
             
         Container.RegisterInstance<ModelConverter>(ModelConverter);
         Container.RegisterInstance<IContentManager>(Content);
-        Container.RegisterInstance<IGamePlatform>(gamePlatform);
-        Container.RegisterInstance<IGame>(this);
+        Container.RegisterInstance<IUniversePlatform>(gamePlatform);
+        Container.RegisterInstance<IUniverse>(this);
         Container.RegisterInstance<IAdamantiumApplication>(this);
         Container.RegisterInstance<IGraphicsDeviceService>(GraphicsDeviceService);
         Container.RegisterInstance<EntityWorld>(EntityWorld);
             
-        GamePlayManager = new GamePlayManager(Container);
         Stopped += Game_Stopped;
-        drawSystems = new Dictionary<GameOutput, EntityService>();
+        drawSystems = new Dictionary<UniverseOutput, EntityService>();
         gameLoopThread = new Thread(StartGameLoop);
     }
         
@@ -120,10 +119,7 @@ public class Game : PropertyChangedBase, IGame
         
     public EntityWorld EntityWorld { get; }
         
-    public ToolsManager ToolsManager { get; private set; }
-    public LightManager LightManager { get; private set; }
     public CameraManager CameraManager { get; private set; }
-    public GamePlayManager GamePlayManager { get; private set; }
     public IGraphicsDeviceService GraphicsDeviceService { get; set; }
 
     public bool IsInitialized { get; private set; }
@@ -154,19 +150,19 @@ public class Game : PropertyChangedBase, IGame
     }
         
     /// <summary>
-    /// Read only collection of <see cref="GameOutput"/>s
+    /// Read only collection of <see cref="UniverseOutput"/>s
     /// </summary>
-    public IReadOnlyList<GameOutput> Outputs => gamePlatform.Outputs;
+    public IReadOnlyList<UniverseOutput> Outputs => gamePlatform.Outputs;
 
     /// <summary>
-    /// Current focused <see cref="GameOutput"/>
+    /// Current focused <see cref="UniverseOutput"/>
     /// </summary>
-    public GameOutput ActiveOutput => gamePlatform.ActiveWindow;
+    public UniverseOutput ActiveOutput => gamePlatform.ActiveWindow;
 
     /// <summary>
-    /// Main <see cref="GameOutput"/>
+    /// Main <see cref="UniverseOutput"/>
     /// </summary>
-    public GameOutput MainOutput => gamePlatform.MainWindow;
+    public UniverseOutput MainOutput => gamePlatform.MainWindow;
 
     public bool IsFixedTimeStep { get; set; }
     public double TimeStep => 1.0d / DesiredFPS;
@@ -188,13 +184,13 @@ public class Game : PropertyChangedBase, IGame
     /// </summary>
     public ShutDownMode ShutDownMode { get; set; }
         
-    public GameMode Mode { get; }
+    public UniverseMode Mode { get; }
         
     public string Title { get; set; }
         
     public bool IsRunning => cancellationTokenSource != null && cancellationTokenSource.IsCancellationRequested != true;
 
-    public void InitializeGame()
+    public void InitializeUniverse()
     {
         InitializeBeforeRun();
     }
@@ -216,10 +212,6 @@ public class Game : PropertyChangedBase, IGame
 
     protected virtual void Initialize()
     {
-        ToolsManager = new ToolsManager(EntityWorld);
-        Container.RegisterInstance<ToolsManager>(ToolsManager);
-        LightManager = new LightManager(EntityWorld);
-        Container.RegisterInstance<LightManager>(LightManager);
         CameraManager = new CameraManager(this);
     }
         
@@ -228,7 +220,7 @@ public class Game : PropertyChangedBase, IGame
         EntityWorld.Reset();
     }
 
-    private void RemoveRenderProcessor(GameOutput window)
+    private void RemoveRenderProcessor(UniverseOutput window)
     {
         lock (drawSystems)
         {
@@ -240,7 +232,7 @@ public class Game : PropertyChangedBase, IGame
         }
     }
 
-    public T CreateRenderService<T>(GameOutput window) where T : RenderingService
+    public T CreateRenderService<T>(UniverseOutput window) where T : RenderingService
     {
         var system = EntityWorld.CreateService<T>(new object[] { EntityWorld, window });
         lock (drawSystems)
@@ -264,7 +256,7 @@ public class Game : PropertyChangedBase, IGame
     /// <summary>
     /// Run game loop on the selected control
     /// </summary>
-    /// <param name="context">Control which will be used for creating corresponding <see cref="GameOutput"/> and further rendering</param>
+    /// <param name="context">Control which will be used for creating corresponding <see cref="UniverseOutput"/> and further rendering</param>
     public void Run(object context)
     {
         if (IsRunning) return;
@@ -284,8 +276,8 @@ public class Game : PropertyChangedBase, IGame
     /// <summary>
     /// Run game loop on the selected control
     /// </summary>
-    /// <param name="window"><see cref="GameOutput"/> which will be used for rendering</param>
-    public void Run(GameOutput window)
+    /// <param name="window"><see cref="UniverseOutput"/> which will be used for rendering</param>
+    public void Run(UniverseOutput window)
     {
         if (IsRunning) return;
             
@@ -300,7 +292,7 @@ public class Game : PropertyChangedBase, IGame
         //StartGameLoop();
         gameLoopThread.Start();
 
-        if (Mode == GameMode.Standalone)
+        if (Mode == UniverseMode.Standalone)
         {
             gamePlatform.Run(cancellationTokenSource.Token);
         }
@@ -322,7 +314,7 @@ public class Game : PropertyChangedBase, IGame
         Started?.Invoke(this, EventArgs.Empty);
     }
 
-    public void AddOutput(GameOutput output)
+    public void AddOutput(UniverseOutput output)
     {
         gamePlatform.AddOutput(output);
     }
@@ -332,7 +324,7 @@ public class Game : PropertyChangedBase, IGame
     /// </summary>
     /// <param name="width">Initial window width</param>
     /// <param name="height">Initial window height</param>
-    public GameOutput CreateOutput(uint width = 1280, uint height = 720)
+    public UniverseOutput CreateOutput(uint width = 1280, uint height = 720)
     {
         return gamePlatform.CreateOutput(width, height);
     }
@@ -341,11 +333,11 @@ public class Game : PropertyChangedBase, IGame
     /// Create new game window from context and add it to the list of game windows
     /// </summary>
     /// <param name="context">Window, in which Vulkan content will be rendered</param>
-    public GameOutput CreateOutputFromContext(object context)
+    public UniverseOutput CreateOutputFromContext(object context)
     {
         if (!contextsMapping.ContainsKey(context))
         {
-            var gameContext = new GameContext(context);
+            var gameContext = new OutputContext(context);
             contextsMapping.Add(context, gameContext);
             return gamePlatform.CreateOutput(gameContext);
         }
@@ -359,7 +351,7 @@ public class Game : PropertyChangedBase, IGame
     /// <param name="surfaceFormat">Surface format</param>
     /// <param name="depthFormat">Depth buffer format</param>
     /// <param name="msaaLevel">MSAA level</param>
-    public GameOutput CreateOutputFromContext(
+    public UniverseOutput CreateOutputFromContext(
         object context, 
         SurfaceFormat surfaceFormat, 
         DepthFormat depthFormat = DepthFormat.Depth32Stencil8X24, 
@@ -368,7 +360,7 @@ public class Game : PropertyChangedBase, IGame
         if (!contextsMapping.ContainsKey(context))
         {
             var window = gamePlatform.CreateOutput(context, surfaceFormat, depthFormat, msaaLevel);
-            contextsMapping.Add(context, window.GameContext);
+            contextsMapping.Add(context, window.OutputContext);
             return window;
         }
         throw new ArgumentException("There are already game window created on the current context");
@@ -410,7 +402,7 @@ public class Game : PropertyChangedBase, IGame
             }
             return;
         }
-        var context = new GameContext(newContext);
+        var context = new OutputContext(newContext);
         gamePlatform.SwitchContext(gameContext, context);
         contextsMapping[newContext] = context;
     }
@@ -544,7 +536,7 @@ public class Game : PropertyChangedBase, IGame
     {
         if (IsInitialized) return;
             
-        if (Mode is GameMode.Standalone or GameMode.Primary)
+        if (Mode is UniverseMode.Standalone or UniverseMode.Primary)
         {
             GraphicsDeviceService.CreateMainDevice("");
         }
@@ -682,7 +674,7 @@ public class Game : PropertyChangedBase, IGame
         return unloadContentCollector.Collect(disposeArg);
     }
 
-    private void OnOutputRemoved(GameOutput output)
+    private void OnOutputRemoved(UniverseOutput output)
     {
         RemoveRenderProcessor(output);
         if (gamePlatform.Outputs.Count == 0 && ShutDownMode == ShutDownMode.OnLastWindowClosed)

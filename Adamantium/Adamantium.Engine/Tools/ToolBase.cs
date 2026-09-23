@@ -90,12 +90,12 @@ public abstract class ToolBase
         Tool.Visible = true;
     }
 
-    protected bool CheckIsLocked(GameInputManager inputManager)
+    protected bool CheckIsLocked(InputWormhole inputManager)
     {
         return inputManager.IsMouseButtonPressed(MouseButton.Left) && toolIntersectionResult.Intersects;
     }
 
-    protected void ShouldStayVisible(GameInputManager inputManager)
+    protected void ShouldStayVisible(InputWormhole inputManager)
     {
         if (inputManager.IsMouseButtonPressed(MouseButton.Left) && !toolIntersectionResult.Intersects)
         {
@@ -104,7 +104,7 @@ public abstract class ToolBase
         }
     }
 
-    protected void SetIsLocked(GameInputManager inputManager)
+    protected void SetIsLocked(InputWormhole inputManager)
     {
         if (inputManager.IsMouseButtonReleased(MouseButton.Left))
         {
@@ -112,9 +112,9 @@ public abstract class ToolBase
         }
     }
 
-    public abstract void Process(Entity targetEntity, CameraManager cameraManager, GameInputManager inputManager);
+    public abstract void Process(Entity targetEntity, CameraManager cameraManager, InputWormhole inputManager);
 
-    protected bool GetRayPlaneIntersectionPoint(Camera camera, GameInputManager inputManager, out Vector3 intersectionPoint)
+    protected bool GetRayPlaneIntersectionPoint(Camera camera, InputWormhole inputManager, out Vector3 intersectionPoint)
     {
         var p = new Plane(toolIntersectionResult.IntersectionPoint, camera.Forward);
         var ray = Collisions.CalculateRay(inputManager.VirtualPosition, camera, Matrix4x4F.Identity);

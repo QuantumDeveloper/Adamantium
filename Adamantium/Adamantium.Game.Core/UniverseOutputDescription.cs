@@ -7,9 +7,9 @@ using Adamantium.Vulkan.Core;
 
 namespace Adamantium.Game.Core
 {
-    public class GameWindowDescription : PropertyChangedBase
+    public class UniverseOutputDescription : PropertyChangedBase
     {
-        public GameWindowDescription(PresenterType presenterType)
+        public UniverseOutputDescription(PresenterType presenterType)
         {
             PresenterType = presenterType;
 
@@ -19,7 +19,7 @@ namespace Adamantium.Game.Core
             BuffersCount = 3;
         }
 
-        public GameWindowDescription(PresentationParameters parameters)
+        public UniverseOutputDescription(PresentationParameters parameters)
         {
             PresenterType = parameters.PresenterType;
 
@@ -33,7 +33,7 @@ namespace Adamantium.Game.Core
             BuffersCount = parameters.BuffersCount;
         }
 
-        public GameWindowDescription(
+        public UniverseOutputDescription(
             PresenterType presenterType, 
             UInt32 width, 
             UInt32 height, 
@@ -52,7 +52,7 @@ namespace Adamantium.Game.Core
             BuffersCount = 3;
         }
 
-        public GameWindowDescription(
+        public UniverseOutputDescription(
             PresenterType presenterType, 
             UInt32 width, 
             UInt32 height, 
@@ -73,7 +73,7 @@ namespace Adamantium.Game.Core
            BuffersCount = buffersCount;
         }
 
-        public GameWindowDescription(GameWindowDescription copy)
+        public UniverseOutputDescription(UniverseOutputDescription copy)
         {
             Width = copy.Width;
             Height = copy.Height;
@@ -97,9 +97,9 @@ namespace Adamantium.Game.Core
 
         public PresentInterval PresentInterval { get; set; }
         
-        public GameWindowDescription Clone()
+        public UniverseOutputDescription Clone()
         {
-            return new GameWindowDescription(this);
+            return new UniverseOutputDescription(this);
         }
 
         public PresentationParameters ToPresentationParameters()
@@ -115,7 +115,7 @@ namespace Adamantium.Game.Core
                 BuffersCount);
         }
         
-        public static implicit operator PresentationParameters(GameWindowDescription description)
+        public static implicit operator PresentationParameters(UniverseOutputDescription description)
         {
             return description.ToPresentationParameters();
         }

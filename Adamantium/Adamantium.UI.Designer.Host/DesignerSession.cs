@@ -28,7 +28,7 @@ public sealed class DesignerSession : IDisposable
 {
     private readonly DesignerApplication _app;
     private readonly IGraphicsDevice _device;
-    private readonly IGameService _gameService;
+    private readonly IUniverseService _gameService;
 
     // One render service for the whole designer session: ONE device (the shared _device) + one renderer/presenter,
     // re-pointed/resized per previewed window (WindowRenderService.RenderHeadlessFrame). It drives the content
@@ -84,9 +84,9 @@ public sealed class DesignerSession : IDisposable
 
         // The engine's game services are normally registered by GameApplication.RegisterServices, which only runs
         // via Run()/Initialize() - which the headless designer skips. Register the game service explicitly so a
-        // design-aware behavior can resolve IGameService and host a game in the preview (see DriveDesignTimeGames).
-        _gameService = new GameService();
-        _app.Container.RegisterInstance<IGameService>(_gameService);
+        // design-aware behavior can resolve IUniverseService and host a game in the preview (see DriveDesignTimeGames).
+        _gameService = new UniverseService();
+        _app.Container.RegisterInstance<IUniverseService>(_gameService);
 
         // Headless: nothing opens a window, so trigger device creation explicitly. Vulkan validation is OPT-IN via
         // ADAMANTIUM_DESIGNER_GRAPHICS_DEBUG=1: when on, the layers report the REAL cause behind a device-lost (bad
@@ -539,7 +539,7 @@ public sealed class DesignerSession : IDisposable
     /// </summary>
     private void DriveDesignTimeGames()
     {
-        var games = _gameService.Games;
+        var games = _gameService.Universes;
         if (games.Count == 0) return;
 
         var total = TimeSpan.Zero;

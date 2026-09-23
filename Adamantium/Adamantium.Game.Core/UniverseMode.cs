@@ -1,6 +1,6 @@
 ﻿namespace Adamantium.Game
 {
-    public enum GameMode
+    public enum UniverseMode
     {
         /// <summary>
         /// Game is working as standalone instance and should start game platforms during work

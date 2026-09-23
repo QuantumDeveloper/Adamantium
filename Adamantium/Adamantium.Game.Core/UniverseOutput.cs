@@ -17,7 +17,7 @@ namespace Adamantium.Game.Core
     /// <summary>
     /// Abstract class representing encapsulated rendering surface (control) with <see cref="GraphicsPresenter"/>
     /// </summary>
-    public abstract class GameOutput : DisposableObject
+    public abstract class UniverseOutput : DisposableObject
     {
         public Guid Id { get; } 
 
@@ -26,25 +26,25 @@ namespace Adamantium.Game.Core
         protected IEventAggregator EventAggregator { get; }
 
         /// <summary>
-        /// Contains <see cref="GameOutput"/> description
+        /// Contains <see cref="UniverseOutput"/> description
         /// </summary>
-        public abstract GameWindowDescription Description { get; protected set; }
+        public abstract UniverseOutputDescription Description { get; protected set; }
 
         public GameWindowType Type => (GameWindowType)Description.PresenterType;
 
-        public GameContext GameContext { get; internal set; }
+        public OutputContext OutputContext { get; internal set; }
 
-        public static GameWindowCursor DefaultCursor = GameWindowCursor.Arrow;
+        public static OutputCursor DefaultCursor = OutputCursor.Arrow;
         
         /// <summary>
-        /// Bounds of the <see cref="GameOutput"/> starting always from (0,0)
+        /// Bounds of the <see cref="UniverseOutput"/> starting always from (0,0)
         /// </summary>
         public Rectangle ClientBounds { get; protected set; }
 
         /// <summary>
-        /// Cursor type that will be displayed when mouse cursor will enter <see cref="GameOutput"/> 
+        /// Cursor type that will be displayed when mouse cursor will enter <see cref="UniverseOutput"/> 
         /// </summary>
-        public abstract GameWindowCursor Cursor { get; set; }
+        public abstract OutputCursor Cursor { get; set; }
 
         /// <summary>
         /// Underlying control for rendering
@@ -52,7 +52,7 @@ namespace Adamantium.Game.Core
         public abstract object NativeWindow { get; }
 
         /// <summary>
-        /// Defines is <see cref="GameOutput"/> currently displayed
+        /// Defines is <see cref="UniverseOutput"/> currently displayed
         /// </summary>
         public abstract Boolean IsVisible { get; }
         
@@ -60,21 +60,21 @@ namespace Adamantium.Game.Core
         
         public abstract WindowState State { get; set; }
 
-        internal abstract bool CanHandle(GameContext gameContext);
+        internal abstract bool CanHandle(OutputContext gameContext);
 
         internal abstract void Resize(uint width, uint height);
 
-        internal abstract void SwitchContext(GameContext context);
+        internal abstract void SwitchContext(OutputContext context);
         
         private void GenerateWindowName()
         {
-            Name = $"Window_{GamePlatform.WindowId++}";
+            Name = $"Window_{UniversePlatform.WindowId++}";
         }
 
         /// <summary>
-        /// Initializes <see cref="GameOutput"/>
+        /// Initializes <see cref="UniverseOutput"/>
         /// </summary>
-        protected GameOutput(IEventAggregator eventAggregator)
+        protected UniverseOutput(IEventAggregator eventAggregator)
         {
             EventAggregator = eventAggregator;
             Viewport = new Viewport();
@@ -88,10 +88,10 @@ namespace Adamantium.Game.Core
         /// Initialize 
         /// </summary>
         /// <param name="context"></param>
-        protected abstract void Initialize(GameContext context);
+        protected abstract void Initialize(OutputContext context);
 
         protected abstract void Initialize(
-            GameContext context, 
+            OutputContext context, 
             SurfaceFormat pixelFormat, 
             DepthFormat depthFormat = DepthFormat.Depth32Stencil8X24, 
             MSAALevel msaaLevel = MSAALevel.X4);
@@ -106,7 +106,7 @@ namespace Adamantium.Game.Core
         /// Keyboard, pointer and - while this output is the active one - gamepad input of this output.
         /// Set when the platform takes the output in; until then its input goes nowhere.
         /// </summary>
-        public GameInputManager Input { get; internal set; }
+        public InputWormhole Input { get; internal set; }
 
         public virtual void CopyOutput(IGraphicsDevice graphicsDevice)
         {
@@ -160,37 +160,37 @@ namespace Adamantium.Game.Core
         {
         }
 
-        public static GameOutput New(IEventAggregator eventAggregator, GameContext gameContext)
+        public static UniverseOutput New(IEventAggregator eventAggregator, OutputContext gameContext)
         {
-            if (gameContext.ContextType == GameContextType.RenderTargetPanel)
+            if (gameContext.ContextType == OutputContextType.RenderTargetPanel)
             {
-                return new RenderTargetGameOutput(eventAggregator, gameContext);
+                return new RenderTargetUniverseOutput(eventAggregator, gameContext);
             }
-            else if (gameContext.ContextType == GameContextType.Window)
+            else if (gameContext.ContextType == OutputContextType.Window)
             {
-                return new AdamantiumGameOutput(eventAggregator, gameContext);
+                return new WindowUniverseOutput(eventAggregator, gameContext);
             }
             throw new NotSupportedException(gameContext.ContextType + " game context is not currently supported");
         }
 
-        public static GameOutput NewWindow(IEventAggregator eventAggregator, uint width, uint height)
+        public static UniverseOutput NewWindow(IEventAggregator eventAggregator, uint width, uint height)
         {
             var wnd = new Window();
             wnd.Width = width;
             wnd.Height = height;
-            return new AdamantiumGameOutput(eventAggregator, new GameContext(wnd));
+            return new WindowUniverseOutput(eventAggregator, new OutputContext(wnd));
         }
 
-        internal static GameOutput New(
+        internal static UniverseOutput New(
             IEventAggregator eventAggregator,
-            GameContext gameContext, 
+            OutputContext gameContext, 
             SurfaceFormat pixelFormat, 
             DepthFormat depthFormat = DepthFormat.Depth32Stencil8X24, 
             MSAALevel msaaLevel = MSAALevel.X4)
         {
-            if (gameContext.ContextType == GameContextType.RenderTargetPanel)
+            if (gameContext.ContextType == OutputContextType.RenderTargetPanel)
             {
-                return new RenderTargetGameOutput(eventAggregator, gameContext, pixelFormat, depthFormat, msaaLevel);
+                return new RenderTargetUniverseOutput(eventAggregator, gameContext, pixelFormat, depthFormat, msaaLevel);
             }
             throw new NotSupportedException(gameContext.ContextType + " game context is not currently supported");
         }
@@ -220,27 +220,27 @@ namespace Adamantium.Game.Core
         /// <summary>
         /// Occurs when window got focus
         /// </summary>
-        public event Action<GameOutput> Activated;
+        public event Action<UniverseOutput> Activated;
 
         /// <summary>
         /// Occurs when window lost focus
         /// </summary>
-        public event Action<GameOutput> Deactivated;
+        public event Action<UniverseOutput> Deactivated;
 
         /// <summary>
         /// Occurs when window size has changed
         /// </summary>
-        public event Action<GameOutputSizeChangedPayload> SizeChanged;
+        public event Action<UniverseOutputSizeChangedPayload> SizeChanged;
 
         /// <summary>
         /// Occurs after GraphicsPresenter finish updating (recreated or resized)
         /// </summary>
-        public event Action<GameOutputParametersPayload> ParametersChanged;
+        public event Action<UniverseOutputParametersPayload> ParametersChanged;
 
         /// <summary>
         /// Occurs before GraphicsPresenter updated (recreated or resized)
         /// </summary>
-        public event Action<GameOutputParametersPayload> ParametersChanging;
+        public event Action<UniverseOutputParametersPayload> ParametersChanging;
 
         /// <summary>
         /// Occurs when window is closed
@@ -263,7 +263,7 @@ namespace Adamantium.Game.Core
         /// <param name="reason"></param>
         internal void OnWindowParametersChanging(ChangeReason reason)
         {
-            ParametersChanging?.Invoke(new GameOutputParametersPayload(this, Description, reason));
+            ParametersChanging?.Invoke(new UniverseOutputParametersPayload(this, Description, reason));
         }
 
         /// <summary>
@@ -272,7 +272,7 @@ namespace Adamantium.Game.Core
         /// <param name="reason"></param>
         internal void OnWindowParametersChanged(ChangeReason reason)
         {
-            ParametersChanged?.Invoke(new GameOutputParametersPayload(this, Description, reason));
+            ParametersChanged?.Invoke(new UniverseOutputParametersPayload(this, Description, reason));
         }
 
         /// <summary>
@@ -280,7 +280,7 @@ namespace Adamantium.Game.Core
         /// </summary>
         internal void OnWindowSizeChanged()
         {
-            SizeChanged?.Invoke(new GameOutputSizeChangedPayload(this, new Size(Width, Height)));
+            SizeChanged?.Invoke(new UniverseOutputSizeChangedPayload(this, new Size(Width, Height)));
         }
 
         internal void OnKeyInput(KeyboardInput args)
@@ -325,7 +325,7 @@ namespace Adamantium.Game.Core
             base.Dispose(disposeManagedResources);
         }
 
-        protected void RaiseSizeChangedEvent(GameOutputSizeChangedPayload payload)
+        protected void RaiseSizeChangedEvent(UniverseOutputSizeChangedPayload payload)
         {
             SizeChanged?.Invoke(payload);
         }

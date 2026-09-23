@@ -29,15 +29,15 @@ public class CameraManager
     ///<summary>
     ///Collection of all cameras.
     ///</summary>
-    private readonly Dictionary<GameOutput, List<Camera>> windowToCameras;
-    private readonly Dictionary<Camera, GameOutput> cameraToWindow;
+    private readonly Dictionary<UniverseOutput, List<Camera>> windowToCameras;
+    private readonly Dictionary<Camera, UniverseOutput> cameraToWindow;
 
     private readonly AdamantiumCollection<Camera> windowToCamerasCollection;
 
     ///<summary>
     ///Collection of active cameras.
     ///</summary>
-    private readonly Dictionary<GameOutput, Camera> activeCameras;
+    private readonly Dictionary<UniverseOutput, Camera> activeCameras;
 
     private readonly AdamantiumCollection<Camera> activeCamerasCollection;
 
@@ -62,17 +62,17 @@ public class CameraManager
     private EntityGroup cameraGroup;
     private static int cameraNumber = 1;
 
-    private IGame game;
+    private IUniverse game;
 
     ///<summary>
     ///Constructor.
     ///</summary>
-    public CameraManager(IGame game)
+    public CameraManager(IUniverse game)
     {
         game.Container.RegisterInstance<CameraManager>(this);
-        windowToCameras = new Dictionary<GameOutput, List<Camera>>();
-        cameraToWindow = new Dictionary<Camera, GameOutput>();
-        activeCameras = new Dictionary<GameOutput, Camera>();
+        windowToCameras = new Dictionary<UniverseOutput, List<Camera>>();
+        cameraToWindow = new Dictionary<Camera, UniverseOutput>();
+        activeCameras = new Dictionary<UniverseOutput, Camera>();
         windowToCamerasCollection = new AdamantiumCollection<Camera>();
         activeCamerasCollection = new AdamantiumCollection<Camera>();
         this.game = game;
@@ -84,11 +84,11 @@ public class CameraManager
             CreateCameraForWindowInternal(window);
         }
 
-        eventAggregator.GetEvent<GameOutputCreatedEvent>().Subscribe(GameBaseWindowCreated);
-        eventAggregator.GetEvent<GameOutputRemovedEvent>().Subscribe(GameBaseWindowRemoved);
-        eventAggregator.GetEvent<GameOutputActivatedEvent>().Subscribe(GameBaseWindowActivated);
-        eventAggregator.GetEvent<GameOutputDeactivatedEvent>().Subscribe(GameBaseWindowDeactivated);
-        eventAggregator.GetEvent<GameOutputSizeChanged>().Subscribe(WindowSizeChanged);
+        eventAggregator.GetEvent<UniverseOutputCreatedEvent>().Subscribe(GameBaseWindowCreated);
+        eventAggregator.GetEvent<UniverseOutputRemovedEvent>().Subscribe(GameBaseWindowRemoved);
+        eventAggregator.GetEvent<UniverseOutputActivatedEvent>().Subscribe(GameBaseWindowActivated);
+        eventAggregator.GetEvent<UniverseOutputDeactivatedEvent>().Subscribe(GameBaseWindowDeactivated);
+        eventAggregator.GetEvent<UniverseOutputSizeChangedEvent>().Subscribe(WindowSizeChanged);
 
         CreateCameraIcon();
         CreateCameraVisual();
@@ -105,7 +105,7 @@ public class CameraManager
         CameraVisual = new CameraVisualTemplate().BuildEntity(null, "Camera Debug");
     }
 
-    private void GameBaseWindowDeactivated(GameOutput output)
+    private void GameBaseWindowDeactivated(UniverseOutput output)
     {
         //UserControlledCamera = null;
     }
@@ -120,7 +120,7 @@ public class CameraManager
         SelectedCamera = camera;
     }
 
-    private void GameBaseWindowActivated(GameOutput output)
+    private void GameBaseWindowActivated(UniverseOutput output)
     {
         if (activeCameras.TryGetValue(output, out var camera))
         {
@@ -128,17 +128,17 @@ public class CameraManager
         }
     }
 
-    private void WindowSizeChanged(GameOutputSizeChangedPayload e)
+    private void WindowSizeChanged(UniverseOutputSizeChangedPayload e)
     {
         UpdateDimensions(e.Output, e.Output.Width, e.Output.Height);
     }
 
-    private void GameBaseWindowRemoved(GameOutput output)
+    private void GameBaseWindowRemoved(UniverseOutput output)
     {
         RemoveCamera(output);
     }
 
-    private void GameBaseWindowCreated(GameOutput output)
+    private void GameBaseWindowCreated(UniverseOutput output)
     {
         CreateCameraForWindowInternal(output);
     }
@@ -157,7 +157,7 @@ public class CameraManager
         }
     }
 
-    private void CreateCameraForWindowInternal(GameOutput window)
+    private void CreateCameraForWindowInternal(UniverseOutput window)
     {
         var camera = CreateCamera(window.Width, window.Height, $"Main camera for {window.Name}");
         camera.Owner.Transform.Position = new Vector3(0,0,-20);
@@ -169,7 +169,7 @@ public class CameraManager
     }
 
 
-    public Camera CreateCameraForWindow(GameOutput window, string name)
+    public Camera CreateCameraForWindow(UniverseOutput window, string name)
     {
         var camera = CreateCamera(window.Width, window.Height, name);
         AddCamera(window, camera);
@@ -204,7 +204,7 @@ public class CameraManager
     ///<remarks>
     ///Sets added camera as Active and User Controlled.
     ///</remarks>
-    public void AddCamera(GameOutput window, Camera camera)
+    public void AddCamera(UniverseOutput window, Camera camera)
     {
         lock (syncRoot)
         {
@@ -242,7 +242,7 @@ public class CameraManager
         }
     }
 
-    public void UpdateDimensions(GameOutput handle, UInt32 width, UInt32 height)
+    public void UpdateDimensions(UniverseOutput handle, UInt32 width, UInt32 height)
     {
         lock (syncRoot)
         {
@@ -310,7 +310,7 @@ public class CameraManager
     ///<summary>
     ///Deletes camera from collection.
     ///</summary>
-    public void RemoveCamera(GameOutput bindingContext)
+    public void RemoveCamera(UniverseOutput bindingContext)
     {
         lock (syncRoot)
         {
@@ -333,7 +333,7 @@ public class CameraManager
     ///<summary>
     ///Adds group of cameras to collection.
     ///</summary>
-    public void AddCameras(GameOutput bindTarget, params Camera[] cameraGroup)
+    public void AddCameras(UniverseOutput bindTarget, params Camera[] cameraGroup)
     {
         lock (syncRoot)
         {
@@ -360,7 +360,7 @@ public class CameraManager
     ///<summary>
     ///Sets camera as Active.
     ///</summary>
-    public void SetActive(Camera camera, GameOutput window)
+    public void SetActive(Camera camera, UniverseOutput window)
     {
         lock (syncRoot)
         {
@@ -386,7 +386,7 @@ public class CameraManager
         }
     }
 
-    public Camera GetActive(GameOutput window)
+    public Camera GetActive(UniverseOutput window)
     {
         lock (syncRoot)
         {
@@ -508,7 +508,7 @@ public class CameraManager
     }
 
     //Индексатор для ключа
-    public List<Camera> this[GameOutput key]
+    public List<Camera> this[UniverseOutput key]
     {
         get
         {
@@ -530,7 +530,7 @@ public class CameraManager
     }
 
     //Индексатор для значения
-    public GameOutput this[Camera value]
+    public UniverseOutput this[Camera value]
     {
         get
         {

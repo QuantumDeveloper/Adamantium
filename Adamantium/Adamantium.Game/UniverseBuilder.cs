@@ -7,7 +7,7 @@ using Adamantium.UI.Platforms.Windows;
 
 namespace Adamantium.Game;
 
-public static class GameBuilder
+public static class UniverseBuilder
 {
     public static void Build(IDependencyContainer container)
     {

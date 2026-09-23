@@ -10,7 +10,7 @@ namespace Adamantium.Engine.EntityServices;
 
 public class ForwardPlusRenderingService : RenderingService
 {
-    public ForwardPlusRenderingService(EntityWorld world, GameOutput window) : base(world, window)
+    public ForwardPlusRenderingService(EntityWorld world, UniverseOutput window) : base(world, window)
     {
     }
 
