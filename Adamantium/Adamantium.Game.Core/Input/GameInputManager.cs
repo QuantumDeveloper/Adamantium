@@ -1,6 +1,5 @@
 ﻿using Adamantium.Core;
 using Adamantium.Core.Events;
-using Adamantium.ECS;
 using Adamantium.Game.Core.Events;
 using Adamantium.Game.Core.Payloads;
 using Adamantium.Mathematics;
@@ -78,7 +77,6 @@ namespace Adamantium.Game.Core.Input
             eventAggregator.GetEvent<GameOutputRemovedEvent>().Subscribe(GamePlatformWindowRemoved);
             eventAggregator.GetEvent<GameOutputActivatedEvent>().Subscribe(GamePlatformWindowActivated);
             eventAggregator.GetEvent<GameOutputDeactivatedEvent>().Subscribe(GamePlatformWindowDeactivated);
-            eventAggregator.GetEvent<GameOutputBoundsChangedEvent>().Subscribe(GamePlatformWindowBoundsChanged);
             eventAggregator.GetEvent<MouseInputEvent>().Subscribe(GamePlatformMouseStateChanged);
             eventAggregator.GetEvent<KeyboardInputEvent>().Subscribe(GamePlatformKeyboardStateChanged);
 
@@ -119,11 +117,6 @@ namespace Adamantium.Game.Core.Input
             {
                 MouseInputs.Add(e);
             }
-        }
-
-        private void GamePlatformWindowBoundsChanged(GameOutputBoundsChangedPayload payload)
-        {
-            Bounds = payload.Bounds;
         }
 
         private void GamePlatformWindowActivated(GameOutput output)

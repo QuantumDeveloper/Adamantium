@@ -1,7 +1,4 @@
 ﻿using Adamantium.Core;
-using Adamantium.Graphics;
-using Adamantium.Graphics.Core;
-using Adamantium.UI.Controls;
 using Adamantium.UI.Controls.Panels;
 using Adamantium.UI.Core;
 using Object = System.Object;
@@ -17,9 +14,8 @@ namespace Adamantium.Game.Core
        /// Constructs GameContext
        /// </summary>
        /// <param name="context">Object that represents surface on which Graphics content will be drawn</param>
-       /// <param name="graphicsDevice">Graphics device on which current context was created</param>
        /// <exception cref="NotSupportedException"></exception>
-       public GameContext(Object context, IGraphicsDevice graphicsDevice = null)
+       public GameContext(Object context)
       {
          var type = context.GetType();
          if (Utilities.IsTypeInheritFrom(type, typeof(IWindow)))
@@ -35,7 +31,6 @@ namespace Adamantium.Game.Core
             throw new NotSupportedException($"context of type {type} is not supported");
          }
          Context = context;
-         GraphicsDevice = graphicsDevice;
       }
 
       /// <summary>
@@ -47,11 +42,6 @@ namespace Adamantium.Game.Core
       /// Type of Game context
       /// </summary>
       public GameContextType ContextType { get; }
-      
-      /// <summary>
-      /// Device on which context was created 
-      /// </summary>
-      public IGraphicsDevice GraphicsDevice { get; }
 
       /// <summary>
       /// Determines whether the specified object is equal to the current object.
@@ -123,13 +113,7 @@ namespace Adamantium.Game.Core
        /// <filterpriority>2</filterpriority>
        public override int GetHashCode()
        {
-           int hashCode = 1;
-           if (Context != null)
-           {
-               return HashCode.Combine(Context.GetHashCode(), GraphicsDevice.GetHashCode());
-           }
-
-           return hashCode;
+           return Context.GetHashCode();
        }
    }
 }

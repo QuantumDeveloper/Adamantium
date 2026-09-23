@@ -262,9 +262,16 @@ public class Game : PropertyChangedBase, IGame
         RunInternal();
     }
 
+    /// <summary>
+    /// Run game loop on the selected control
+    /// </summary>
+    /// <param name="context">Control which will be used for creating corresponding <see cref="GameOutput"/> and further rendering</param>
     public void Run(object context)
     {
-        Run(context, null);
+        if (IsRunning) return;
+
+        var window = CreateOutputFromContext(context);
+        Run(window);
     }
 
     public void RunOnce(AppTime time)
@@ -273,19 +280,6 @@ public class Game : PropertyChangedBase, IGame
         Update(time);
         ExecuteDrawSequence2(time);
         FrameFinished?.Invoke(this, EventArgs.Empty);
-    }
-
-    /// <summary>
-    /// Run game loop on the selected control
-    /// </summary>
-    /// <param name="context">Control which will be used for creating corresponding <see cref="GameOutput"/> and further rendering</param>
-    /// <param name="graphicsDevice">Device on which Context was created</param>
-    public void Run(Object context, GraphicsDevice graphicsDevice)
-    {
-        if (IsRunning) return;
-            
-        var window = CreateOutputFromContext(context, graphicsDevice);
-        Run(window);
     }
 
     /// <summary>
@@ -348,12 +342,11 @@ public class Game : PropertyChangedBase, IGame
     /// Create new game window from context and add it to the list of game windows
     /// </summary>
     /// <param name="context">Window, in which Vulkan content will be rendered</param>
-    /// <param name="graphicsDevice">Graphics device which will be used for communication with parent thread</param>
-    public GameOutput CreateOutputFromContext(object context, IGraphicsDevice graphicsDevice)
+    public GameOutput CreateOutputFromContext(object context)
     {
         if (!contextsMapping.ContainsKey(context))
         {
-            var gameContext = new GameContext(context, graphicsDevice);
+            var gameContext = new GameContext(context);
             contextsMapping.Add(context, gameContext);
             return gamePlatform.CreateOutput(gameContext);
         }
@@ -376,6 +369,7 @@ public class Game : PropertyChangedBase, IGame
         if (!contextsMapping.ContainsKey(context))
         {
             var window = gamePlatform.CreateOutput(context, surfaceFormat, depthFormat, msaaLevel);
+            contextsMapping.Add(context, window.GameContext);
             return window;
         }
         throw new ArgumentException("There are already game window created on the current context");
@@ -388,6 +382,7 @@ public class Game : PropertyChangedBase, IGame
     public void RemoveWindowByContext(object context)
     {
         gamePlatform.RemoveOutput(context);
+        contextsMapping.Remove(context);
     }
 
     /// <summary>
@@ -407,13 +402,18 @@ public class Game : PropertyChangedBase, IGame
             throw new ArgumentNullException(nameof(newContext));
         }
 
-        if (contextsMapping.TryGetValue(oldContext, out var gameContext))
+        // Nothing on the old context: the game still has to end up on the new one.
+        if (!contextsMapping.Remove(oldContext, out var gameContext))
         {
-            gamePlatform.RemoveOutput(gameContext);
+            if (!contextsMapping.ContainsKey(newContext))
+            {
+                CreateOutputFromContext(newContext);
+            }
+            return;
         }
         var context = new GameContext(newContext);
         gamePlatform.SwitchContext(gameContext, context);
-        contextsMapping.TryAdd(newContext, context);
+        contextsMapping[newContext] = context;
     }
         
     /// <summary>
@@ -595,6 +595,7 @@ public class Game : PropertyChangedBase, IGame
     /// <param name="gameTime">AppTime contains elapsed time, total time and FPS</param>
     protected virtual void Update(AppTime gameTime)
     {
+        InputManager.Update(gameTime);
         EntityWorld.ServiceManager.Update(gameTime);
     }
 
@@ -710,11 +711,6 @@ public class Game : PropertyChangedBase, IGame
     /// Load content at startup after game resources initialization
     /// </summary>
     protected virtual void LoadContent() { }
-
-    private void UpdateCore(AppTime gameTime)
-    {
-        Update(gameTime);
-    }
 
     public event EventHandler Initialized;
     public event EventHandler FrameFinished;

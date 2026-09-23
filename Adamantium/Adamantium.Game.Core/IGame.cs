@@ -54,7 +54,7 @@ namespace Adamantium.Game.Core
         /// </summary>
         String Title { get; set; }
 
-        void Run(object context, GraphicsDevice graphicsDevice);
+        void Run(object context);
         
         public event EventHandler Initialized;
 

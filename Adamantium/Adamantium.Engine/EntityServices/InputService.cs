@@ -71,7 +71,6 @@ public class InputService : EntityService
         //{
         //    userControlledEntity = currentCamera.Owner;
         //}
-        inputManager.Update(gameTime);
         var gamepadState = inputManager.GetGamepadState(0);
         Double cameraMovementSpeed = currentCamera.Velocity * gameTime.FrameTime;
         float rotationAngle = currentCamera.RotationSpeed * (float)gameTime.FrameTime;

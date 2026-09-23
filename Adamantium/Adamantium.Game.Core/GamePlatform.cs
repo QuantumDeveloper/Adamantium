@@ -125,9 +125,10 @@ namespace Adamantium.Game.Core
         /// <param name="newContext">New control for drawing</param>
         public void SwitchContext(GameContext oldContext, GameContext newContext)
         {
-            if (contextToWindow.TryGetValue(oldContext, out var wnd))
+            if (contextToWindow.Remove(oldContext, out var wnd))
             {
                 wnd.SwitchContext(newContext);
+                contextToWindow[newContext] = wnd;
             }
         }
 
@@ -205,8 +206,8 @@ namespace Adamantium.Game.Core
         {
             wnd.Activated -= Window_Activated;
             wnd.Deactivated -= Window_Deactivated;
-            wnd.MouseInput += OnMouseInput;
-            wnd.KeyInput += OnKeyInput;
+            wnd.MouseInput -= OnMouseInput;
+            wnd.KeyInput -= OnKeyInput;
             wnd.Closed -= Wnd_Closed;
         }
 
@@ -226,17 +227,17 @@ namespace Adamantium.Game.Core
                     var wnd = wndObj.Key;
                     if ((graphicsDeviceChanged || reason == ChangeReason.FullUpdate) && wndObj.Key.Type != GameWindowType.RenderTarget)
                     {
-                        OnWindowParametersChanging(wnd, wnd.Description, ChangeReason.FullUpdate);
+                        wnd.OnWindowParametersChanging(ChangeReason.FullUpdate);
                         var device = GraphicsDeviceService.MainGraphicsDevice.UpdateDevice(wnd.GraphicsDevice.DeviceId);
                         wnd.SetGraphicsDevice(device);
-                        OnWindowParametersChanged(wnd, wnd.Description, ChangeReason.FullUpdate);
+                        wnd.OnWindowParametersChanged(ChangeReason.FullUpdate);
                     }
                     else if (reason == ChangeReason.Resize)
                     {
-                        OnWindowParametersChanging(wnd, wnd.Description, ChangeReason.Resize);
+                        wnd.OnWindowParametersChanging(ChangeReason.Resize);
                         Log.Logger.Debug("Update game output presenter");
                         wnd.UpdatePresenter();
-                        OnWindowParametersChanged(wnd, wnd.Description, ChangeReason.Resize);
+                        wnd.OnWindowParametersChanged(ChangeReason.Resize);
                         OnWindowSizeChanged(wnd);
                     }
                     else
@@ -248,20 +249,6 @@ namespace Adamantium.Game.Core
                 _changedOutputs.Clear();
                 graphicsDeviceChanged = false;
             }
-        }
-
-        private void OnWindowParametersChanging(GameOutput window,  GameWindowDescription description, ChangeReason reason)
-        {
-            window.OnWindowParametersChanging(reason);
-
-            _eventAggregator.GetEvent<GameOutputParametersChangingEvent>().Publish(new GameOutputParametersPayload(window, description, reason));
-        }
-
-        private void OnWindowParametersChanged(GameOutput window, GameWindowDescription description, ChangeReason reason)
-        {
-            window.OnWindowParametersChanged(reason);
-
-            _eventAggregator.GetEvent<GameOutputParametersChangedEvent>().Publish(new GameOutputParametersPayload(window, description, reason));
         }
 
         private void Window_Deactivated(GameOutput output)
@@ -276,13 +263,12 @@ namespace Adamantium.Game.Core
             OnActivated(ActiveWindow);
         }
 
+        // Through the same queue a closed window takes, so the output is unsubscribed and its removal announced.
         public void RemoveOutput(GameContext context)
         {
-            if (contextToWindow.ContainsKey(context))
+            if (contextToWindow.Remove(context, out var window))
             {
-                var window = contextToWindow[context];
-                contextToWindow.Remove(context);
-                outputs.Remove(window);
+                windowsToRemove.Add(window);
             }
         }
 
@@ -360,6 +346,7 @@ namespace Adamantium.Game.Core
             }
 
             var wnd = GameOutput.New(_eventAggregator, context);
+            contextToWindow.Add(context, wnd);
             windowsToAdd.Add(wnd);
             return wnd;
         }

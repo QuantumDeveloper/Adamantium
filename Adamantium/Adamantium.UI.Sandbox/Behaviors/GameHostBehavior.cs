@@ -55,10 +55,10 @@ public class GameHostBehavior : Behavior<RenderTargetPanel>
             var graphicsDeviceService = app.UIContext.Resolve<IGraphicsDeviceService>();
 
             // Slave-mode game sharing the designer's device service; no render service (the designer drives it
-            // directly, not via GameService.RunGames). The GameContext device is only a key, so reuse an existing one.
+            // directly, not via GameService.RunGames).
             var game = gameService.CreateGame<AdamantiumGame>(
                 "AdamantiumGame", panel.RootVisual as IWindow, null, graphicsDeviceService, app.EnableGraphicsDebug);
-            game.CreateOutputFromContext(panel, graphicsDeviceService.ResourceLoaderDevice);
+            game.CreateOutputFromContext(panel);
             _gameAttached = true;
         }
         catch (Exception ex)
@@ -87,10 +87,7 @@ public class GameHostBehavior : Behavior<RenderTargetPanel>
 
         var game = gameService.CreateGame<AdamantiumGame>(
             "AdamantiumGame", window, renderService, graphicsDeviceService, app.EnableGraphicsDebug);
-        // Don't spin up a fresh render device here: GamePlatform already creates one per GameOutput, and the
-        // device handed to the GameContext is only used for its hash (GameContext.GetHashCode) — never for
-        // rendering. Reuse the window's existing render device so we don't burn another slice of the BAR window.
-        game.CreateOutputFromContext(panel, renderService.GraphicsDevice);
+        game.CreateOutputFromContext(panel);
         _gameAttached = true;
 
         // Bridge the live game to the tab's view-model so its menu can load models at runtime. The panel's DataContext is

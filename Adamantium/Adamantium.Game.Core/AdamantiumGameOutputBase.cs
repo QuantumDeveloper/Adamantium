@@ -117,7 +117,7 @@ namespace Adamantium.Game.Core
             TranslationKeys[Key.RightWin] = Keys.RightWindows;
             TranslationKeys[Key.Apps] = Keys.Apps;
             TranslationKeys[Key.Sleep] = Keys.Sleep;
-            TranslationKeys[Key.NumPad0] = Keys.NumPad6;
+            TranslationKeys[Key.NumPad0] = Keys.NumPad0;
             TranslationKeys[Key.NumPad1] = Keys.NumPad1;
             TranslationKeys[Key.NumPad2] = Keys.NumPad2;
             TranslationKeys[Key.NumPad3] = Keys.NumPad3;
