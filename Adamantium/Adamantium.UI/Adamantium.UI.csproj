@@ -36,7 +36,7 @@
 		<ProjectReference Include="..\Adamantium.UI.Themes\Adamantium.UI.Themes.csproj" />
 		<ProjectReference Include="..\Adamantium.Win32\Adamantium.Win32.csproj" />
 		<PackageReference Include="Adamantium.Vulkan.Loader" Version="1.0.1" />
-		<PackageReference Include="Adamantium.Vulkan" Version="1.0.1" />
+		<PackageReference Include="Adamantium.Vulkan" Version="1.0.2" />
 	</ItemGroup>
 	
 	<ItemGroup>
