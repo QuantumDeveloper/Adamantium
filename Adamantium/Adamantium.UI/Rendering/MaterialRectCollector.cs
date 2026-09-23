@@ -271,7 +271,7 @@ internal sealed class MaterialRectCollector : SdfBatchCollector<MaterialRectItem
 
     protected override void DrawSegment(IGraphicsDevice device, Buffer<MaterialRectItem> buffer, uint count, uint firstInstance, Matrix4x4F projection)
     {
-        EnsureEffectForDraw(device);
+        if (!EnsureEffectForDraw(device)) return;
 
         if (!BindSource(device, WallpaperSegment, CaptureRegion, _boundSource, _boundAnchor,
                 Effect.SourceTexture, Effect.SourceSampler, SourceUvParam)) return;

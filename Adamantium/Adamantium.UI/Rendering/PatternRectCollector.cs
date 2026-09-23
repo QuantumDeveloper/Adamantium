@@ -87,7 +87,7 @@ internal sealed class PatternRectCollector : BrushSdfCollector<PatternRectItem>
     // so Time is 0 otherwise. Same hook the fractal pass uses.
     protected override void DrawSegment(IGraphicsDevice device, Buffer<PatternRectItem> buffer, uint count, uint firstInstance, Matrix4x4F projection)
     {
-        EnsureEffectForDraw(device);
+        if (!EnsureEffectForDraw(device)) return;
         Effect.Time.SetValue((float)NoiseClock.Time);
         base.DrawSegment(device, buffer, count, firstInstance, projection);
     }

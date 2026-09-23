@@ -66,7 +66,9 @@ internal sealed class TextureBatchCollector : BrushSdfCollector<TextureItem>
             return;
         }
 
-        EnsureEffectForDraw(device);
+        if (!EnsureEffectForDraw(device)) 
+            return;
+        
         Effect.SourceTexture.SetResource(_texture);
         Effect.SourceSampler.SetResource(((GraphicsDevice)device).SamplerStates.LinearClampToEdge);
         base.DrawSegment(device, buffer, count, firstInstance, projection);

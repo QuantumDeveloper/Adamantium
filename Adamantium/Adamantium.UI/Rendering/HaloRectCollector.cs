@@ -58,7 +58,7 @@ internal sealed class HaloRectCollector : ShapeSdfCollector<HaloRectItem>
 
     protected override void DrawSegment(IGraphicsDevice device, Buffer<HaloRectItem> buffer, uint count, uint firstInstance, Matrix4x4F projection)
     {
-        EnsureEffectForDraw(device);
+        if (!EnsureEffectForDraw(device)) return;
 
         // A segment with no field holds only analytic bands, and those never sample - so unlike the textured batch there
         // is nothing to refuse here. When there IS one, bind it; the shader reaches it only for shape 2.

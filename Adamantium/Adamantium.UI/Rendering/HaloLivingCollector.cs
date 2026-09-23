@@ -54,7 +54,7 @@ internal sealed class HaloLivingCollector : ShapeSdfCollector<HaloLivingItem>
     {
         // The shared flow clock, the same one the animated noise brushes advance on - so a breathing aura and a flowing
         // noise fill drift together rather than each on its own timebase.
-        EnsureEffectForDraw(device);
+        if (!EnsureEffectForDraw(device)) return;
         Effect.Time.SetValue((float)NoiseClock.Time);
 
         if (_field != null)

@@ -15,6 +15,9 @@ namespace Adamantium.UI.Rendering;
 // shaders); this just unifies the code.
 internal abstract class SdfBatchCollector<TItem> : BatchCollector<TItem> where TItem : struct
 {
+    private bool _effectUnavailable;
+    private int _verdictsWhenGaveUp = -1;
+
     // WHICH effect feeds this collector is the subclass's business: the shapes draw through BatchEffect and the brushes
     // through BrushEffect (see BrushEffect.fx - two effects because one parameter block could not hold both). What the
     // draw needs is the four parameters BOTH declare, held as fields rather than looked up by name: a dictionary hit per
@@ -39,7 +42,29 @@ internal abstract class SdfBatchCollector<TItem> : BatchCollector<TItem> where T
     // touches every collector whether or not it has anything to draw. Building one for a collector that draws nothing
     // costs a set of shader objects per device for nothing - which, once the brushes became a SECOND effect, was enough
     // extra pressure to take the off-screen test host down natively partway through a run.
-    protected void EnsureEffectForDraw(IGraphicsDevice device) => EnsureEffect(device);
+    // Remembered rather than retried: the attempt is per DRAW, so a refused shader would throw thousands of times a
+    // minute. Held only until the verdicts change, since a background attempt may yet build the effect.
+    protected bool EnsureEffectForDraw(IGraphicsDevice device)
+    {
+        if (_effectUnavailable)
+        {
+            if (_verdictsWhenGaveUp == ShaderCompileStats.Generation) return false;
+            _effectUnavailable = false;
+        }
+
+        try
+        {
+            EnsureEffect(device);
+            return true;
+        }
+        catch (System.InvalidOperationException e)
+        {
+            _effectUnavailable = true;
+            _verdictsWhenGaveUp = ShaderCompileStats.Generation;
+            Serilog.Log.Logger.Error(e, $"{GetType().Name} draws nothing until its effect can be built");
+            return false;
+        }
+    }
 
     // The SDF draw pass for this shape (per-instance TItem read from the buffer's device address by SV_InstanceID).
     protected abstract IEffectPass DrawPass { get; }
@@ -51,7 +76,7 @@ internal abstract class SdfBatchCollector<TItem> : BatchCollector<TItem> where T
     protected override void DrawSegment(IGraphicsDevice device, Buffer<TItem> buffer, uint count, uint firstInstance, Matrix4x4F projection)
     {
         var dev = (GraphicsDevice)device;
-        EnsureEffectForDraw(device);
+        if (!EnsureEffectForDraw(device)) return;
 
         // Set what this draw DEPENDS on, don't inherit it. The colour mask is device state like any other, and a pass
         // that borrows it (the strokes' union coverage masks colour off for its depth pass) would otherwise leave these

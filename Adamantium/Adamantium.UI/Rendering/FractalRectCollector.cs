@@ -114,7 +114,7 @@ internal sealed class FractalRectCollector : BrushSdfCollector<FractalRectItem>
     // it; an Animate one drifts C by it. FractalClock advances only while an animating fractal is live, so this is 0 otherwise.
     protected override void DrawSegment(IGraphicsDevice device, Buffer<FractalRectItem> buffer, uint count, uint firstInstance, Matrix4x4F projection)
     {
-        EnsureEffectForDraw(device);
+        if (!EnsureEffectForDraw(device)) return;
         Effect.Time.SetValue((float)FractalClock.Time);
 
         // Publish the reference-orbit buffer (perturbation deep path). Uploaded ONCE per frame on the first segment; the
