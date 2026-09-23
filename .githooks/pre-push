@@ -1,0 +1,15 @@
+#!/bin/sh
+# Refuse to push anything AT the protected branch, whatever branch is checked out - which is what catches
+# "git push origin HEAD:master". Git feeds one line per ref: <local ref> <local sha> <remote ref> <remote sha>.
+while read -r _local_ref _local_sha remote_ref _remote_sha
+do
+    case "$remote_ref" in
+        refs/heads/master|refs/heads/main)
+            echo "hook: '$remote_ref' takes pull requests only."
+            echo "      push your branch and open one; --no-verify overrides this."
+            exit 1
+            ;;
+    esac
+done
+
+exit 0

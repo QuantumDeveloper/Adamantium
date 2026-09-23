@@ -1,0 +1,15 @@
+#!/bin/sh
+# Refuse to commit while standing on the protected branch. The server refuses the push anyway - this only saves
+# moving the commit off master afterwards.
+branch=$(git rev-parse --abbrev-ref HEAD)
+
+case "$branch" in
+    master|main)
+        echo "hook: '$branch' is protected - make a branch first:"
+        echo "      git switch -c <name>"
+        echo "      (git commit --no-verify overrides this)"
+        exit 1
+        ;;
+esac
+
+exit 0
