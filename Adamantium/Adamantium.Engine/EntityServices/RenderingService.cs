@@ -36,21 +36,29 @@ public class RenderingService : EntityService
         GraphicsDevice = window.GraphicsDevice;
         Content = world.Satellites.Get<IContentManager>();
         Window = window;
-        Window.ParametersChanging += Window_ParametersChanging;
-        Window.ParametersChanged += Window_ParametersChanged;
-        Window.SizeChanged += WindowOnSizeChanged;
+        Window.ParametersChanging += OnWindowParametersChanging;
+        Window.ParametersChanged += OnWindowParametersChanged;
     }
 
-    private void WindowOnSizeChanged(UniverseOutputSizeChangedPayload obj)
+    private void OnWindowParametersChanged(UniverseOutputParametersPayload payload)
     {
-    }
+        // A full update gives the output a new device: the service and its processors move to it.
+        if (payload.Reason == ChangeReason.FullUpdate)
+        {
+            GraphicsDevice = Window.GraphicsDevice;
+            for (int i = 0; i < Processors.Count; i++)
+            {
+                if (Processors[i] is RenderingProcessor processor)
+                {
+                    processor.OnOutputDeviceChanged();
+                }
+            }
+        }
 
-    private void Window_ParametersChanged(UniverseOutputParametersPayload payload)
-    {
         OnWindowParametersChanged(payload.Reason);
     }
 
-    private void Window_ParametersChanging(UniverseOutputParametersPayload payload)
+    private void OnWindowParametersChanging(UniverseOutputParametersPayload payload)
     {
         OnWindowParametersChanging(payload.Reason);
     }

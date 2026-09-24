@@ -65,11 +65,8 @@ public unsafe class BitmapSource : ImageSource
       Texture.Save(filePath.IsAbsoluteUri ? filePath.AbsolutePath : filePath.LocalPath, fileType);
    }
    
-   /// <summary>Defers the GPU texture instead of destroying it here - the same queue every GPU buffer uses, drained at
-   /// the next <c>BeginDraw</c> once that frame's fence has been waited on. A picture is replaced on the UI thread while
-   /// frames that sample it are still in flight, and freeing the image out from under them is an invalid read on the
-   /// GPU: the whole device goes, not one wrong pixel.
-   /// </summary>
+   /// <summary>Retires the texture instead of destroying it: frames in flight may still sample it, and freeing it under
+   /// them loses the device.</summary>
    protected override void ReleaseUnmanagedResources()
    {
       var texture = Texture;
@@ -100,11 +97,10 @@ public unsafe class BitmapSource : ImageSource
          throw new ObjectDisposedException(nameof(BitmapSource));
       }
 
-      if (Texture == null)
+      // A texture dies with its device; after a device swap it is made again from the pixels.
+      if (Texture == null || Texture.IsDisposed)
       {
-         // Async URI decode still in flight (or failed): no pixels yet. Hand back null - the caller skips drawing and
-         // retries on a later re-render - instead of passing a null byte[] into texture creation (an NRE that killed
-         // the render thread when a flip revealed a photo before its background decode completed).
+         // Decode still in flight: null, and the caller retries on a later render.
          if (_pixels == null) return null;
 
          var textureDescription = new TextureDescription

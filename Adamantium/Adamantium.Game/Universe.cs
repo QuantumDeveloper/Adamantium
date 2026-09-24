@@ -23,6 +23,8 @@ namespace Adamantium.Game;
 public class Universe : PropertyChangedBase, IUniverse
 {
     private readonly Dictionary<UniverseOutput, EntityService> drawSystems = [];
+    private volatile bool deviceResourcesLost;
+    private bool isStopped;
 
     private readonly DisposeCollector unloadContentCollector;
         
@@ -31,14 +33,10 @@ public class Universe : PropertyChangedBase, IUniverse
     private readonly Thread gameLoopThread;
 
     private double accumulatedFrameTime;
-    /// <summary>
-    /// Contains game time passed from game start and time from last frame
-    /// </summary>
     private AppTime appTime;
 
     private TimeSpan totalTime;
 
-    // The game's OWN rendering cost, kept apart from the cadence it is ticked at. See DrawTimeMs / RenderFps.
     private readonly System.Diagnostics.Stopwatch renderTimer = new();
     private double renderSeconds, renderWindow;
     private int renderedFrames;
@@ -68,12 +66,11 @@ public class Universe : PropertyChangedBase, IUniverse
         DesiredFPS = 60;
         Satellites = new Satellites();
         Content = new ContentManager(Container, Satellites);
-        // Cooked artifacts (.aemf etc.) take precedence over raw source; falls back to the file system.
+        // Cooked artifacts win over raw source.
         Content.Resolvers.Add(new CookedContentResolver());
         Content.Resolvers.Add(new FileSystemContentResolver());
         Content.Resolvers.Add(new EffectContentResolver());
-        // Model files -> SceneData (runtime parse); image files -> GPU Texture for material maps. The texture reader
-        // takes the device lazily from the universe's Satellites at load time (ResourceLoaderDevice exists by then).
+        // The texture reader takes its device from the Satellites at load time, when it exists.
         Content.Readers.Add(typeof(SceneData), new SceneDataContentReader());
         Content.Readers.Add(typeof(Texture), new TextureContentReader());
             
@@ -116,8 +113,7 @@ public class Universe : PropertyChangedBase, IUniverse
     public EntityWorld EntityWorld { get; }
 
     /// <summary>
-    /// What this universe has its own of: itself, its content, its platform, its graphics device service. Its
-    /// services reach them through <see cref="Adamantium.ECS.EntityWorld.Satellites"/>.
+    /// What this universe has its own of; its services reach them through <see cref="Adamantium.ECS.EntityWorld.Satellites"/>.
     /// </summary>
     public Satellites Satellites { get; }
 
@@ -166,14 +162,11 @@ public class Universe : PropertyChangedBase, IUniverse
         
     public UInt32 DesiredFPS { get; set; }
 
-    /// <summary>What ONE of the game's own frames costs on the CPU - recording the scene and submitting it - averaged
-    /// over the last second. The GPU's own time is not in it: <c>Draw</c> records commands, it does not wait for them.
-    /// </summary>
+    /// <summary>CPU cost of one drawn frame (recording and submitting), averaged over the last second.</summary>
     public Double DrawTimeMs { get; private set; }
 
-    /// <summary>Frames per second the game's RENDERING could sustain, from <see cref="DrawTimeMs"/>. Deliberately not
-    /// the rate it is ticked at: a hosted game is driven once per frame of whoever hosts it, so counting ticks reports
-    /// the HOST and says nothing about what the scene costs.</summary>
+    /// <summary>Frames per second the game's rendering could sustain, from <see cref="DrawTimeMs"/> - not the rate its
+    /// host ticks it at.</summary>
     public Single RenderFps { get; private set; }
 
     /// <summary>
@@ -263,11 +256,20 @@ public class Universe : PropertyChangedBase, IUniverse
         Run(window);
     }
 
+    /// <summary>
+    /// Runs one frame on the host's tick; nothing while paused. Its own clock resumes where it stopped.
+    /// </summary>
     public void RunOnce(AppTime time)
     {
+        if (IsPaused)
+        {
+            return;
+        }
+
+        UpdateAppTime(time.FrameTime);
         MakePreparations();
-        Update(time);
-        ExecuteDrawSequence2(time);
+        Update(appTime);
+        ExecuteDrawSequence2(appTime);
         FrameFinished?.Invoke(this, EventArgs.Empty);
     }
 
@@ -298,6 +300,11 @@ public class Universe : PropertyChangedBase, IUniverse
 
     public void Submit()
     {
+        if (IsPaused)
+        {
+            return;
+        }
+
         EndScene();
     }
 
@@ -488,8 +495,7 @@ public class Universe : PropertyChangedBase, IUniverse
         }
         catch (Exception exception)
         {
-            // Reaching here means the loop is over - this is the game thread's outermost frame - so this is the only
-            // record that it stopped at all, let alone why.
+            // The game thread's outermost frame: the only record that the loop stopped, and why.
             Log.Logger.Fatal(exception, "Game loop stopped");
         }
     }
@@ -512,13 +518,14 @@ public class Universe : PropertyChangedBase, IUniverse
         if (BeginScene())
         {
             renderTimer.Restart();
-            Draw(gameTime);
-            renderSeconds += renderTimer.Elapsed.TotalSeconds;
-            renderedFrames++;
+            if (Draw(gameTime))
+            {
+                renderSeconds += renderTimer.Elapsed.TotalSeconds;
+                renderedFrames++;
+            }
         }
 
-        // Over a second, like the loop's own counter: a single frame is noise, and a rate recomputed every frame is
-        // unreadable on screen.
+        // Averaged over a second: one frame is noise.
         renderWindow += gameTime.FrameTime;
         if (renderWindow < 1.0) return;
 
@@ -552,7 +559,36 @@ public class Universe : PropertyChangedBase, IUniverse
     {
         GraphicsDeviceService.DeviceCreated += GraphicsDeviceCreated;
         GraphicsDeviceService.DeviceDisposing += GraphicsDeviceDisposing;
+        GraphicsDeviceService.DeviceChangeEnd += GraphicsDeviceChanged;
         Initialize();
+    }
+
+    private void GraphicsDeviceChanged(object sender, EventArgs e)
+    {
+        deviceResourcesLost = true;
+    }
+
+    // Textures died with the old device and are loaded again; the scene itself stays.
+    private void ReloadMaterialTextures()
+    {
+        var options = new ContentLoadOptions
+        {
+            AllowDuplication = false,
+            IgnoreRootDirectory = true
+        };
+
+        var roots = EntityWorld.RootEntities;
+        for (int i = 0; i < roots.Count; i++)
+        {
+            roots[i].TraverseByLayer(entity =>
+            {
+                var material = entity.GetComponent<Material>();
+                if (material?.Texture is { IsDisposed: true } && !string.IsNullOrEmpty(material.TexturePath))
+                {
+                    material.Texture = Content.Load<Texture>(material.TexturePath, options);
+                }
+            });
+        }
     }
 
     private void LoadContentCore()
@@ -568,13 +604,11 @@ public class Universe : PropertyChangedBase, IUniverse
 
     private void GraphicsDeviceDisposing(object sender, EventArgs e)
     {
-        // unsubscribe from Disposing event to reduce possibility of cyclic dependency and
-        // as a result StackOverFlow exception
+        // Unsubscribed meanwhile, so the unload cannot recurse into it.
         GraphicsDeviceService.DeviceDisposing -= GraphicsDeviceDisposing;
         unloadContentCollector.DisposeAndClear();
         ContentUnloading?.Invoke(this, e);
         UnloadContent();
-        // After finish ContentUnloading event, subscribe back to DeviceDisposing event
         GraphicsDeviceService.DeviceDisposing += GraphicsDeviceDisposing;
     }
 
@@ -600,9 +634,10 @@ public class Universe : PropertyChangedBase, IUniverse
     /// Method for drawing operation
     /// </summary>
     /// <param name="gameTime">AppTime contains elapsed time from the last frame, total time and current FPS</param>
-    protected virtual void Draw(AppTime gameTime)
+    /// <returns>True when anything was drawn: an output that is hidden or has no area yet draws nothing.</returns>
+    protected virtual bool Draw(AppTime gameTime)
     {
-        EntityWorld.ServiceManager.Draw(gameTime);
+        return EntityWorld.ServiceManager.Draw(gameTime);
     }
 
     /// <summary>
@@ -630,11 +665,16 @@ public class Universe : PropertyChangedBase, IUniverse
     }
 
     /// <summary>
-    /// Called after EndScene to update all devices and resources to avoid resizing issues and black screens
+    /// Applies the output and device changes at the start of the frame.
     /// </summary>
     protected virtual void MakePreparations()
     {
         gamePlatform.MakePreparationsForNextFrame();
+        if (deviceResourcesLost)
+        {
+            deviceResourcesLost = false;
+            ReloadMaterialTextures();
+        }
         OutputsSettled?.Invoke(this, EventArgs.Empty);
     }
 
@@ -644,6 +684,7 @@ public class Universe : PropertyChangedBase, IUniverse
         {
             GraphicsDeviceService.DeviceCreated -= GraphicsDeviceCreated;
             GraphicsDeviceService.DeviceDisposing -= GraphicsDeviceDisposing;
+            GraphicsDeviceService.DeviceChangeEnd -= GraphicsDeviceChanged;
         }
     }
 
@@ -651,14 +692,18 @@ public class Universe : PropertyChangedBase, IUniverse
     {
         lock (this)
         {
+            // Nothing of this universe may still be in flight on the GPU when its resources go.
+            GraphicsDeviceService?.MainGraphicsDevice?.DeviceWaitIdle();
             contextsMapping.Clear();
-
-            var disposableGraphicsService = GraphicsDeviceService as IDisposable;
-            disposableGraphicsService?.Dispose();
-
+            gamePlatform?.Dispose();
+            Content.Unload();
             DisposeGraphicsDeviceEvents();
 
-            gamePlatform?.Dispose();
+            // Only a service this universe made is its to dispose; a hosted universe shares its host's.
+            if (Mode is UniverseMode.Standalone or UniverseMode.Primary)
+            {
+                (GraphicsDeviceService as IDisposable)?.Dispose();
+            }
         }
     }
         
@@ -698,10 +743,22 @@ public class Universe : PropertyChangedBase, IUniverse
     public virtual void ShutDown()
     {
         cancellationTokenSource?.Cancel();
+
+        // A universe driven by its host has no loop of its own to finish in: it stops here.
+        if (Mode != UniverseMode.Standalone)
+        {
+            OnStopped();
+        }
     }
-        
+
     private void OnStopped()
     {
+        if (isStopped)
+        {
+            return;
+        }
+
+        isStopped = true;
         ShuttingDown?.Invoke(this, EventArgs.Empty);
         FreeGameResources();
         Stopped?.Invoke(this, EventArgs.Empty);

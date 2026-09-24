@@ -1,6 +1,7 @@
 ﻿using Adamantium.Core;
 using Adamantium.Core.Events;
 using Adamantium.ECS.Components;
+using Adamantium.Game.Core.Events;
 using Adamantium.Game.Core.Input;
 using Adamantium.Game.Core.Payloads;
 using Adamantium.Graphics.Core;
@@ -21,6 +22,10 @@ namespace Adamantium.Game.Core
         private Camera[] cameras = [];
         private readonly object camerasLock = new object();
         private Camera camera;
+        private readonly object requestedSizeLock = new object();
+        private uint requestedWidth;
+        private uint requestedHeight;
+        private bool sizeRequested;
 
         public Guid Id { get; }
 
@@ -76,8 +81,6 @@ namespace Adamantium.Game.Core
 
         internal abstract bool CanHandle(OutputContext gameContext);
 
-        internal abstract void Resize(uint width, uint height);
-
         internal abstract void SwitchContext(OutputContext context);
         
         private void GenerateWindowName()
@@ -85,9 +88,6 @@ namespace Adamantium.Game.Core
             Name = $"Window_{UniversePlatform.WindowId++}";
         }
 
-        /// <summary>
-        /// Initializes <see cref="UniverseOutput"/>
-        /// </summary>
         protected UniverseOutput(IEventAggregator eventAggregator)
         {
             EventAggregator = eventAggregator;
@@ -98,10 +98,6 @@ namespace Adamantium.Game.Core
             Id = Guid.NewGuid();
         }
         
-        /// <summary>
-        /// Initialize 
-        /// </summary>
-        /// <param name="context"></param>
         protected abstract void Initialize(OutputContext context);
 
         protected abstract void Initialize(
@@ -124,7 +120,12 @@ namespace Adamantium.Game.Core
 
         public virtual void CopyOutput(IGraphicsDevice graphicsDevice)
         {
-            graphicsDevice.BlitImage(GraphicsDevice.CurrentCommandBuffer, 
+            if (Presenter == null)
+            {
+                return;
+            }
+
+            graphicsDevice.BlitImage(GraphicsDevice.CurrentCommandBuffer,
                 GraphicsDevice.CurrentRenderTarget,
                 Presenter.GetCurrentImage());
         }
@@ -140,14 +141,21 @@ namespace Adamantium.Game.Core
         public void SetGraphicsDevice(IGraphicsDevice graphicsDevice)
         {
             GraphicsDevice = graphicsDevice;
-            Presenter = GraphicsPresenter.Create(graphicsDevice, Description.ToPresentationParameters());
+            // Nothing to draw into until the output has an area: a presenter made now would be made of zero-size images.
+            Presenter = HasArea ? GraphicsPresenter.Create(graphicsDevice, Description.ToPresentationParameters()) : null;
             ClearState();
             OnDeviceSet();
         }
 
         protected virtual void OnDeviceSet()
         {
-            
+
+        }
+
+        // While the old device is still alive: the presenter goes with it, and the output is not drawn until it has a new one.
+        internal virtual void ReleaseDeviceResources()
+        {
+            Presenter = null;
         }
 
         internal Boolean ResizeRequested { get; set; }
@@ -157,8 +165,10 @@ namespace Adamantium.Game.Core
 
         public Boolean IsUpToDate()
         {
-            return !ResizeRequested && !UpdateRequested;
+            return Presenter != null && !ResizeRequested && !UpdateRequested;
         }
+
+        private bool HasArea => Width > 0 && Height > 0;
 
         internal void ClearState()
         {
@@ -181,19 +191,27 @@ namespace Adamantium.Game.Core
 
         public void UpdatePresenter()
         {
-            ResizePresenter();
+            // Without an area the old presenter stays, and the output is not drawn until it has one again.
+            if (!HasArea)
+            {
+                return;
+            }
+
+            if (Presenter == null)
+            {
+                Presenter = GraphicsPresenter.Create(GraphicsDevice, Description.ToPresentationParameters());
+            }
+            else
+            {
+                ResizePresenter();
+            }
+
             ClearState();
         }
 
         internal void ResizePresenter()
         {
             Presenter.Resize(Description);
-        }
-
-        internal void SetPresentOptions()
-        {
-            //Presenter.PresentInterval = Description.PresentInterval;
-            //Presenter.PresentFlags = Description.PresentFlags;
         }
 
         /// <summary>
@@ -226,27 +244,16 @@ namespace Adamantium.Game.Core
             Closed?.Invoke(this, EventArgs.Empty);
         }
 
-        /// <summary>
-        /// Called when GraphicsPresenter updated (recreated or resized)
-        /// </summary>
-        /// <param name="reason"></param>
         internal void OnWindowParametersChanging(ChangeReason reason)
         {
             ParametersChanging?.Invoke(new UniverseOutputParametersPayload(this, Description, reason));
         }
 
-        /// <summary>
-        /// Called when GraphicsPresenter updated (recreated or resized)
-        /// </summary>
-        /// <param name="reason"></param>
         internal void OnWindowParametersChanged(ChangeReason reason)
         {
             ParametersChanged?.Invoke(new UniverseOutputParametersPayload(this, Description, reason));
         }
 
-        /// <summary>
-        /// Called after GraphicsPresenter has been resized
-        /// </summary>
         internal void OnWindowSizeChanged()
         {
             SizeChanged?.Invoke(new UniverseOutputSizeChangedPayload(this, new Size(Width, Height)));
@@ -280,6 +287,71 @@ namespace Adamantium.Game.Core
                     FitCamera(viewpoints[i], width, height);
                 }
             }
+        }
+
+        /// <summary>
+        /// Asks for a new size from any thread; applied at the start of the next universe frame, so no frame sees it change.
+        /// </summary>
+        protected void RequestResize(uint width, uint height)
+        {
+            lock (requestedSizeLock)
+            {
+                requestedWidth = width;
+                requestedHeight = height;
+                sizeRequested = true;
+            }
+
+            ResizeRequested = true;
+            PublishChange(ChangeReason.Resize);
+        }
+
+        // Before the presenter exists there is nothing to update: it is created from the description as it is then.
+        private void RequestChange(ChangeReason reason)
+        {
+            if (Presenter == null)
+            {
+                return;
+            }
+
+            if (reason == ChangeReason.FullUpdate)
+            {
+                UpdateRequested = true;
+            }
+            else
+            {
+                ResizeRequested = true;
+            }
+
+            PublishChange(reason);
+        }
+
+        private void PublishChange(ChangeReason reason)
+        {
+            EventAggregator.GetEvent<UniverseOutputChangesRequestedEvent>()
+                .Publish(new UniverseOutputParametersPayload(this, Description, reason));
+        }
+
+        internal bool ApplyRequestedSize()
+        {
+            uint width;
+            uint height;
+            lock (requestedSizeLock)
+            {
+                if (!sizeRequested)
+                {
+                    return false;
+                }
+
+                width = requestedWidth;
+                height = requestedHeight;
+                sizeRequested = false;
+            }
+
+            Width = width;
+            Height = height;
+            ClientBounds = new Rectangle(0, 0, (int)width, (int)height);
+            UpdateViewportAndScissor(width, height);
+            return true;
         }
 
         /// <summary>
@@ -344,20 +416,10 @@ namespace Adamantium.Game.Core
             viewpoint.Initialize();
         }
 
-        /// <summary>
-        /// Disposes of object resources.
-        /// </summary>
-        /// <param name="disposeManagedResources">If true, managed resources should be
-        /// disposed of in addition to unmanaged resources.</param>
         protected override void Dispose(bool disposeManagedResources)
         {
             GraphicsDevice?.Dispose();
             base.Dispose(disposeManagedResources);
-        }
-
-        protected void RaiseSizeChangedEvent(UniverseOutputSizeChangedPayload payload)
-        {
-            SizeChanged?.Invoke(payload);
         }
 
 
@@ -369,7 +431,6 @@ namespace Adamantium.Game.Core
                 if (Description.Width != value)
                 {
                     Description.Width = value;
-                    //ResizeRequested = true;
                     RaisePropertyChanged();
                 }
             }
@@ -383,7 +444,6 @@ namespace Adamantium.Game.Core
                 if (Description.Height != value)
                 {
                     Description.Height = value;
-                    //ResizeRequested = true;
                     RaisePropertyChanged();
                 }
             }
@@ -400,8 +460,7 @@ namespace Adamantium.Game.Core
         public abstract Vector2F PointToSurface(Vector2F absolute);
 
         /// <summary>
-        /// Pins the pointer where it stands and hides it, so a drag the game is running carries on past the edge of
-        /// the screen and arrives as motion rather than as a position. Released with false, which puts the cursor back.
+        /// Pins and hides the pointer, so a drag carries on past the screen edge as motion. False puts the cursor back.
         /// </summary>
         public abstract void HoldPointer(bool hold, Vector2F origin);
 
@@ -413,7 +472,7 @@ namespace Adamantium.Game.Core
                 if (Description.Handle != value)
                 {
                     Description.Handle = value;
-                    UpdateRequested = true;
+                    RequestChange(ChangeReason.FullUpdate);
                     RaisePropertyChanged();
                 }
             }
@@ -427,7 +486,7 @@ namespace Adamantium.Game.Core
                 if (Description.PixelFormat != value)
                 {
                     Description.PixelFormat = value;
-                    ResizeRequested = true;
+                    RequestChange(ChangeReason.Resize);
                     RaisePropertyChanged();
                 }
             }
@@ -441,7 +500,7 @@ namespace Adamantium.Game.Core
                 if (Description.DepthFormat != value)
                 {
                     Description.DepthFormat = value;
-                    ResizeRequested = true;
+                    RequestChange(ChangeReason.Resize);
                     RaisePropertyChanged();
                 }
             }
@@ -455,7 +514,7 @@ namespace Adamantium.Game.Core
                 if (Description.MsaaLevel != value)
                 {
                     Description.MsaaLevel = value;
-                    UpdateRequested = true;
+                    RequestChange(ChangeReason.FullUpdate);
                     RaisePropertyChanged();
                 }
             }
@@ -471,7 +530,7 @@ namespace Adamantium.Game.Core
                     Description.BuffersCount = value;
                     if (Description.PresenterType == PresenterType.Swapchain)
                     {
-                        ResizeRequested = true;
+                        RequestChange(ChangeReason.Resize);
                     }
                     RaisePropertyChanged();
                 }

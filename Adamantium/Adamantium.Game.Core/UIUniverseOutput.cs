@@ -21,10 +21,7 @@ namespace Adamantium.Game.Core
         /// cursor position only means something relative to it.</summary>
         public IInputComponent InputComponent { get; protected set; }
 
-        // Relative to the SURFACE, not to the window: a game hosted in a panel does not start at the client origin,
-        // so screen-to-client answered in the wrong space and every pick missed by the height of the chrome above it.
-        // Through the UI's own conversion, because it divides by the DPI scale at the root and then walks the offsets
-        // down in the SAME logical space - subtracting the surface origin by hand was right only at 100%.
+        // Relative to the surface, not the window, through the UI's own conversion: by hand it was right only at 100% DPI.
         public override Vector2F PointerScreenPosition
         {
             get
@@ -353,11 +350,6 @@ namespace Adamantium.Game.Core
 
         protected IWindow HostWindow => InputComponent as IWindow ?? InputComponent.RootVisual as IWindow;
 
-        internal override void Resize(uint width, uint height)
-        {
-            UpdateViewportAndScissor(width, height);
-        }
-        
         private void OnMouseMove(object sender, UnboundMouseEventArgs e)
         {
             var mouseInput = new MouseInput();

@@ -6,17 +6,12 @@
    public enum ChangeReason
    {
       /// <summary>
-      /// Full <see cref="GraphicsPresenter"/> was updated
+      /// The surface or the sample count changed: the output's device and <see cref="GraphicsPresenter"/> are made anew.
       /// </summary>
       FullUpdate,
 
       /// <summary>
-      /// Only DepthBuffer was updated
-      /// </summary>
-      DepthBufferOnly,
-
-      /// <summary>
-      /// <see cref="GraphicsPresenter"/> was resized
+      /// The size or a buffer format changed: the <see cref="GraphicsPresenter"/> rebuilds its buffers.
       /// </summary>
       Resize,
    }

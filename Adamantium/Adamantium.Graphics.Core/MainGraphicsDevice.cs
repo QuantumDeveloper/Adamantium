@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
@@ -34,18 +34,11 @@ namespace Adamantium.Graphics.Core
 
         public GraphicsAdapter GraphicsAdapter { get; private set; }
 
-        // The resource-loader device and the global descriptor heap belong to the main (logical) device for its
-        // whole lifetime, so the main device creates and owns them itself (see ctor) — callers only read the getters.
+        /// <summary>The resource-loader device, owned by the main device for its whole lifetime.</summary>
         public IGraphicsDevice ResourceLoaderDevice { get; private set; }
 
-        // Deferred disposal, for EVERY GPU resource of this logical device. It lives here rather than per device wrapper
-        // because the wrappers share one VkDevice and freely share resources: a texture is made by the resource loader,
-        // which draws no frames at all, and sampled by any window that paints with it. A per-wrapper queue can only
-        // promise that ITS OWN frames finished, and freeing an image a moment too early is not a wrong pixel - the GPU
-        // reads a recycled address and the device is lost.
-        // So a resource is held until EVERY drawing wrapper has begun enough frames to have retired whatever was in
-        // flight when it was handed over. A window that stops drawing (minimised) simply delays that - it is alive and
-        // will paint again, so its resources must stay. Only DESTROYING a wrapper drops its vote.
+        // Deferred disposal for every GPU resource of this logical device, held until every drawing wrapper has retired
+        // the frames in flight at hand-over: the wrappers share one VkDevice and share resources.
         private readonly List<(IDisposable Resource, IGraphicsDevice[] Devices, ulong[] Due)> _retired = [];
         private readonly object _retireSync = new();
 
@@ -63,8 +56,7 @@ namespace Adamantium.Graphics.Core
                 var due = new ulong[devices.Length];
                 for (var i = 0; i < devices.Length; i++)
                 {
-                    // Its frame in flight NOW is retired once this many more frames have begun - each begin waits on the
-                    // fence of the frame MaxFramesInFlight back.
+                    // Each begin waits on the fence of the frame MaxFramesInFlight back.
                     due[i] = devices[i].FrameTicket + devices[i].MaxFramesInFlight + 1;
                 }
 
@@ -101,11 +93,8 @@ namespace Adamantium.Graphics.Core
             }
         }
 
-        /// <summary>Dispose everything retired, WITHOUT waiting for frames to retire it. The caller must have waited the
-        /// device idle first - idle proves no submitted work can reference any of it, which is a stronger guarantee than
-        /// the frame tickets give. For teardown and for anything that stops drawing: the ordinary path frees a resource
-        /// only when a wrapper BEGINS another frame, so whatever is retired after the last frame is never freed at all.
-        /// A test run pays for that directly - each fixture's targets accumulate until the device runs out of memory.</summary>
+        /// <summary>Disposes everything retired without waiting for frames; the caller must have waited the device idle.
+        /// For teardown: what is retired after the last frame is otherwise never freed.</summary>
         public void FlushRetiredAfterIdle()
         {
             List<IDisposable> due;
@@ -126,7 +115,7 @@ namespace Adamantium.Graphics.Core
             }
         }
 
-        // A wrapper that is gone cannot be executing anything, so its vote is dropped rather than waited on for ever.
+        // A wrapper that is gone cannot be executing anything, so its vote is dropped.
         private bool IsDue(IGraphicsDevice[] devices, ulong[] due)
         {
             for (var i = 0; i < devices.Length; i++)
@@ -140,12 +129,10 @@ namespace Adamantium.Graphics.Core
             return true;
         }
 
-        // One shared heap per logical device, used by every render-device wrapper (they share one VkDevice).
+        /// <summary>One descriptor heap per logical device, shared by every render-device wrapper.</summary>
         public IDescriptorHeapManager DescriptorHeapManager { get; private set; }
 
-        // One shared device-memory allocator per logical device (same reason as the heap). Render devices reach it via
-        // this and sub-allocate from its blocks, so no render device grabs its own big host-visible BAR block. Created
-        // lazily on first use (once ResourceLoaderDevice exists) but OWNED here - a render device never creates one.
+        // Shared like the heap, so no render device grabs its own BAR block. Created on first use.
         private IDeviceMemoryAllocator _memoryAllocator;
         public IDeviceMemoryAllocator MemoryAllocator => _memoryAllocator ??= _graphicsDeviceFactory.CreateMemoryAllocator(ResourceLoaderDevice);
 
@@ -157,25 +144,22 @@ namespace Adamantium.Graphics.Core
 
         public static ReadOnlyCollection<string> DeviceExtensions { get; private set; }
 
-        // Optional (best-effort) extensions: enabled if the device supports them, never required. See CreateLogicalDevice.
+        /// <summary>Extensions enabled when supported, never required.</summary>
         public static ReadOnlyCollection<string> OptionalDeviceExtensions { get; private set; }
 
-        /// <summary>Device extensions this device actually enabled - the required ones plus whichever optional ones the
-        /// driver turned out to support. Ask this, never the wish list.</summary>
+        /// <summary>Device extensions this device actually enabled: the required ones plus the supported optional ones.</summary>
         public IReadOnlySet<string> EnabledDeviceExtensions { get; private set; } = new HashSet<string>();
 
         public bool IsExtensionEnabled(string extension) => EnabledDeviceExtensions.Contains(extension);
 
-        /// <summary>A present fence per present, present-mode changes without recreating the swapchain, and defined
-        /// scaling on resize. Advertised as KHR after promotion, as EXT before it - either will do. The FEATURE has to
-        /// be supported too, and enabled at device creation: passing one of those structures with it off is invalid
-        /// use rather than a no-op, so both halves are asked here and callers get one answer.</summary>
+        /// <summary>A present fence per present, present-mode changes without a rebuild, defined scaling on resize. The
+        /// extension (KHR or EXT) and the feature both have to be there.</summary>
         public bool SupportsSwapchainMaintenance =>
             GraphicsAdapter.SupportsSwapchainMaintenance1
             && (IsExtensionEnabled(Constants.VK_KHR_SWAPCHAIN_MAINTENANCE_1_EXTENSION_NAME)
                 || IsExtensionEnabled(Constants.VK_EXT_SWAPCHAIN_MAINTENANCE_1_EXTENSION_NAME));
 
-        /// <summary>Wait for a NAMED present instead of for an image to come free - explicit frame pacing.</summary>
+        /// <summary>Wait for a named present instead of for an image to come free.</summary>
         public bool SupportsPresentWait =>
             IsExtensionEnabled(Constants.VK_KHR_PRESENT_WAIT_EXTENSION_NAME)
             && IsExtensionEnabled(Constants.VK_KHR_PRESENT_ID_EXTENSION_NAME);
@@ -209,37 +193,22 @@ namespace Adamantium.Graphics.Core
             deviceExt.Add(Constants.VK_EXT_DESCRIPTOR_HEAP_EXTENSION_NAME);
             DeviceExtensions = new ReadOnlyCollection<string>(deviceExt);
 
-            // Cross-API shared-surface interop is OPTIONAL: enable every external-memory/semaphore transport the
-            // driver actually supports — both Win32 NT handles AND POSIX fds — instead of hard-coding one per OS.
-            // The producer dictates the handle flavour, not the consumer's OS: a D3D11/D3D12/GL producer on Windows
-            // hands an NT handle, a GL/dma-buf producer hands an fd, and an fd producer can exist on Windows too.
-            // These are NOT required — a machine without them still runs, it just can't import external surfaces;
-            // the optional pass in CreateLogicalDevice adds the supported ones without throwing.
+            // Every external memory/semaphore transport the driver has, NT handles and fds alike: the producer dictates
+            // the handle, not our OS.
             OptionalDeviceExtensions = new ReadOnlyCollection<string>(new List<string>
             {
                 Constants.VK_KHR_EXTERNAL_MEMORY_WIN32_EXTENSION_NAME,
                 Constants.VK_KHR_EXTERNAL_SEMAPHORE_WIN32_EXTENSION_NAME,
                 Constants.VK_KHR_EXTERNAL_MEMORY_FD_EXTENSION_NAME,
                 Constants.VK_KHR_EXTERNAL_SEMAPHORE_FD_EXTENSION_NAME,
-                // After a device-lost (VK_ERROR_DEVICE_LOST), lets us query the REAL GPU fault (description + faulting
-                // address regions) instead of guessing - the diagnostic for the designer's render-time device loss.
+                // The real cause of a device-lost.
                 Constants.VK_EXT_DEVICE_FAULT_EXTENSION_NAME,
 
-                // Presentation, asked for in the PROMOTED KHR form first and the original EXT form as the fallback - the
-                // pair was promoted, and a driver may advertise either. What they buy, measured on this engine: the frame
-                // loop blocks synchronously in AcquireNextImage (0.6-0.8 ms a frame, with the GPU fence wait at 0.00),
-                // and with update and render on one thread that back-pressure paces the WHOLE engine. swapchain
-                // maintenance gives a fence per present (know when an image is free instead of blocking to find out),
-                // present-mode changes WITHOUT recreating the swapchain (the vsync setting stops being a teardown), and
-                // defined scaling on resize. surface maintenance answers "how many images does THIS present mode need",
-                // which is currently a hardcoded 3.
+                // Promoted KHR form first, EXT as the fallback: a driver may advertise either.
                 Constants.VK_KHR_SWAPCHAIN_MAINTENANCE_1_EXTENSION_NAME,
                 Constants.VK_EXT_SWAPCHAIN_MAINTENANCE_1_EXTENSION_NAME,
-                // Explicit frame pacing: wait for a NAMED present to complete rather than for an image to come free.
                 Constants.VK_KHR_PRESENT_ID_EXTENSION_NAME,
                 Constants.VK_KHR_PRESENT_WAIT_EXTENSION_NAME,
-                // Present only the rectangles that changed - which this renderer already knows, since its whole cache is
-                // built around repainting just those.
                 Constants.VK_KHR_INCREMENTAL_PRESENT_EXTENSION_NAME,
             });
         }
@@ -272,8 +241,6 @@ namespace Adamantium.Graphics.Core
                 }
             }
 
-            // The resource-loader device and the shared descriptor heap live for the whole logical-device lifetime,
-            // so the main device owns them. Created here (after the logical device exists); callers just read them.
             ResourceLoaderDevice = CreateResourceLoaderDevice();
             DescriptorHeapManager = _graphicsDeviceFactory.CreateDescriptorHeapManager(ResourceLoaderDevice);
         }
@@ -344,7 +311,6 @@ namespace Adamantium.Graphics.Core
             queueCreateInfo.PQueuePriorities = queuePriorities;
             queueInfos.Add(queueCreateInfo);
 
-            // enumerate all available device extensions
             uint propCount = 0;
             GraphicsAdapter.Adapter.EnumerateDeviceExtensionProperties(null, ref propCount, null);
             var supportedDeviceExtensions = new ExtensionProperties[propCount];
@@ -366,7 +332,6 @@ namespace Adamantium.Graphics.Core
                 throw new ExtensionNotSupportedException(GraphicsAdapter.AdapterProperties.DeviceName, diff);
             }
 
-            // Optional extensions: enable whatever the device supports, never throw on the missing ones.
             foreach (var extension in OptionalDeviceExtensions)
             {
                 if (availableDeviceExtensions.Contains(extension) && !finalDeviceExtensions.Contains(extension))
@@ -375,10 +340,7 @@ namespace Adamantium.Graphics.Core
                 }
             }
 
-            // What was ACTUALLY enabled, asked of the device rather than assumed from a list. Everything built on an
-            // optional extension reads this: the same binary runs on a driver that has it and one that does not (a Mac
-            // on MoltenVK has none of the presentation set), and "works on my machine" is exactly the failure mode a
-            // hardcoded assumption produces here.
+            // What was actually enabled: the same binary runs where the optional ones are missing (MoltenVK has none).
             EnabledDeviceExtensions = new HashSet<string>(finalDeviceExtensions, StringComparer.Ordinal);
 
             var descriptorBufferFeature = new PhysicalDeviceDescriptorBufferFeaturesEXT
@@ -389,9 +351,7 @@ namespace Adamantium.Graphics.Core
 
             var vulkan11Features = new PhysicalDeviceVulkan11Features
             {
-                // SV_VertexID / SV_InstanceID make Slang emit the SPIR-V DrawParameters capability (BaseVertex/
-                // BaseInstance correction) used by the instanced sprite/glyph expansion that replaced the geometry
-                // shaders; without this feature vkCreateShadersEXT rejects those shaders (and the NV driver AVs).
+                // SV_VertexID/SV_InstanceID need DrawParameters; without it vkCreateShadersEXT rejects the instanced shaders.
                 ShaderDrawParameters = true,
             };
 
@@ -401,13 +361,9 @@ namespace Adamantium.Graphics.Core
                 BufferDeviceAddress = true,
                 BufferDeviceAddressCaptureReplay = true,
                 SamplerMirrorClampToEdge = true,
-                // Only when reported - it is a FEATURE of 1.2, not a guarantee, and asking for one the device does not
-                // have fails vkCreateDevice. See GraphicsAdapter.SupportsScalarBlockLayout for what it buys.
+                // Only when reported: requesting a missing feature fails vkCreateDevice.
                 ScalarBlockLayout = GraphicsAdapter.SupportsScalarBlockLayout,
-                // 8-bit colour in the instance records: every batch stores its colours as four BYTES, so these two are
-                // as unconditional as BufferDeviceAddress beside them - a shader that declares uint8_t4 is invalid
-                // without them, and there is no second record layout to fall back to. Reported by every adapter this
-                // engine has run on; a device that lacks them fails creation LOUDLY rather than drawing wrong colours.
+                // Byte colors in every instance record; there is no second layout to fall back to.
                 StorageBuffer8BitAccess = true,
                 ShaderInt8 = true,
             };
@@ -416,16 +372,10 @@ namespace Adamantium.Graphics.Core
             {
                 Synchronization2 = true,
                 DynamicRendering = true,
-                // A shader that discards BEFORE it takes a derivative cannot compile to OpKill - a killed lane stops
-                // feeding its neighbours' fwidth - so the compiler emits OpDemoteToHelperInvocation instead, and that
-                // needs this. It was declared by the shaders and never enabled here, which is a capability used outside
-                // the contract: undefined behaviour, and the shape it took on this driver was a lost device reporting an
-                // invalid read. Unconditional like the two above - Vulkan 1.3 requires every device to support it.
+                // Discard before a derivative compiles to demote; used without this it lost the device.
                 ShaderDemoteToHelperInvocation = true,
             };
-            
-            // Enable host image copy only when the device reports support — turning it on unconditionally would
-            // fail vkCreateDevice. Texture.Save uses it when available, otherwise falls back to a staging buffer.
+
             var features14 = new PhysicalDeviceVulkan14Features
             {
                 HostImageCopy = GraphicsAdapter.SupportsHostImageCopy
@@ -435,11 +385,10 @@ namespace Adamantium.Graphics.Core
             {
                 PrimitiveTopologyListRestart = true,
             };
-            
+
             var heapFeatures = new PhysicalDeviceDescriptorHeapFeaturesEXT
             {
                 DescriptorHeap = true,
-                // Enable only if the device actually supports it — otherwise vkCreateDevice will fail.
                 DescriptorHeapCaptureReplay = GraphicsAdapter.SupportsDescriptorHeapCaptureReplay
             };
 
@@ -452,7 +401,7 @@ namespace Adamantium.Graphics.Core
             //vulkan13Features.PNext = descriptorBufferFeature;
             features14.PNext = primitiveRestart;
             primitiveRestart.PNext = descriptorBufferFeature;
-            
+
             if (EnableDynamicRendering &&
                 finalDeviceExtensions.Contains(Constants.VK_EXT_SHADER_OBJECT_EXTENSION_NAME))
             {
@@ -468,8 +417,6 @@ namespace Adamantium.Graphics.Core
                 descriptorBufferFeature.PNext = heapFeatures;
             }
 
-            // VK_EXT_device_fault: turn on deviceFault so a later device-lost can be interrogated for its real cause.
-            // heapFeatures is the current tail of the feature chain; extend it.
             PhysicalDeviceFaultFeaturesEXT faultFeatures = null;
             if (finalDeviceExtensions.Contains(Constants.VK_EXT_DEVICE_FAULT_EXTENSION_NAME))
             {
@@ -478,8 +425,7 @@ namespace Adamantium.Graphics.Core
                 DeviceFaultSupported = true;
             }
 
-            // swapchain_maintenance1: a fence per present, scaling on resize, present-mode changes without a rebuild.
-            // Both this and the fault block are conditional, so the tail is whichever of them landed.
+            // Both this and the fault block are conditional, so the chain's tail is whichever of them landed.
             if (SupportsSwapchainMaintenance)
             {
                 var maintenanceFeatures = new PhysicalDeviceSwapchainMaintenance1FeaturesKHR
@@ -500,8 +446,7 @@ namespace Adamantium.Graphics.Core
             deviceFeatures2.Features.SamplerAnisotropy = true;
             deviceFeatures2.Features.SampleRateShading = true;
             deviceFeatures2.Features.GeometryShader = true;
-            // The GPU stroke expander dereferences BDA pointers (uint64_t) in its compute shader, which declares the
-            // SPIR-V Int64 capability - that requires the shaderInt64 device feature.
+            // The stroke expander's compute shader dereferences BDA pointers (uint64_t).
             deviceFeatures2.Features.ShaderInt64 = true;
 
             var createInfo = new DeviceCreateInfo();
@@ -618,7 +563,8 @@ namespace Adamantium.Graphics.Core
         {
             Log.Logger.Debug("Start disposing main device");
             LogicalDevice?.DeviceWaitIdle();
-            foreach (var device in graphicsDevices)
+            // A copy: a device takes itself off this list as it is disposed.
+            foreach (var device in graphicsDevices.ToArray())
             {
                 device?.Dispose();
             }
@@ -626,25 +572,17 @@ namespace Adamantium.Graphics.Core
             graphicsDevices.Clear();
             deviceMap.Clear();
 
-            // The main device owns these now; dispose the resource-loader device before the logical device (it frees
-            // the shared heap's buffers, which were allocated through it).
-            // The heap's buffers were allocated through the resource-loader device, so they go BEFORE it - and they have
-            // to actually go: this used to drop the reference without disposing, leaving two live buffers on a device
-            // about to be destroyed.
+            // The heap's buffers were allocated through the resource-loader device, so they go first.
             DescriptorHeapManager?.Dispose();
             DescriptorHeapManager = null;
 
             ResourceLoaderDevice?.Dispose();
             ResourceLoaderDevice = null;
 
-            // After every device's buffers have returned their sub-ranges, free the shared blocks (uses the still-alive
-            // shared LogicalDevice). Before the logical device itself is destroyed.
+            // After every device returned its sub-ranges, before the logical device goes.
             _memoryAllocator?.Dispose();
             _memoryAllocator = null;
 
-            // The main device creates its OWN per-frame fences alongside the logical device (see CreateLogicalDevice) and
-            // never destroyed them - so every logical device was torn down with three live fences on it. The render
-            // devices' fences are their own and are freed with them; these are the ones nobody owned.
             if (InFlightFences != null)
             {
                 foreach (var fence in InFlightFences) LogicalDevice?.DestroyFence(fence);

@@ -7,9 +7,8 @@ using Adamantium.UI.Core.Dispatcher;
 
 namespace Adamantium.UI.Sandbox.ViewModels;
 
-/// <summary>Game tab: a RenderTargetPanel runs the 3D game as the backdrop, with a simple in-game-style overlay menu on
-/// top. The menu's show/hide is fully view-model driven; the "Load …" commands swap the model shown in the scene at
-/// runtime via the game bridge (<see cref="AttachGame"/>, populated by GameHostBehavior once the game is live).</summary>
+/// <summary>Game tab: the 3D game behind an overlay menu. The load commands reach the game through
+/// <see cref="AttachGame"/>, which GameHostBehavior calls once it is live.</summary>
 [ViewModel]
 public partial class GameViewModel : TabPageViewModel
 {
@@ -22,6 +21,9 @@ public partial class GameViewModel : TabPageViewModel
     {
         _game = game;
         Status = "Game ready";
+
+        // A rebuilt view brings a new game with a new camera: its home and speed are taken afresh on the next pulse.
+        _home = null;
 
         // Once the game is there, the readout has something to read. On the UI thread, so nothing touched here ever
         // crosses over from the game loop.

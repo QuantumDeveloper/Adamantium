@@ -1,4 +1,6 @@
-<View xmlns="http://adamantium/ui"
+<View x:KeepAlive="Required"
+      xmlns="http://adamantium/ui"
+      xmlns:x="http://adamantium/ui/xaml/extensions"
       xmlns:behaviors="clr-namespace:Adamantium.UI.Sandbox.Behaviors">
     <!-- DataContext is the GameViewModel. The RenderTargetPanel runs the 3D game as the backdrop; a game-style overlay
          menu sits on top, shown/hidden via the view-model (a DataTrigger collapses it), and its buttons load models. -->

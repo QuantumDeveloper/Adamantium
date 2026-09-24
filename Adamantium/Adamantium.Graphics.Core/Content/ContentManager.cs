@@ -106,7 +106,13 @@ namespace Adamantium.Graphics.Core.Content
                     {
                         if (LoadedAssets.TryGetValue(assetKey, out result))
                         {
-                            return result;
+                            // A GPU asset dies with its device; then it is loaded again, for the new one.
+                            if (result is not DisposableObject { IsDisposed: true })
+                            {
+                                return result;
+                            }
+
+                            LoadedAssets.Remove(assetKey);
                         }
                     }
                 }

@@ -12,10 +12,8 @@ using Adamantium.UI.EntityServices;
 namespace Adamantium.UI.Sandbox.Behaviors;
 
 /// <summary>
-/// Declaratively (from AUML) runs <see cref="AdamantiumGame"/> into the <see cref="RenderTargetPanel"/> it is
-/// attached to. <see cref="AdamantiumGame"/> renders its frame, exports it as a shared surface and hands the
-/// panel the descriptor; the panel imports it zero-copy and samples it during compositing — the full Phase 2/3
-/// path. Attach in markup:
+/// Runs <see cref="AdamantiumGame"/> into the <see cref="RenderTargetPanel"/> it is attached to; pauses it while the
+/// panel is out of the tree and removes it when the panel is discarded. Attach in markup:
 /// <code>
 /// &lt;RenderTargetPanel.Behaviors&gt;&lt;local:GameHostBehavior/&gt;&lt;/RenderTargetPanel.Behaviors&gt;
 /// </code>
@@ -23,12 +21,12 @@ namespace Adamantium.UI.Sandbox.Behaviors;
 public class GameHostBehavior : Behavior<RenderTargetPanel>
 {
     private bool _gameAttached;
+    private IUniverseService _gameService;
+    private AdamantiumGame _game;
 
     protected override void OnAttached(RenderTargetPanel panel)
     {
-        // Design-time game preview is WIP and OFF by default: driving a game per render is expensive, so the
-        // interactive designer stays responsive (panel shows its placeholder). Opt in with ADAMANTIUM_DESIGN_GAME=1
-        // while working on the feature. The designer (DesignerSession) drives the snapshot and composites it.
+        // Design-time preview is WIP and off: a game per render is expensive. ADAMANTIUM_DESIGN_GAME=1 turns it on.
         if (Design.IsDesignMode)
         {
             if (Environment.GetEnvironmentVariable("ADAMANTIUM_DESIGN_GAME") == "1")
@@ -36,16 +34,15 @@ public class GameHostBehavior : Behavior<RenderTargetPanel>
             return;
         }
 
-        // OnAttached fires while the AUML tree is being built, before the panel is in the visual tree. Defer the
-        // wiring until it is attached, by which point its window and WindowRenderService exist.
+        // Wired once in the tree, where its window and render service exist.
         panel.AttachedToVisualTreeEvent += OnPanelAttachedToVisualTree;
+        panel.DetachedFromVisualTreeEvent += OnPanelDetachedFromVisualTree;
     }
 
     private void AttachDesignTimeGame(RenderTargetPanel panel)
     {
         if (_gameAttached) return;
-        // Guarded: a design-time game-setup failure must degrade to a panel-without-game, never break the whole
-        // preview (this runs inside the markup instantiation, where an exception would null the entire tree).
+        // A failure here would null the whole preview tree: degrade to a panel without a game.
         try
         {
             var app = UIApplication.Current;
@@ -54,12 +51,13 @@ public class GameHostBehavior : Behavior<RenderTargetPanel>
             var gameService = app.UIContext.Resolve<IUniverseService>();
             var graphicsDeviceService = app.UIContext.Resolve<IGraphicsDeviceService>();
 
-            // Slave-mode game sharing the designer's device service; no render service (the designer drives it
-            // directly, not via UniverseService.RunUniverses).
+            // No render service: the designer drives it directly.
             var game = gameService.CreateUniverse<AdamantiumGame>(
                 "AdamantiumGame", panel.RootVisual as IWindow, null, graphicsDeviceService, app.EnableGraphicsDebug);
             game.CreateOutputFromContext(panel);
             _gameAttached = true;
+            _gameService = gameService;
+            _game = game;
         }
         catch (Exception ex)
         {
@@ -67,14 +65,35 @@ public class GameHostBehavior : Behavior<RenderTargetPanel>
         }
     }
 
+    // Only on a discard (a kept view is parked): the game goes with the panel.
     protected override void OnDetached(RenderTargetPanel panel)
     {
         panel.AttachedToVisualTreeEvent -= OnPanelAttachedToVisualTree;
+        panel.DetachedFromVisualTreeEvent -= OnPanelDetachedFromVisualTree;
+        if (_game == null)
+        {
+            return;
+        }
+
+        _gameService.RemoveUniverse(_game);
+        _game = null;
+        _gameService = null;
+        _gameAttached = false;
+    }
+
+    private void OnPanelDetachedFromVisualTree(object sender, VisualTreeAttachmentEventArgs e)
+    {
+        _game?.Pause();
     }
 
     private void OnPanelAttachedToVisualTree(object sender, VisualTreeAttachmentEventArgs e)
     {
-        if (_gameAttached) return;
+        if (_gameAttached)
+        {
+            _game?.Resume();
+            return;
+        }
+
         var panel = (RenderTargetPanel)sender;
         var app = UIApplication.Current;
         if (app == null || panel.RootVisual is not IWindow window) return;
@@ -89,11 +108,10 @@ public class GameHostBehavior : Behavior<RenderTargetPanel>
             "AdamantiumGame", window, renderService, graphicsDeviceService, app.EnableGraphicsDebug);
         game.CreateOutputFromContext(panel);
         _gameAttached = true;
+        _gameService = gameService;
+        _game = game;
 
-        // Bridge the live game to the tab's view-model so its menu can load models at runtime. The panel's DataContext is
-        // INHERITED from the hosting tab and is usually NOT set yet at attach time (attach fires before the inherited
-        // value propagates), so bridge now if it's already the GameViewModel, else the moment it becomes one - otherwise
-        // the menu's load commands keep seeing a null game and report "not ready".
+        // The inherited DataContext usually arrives after attach, so the bridge waits for it.
         BridgeToViewModel(panel, game);
     }
 

@@ -20,11 +20,12 @@ public class ForwardRenderingProcessor : RenderingProcessor
     {
     }
 
-    protected override void LoadContent()
+    protected override void CreateDeviceResources()
     {
+        _geometryCache?.Dispose();
         BasicEffect = new BasicEffect(GraphicsDevice);
         _geometryCache = new MeshGeometryCache(GraphicsDevice);
-        base.LoadContent();
+        base.CreateDeviceResources();
     }
 
     protected override void OnDetached()
@@ -46,8 +47,7 @@ public class ForwardRenderingProcessor : RenderingProcessor
             OnDraw(entity, gameTime);
         }
 
-        // Over the scene, in screen space: the orientation gizmo. Its logic has run every frame all along - only the
-        // draw was missing, and it lived in a service nothing creates.
+        // The orientation gizmo, over the scene in screen space.
         DrawHUD();
     }
     
@@ -103,8 +103,7 @@ public class ForwardRenderingProcessor : RenderingProcessor
         var controller = entity.GetComponent<AnimationController>();
         if (controller != null && controller.FinalMatrices.Count > 0)
         {
-            // Skinning is WIP; upload the bones here once the pass is wired (do NOT materialise the array every frame
-            // until it is actually consumed).
+            // Skinning is WIP: the bones are uploaded here once the pass consumes them.
             //BasicEffect.Parameters["Bones"].SetValue(controller.FinalMatrices.Values.ToArray());
         }
 
@@ -130,8 +129,7 @@ public class ForwardRenderingProcessor : RenderingProcessor
             BasicEffect.ShaderTexture.SetResource(material.Texture);
         }
 
-        // The render PATH is the mesh data's explicit choice, not a property of the mesh - it selects the shader pass
-        // here and (inside DrawMesh) the vertex format the GPU buffers are built for.
+        // The mesh data's choice, not the mesh's: it picks the pass here and the vertex format inside DrawMesh.
         if (meshData.RenderMode == MeshRenderMode.Skinned)
         {
             BasicEffect.Techniques["Basic"].Passes["Skinned"].Apply();
@@ -264,7 +262,6 @@ public class ForwardRenderingProcessor : RenderingProcessor
         }
     }
 
-    // What one drawable part of a HUD tool amounts to: a mesh, where it stands, and what colour it is.
     private readonly record struct HudPart(MeshData Data, Matrix4x4F World, Vector4F Color);
 
     private readonly List<HudPart> _hudParts = [];
@@ -298,8 +295,7 @@ public class ForwardRenderingProcessor : RenderingProcessor
         }
     }
 
-    // Parts that SHARE a mesh go out as ONE instanced draw: the orientation gizmo is seven balls, three arms and four
-    // arrows - three meshes, three draws. Only the placement and the colour differ per copy.
+    // Parts sharing a mesh go out as one instanced draw; only placement and color differ per copy.
     private void DrawHudParts()
     {
         if (_hudParts.Count == 0) return;

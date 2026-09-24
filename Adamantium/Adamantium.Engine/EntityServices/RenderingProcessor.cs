@@ -52,14 +52,20 @@ public class RenderingProcessor : EntityProcessor<RenderingService>, IDisposable
         GraphicsDeviceService.DeviceChangeEnd += DeviceChangeEnd;
         Content = EntityWorld.Satellites.Get<IContentManager>();
         Window = AssociatedService.Window;
-        Window.SizeChanged += WindowOnSizeChanged;
-        //SpriteBatch = new SpriteBatch(GraphicsDevice, 80000);
-        LoadContent();
+        CreateDeviceResources();
     }
 
-    protected virtual void LoadContent()
+    /// <summary>Makes what this processor draws with on the current device, on attach and on every device change - not
+    /// the lifecycle's LoadContent, which a device change never repeats.</summary>
+    protected virtual void CreateDeviceResources()
     {
-        
+
+    }
+
+    internal void OnOutputDeviceChanged()
+    {
+        GraphicsDevice = AssociatedService.GraphicsDevice;
+        CreateDeviceResources();
     }
 
     private void DeviceChangeEnd(object sender, EventArgs e)
@@ -83,10 +89,6 @@ public class RenderingProcessor : EntityProcessor<RenderingService>, IDisposable
     protected virtual void OnDeviceChangeEnd()
     {
         SpriteBatch = new SpriteBatch(GraphicsDevice, 25000);
-    }
-
-    private void WindowOnSizeChanged(UniverseOutputSizeChangedPayload obj)
-    {
     }
 
     public void Dispose()

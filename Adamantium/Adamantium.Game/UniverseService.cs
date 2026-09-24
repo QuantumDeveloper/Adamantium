@@ -7,6 +7,7 @@ using Adamantium.ECS;
 using Adamantium.Game.Core;
 using Adamantium.Graphics.Core;
 using Adamantium.UI.Core;
+using Adamantium.UI.EntityServices;
 
 namespace Adamantium.Game;
 
@@ -15,6 +16,8 @@ public class UniverseService : IUniverseService
     private readonly object _locker = new object();
 
     private List<UniverseKey> _universes;
+
+    private readonly List<IUniverse> _retired = [];
 
     public UniverseService()
     {
@@ -46,12 +49,22 @@ public class UniverseService : IUniverseService
         return universe;
     }
 
+    /// <summary>
+    /// Takes the universe out; it is stopped on the next <see cref="RunUniverses"/>, the thread that may wait the device idle.
+    /// </summary>
     public bool RemoveUniverse(IUniverse universe)
     {
         lock (_locker)
         {
             var result = _universes.FirstOrDefault(x => x.Universe == universe);
-            return _universes.Remove(result);
+            if (result == null)
+            {
+                return false;
+            }
+
+            _universes.Remove(result);
+            _retired.Add(universe);
+            return true;
         }
     }
 
@@ -59,9 +72,18 @@ public class UniverseService : IUniverseService
     {
         lock (_locker)
         {
+            for (int i = 0; i < _retired.Count; i++)
+            {
+                _retired[i].ShutDown();
+            }
+            _retired.Clear();
+
+            // Matched by window, not by service: the service drawing a window is replaced when the devices are made
+            // anew, the window is not. A universe created without a service is driven by whoever created it.
+            var window = (renderService as WindowRenderService)?.Window;
             Parallel.ForEach(_universes, (item) =>
             {
-                if (item.Service != renderService)
+                if (item.Service == null || window == null || !ReferenceEquals(item.Window, window))
                 {
                     return;
                 }

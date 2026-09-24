@@ -303,20 +303,26 @@ public abstract class UIApplication : FundamentalUIComponent, IAdamantiumApplica
     private void RecreateDevicesAndServices()
     {
         Log.Logger.Debug("======Starting recreating sequence======");
-        EntityWorld.RemoveAllServices();
-        EntityWorld.RemoveAllEntities();
-        EntityWorld.ForceUpdate();
-        windowToSystem.Clear();
-        foreach (var window in Windows)
+        // The render thread must not draw while the devices it draws with are destroyed and remade.
+        lock (_renderGate)
         {
-            window.InvalidateRender(true);
+            EntityWorld.RemoveAllServices();
+            EntityWorld.RemoveAllEntities();
+            EntityWorld.ForceUpdate();
+            windowToSystem.Clear();
+            foreach (var window in Windows)
+            {
+                window.InvalidateRender(true);
+            }
+            Graphics.Fonts.FontAtlasStore.Reset();
+            GraphicsDeviceService.ChangeOrCreateMainDevice("Adamantium Main", true);
+            foreach (var window in Windows)
+            {
+                CreateWindowService(window);
+            }
+            EntityWorld.ForceUpdate();
+            Interlocked.Exchange(ref _framesInFlight, 0);
         }
-        GraphicsDeviceService.ChangeOrCreateMainDevice("Adamantium Main", true);
-        foreach (var window in Windows)
-        {
-            CreateWindowService(window);
-        }
-        EntityWorld.ForceUpdate();
         Log.Logger.Debug("======Finish recreating sequence======");
     }
 

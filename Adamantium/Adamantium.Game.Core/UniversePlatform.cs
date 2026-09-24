@@ -35,9 +35,6 @@ namespace Adamantium.Game.Core
 
         private object syncObject = new object();
 
-        /// <summary>
-        ///
-        /// </summary>
         public string DefaultAppDirectory
         {
             get
@@ -63,10 +60,6 @@ namespace Adamantium.Game.Core
         
         internal IGraphicsDeviceService GraphicsDeviceService { get; private set; }
         
-        /// <summary>
-        /// Constructs <see cref="UniversePlatform"/> from <see cref="IUniverse"/> instance
-        /// </summary>
-        /// <param name="universe"></param>
         public UniversePlatform(IUniverse universe)
         {
             Universe = universe;
@@ -90,6 +83,12 @@ namespace Adamantium.Game.Core
         {
             lock (syncObject)
             {
+                // A full update covers a resize; a resize asked for after one must not downgrade it.
+                if (_changedOutputs.TryGetValue(obj.Output, out var queued) && queued.Reason == ChangeReason.FullUpdate)
+                {
+                    return;
+                }
+
                 _changedOutputs[obj.Output] = obj;
             }
         }
@@ -97,7 +96,17 @@ namespace Adamantium.Game.Core
         private void Initialized(object sender, EventArgs e)
         {
             GraphicsDeviceService = Universe.Satellites.Get<IGraphicsDeviceService>();
+            GraphicsDeviceService.DeviceChangeBegin += DeviceChangeBegin;
             GraphicsDeviceService.DeviceChangeEnd += DeviceChangeEnd;
+        }
+
+        // The old device is still alive here: what the outputs made on it goes now, not after it is gone.
+        private void DeviceChangeBegin(object sender, EventArgs e)
+        {
+            for (int i = 0; i < outputs.Count; i++)
+            {
+                outputs[i].ReleaseDeviceResources();
+            }
         }
 
         private void DeviceChangeEnd(object sender, EventArgs e)
@@ -106,10 +115,8 @@ namespace Adamantium.Game.Core
         }
 
         /// <summary>
-        /// Switches drawing context from old control to new control. After this old control could be safely removed
+        /// Moves drawing from the old control to the new one; the old control can then be removed.
         /// </summary>
-        /// <param name="oldContext">Old control for drawing</param>
-        /// <param name="newContext">New control for drawing</param>
         public void SwitchContext(OutputContext oldContext, OutputContext newContext)
         {
             if (contextToWindow.Remove(oldContext, out var wnd))
@@ -179,7 +186,7 @@ namespace Adamantium.Game.Core
         }
 
         /// <summary>
-        /// Called after EndScene to update all devices and resources to avoid resizing issues and black screens
+        /// Applies the queued output and device changes at the start of the frame.
         /// </summary>
         public void MakePreparationsForNextFrame()
         {
@@ -188,31 +195,53 @@ namespace Adamantium.Game.Core
             lock (syncObject)
             {
                 AddWindowsInternal();
-                foreach (var wndObj in _changedOutputs)
+                if (graphicsDeviceChanged)
                 {
-                    var reason = wndObj.Value.Reason;
-                    var wnd = wndObj.Key;
-                    if ((graphicsDeviceChanged || reason == ChangeReason.FullUpdate) && wndObj.Key.Type != GameWindowType.RenderTarget)
+                    // The main device was made anew, and with it the logical device every output's resources lived on.
+                    for (int i = 0; i < outputs.Count; i++)
                     {
+                        var wnd = outputs[i];
+                        var resized = wnd.ApplyRequestedSize();
                         wnd.OnWindowParametersChanging(ChangeReason.FullUpdate);
-                        var device = GraphicsDeviceService.MainGraphicsDevice.UpdateDevice(wnd.GraphicsDevice.DeviceId);
-                        wnd.SetGraphicsDevice(device);
+                        wnd.SetGraphicsDevice(GraphicsDeviceService.CreateRenderDevice());
                         wnd.OnWindowParametersChanged(ChangeReason.FullUpdate);
-                    }
-                    else if (reason == ChangeReason.Resize)
-                    {
-                        wnd.OnWindowParametersChanging(ChangeReason.Resize);
-                        Log.Logger.Debug("Update game output presenter");
-                        wnd.UpdatePresenter();
-                        wnd.OnWindowParametersChanged(ChangeReason.Resize);
-                        OnWindowSizeChanged(wnd);
-                    }
-                    else
-                    {
-                        wnd.SetPresentOptions();
+                        if (resized)
+                        {
+                            OnWindowSizeChanged(wnd);
+                        }
                     }
                 }
-                
+                else
+                {
+                    foreach (var wndObj in _changedOutputs)
+                    {
+                        var reason = wndObj.Value.Reason;
+                        var wnd = wndObj.Key;
+                        var resized = wnd.ApplyRequestedSize();
+
+                        if (reason == ChangeReason.FullUpdate && wndObj.Key.Type != GameWindowType.RenderTarget)
+                        {
+                            wnd.OnWindowParametersChanging(ChangeReason.FullUpdate);
+                            var device = GraphicsDeviceService.MainGraphicsDevice.UpdateDevice(wnd.GraphicsDevice.DeviceId);
+                            wnd.SetGraphicsDevice(device);
+                            wnd.OnWindowParametersChanged(ChangeReason.FullUpdate);
+                        }
+                        else
+                        {
+                            // A render target rebuilds every buffer on resize, so it needs nothing more for a full update.
+                            wnd.OnWindowParametersChanging(reason);
+                            Log.Logger.Debug("Update game output presenter");
+                            wnd.UpdatePresenter();
+                            wnd.OnWindowParametersChanged(reason);
+                        }
+
+                        if (resized)
+                        {
+                            OnWindowSizeChanged(wnd);
+                        }
+                    }
+                }
+
                 _changedOutputs.Clear();
                 graphicsDeviceChanged = false;
             }
@@ -280,10 +309,8 @@ namespace Adamantium.Game.Core
         }
 
         /// <summary>
-        /// Creates <see cref="UniverseOutput"/> from <see cref="OutputContext"/>
+        /// Creates an output on the control in <paramref name="context"/>.
         /// </summary>
-        /// <param name="context">Context (Control) from which <see cref="UniverseOutput"/> will be created</param>
-        /// <returns>new <see cref="UniverseOutput"/></returns>
         public virtual UniverseOutput CreateOutput(OutputContext context)
         {
             if (context == null)
@@ -298,10 +325,8 @@ namespace Adamantium.Game.Core
         }
 
         /// <summary>
-        /// Creates <see cref="UniverseOutput"/> from <see cref="object"/>
+        /// Creates an output on <paramref name="context"/>, a control.
         /// </summary>
-        /// <param name="context">Context (Control) from which <see cref="UniverseOutput"/> will be created</param>
-        /// <returns>new <see cref="UniverseOutput"/></returns>
         public UniverseOutput CreateOutput(object context)
         {
             var gameContext = new OutputContext(context);
@@ -309,13 +334,9 @@ namespace Adamantium.Game.Core
         }
 
         /// <summary>
-        /// Create new game window from context (if no windows has been created already using this context) and add it to the list of game windows
+        /// Creates an output on <paramref name="context"/> with the given formats, or returns the one it already has.
         /// </summary>
-        /// <param name="context">Window, in which Vulkan content will be rendered</param>
-        /// <param name="surfaceFormat">Surface format</param>
-        /// <param name="depthFormat">Depth buffer format</param>
-        /// <param name="msaaLevel">MSAA level</param>
-        public UniverseOutput CreateOutput( 
+        public UniverseOutput CreateOutput(
             object context,
             SurfaceFormat surfaceFormat, 
             DepthFormat depthFormat = DepthFormat.Depth32Stencil8X24, 
@@ -333,9 +354,8 @@ namespace Adamantium.Game.Core
         }
 
         /// <summary>
-        /// Adds <see cref="UniverseOutput"/> to the windows collection
+        /// Adds an output; it joins at the start of the next frame.
         /// </summary>
-        /// <param name="window">window to add to the windows collection</param>
         public void AddOutput(UniverseOutput window)
         {
             if (outputs.Contains(window)) return;
@@ -348,9 +368,8 @@ namespace Adamantium.Game.Core
         }
 
         /// <summary>
-        /// Remove <see cref="UniverseOutput"/>
+        /// Removes the output of the control <paramref name="context"/>.
         /// </summary>
-        /// <param name="context">UI Control for which <see cref="UniverseOutput"/> will be removed</param>
         public void RemoveOutput(object context)
         {
             var gameContext = new OutputContext(context);

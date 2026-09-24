@@ -5,9 +5,8 @@ using Adamantium.UI.Core.Graphics;
 namespace Adamantium.UI.Core.Media.Imaging;
 
 /// <summary>
-/// An <see cref="ImageSource"/> backed by an externally produced shared surface. The surface is imported
-/// zero-copy on first render (on the UI resource device, via the factory) and then sampled like any bitmap.
-/// Disposing frees the imported texture and, through it, the Vulkan import and its OS handles.
+/// An <see cref="ImageSource"/> backed by an externally produced shared surface, imported zero-copy on first render
+/// and then sampled like any bitmap.
 /// </summary>
 public sealed class SharedSurfaceImage : BitmapSource
 {
@@ -30,14 +29,17 @@ public sealed class SharedSurfaceImage : BitmapSource
             throw new ObjectDisposedException(nameof(SharedSurfaceImage));
         }
 
+        // The import died with its device, and so did the producer's surface: nothing to import again until the
+        // producer hands over a surface made on the new device.
+        if (Texture is { IsDisposed: true })
+        {
+            return null;
+        }
+
         return Texture ??= factory.ImportSharedSurface(_descriptor);
     }
 
-    // The imported surface's GPU lifetime is owned by the ImageRenderComponent that samples it - it frees the import
-    // through the render device's fence-gated deferred-dispose when the compositor switches off it (a producer resize
-    // hands over a new surface). So this source must NOT dispose the texture: freeing it on the panel's / GC finalizer
-    // thread would race the render thread still replaying an op that samples it, or double-free what the component
-    // already released. Drop the reference only.
+    // The render component that samples the import owns and frees it; disposing here would race the render thread.
     protected override void ReleaseUnmanagedResources()
     {
         Texture = null;

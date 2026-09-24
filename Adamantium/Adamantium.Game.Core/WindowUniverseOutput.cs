@@ -59,11 +59,10 @@ namespace Adamantium.Game.Core
 
         private void WindowOnClientSizeChanged(object sender, SizeChangedEventArgs e)
         {
-            Width = (uint)window.ClientWidth;
-            Height = (uint)window.ClientHeight;
-            Resize(Width, Height);
-            ResizeRequested = true;
-            window.Measure(new Size(Width, Height));
+            var width = (uint)window.ClientWidth;
+            var height = (uint)window.ClientHeight;
+            RequestResize(width, height);
+            window.Measure(new Size(width, height));
             window.Arrange(new Rect(window.DesiredSize));
         }
 

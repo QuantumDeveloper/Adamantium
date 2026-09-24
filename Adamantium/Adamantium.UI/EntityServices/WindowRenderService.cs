@@ -1,4 +1,4 @@
-﻿using System.Diagnostics;
+using System.Diagnostics;
 using System.Threading;
 using Adamantium.Core;
 using Adamantium.ECS;
@@ -24,25 +24,20 @@ public class WindowRenderService : UiRenderService
     private IWindowRenderer _pendingRenderer;
     private IThemeManager _themeManager;
     private readonly AutoResetEvent pauseEvent;
-    // Optional shared render device (designer: reuse ONE device for the whole session). Null => the service creates its
-    // own (the runtime path, unchanged).
     private readonly IGraphicsDevice _injectedDevice;
 
     public IWindow Window { get; private set; }
 
-    /// <summary>The viewport zoom the content is rendered at (designer zoom; 1 = on-screen 1:1). The adorner overlay
-    /// stage renders at the same scale so its analytic AA (fringe width) matches the content.</summary>
+    /// <summary>The zoom the content is rendered at; 1 is on-screen 1:1.</summary>
     public double RenderScale => windowRenderer?.RenderScale ?? 1.0;
 
-    // Runtime path: EntityWorld.CreateService resolves the service via Activator.CreateInstance, which matches a
-    // constructor by EXACT argument count (it ignores optional/default parameters). The runtime constructs this with
-    // (world, window), so that 2-arg form needs its OWN constructor - an optional 3rd param would not be found.
+    /// <summary>A constructor of its own: Activator.CreateInstance matches the argument count exactly and ignores
+    /// optional parameters.</summary>
     public WindowRenderService(EntityWorld world, IWindow window) : this(world, window, null)
     {
     }
 
-    // Designer path: a shared render device is injected (see DesignerRenderService) so the whole session reuses one
-    // device instead of creating one per window.
+    /// <summary>Designer path: the whole session shares one injected render device.</summary>
     public WindowRenderService(EntityWorld world, IWindow window, IGraphicsDevice renderDevice)
         : base(world)
     {
@@ -71,23 +66,19 @@ public class WindowRenderService : UiRenderService
         Window.DefaultRenderer = windowRenderer;
         Window.RendererChanged += WindowOnRendererChanged;
 
-        // Tooling overlays (AdornerLayer: selection frames etc.) are a second stage in the processor collection,
-        // drawn on top of the content in the same frame. Same for runtime and the headless designer.
         AttachProcessor(new AdornerRenderProcessor());
-        // The popup stage (tooltips, in-window popups) draws on top of the content AND the adorners (higher Order).
         AttachProcessor(new PopupRenderProcessor());
     }
 
-    // The renderer this service drives. The headless (designer) service overrides this to render into a texture
-    // instead of a swapchain - the only difference is the presenter kind (read-back is identical: ResolveTexture).
+    /// <summary>The renderer this service drives; the headless designer renders into a texture instead of a swapchain.</summary>
     protected virtual IWindowRenderer CreateRenderer() =>
         new ForwardWindowRenderer(GraphicsDevice, new RenderUnitFactory(GraphicsDevice, DependencyResolver.Resolve<IResourceFactory>()));
-    
+
     private void WindowOnRendererChanged(object sender, WindowRendererChangedEventArgs e)
     {
         _pendingRenderer = e.NewRenderer;
     }
-    
+
     public override void Present()
     {
         var t0 = Stopwatch.GetTimestamp();
@@ -97,17 +88,20 @@ public class WindowRenderService : UiRenderService
 
     public override void UnloadContent()
     {
-        // Free the window's GPU resources on close. Wait for the device to be idle first (nothing we free is still in
-        // flight), dispose the renderer (its cache units + swapchain), then - on the runtime path - the per-window render
-        // DEVICE this service created (_injectedDevice == null). Without disposing the device, each window open/close
-        // leaked a whole device (its dynamic buffer pools, descriptor pools, ...) and a few reopens hit
-        // ErrorOutOfDeviceMemory - which also silently stalled rendering everywhere once the GPU ran dry. The designer's
-        // SHARED injected device is owned by the session - never dispose it here.
         GraphicsDevice?.DeviceWaitIdle();
-        windowRenderer?.Dispose();   // frees the per-window swapchain + render-cache units (returns their sub-ranges to the shared allocator)
-        // Release the render device (the shared device-memory allocator + descriptor heap are owned by the MAIN device and
-        // are NOT touched here, so this only frees the device's own small per-device objects). Skip the designer's injected
-        // shared device.
+        // A renderer belongs to one device: left on the window, the next service would build on a dead one after a swap.
+        Window.RendererChanged -= WindowOnRendererChanged;
+        Window.StateChanged -= WindowOnStateChanged;
+        if (ReferenceEquals(Window.Renderer, windowRenderer))
+        {
+            Window.Renderer = null;
+        }
+        if (ReferenceEquals(Window.DefaultRenderer, windowRenderer))
+        {
+            Window.DefaultRenderer = null;
+        }
+        windowRenderer?.Dispose();
+        // The designer's injected device belongs to its session.
         if (_injectedDevice == null && GraphicsDevice != null)
             GraphicsDeviceService.MainGraphicsDevice.RemoveDevice(GraphicsDevice);
     }
@@ -118,28 +112,15 @@ public class WindowRenderService : UiRenderService
     public override void Update(AppTime gameTime)
     {
         Window.Update(_themeManager, gameTime);
-        base.Update(gameTime);   // processors' Update: the adorner stage builds its overlay cache from the fresh layout
+        base.Update(gameTime);
     }
-    
-    // Set by RecordFrame each decoupled frame: true = the packet was recorded at loop level (BeginDraw only APPLIES);
-    // false = record was deferred to the inline path (BeginDraw records + applies) - the resize/state-swap fallback below.
+
     private bool _recordedAtLoopLevel;
 
-    /// <summary>Phase 3.2 Step 2b: the DEVICE-FREE record half, hoisted to loop level (UIApplication.RecordRenderFrame) so
-    /// it runs after the whole Update phase (all layout settled) and before any GPU Draw. No presenter/device needed here;
-    /// the apply half stays in BeginDraw (ApplyData). No-op in the default single-threaded path (record stays inline).</summary>
-    /// <summary>Records this window's packet. Returns FALSE when it could not - the caller must then NOT clear RenderDirty,
-    /// or the marks it never recorded are lost for good.</summary>
+    /// <summary>Records this window's packet on the loop thread. False when it could not: the caller must then keep
+    /// RenderDirty, or the marks it never recorded are lost.</summary>
     public bool RecordFrame()
     {
-        // The renderer is awaiting a presenter resize (and at startup it always is, until the swapchain exists) - there is
-        // nothing coherent to record against yet, so skip this frame; the render thread simply replays what it has.
-        //
-        // Reporting that back MATTERS. The caller used to clear RenderDirty regardless, so everything the layout pass marked
-        // while the renderer was still coming up was wiped WITHOUT ever being recorded - and nothing re-marks a component that
-        // is already clean. That is why the first tab's content, which is built during exactly that startup window, was simply
-        // never drawn: its marks were thrown away before the first real record. Later tabs are built once the renderer is up,
-        // so they were fine, which is what made it look like a tab bug rather than a lost-invalidation bug.
         if (windowRenderer is not { IsRendererUpToDate: true })
         {
             _recordedAtLoopLevel = false;
@@ -152,39 +133,16 @@ public class WindowRenderService : UiRenderService
 
     public override bool BeginDraw()
     {
-        // The service may have been unloaded (its window closed, or the app is shutting down) yet linger in the draw list
-        // for a frame until its removal propagates - renderer and presenter are already gone. Skip the frame instead of
-        // dereferencing a null presenter below (an NRE the render thread would swallow and log on every teardown).
+        // Unloaded, but still in the draw list until its removal propagates.
         if (windowRenderer?.Presenter == null) return false;
 
-        // Refresh the analytic-AA switch from this window before recording (PreRender reads it in the beforeRenderPass
-        // hook). Windows render serially, so this app-global flag is correct per window.
+        // App-global, but windows render one after another.
         Rendering.RenderUnits.AnalyticAa.Enabled = Window?.AnalyticAntialiasing ?? true;
-        // Backdrop = the window's Background (theme-owned), read each frame so a theme swap / runtime change reflects it.
         GraphicsDevice.ClearColor = (Window?.Background as SolidColorBrush)?.Color ?? Colors.Black;
-        // A resize is pending (the loop thread cleared IsRendererUpToDate on a size/DPI/MSAA change): recreate the presenter
-        // NOW, before this frame draws, so the render thread never records/submits/presents against the STALE swapchain.
-        // ResizePresenter waits for device idle and runs on THIS (render) thread, so it is serialized with our own
-        // Submit/Present - it used to run only in FrameEnded, AFTER the frame had already been drawn against the old one.
-        // Recreate on a pending size change (IsRendererUpToDate cleared by WM_SIZE) OR when the swapchain has gone
-        // OutOfDate. The latter is the SELF-HEAL: a resize can leave the swapchain OutOfDate with no further WM_SIZE to
-        // trigger a rebuild (the drag already ended), so acquire keeps failing and - now that present is correctly gated
-        // on a real acquire+submit - the picture freezes. Rebuilding whenever the presenter reports OutOfDate makes the
-        // swapchain recover deterministically instead of "works most of the time".
-        // Suboptimal counts as much as OutOfDate. Once the swapchain declares what it does when its images no longer
-        // match the window, presenting a stale one stops being an ERROR and becomes merely SUBOPTIMAL - so the driver
-        // says suboptimal where it used to say out-of-date, and a rebuild driven only by the latter silently stopped
-        // happening mid-drag. It cannot loop: the surface dictates the extent, so one rebuild makes them agree and the
-        // driver stops saying it.
-        // Asked ONCE a frame: it is a surface query, and both the rebuild below and the loop's pacing want the answer.
         var trailing = windowRenderer.Presenter?.NeedsRebuild ?? false;
 
-        // A swapchain that trails its window IS work owed, and the loop had no way to know it. It sleeps unless
-        // something is dirty or animating - and dragging a window dirties NOTHING: the tree is unchanged, only the
-        // window is a different size. So the only thing waking the loop was the size change itself, one frame per
-        // WM_SIZE (measured: 70 of 88 intervals were exactly one frame, against 178 000 frames on a still window).
-        // Asked for through the same pipe as layout and bindings. ASSIGNED unconditionally rather than only when set,
-        // or it would latch on the first drag and the loop would never be paced again.
+        // Resizing dirties nothing in the tree, so a trailing swapchain must wake the loop itself. Assigned every frame,
+        // or it would latch.
         UIApplication.SwapchainTrailing = trailing;
 
         if (trailing)
@@ -192,6 +150,8 @@ public class WindowRenderService : UiRenderService
             Core.LoopSignal.Request();
         }
 
+        // Rebuilt here, on this thread, so nothing is submitted against a stale swapchain. Suboptimal counts too: that is
+        // how the driver reports a stale image once the swapchain says what it does on a mismatch.
         if (windowRenderer.Presenter != null &&
             (!windowRenderer.IsRendererUpToDate
              || windowRenderer.Presenter.LastPresenterState is PresenterState.OutOfDate or PresenterState.Suboptimal
@@ -204,42 +164,22 @@ public class WindowRenderService : UiRenderService
         GraphicsDevice.SetDepthBuffer(windowRenderer.Presenter.DepthBuffer);
         GraphicsDevice.MSAALevel = windowRenderer.Presenter.MSAALevel;
         GraphicsDevice.Presenter = windowRenderer.Presenter;
-        // Record shared-surface latch copies BEFORE BeginRendering so this frame's compositing samples the freshly
-        // latched private textures (zero latency), and the copies aren't recorded inside the render pass.
         var beginStart = Stopwatch.GetTimestamp();
         try
         {
             return GraphicsDevice.BeginDraw(beforeRenderPass: _ =>
             {
-                // Build the content render cache HERE - inside beforeRenderPass, which runs after BeginDraw's fence wait
-                // (the GPU is done with this slot, so buffer updates/frees can't race it) and after this frame's layout
-                // Update, but BEFORE PreRender and the render pass. So the cache the renderer draws this frame reflects
-                // THIS frame's visual tree. It used to be built in EndDraw - one frame AFTER it was drawn - so a container
-                // realized/collapsed this frame lagged the draw by a frame: an item entering the window had no unit yet (a
-                // one-frame hole) and one leaving still had a stale unit (a one-frame ghost overlapping with a foreign item).
-                // Default path records + applies inline here. The decoupled path applies the loop-level packet - UNLESS this
-                // window deferred to inline this frame (the resize/state-swap fallback in RecordFrame), in which case it records
-                // + applies inline here too.
-                //
-                // The RECORD may only ever run on the LOOP thread. BeginDraw runs on the render thread once one exists, and there
-                // the inline fallback would read the live visual tree AND race the loop's own record on the same cache: two
-                // threads inside RecordFrame, one nulling the packet it just published while the other still writes to it
-                // (a NullReferenceException in CaptureSnapshot - thrown INSIDE GraphicsDevice.BeginDraw's beforeRenderPass, which
-                // left the command buffer open and hung the device on the next frame's fence). The render thread therefore only
-                // ever APPLIES: with no packet published yet it simply finds an empty queue, classifies the frame Clean and
-                // replays - and the loop, which is the thread that defers to inline, still records inline on its own frames
-                // (the swap barrier parks the render thread first, so those never overlap).
+                // After the fence wait and before the pass, so this frame draws this frame's tree. Only the loop thread
+                // records: the render thread would race the loop's own record on the same cache.
                 var onRenderThread = Thread.CurrentThread == RenderThreadOptions.RenderThread;
                 if (RenderThreadOptions.SingleThreaded || (!_recordedAtLoopLevel && !onRenderThread)) windowRenderer.PrepareData();
                 else windowRenderer.ApplyData();
                 windowRenderer.PreRender();
-                PreRenderProcessors();   // adorner stage compute (stroke expander) before the render pass
+                PreRenderProcessors();
             });
         }
         finally
         {
-            // Includes the fence wait for this slot AND the record/apply/prerender done in beforeRenderPass - those are
-            // timed on their own, so the WAIT is what is left when they are taken off this number.
             RuntimeStats.LastBeginDrawMs = Stopwatch.GetElapsedTime(beginStart).TotalMilliseconds;
         }
     }
@@ -251,9 +191,9 @@ public class WindowRenderService : UiRenderService
             pauseEvent.WaitOne();
         }
 
-        windowRenderer?.Render(gameTime);   // content first
+        windowRenderer?.Render(gameTime);
         var t0 = Stopwatch.GetTimestamp();
-        DrawProcessors(gameTime);           // then processors (adorner overlays) on top, same frame
+        DrawProcessors(gameTime);
         RuntimeStats.LastProcessorsMs = Stopwatch.GetElapsedTime(t0).TotalMilliseconds;
     }
 
@@ -261,10 +201,7 @@ public class WindowRenderService : UiRenderService
     {
         var t0 = Stopwatch.GetTimestamp();
         GraphicsDevice.EndDraw();
-        // The content cache is built in BeginDraw (beforeRenderPass) now, not here: it must reflect the frame BEFORE
-        // that frame is drawn, not one frame late. EndDraw only finalizes and blits the rendered frame to the swapchain.
-        // No image, no blit: EndDraw acquires it now (see GraphicsDevice.EndDraw), and a failed acquire means there is
-        // nothing to copy into and nothing to present.
+        // A failed acquire leaves nothing to copy into and nothing to present.
         if (GraphicsDevice.HasSwapchainImage)
         {
             GraphicsDevice.BlitImage(GraphicsDevice.CurrentCommandBuffer,
@@ -291,41 +228,29 @@ public class WindowRenderService : UiRenderService
         _pendingRenderer = null;
     }
 
-    // --- Headless one-shot rendering (designer) -------------------------------------------------------------------
-    // Same shape as the runtime loop: BeginDraw builds the content cache (in beforeRenderPass, after the fence wait)
-    // and PreRenders it, then Render draws it. The headless one-shot additionally waits for GPU idle afterwards (so the
-    // result texture is safe to read back and frees can't race the GPU). It uses the SAME renderer + processors as the
-    // loop and does NOT call the loop's EndDraw (no swapchain blit). Window.Update is the caller's responsibility.
+    /// <summary>Designer one-shot frame: the loop's renderer and processors, then a wait for GPU idle so the result can
+    /// be read back. Window.Update is the caller's.</summary>
     public bool RenderHeadlessFrame(IWindow window, double renderScale, AppTime time)
     {
-        // Bind/resize to the requested window + scale, reusing device + presenter (resize, not recreate). Needed only
-        // when the window or scale actually changed - a live reconcile keeps the same window + scale, so it's skipped.
         if (!ReferenceEquals(Window, window) || System.Math.Abs(windowRenderer.RenderScale - renderScale) > 1e-9)
         {
             windowRenderer.RenderScale = renderScale;
             RebindWindow(window);
         }
 
-        UpdateProcessors(time);          // adorner stage builds its overlay cache from the current layout
+        UpdateProcessors(time);
 
-        // shared setup + beforeRenderPass: builds the content cache (PrepareData) and PreRenders it, then the
-        // processors - same as the runtime path. Throw (not a bare false) with the device's real reason so the
-        // designer reports it instead of an opaque "render failed".
         if (!BeginDraw())
             throw new System.InvalidOperationException(
                 $"GraphicsDevice.BeginDraw failed: {GraphicsDevice.LastFrameError ?? "unknown device error"}");
-        windowRenderer.Render(time);      // content
-        DrawProcessors(time);              // adorner overlays on top
+        windowRenderer.Render(time);
+        DrawProcessors(time);
 
-        GraphicsDevice.EndDraw();          // not this.EndDraw(): no next-frame rebuild, no swapchain blit
+        GraphicsDevice.EndDraw();          // not this.EndDraw(): no swapchain blit
         GraphicsDevice.Submit();
-        GraphicsDevice.DeviceWaitIdle();   // frame finished -> the resolve texture is safe to read back
+        GraphicsDevice.DeviceWaitIdle();
 
-        // Complete the frame the way the runtime loop does. The headless designer does NOT run the app loop that
-        // normally raises FrameFinished, and WITHOUT it the per-frame dynamic buffer pools are never Reset() - every
-        // frame's draws keep allocating fresh 2 MB GPU pages, so a streamed/zoomed preview leaks VRAM until the device
-        // runs out (the "dies after a few zooms" regression). Raise it here, then advance the frame slot (cycling the
-        // deferred-dispose queues), exactly like the on-screen path. Safe now: the GPU is idle.
+        // The designer runs no app loop, and without this the per-frame buffer pools are never reset and leak VRAM.
         GraphicsDevice.MainDevice.OnFrameFinished();
         GraphicsDevice.FrameEnded();
         return true;
@@ -334,9 +259,7 @@ public class WindowRenderService : UiRenderService
     /// <summary>Drops the renderer's cached units; the designer calls this on a full (non-reconcile) rebuild.</summary>
     public void ResetFrameCache() => windowRenderer.ResetCache();
 
-    /// <summary>Designer: switch the previewed window WITHOUT recreating the device/renderer/presenter - the renderer
-    /// re-points and resizes its presenter to the new window (see <see cref="IWindowRenderer.Retarget"/>), and the
-    /// adorner processor follows because it reads this service's Window. The runtime never calls this (it binds once).</summary>
+    /// <summary>Designer: previews another window on the same device, renderer and presenter.</summary>
     public void RebindWindow(IWindow window)
     {
         Window = window;
