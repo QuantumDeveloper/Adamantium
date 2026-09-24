@@ -1,15 +1,13 @@
+using System.Collections.Generic;
+using System.Runtime.InteropServices;
 using Adamantium.UI.Controls.Base;
 using Adamantium.UI.Core;
 
 namespace Adamantium.UI.Controls;
 
 /// <summary>
-/// Parks a subtree and brings it back. What <c>x:KeepAlive</c> asks for and what an <c>x:Load</c> slot does between
-/// conditions: the element leaves the tree but is NOT gone - it waits by reference, keeping what was built for it.
-/// <para>The subtree is marked BEFORE its owner lets go of it, because detachment is what the renderer watches: an
-/// unmarked detach means "thrown away" and its cached units are freed on the next build, which is exactly the cost
-/// parking exists to avoid. Whoever parks it still does the removing - a panel removes a child, a ContentControl clears
-/// its Content - this only states what that removal MEANS.</para>
+/// Parks a subtree and brings it back: it leaves the tree but waits by reference, keeping what was built for it. Marked
+/// before its owner removes it, or the renderer reads the detach as "thrown away" and frees its units.
 /// </summary>
 public static class ParkedSubtree
 {
@@ -21,24 +19,42 @@ public static class ParkedSubtree
         (root as UIComponent)?.SuspendForPark();
     }
 
-    /// <summary>The reverse, called AFTER the subtree is back in the tree: clear the mark and measure it once - it was out
-    /// of the layout while parked, and whatever changed in the meantime has to reach it.
-    /// <para>Nothing is marked render-dirty here on purpose. Re-attaching already invalidates the subtree's render
-    /// (UIComponent.AttachedToVisualTree), and doing it again per node told the renderer to re-record every one of them -
-    /// throwing away the units parking had just kept, which is the opposite of the point.</para></summary>
+    /// <summary>The reverse, after the subtree is back in the tree: clears the mark and remeasures. Nothing is marked
+    /// render-dirty: that would re-record the units parking kept.</summary>
     public static void Unpark(IUIComponent root, bool remeasure = true)
     {
         Mark(root, false);
 
-        // Only when the container it comes back into is a different size than the one it left. Measuring a page of a
-        // thousand realized rows is the whole remaining cost of a return, and repeating it to arrive at the layout the
-        // view already has buys nothing - it kept that layout, which is why it was parked whole.
         if (remeasure) (root as IMeasurableComponent)?.InvalidateMeasure();
     }
 
     /// <summary>Drops the parked mark BEFORE the subtree is attached, so the attach takes its ordinary path: everything a
     /// node revalidates on the way in is done, because the world it comes back to is not the one it left.</summary>
     public static void Revalidate(IUIComponent root) => Mark(root, false);
+
+    /// <summary>Ends the park for good: nothing will come back for <paramref name="root"/>, so it is discarded like any
+    /// destroyed subtree. A parked element refuses a discard on its own, so the mark is dropped first.</summary>
+    public static void Discard(IUIComponent root)
+    {
+        Mark(root, false);
+
+        var gone = new List<IFundamentalUIComponent>();
+        Collect(root, gone);
+        DiscardedVisuals.Publish(CollectionsMarshal.AsSpan(gone));
+    }
+
+    private static void Collect(IUIComponent node, List<IFundamentalUIComponent> gone)
+    {
+        if (node is IFundamentalUIComponent fundamental)
+        {
+            gone.Add(fundamental);
+        }
+
+        foreach (var child in node.VisualChildren)
+        {
+            Collect(child, gone);
+        }
+    }
 
     private static void Mark(IUIComponent node, bool parked)
     {

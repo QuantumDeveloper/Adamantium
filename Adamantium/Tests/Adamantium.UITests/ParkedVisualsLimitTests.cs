@@ -35,6 +35,17 @@ public class ParkedVisualsLimitTests
     }
 
     [Test]
+    public void Enabled_LetGo_IsDiscarded()
+    {
+        ParkedVisuals.Limit = 1;
+        var oldest = new ParkedView { Mode = NavigationCacheMode.Enabled };
+        ParkedVisuals.Keep(Owner, new object(), oldest);
+        ParkedVisuals.Keep(Owner, new object(), new ParkedView { Mode = NavigationCacheMode.Enabled });
+
+        Assert.That(oldest.IsDiscarded, Is.True, "a view let go will never come back - its subscriptions must go too");
+    }
+
+    [Test]
     public void Required_IsNeverEvicted_HoweverManyArrive()
     {
         ParkedVisuals.Limit = 1;
@@ -57,9 +68,7 @@ public class ParkedVisualsLimitTests
         Assert.That(held[3] && held[4], Is.True, "the newest survive");
     }
 
-    // One owner for the whole set: the store is keyed by WHO parked a visual as well as by what it was parked for (a
-    // view model is shown by more than one presenter - see ParkedVisuals), and these tests are about the limit, which is
-    // a property of the store as a whole.
+    // One owner for the whole set: the limit is a property of the store as a whole.
     private static readonly object Owner = new();
 
     private static object[] Park(int count, NavigationCacheMode mode)
