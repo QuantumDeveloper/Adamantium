@@ -57,7 +57,7 @@ public class PointLightTool : LightToolBase
 
             toolIntersectionResult = Tool.Intersects(
                 camera,
-                inputManager.VirtualPosition,
+                inputManager.RelativePosition,
                 collisionMode,
                 CompareOrder.Less,
                 0.05f);
@@ -74,7 +74,7 @@ public class PointLightTool : LightToolBase
 
             if (IsLocked)
             {
-                startPosition = inputManager.VirtualPosition;
+                startPosition = inputManager.RelativePosition;
                 HighlightSelectedTool(true);
             }
             else
@@ -98,7 +98,7 @@ public class PointLightTool : LightToolBase
 
     private void ScalePointLight(Entity lightToTransform, InputWormhole input, Vector3F rayPlaneInterPoint)
     {
-        var res = input.VirtualPosition / startPosition;
+        var res = input.RelativePosition / startPosition;
             
         if (!float.IsInfinity(_scale.X) && !float.IsInfinity(_scale.Y) && !float.IsInfinity(_scale.Z))
         {

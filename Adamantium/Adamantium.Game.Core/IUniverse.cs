@@ -3,7 +3,6 @@ using Adamantium.Core.DependencyInjection;
 using Adamantium.ECS;
 using Adamantium.Graphics;
 using Adamantium.Graphics.Core;
-using Adamantium.UI.Core;
 
 namespace Adamantium.Game.Core
 {

@@ -25,6 +25,15 @@ namespace Adamantium.Game.Core
         // so screen-to-client answered in the wrong space and every pick missed by the height of the chrome above it.
         // Through the UI's own conversion, because it divides by the DPI scale at the root and then walks the offsets
         // down in the SAME logical space - subtracting the surface origin by hand was right only at 100%.
+        public override Vector2F PointerScreenPosition
+        {
+            get
+            {
+                var point = MouseDevice.CurrentDevice.GetScreenPosition();
+                return new Vector2F((float)point.X, (float)point.Y);
+            }
+        }
+
         public override Vector2F PointToSurface(Vector2F absolute)
         {
             var point = UIExtensions.PointToClient(InputComponent, new PixelPoint((int)absolute.X, (int)absolute.Y));

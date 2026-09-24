@@ -6,7 +6,6 @@ using Adamantium.Graphics.Core;
 using Adamantium.Graphics.Core.Presentation;
 using Adamantium.Imaging;
 using Adamantium.UI.Controls.Panels;
-using Adamantium.UI.Core;
 using Adamantium.UI.Core.RoutedEvents;
 using Rectangle = Adamantium.Mathematics.Rectangle;
 
@@ -167,7 +166,7 @@ public class RenderTargetUniverseOutput : UIUniverseOutput
 
     internal override bool CanHandle(OutputContext gameContext)
     {
-        return gameContext.ContextType == OutputContextType.RenderTargetPanel && nativeWindow != null;
+        return gameContext.Context is RenderTargetPanel && nativeWindow != null;
     }
 
     internal override void SwitchContext(OutputContext context)

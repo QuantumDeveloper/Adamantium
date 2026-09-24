@@ -8,7 +8,6 @@ using Adamantium.Graphics.Core.Extensions;
 using Adamantium.Graphics.Core.Presentation;
 using Adamantium.Imaging;
 using Adamantium.Mathematics;
-using Adamantium.UI.Controls;
 using Adamantium.Vulkan.Core;
 using Rectangle = Adamantium.Mathematics.Rectangle;
 
@@ -173,41 +172,6 @@ namespace Adamantium.Game.Core
 
         public virtual void Close()
         {
-        }
-
-        public static UniverseOutput New(IEventAggregator eventAggregator, OutputContext gameContext)
-        {
-            if (gameContext.ContextType == OutputContextType.RenderTargetPanel)
-            {
-                return new RenderTargetUniverseOutput(eventAggregator, gameContext);
-            }
-            else if (gameContext.ContextType == OutputContextType.Window)
-            {
-                return new WindowUniverseOutput(eventAggregator, gameContext);
-            }
-            throw new NotSupportedException(gameContext.ContextType + " game context is not currently supported");
-        }
-
-        public static UniverseOutput NewWindow(IEventAggregator eventAggregator, uint width, uint height)
-        {
-            var wnd = new Window();
-            wnd.Width = width;
-            wnd.Height = height;
-            return new WindowUniverseOutput(eventAggregator, new OutputContext(wnd));
-        }
-
-        internal static UniverseOutput New(
-            IEventAggregator eventAggregator,
-            OutputContext gameContext, 
-            SurfaceFormat pixelFormat, 
-            DepthFormat depthFormat = DepthFormat.Depth32Stencil8X24, 
-            MSAALevel msaaLevel = MSAALevel.X4)
-        {
-            if (gameContext.ContextType == OutputContextType.RenderTargetPanel)
-            {
-                return new RenderTargetUniverseOutput(eventAggregator, gameContext, pixelFormat, depthFormat, msaaLevel);
-            }
-            throw new NotSupportedException(gameContext.ContextType + " game context is not currently supported");
         }
 
         public virtual async Task TakeScreenshotAsync(string path, ImageFileType fileType)
@@ -424,6 +388,11 @@ namespace Adamantium.Game.Core
                 }
             }
         }
+
+        /// <summary>
+        /// Where the pointer is on the screen, in the coordinates <see cref="PointToSurface"/> converts from.
+        /// </summary>
+        public abstract Vector2F PointerScreenPosition { get; }
 
         /// <summary>
         /// Converts a point in screen coordinates into the coordinates of the surface this output draws on.

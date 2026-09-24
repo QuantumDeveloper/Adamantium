@@ -1,5 +1,4 @@
 using Adamantium.Mathematics;
-using Adamantium.XInput;
 
 namespace Adamantium.Game.Core.Input;
 
@@ -36,11 +35,10 @@ public class GamepadHub
         GamepadButton.DpadDown
     ];
 
-    private XBoxGamepadFactory gamepadFactory;
     private Gamepad[] gamepads;
     private GamepadState[] gamepadStates;
 
-    public GamepadHub()
+    public GamepadHub(IGamepadFactory gamepadFactory)
     {
         downGamepadButtons = new HashSet<GamepadButton>[MaxGamepadsCount];
         pressedGamepadButtons = new HashSet<GamepadButton>[MaxGamepadsCount];
@@ -55,7 +53,6 @@ public class GamepadHub
             currentGamepadButtons[i] = [];
         }
 
-        gamepadFactory = new XBoxGamepadFactory();
         gamepads = gamepadFactory.GetConnectedGamepads();
         gamepadStates = new GamepadState[MaxGamepadsCount];
     }

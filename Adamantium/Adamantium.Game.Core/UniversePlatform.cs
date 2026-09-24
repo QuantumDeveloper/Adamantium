@@ -1,44 +1,51 @@
 ﻿using Adamantium.Core;
 using Adamantium.Core.Collections;
-using Adamantium.Core.DependencyInjection;
 using Adamantium.Core.Events;
 using Adamantium.Game.Core.Events;
 using Adamantium.Game.Core.Input;
 using Adamantium.Game.Core.Payloads;
 using Adamantium.Graphics.Core;
 using Adamantium.Imaging;
-using Adamantium.UI.Controls.Panels;
-using Adamantium.UI.Core;
 using Serilog;
 
 namespace Adamantium.Game.Core
 {
     /// <summary>
-    /// Abstract class for different game platforms
+    /// Keeps the universe's outputs and their input. The surfaces, the windows and the message loop come from the host,
+    /// through <see cref="IOutputFactory"/> and <see cref="IWindowingPlatform"/>.
     /// </summary>
-    public abstract class UniversePlatform : IUniversePlatform, IDisposable
+    public class UniversePlatform : IUniversePlatform, IDisposable
     {
         private List<UniverseOutput> windowsToAdd;
         private List<UniverseOutput> windowsToRemove;
         private readonly IEventAggregator _eventAggregator;
+        private readonly IOutputFactory outputFactory;
+        private readonly IWindowingPlatform windowingPlatform;
         private Dictionary<OutputContext, UniverseOutput> contextToWindow;
 
         private bool graphicsDeviceChanged;
-        
+
         internal static int WindowId = 1;
 
         private AdamantiumCollection<UniverseOutput> outputs;
 
         private Dictionary<UniverseOutput, UniverseOutputParametersPayload> _changedOutputs;
 
-        private readonly GamepadHub gamepads = new GamepadHub();
+        private readonly GamepadHub gamepads;
 
         private object syncObject = new object();
 
         /// <summary>
-        /// 
+        ///
         /// </summary>
-        public abstract string DefaultAppDirectory { get; }
+        public string DefaultAppDirectory
+        {
+            get
+            {
+                var assemblyUri = new Uri(Universe.GetType().Assembly.CodeBase);
+                return Path.GetDirectoryName(assemblyUri.LocalPath);
+            }
+        }
 
         /// <summary>
         /// Main <see cref="UniverseOutput"/>
@@ -60,12 +67,15 @@ namespace Adamantium.Game.Core
         /// Constructs <see cref="UniversePlatform"/> from <see cref="IUniverse"/> instance
         /// </summary>
         /// <param name="universe"></param>
-        protected UniversePlatform(IUniverse universe)
+        public UniversePlatform(IUniverse universe)
         {
             Universe = universe;
             universe.Initialized += Initialized;
 
             _eventAggregator = universe.Container.Resolve<IEventAggregator>();
+            outputFactory = universe.Container.Resolve<IOutputFactory>();
+            windowingPlatform = universe.Container.Resolve<IWindowingPlatform>();
+            gamepads = new GamepadHub(universe.Container.Resolve<IGamepadFactory>());
             _eventAggregator.GetEvent<UniverseOutputChangesRequestedEvent>()
                 .Subscribe(OnUniverseOutputChangesRequested);
 
@@ -96,24 +106,6 @@ namespace Adamantium.Game.Core
         }
 
         /// <summary>
-        /// Creates <see cref="UniversePlatform"/> from <see cref="IUniverse"/>
-        /// </summary>
-        /// <param name="universe">instance of <see cref="IUniverse"/></param>
-        /// <param name="resolver">instance of <see cref="IDependencyResolver"/></param>
-        /// <returns>new <see cref="UniversePlatform"/> instance</returns>
-        public static UniversePlatform Create(IUniverse universe, IDependencyResolver resolver)
-        {
-            switch (Configuration.Platform)
-            {
-                case Platform.Windows:
-                    return new UniversePlatformWindows(universe, resolver);
-                case Platform.OSX:
-                    default:
-                    throw new NotImplementedException("Current UniversePlatform is not implemented yet");
-            }
-        }
-
-        /// <summary>
         /// Switches drawing context from old control to new control. After this old control could be safely removed
         /// </summary>
         /// <param name="oldContext">Old control for drawing</param>
@@ -125,19 +117,6 @@ namespace Adamantium.Game.Core
                 wnd.SwitchContext(newContext);
                 contextToWindow[newContext] = wnd;
             }
-        }
-
-        internal static OutputContextType GetContextType(object context)
-        {
-            if (context is IWindow)
-            {
-                return OutputContextType.Window;
-            }
-            if (context is RenderTargetPanel)
-            {
-                return OutputContextType.RenderTargetPanel;
-            }
-            throw new NotSupportedException("this context type currently is not supported");
         }
 
         private void AddWindowsInternal()
@@ -288,10 +267,14 @@ namespace Adamantium.Game.Core
             }
         }
 
-        public abstract void Run(CancellationToken token);
+        public void Run(CancellationToken token)
+        {
+            windowingPlatform.Run(token);
+        }
+
         public UniverseOutput CreateOutput(uint width = 1280, uint height = 720)
         {
-            var wnd = UniverseOutput.NewWindow(_eventAggregator, width, height);
+            var wnd = windowingPlatform.CreateWindow(width, height);
             windowsToAdd.Add(wnd);
             return wnd;
         }
@@ -308,7 +291,7 @@ namespace Adamantium.Game.Core
                 return null;
             }
 
-            var wnd = UniverseOutput.New(_eventAggregator, context);
+            var wnd = outputFactory.Create(context);
             contextToWindow.Add(context, wnd);
             windowsToAdd.Add(wnd);
             return wnd;
@@ -341,7 +324,7 @@ namespace Adamantium.Game.Core
             var gameContext = new OutputContext(context);
             if (!contextToWindow.ContainsKey(gameContext))
             {
-                var wnd = UniverseOutput.New(_eventAggregator, gameContext, surfaceFormat, depthFormat, msaaLevel);
+                var wnd = outputFactory.Create(gameContext, surfaceFormat, depthFormat, msaaLevel);
                 contextToWindow.Add(gameContext, wnd);
                 windowsToAdd.Add(wnd);
                 return wnd;

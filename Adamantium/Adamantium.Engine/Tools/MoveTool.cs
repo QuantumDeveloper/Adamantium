@@ -70,7 +70,7 @@ public class MoveTool: ToolBase
 
             toolIntersectionResult = Tool.Intersects(
                 camera,
-                inputManager.VirtualPosition,
+                inputManager.RelativePosition,
                 collisionMode,
                 CompareOrder.Less, 
                 0.05f);

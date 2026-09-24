@@ -1,6 +1,6 @@
 ﻿namespace Adamantium.Game.Core.Input
 {
-    internal interface IGamepadFactory
+    public interface IGamepadFactory
     {
         Gamepad GetGamepad(int index);
 

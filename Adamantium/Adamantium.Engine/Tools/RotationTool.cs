@@ -102,7 +102,7 @@ public class RotationTool: ToolBase
     private void TransformEntityByRotationTool(Entity targetEntity, Camera camera, InputWormhole inputManager)
     {
         Vector3F start = lastCoordinates;
-        Vector3F end = new Vector3F(inputManager.VirtualPosition);
+        Vector3F end = new Vector3F(inputManager.RelativePosition);
         float radians = MathHelper.AngleBetween2D(Vector3F.Normalize(start), Vector3F.Normalize(end));
         radians /= coefficient;
 
@@ -189,7 +189,7 @@ public class RotationTool: ToolBase
                 targetEntity.Transform.Rotate(Vector3F.Up, radians);
             }
         }
-        lastCoordinates = new Vector3F(inputManager.VirtualPosition);
+        lastCoordinates = new Vector3F(inputManager.RelativePosition);
     }
 
     private void TransformRotationTool(Entity current, Camera camera)

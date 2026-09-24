@@ -31,7 +31,7 @@ namespace Adamantium.Game.Core
 
         internal override bool CanHandle(OutputContext gameContext)
         {
-            return gameContext.ContextType == OutputContextType.Window && window != null;
+            return gameContext.Context is IWindow && window != null;
         }
 
         protected override void InitializeInternal(OutputContext context)

@@ -1,5 +1,4 @@
 ﻿using Adamantium.Mathematics;
-using Adamantium.XInput;
 
 namespace Adamantium.Game.Core.Input
 {

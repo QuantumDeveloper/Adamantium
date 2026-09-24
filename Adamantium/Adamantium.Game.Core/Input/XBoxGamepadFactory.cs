@@ -2,7 +2,7 @@
 
 namespace Adamantium.Game.Core.Input
 {
-    internal class XBoxGamepadFactory : IGamepadFactory
+    public class XBoxGamepadFactory : IGamepadFactory
     {
         private static Gamepad[] Gamepads;
         private static XBoxController[] Controllers;

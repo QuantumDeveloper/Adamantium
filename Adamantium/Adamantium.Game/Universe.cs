@@ -15,7 +15,6 @@ using Adamantium.Graphics.Core.Content;
 using Adamantium.Graphics.Core.Models;
 using Adamantium.Imaging;
 using Adamantium.Mathematics;
-using Adamantium.UI.Core;
 using Adamantium.UI.Services;
 using Serilog;
 
@@ -97,7 +96,7 @@ public class Universe : PropertyChangedBase, IUniverse
             GraphicsDeviceService = graphicsDeviceService;
         }
             
-        gamePlatform = UniversePlatform.Create(this, Container);
+        gamePlatform = new UniversePlatform(this);
         EntityWorld = new EntityWorld(Container);
             
         Container.RegisterInstance<ModelConverter>(ModelConverter);
@@ -331,8 +330,9 @@ public class Universe : PropertyChangedBase, IUniverse
         if (!contextsMapping.ContainsKey(context))
         {
             var gameContext = new OutputContext(context);
+            var output = gamePlatform.CreateOutput(gameContext);
             contextsMapping.Add(context, gameContext);
-            return gamePlatform.CreateOutput(gameContext);
+            return output;
         }
         throw new ArgumentException("There are already game window created on the current context");
     }

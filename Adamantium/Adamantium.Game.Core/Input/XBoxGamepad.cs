@@ -17,7 +17,7 @@ namespace Adamantium.Game.Core.Input
             state = new GamepadState();
             state.IsConnected = _controller.IsConnected;
             var currentState = _controller.GetState();
-            state.Buttons = currentState.Gamepad.Buttons;
+            state.Buttons = (GamepadButton)(ushort)currentState.Gamepad.Buttons;
             state.LeftThumb.X = currentState.Gamepad.LeftThumbX;
             state.LeftThumb.Y = currentState.Gamepad.LeftThumbY;
             state.RightThumb.X = currentState.Gamepad.RightThumbX;

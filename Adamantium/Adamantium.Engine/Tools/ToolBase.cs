@@ -120,7 +120,7 @@ public abstract class ToolBase
     protected bool GetRayPlaneIntersectionPoint(Camera camera, InputWormhole inputManager, out Vector3 intersectionPoint)
     {
         var p = new Plane(toolIntersectionResult.IntersectionPoint, camera.Forward);
-        var ray = Collisions.CalculateRay(inputManager.VirtualPosition, camera, Matrix4x4F.Identity);
+        var ray = Collisions.CalculateRay(inputManager.RelativePosition, camera, Matrix4x4F.Identity);
         var intersects = ray.Intersects(ref p, out Vector3F interPoint);
         intersectionPoint = (Vector3)interPoint;
         if (previousCoordinates == intersectionPoint)

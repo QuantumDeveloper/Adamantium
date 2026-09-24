@@ -1,9 +1,7 @@
-﻿using Adamantium.Engine.Services;
-using Adamantium.Engine.Templates.Tools;
+﻿using Adamantium.Engine.Templates.Tools;
 using Adamantium.ECS;
 using Adamantium.ECS.Components;
 using Adamantium.ECS.Components.Extensions;
-using Adamantium.Game.Core;
 using Adamantium.Game.Core.Input;
 using Adamantium.Mathematics;
 
@@ -84,7 +82,7 @@ public class ScaleTool : ToolBase
             PositionManipulators(targetEntity);
             UpdateScaleAndPosition(targetEntity);
 
-            toolIntersectionResult = Tool.Intersects(camera, inputManager.VirtualPosition, collisionMode, CompareOrder.Less, 0);
+            toolIntersectionResult = Tool.Intersects(camera, inputManager.RelativePosition, collisionMode, CompareOrder.Less, 0);
 
             if (toolIntersectionResult.Intersects)
             {

@@ -1,7 +1,5 @@
 using Adamantium.Core;
 using Adamantium.Mathematics;
-using Adamantium.Win32;
-using Adamantium.XInput;
 
 namespace Adamantium.Game.Core.Input;
 
@@ -20,16 +18,7 @@ public class InputWormhole
     private readonly GamepadHub gamepads;
 
     private Vector2F absolutePosition;
-    private Vector2F absolutePositionPrevious;
-    private Vector2F virtualPosition;
-    private Vector2F mouseDelta;
-    private Vector2F acceleratedMouseDelta;
-    private Vector2F lockMousePosition;
-    private bool isLockedToCenter;
     private bool isPointerHeld;
-    private OutputCursor currentCursor;
-    private int virtualPositionMultiplierX = 0;
-    private int virtualPositionMultiplierY = 0;
     private Vector2F rawMouseDelta;
     private int mouseWheelDelta;
 
@@ -38,8 +27,6 @@ public class InputWormhole
         this.output = output;
         this.gamepads = gamepads;
     }
-
-    protected Rectangle Bounds => output.ClientBounds;
 
     internal void OnKeyboardInput(KeyboardInput e)
     {
@@ -57,20 +44,9 @@ public class InputWormhole
         }
     }
 
-    public KeyboardInput[] GetKeyboardInputs()
-    {
-        return KeyboadInputs.ToArray();
-    }
-
     internal List<KeyboardInput> KeyboadInputs { get; } = [];
 
     internal List<MouseInput> MouseInputs { get; } = [];
-
-    public bool HasKeyboard { get; internal set; }
-
-    public bool HasMouse { get; internal set; }
-
-    public bool HasGamePad { get; internal set; }
 
     /// <summary>
     /// Whether the output takes the keyboard. Keys are still tracked while it is off, so none sticks when it comes back.
@@ -92,12 +68,6 @@ public class InputWormhole
     public bool CanLocatePointer => output.IsVisible;
 
     public Vector2F RawMouseDelta => IsMouseEnabled ? rawMouseDelta : Vector2F.Zero;
-
-    public Vector2F AcceleratedMouseDelta
-    {
-        get { return acceleratedMouseDelta; }
-        private set { acceleratedMouseDelta = value; }
-    }
 
     public bool IsKeyDown(Keys key)
     {
@@ -150,28 +120,6 @@ public class InputWormhole
 
     public Vector2F RelativePosition => output.PointToSurface(absolutePosition);
 
-    public Vector2F VirtualPosition
-    {
-        get
-        {
-            if (IsMouseButtonDown(MouseButton.Left) && IsLockedToWindowBounds)
-            {
-                return virtualPosition;
-            }
-
-            return RelativePosition;
-        }
-    }
-
-    public void ScanInputDevices()
-    {
-
-    }
-
-    public bool IsMousePositionLocked { get; private set; }
-
-    public bool IsLockedToWindowBounds { get; private set; }
-
     /// <summary>Holds the pointer for a drag the game runs - turning a gizmo, say: the cursor is hidden and pinned, and
     /// the motion arrives as <see cref="RawMouseDelta"/>. Released with false, which puts the cursor back.</summary>
     public void HoldPointer(bool hold)
@@ -182,38 +130,6 @@ public class InputWormhole
         }
         isPointerHeld = hold;
         output.HoldPointer(hold, absolutePosition);
-    }
-
-    protected virtual void SetMousePosition(Vector2F position)
-    {
-        Win32Interop.SetCursorPos((int)position.X, (int)position.Y);
-    }
-
-    protected virtual void LockMousePosition(bool lockToCenter = true)
-    {
-        IsMousePositionLocked = true;
-        isLockedToCenter = lockToCenter;
-        Win32Interop.GetCursorPos(out var point);
-        lockMousePosition = new Vector2F(point.X, point.Y);
-        SetLockedMousePosition();
-        currentCursor = output.Cursor;
-        output.Cursor = OutputCursor.None;
-    }
-
-    protected virtual void UnlockMousePosition()
-    {
-        IsMousePositionLocked = false;
-        output.Cursor = currentCursor;
-    }
-
-    protected virtual void LockCursorToWindowBounds()
-    {
-        IsLockedToWindowBounds = true;
-    }
-
-    protected virtual void UnlockWindowBounds()
-    {
-        IsLockedToWindowBounds = false;
     }
 
     public bool IsGamepadButtonDown(int gamepadIndex, GamepadButton button)
@@ -282,18 +198,9 @@ public class InputWormhole
 
     private void UpdateMouse()
     {
-        if (!IsMousePositionLocked)
-        {
-            Win32Interop.GetCursorPos(out NativePoint np);
-            absolutePosition = new Vector2F(np.X, np.Y);
-        }
-        else
-        {
-            SetLockedMousePosition();
-        }
+        absolutePosition = output.PointerScreenPosition;
         mouseWheelDelta = 0;
         rawMouseDelta = Vector2F.Zero;
-        AcceleratedMouseDelta = Vector2F.Zero;
 
         for (int i = 0; i < mouseButtons.Length; ++i)
         {
@@ -326,141 +233,6 @@ public class InputWormhole
                 }
             }
             MouseInputs.Clear();
-        }
-
-        if (IsMouseButtonPressed(MouseButton.Left) && IsLockedToWindowBounds)
-        {
-            virtualPosition = RelativePosition;
-            //_window.Cursor = OutputCursor.None;
-        }
-
-        if (IsMouseButtonReleased(MouseButton.Left))
-        {
-            virtualPosition = RelativePosition;
-            virtualPositionMultiplierX = 0;
-            virtualPositionMultiplierY = 0;
-            //_window.Cursor = OutputCursor.Arrow;
-        }
-
-        if (IsMouseButtonDown(MouseButton.Left) && (IsMousePositionLocked && RawMouseDelta != Vector2F.Zero))
-        {
-            CalculateMousePosition();
-            if (!IsMousePositionLocked)
-            {
-                if (virtualPositionMultiplierX == 0)
-                {
-                    virtualPosition.X = RelativePosition.X;
-                }
-                else
-                {
-                    virtualPosition.X = Bounds.Width * virtualPositionMultiplierX +RelativePosition.X;
-                }
-
-                if (virtualPositionMultiplierY == 0)
-                {
-                    virtualPosition.Y = RelativePosition.Y;
-                }
-                else
-                {
-                    virtualPosition.Y = Bounds.Height * virtualPositionMultiplierY + RelativePosition.Y;
-                }
-            }
-        }
-        absolutePositionPrevious = absolutePosition;
-    }
-
-    private void CalculateMousePosition()
-    {
-        if (IsOutsideXBounds())
-        {
-            if (AbsolutePosition.X >= Bounds.Right)
-            {
-                absolutePosition.X = Bounds.Left;
-                virtualPositionMultiplierX++;
-            }
-            else if (AbsolutePosition.X <= Bounds.Left)
-            {
-                absolutePosition.X = Bounds.Right;
-                virtualPositionMultiplierX--;
-            }
-            Win32Interop.SetCursorPos((int)absolutePosition.X, (int)absolutePosition.Y);
-        }
-
-        if (IsOutsideYBounds())
-        {
-            if (AbsolutePosition.Y >= Bounds.Bottom)
-            {
-                absolutePosition.Y = Bounds.Top;
-                virtualPositionMultiplierY++;
-            }
-            else if (AbsolutePosition.Y <= Bounds.Top)
-            {
-                absolutePosition.Y = Bounds.Bottom;
-                virtualPositionMultiplierY--;
-            }
-            Win32Interop.SetCursorPos((int)absolutePosition.X, (int)absolutePosition.Y);
-        }
-
-        if (absolutePosition.X == absolutePositionPrevious.X && RawMouseDelta.X != 0)
-        {
-            if (AbsolutePosition.X >= SystemParameters.VirtualScreenWidth - 1)
-            {
-                absolutePosition.X = Bounds.Left;
-                virtualPositionMultiplierX++;
-            }
-            else if (AbsolutePosition.X <= 0)
-            {
-                absolutePosition.X = Bounds.Right;
-                virtualPositionMultiplierX--;
-            }
-            Win32Interop.SetCursorPos((int)absolutePosition.X, (int)absolutePosition.Y);
-        }
-
-        if (absolutePosition.Y == absolutePositionPrevious.Y && RawMouseDelta.Y != 0)
-        {
-            if (AbsolutePosition.Y >= SystemParameters.VirtualScreenHeight - 1)
-            {
-                absolutePosition.Y = Bounds.Top;
-                virtualPositionMultiplierY++;
-            }
-            else if (AbsolutePosition.Y <= 0)
-            {
-                absolutePosition.Y = Bounds.Bottom;
-                virtualPositionMultiplierY--;
-            }
-            Win32Interop.SetCursorPos((int)absolutePosition.X, (int)absolutePosition.Y);
-        }
-    }
-
-    private bool IsOutsideXBounds()
-    {
-        var actualPos = AbsolutePosition.X;
-        if (actualPos > Bounds.Right || actualPos < Bounds.X)
-        {
-            return true;
-        }
-        return false;
-    }
-
-    private bool IsOutsideYBounds()
-    {
-        var actualPos = AbsolutePosition.Y;
-        if (actualPos > Bounds.Bottom || actualPos < Bounds.Y)
-        {
-            return true;
-        }
-        return false;
-    }
-
-    private void SetLockedMousePosition()
-    {
-        if (!isLockedToCenter)
-        {
-            Win32Interop.SetCursorPos((int)lockMousePosition.X, (int)lockMousePosition.Y);
-        }
-        else
-        {
-            Win32Interop.SetCursorPos((int)Bounds.Center.X, (int)Bounds.Center.Y);
         }
     }
 

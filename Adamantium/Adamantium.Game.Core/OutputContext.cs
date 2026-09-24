@@ -1,12 +1,10 @@
-﻿using Adamantium.Core;
-using Adamantium.UI.Controls.Panels;
-using Adamantium.UI.Core;
-using Object = System.Object;
+﻿using Object = System.Object;
 
 namespace Adamantium.Game.Core
 {
    /// <summary>
-   /// Contains width, height, hwnd and Control itself, to which D3D will render its content
+   /// The host's surface an output draws into - a window, a panel. What kinds there are is the host's business: its
+   /// <see cref="IOutputFactory"/> decides.
    /// </summary>
    public class OutputContext:IEquatable<OutputContext>
    {
@@ -14,22 +12,8 @@ namespace Adamantium.Game.Core
        /// Constructs OutputContext
        /// </summary>
        /// <param name="context">Object that represents surface on which Graphics content will be drawn</param>
-       /// <exception cref="NotSupportedException"></exception>
        public OutputContext(Object context)
       {
-         var type = context.GetType();
-         if (Utilities.IsTypeInheritFrom(type, typeof(IWindow)))
-         {
-            ContextType = OutputContextType.Window;
-         }
-         else if (Utilities.IsTypeInheritFrom(type, typeof(RenderTargetPanel)))
-         {
-            ContextType = OutputContextType.RenderTargetPanel;
-         }
-         else
-         {
-            throw new NotSupportedException($"context of type {type} is not supported");
-         }
          Context = context;
       }
 
@@ -37,11 +21,6 @@ namespace Adamantium.Game.Core
       /// Object that represents surface on which Graphics content will be drawn
       /// </summary>
       public object Context { get; }
-
-      /// <summary>
-      /// Type of Game context
-      /// </summary>
-      public OutputContextType ContextType { get; }
 
       /// <summary>
       /// Determines whether the specified object is equal to the current object.
