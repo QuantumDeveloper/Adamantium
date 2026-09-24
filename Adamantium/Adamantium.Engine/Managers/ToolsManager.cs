@@ -5,6 +5,7 @@ using Adamantium.Engine.Tools;
 using Adamantium.ECS;
 using Adamantium.ECS.Components;
 using Adamantium.ECS.Components.Extensions;
+using Adamantium.Game.Core;
 using Adamantium.Game.Core.Input;
 using Adamantium.Mathematics;
 
@@ -12,6 +13,17 @@ namespace Adamantium.Engine.Managers;
 
 public class ToolsManager
 {
+    private CollisionResult result = new CollisionResult();
+    private float limitDistance = 0.06f;
+    private ToolBase currentTool = null;
+    private bool _lightProcessingResult;
+    private bool _isDraggingEnabled;
+    private bool _isMoveToolEnabled;
+    private bool _isRotationToolEnabled;
+    private bool _isPivotToolEnabled;
+    private bool _isScaleToolEnabled;
+    private bool _localTransformEnabled;
+
     public CameraDragTool CameraDragTool { get; private set; }
 
     public RotationTool RotationTool { get; private set; }
@@ -28,21 +40,7 @@ public class ToolsManager
 
     public Entity PlaneGridTool { get; set; }
 
-    private CollisionResult result = new CollisionResult();
-
     public String Text { get; private set; }
-
-    private float limitDistance = 0.06f;
-
-    private ToolBase currentTool = null;
-
-    bool _lightProcessingResult;
-    private bool _isDraggingEnabled;
-    private bool _isMoveToolEnabled;
-    private bool _isRotationToolEnabled;
-    private bool _isPivotToolEnabled;
-    private bool _isScaleToolEnabled;
-    private bool _localTransformEnabled;
 
     public ToolsManager(EntityWorld entityWorld)
     {
@@ -159,26 +157,31 @@ public class ToolsManager
         return collisionResult;
     }
 
-    /// <param name="inputManager">Input of the active output; null when no output is active.</param>
-    public void Update(IEnumerable<Entity> entities, CameraManager cameraManager, LightManager lightManager, InputWormhole inputManager)
+    /// <summary>
+    /// Picks and drags in the output under the pointer; places the gizmos for the camera of every visible output.
+    /// </summary>
+    public void Update(IEnumerable<Entity> entities, Observatory observatory, LightManager lightManager)
     {
-        // The tools pick with the pointer taken in the SURFACE's own coordinates, and a surface that is off screen -
-        // a game panel whose tab is no longer the selected one - has no such point: the walk to its root finds no
-        // root. The grid below is not pointer work and still owes the cameras its transform.
-        if (inputManager is { CanLocatePointer: true })
+        if (observatory.PointerOutput is { Camera: not null, Input.CanLocatePointer: true })
         {
-            ProcessTools(entities, cameraManager, lightManager, inputManager);
+            ProcessTools(entities, observatory, lightManager);
         }
         else
         {
-            OrientationTool.Process(SelectedEntity, cameraManager, null);
+            OrientationTool.Process(SelectedEntity, observatory);
         }
 
+        var outputs = observatory.VisibleOutputs;
         PlaneGridTool.TraverseInDepth(
             current =>
             {
-                foreach (var activeCamera in cameraManager.ActiveCameras)
+                for (int i = 0; i < outputs.Count; i++)
                 {
+                    if (outputs[i].Camera is not { } activeCamera)
+                    {
+                        continue;
+                    }
+
                     current.Transform.CalculateFinalTransform(activeCamera, Vector3F.Zero, Matrix4x4F.Identity);
                 }
             });
@@ -186,37 +189,39 @@ public class ToolsManager
         Text = "Current selected entity: " + SelectedEntity + "\n";
     }
 
-    private void ProcessTools(IEnumerable<Entity> entities, CameraManager cameraManager, LightManager lightManager, InputWormhole inputManager)
+    private void ProcessTools(IEnumerable<Entity> entities, Observatory observatory, LightManager lightManager)
     {
         CollisionMode collisionMode = CollisionMode.IgnoreNonGeometryParts;
-        var camera = cameraManager.UserControlledCamera;
+        var output = observatory.PointerOutput;
+        var camera = output.Camera;
+        var inputManager = output.Input;
         if (SelectedEntity != null && !SelectedEntity.IsEnabled)
         {
             currentTool.SetStandby();
         }
 
-        if (!currentTool.IsLocked && !_lightProcessingResult && camera != null)
+        if (!currentTool.IsLocked && !_lightProcessingResult)
         {
             result = CheckEntityIntersection(entities, camera, inputManager.RelativePosition, collisionMode);
             var lightResult = lightManager.Intersects(camera, inputManager.RelativePosition, collisionMode);
-            var cameraResult = cameraManager.Intersects(camera, inputManager.RelativePosition, collisionMode);
+            var cameraResult = observatory.CameraGizmo.Intersects(collisionMode);
 
             result.ValidateAgainst(lightResult);
             result.ValidateAgainst(cameraResult);
 
         }
 
-        OrientationTool.Process(SelectedEntity, cameraManager, inputManager);
+        OrientationTool.Process(SelectedEntity, observatory);
 
         if (currentTool.Enabled && !_lightProcessingResult)
         {
             currentTool.LocalTransformEnabled = LocalTransformEnabled;
-            currentTool.Process(SelectedEntity, cameraManager, inputManager);
+            currentTool.Process(SelectedEntity, observatory);
         }
 
         if (!currentTool.IsLocked)
         {
-            _lightProcessingResult = lightManager.ProcessLight(SelectedEntity, cameraManager, inputManager);
+            _lightProcessingResult = lightManager.ProcessLight(SelectedEntity, observatory);
         }
 
         if (result.Intersects && inputManager.IsMouseButtonPressed(MouseButton.Left) && !currentTool.IsLocked && !_lightProcessingResult)

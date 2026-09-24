@@ -1,9 +1,9 @@
-﻿using Adamantium.Engine.Managers;
-using Adamantium.Engine.Services;
+﻿using Adamantium.Engine.Services;
 using Adamantium.Engine.Templates.Tools;
 using Adamantium.ECS;
 using Adamantium.ECS.Components;
 using Adamantium.ECS.Components.Extensions;
+using Adamantium.Game.Core;
 using Adamantium.Game.Core.Input;
 using Adamantium.Mathematics;
 
@@ -56,13 +56,15 @@ public class ScaleTool : ToolBase
         centralManipulator = Tool.Get(CentralManipulatorName);
     }
 
-    public override void Process(Entity targetEntity, CameraManager cameraManager, InputWormhole inputManager)
+    public override void Process(Entity targetEntity, Observatory observatory)
     {
+        var output = observatory.PointerOutput;
+        var inputManager = output.Input;
         if (!CheckTargetEntity(targetEntity))
             return;
 
         HighlightSelectedTool(false);
-        var camera = cameraManager.UserControlledCamera;
+        var camera = output.Camera;
 
         if (inputManager.IsMouseButtonReleased(MouseButton.Left))
         {
@@ -73,7 +75,7 @@ public class ScaleTool : ToolBase
         if (!IsLocked)
         {
             Tool.IsEnabled = true;
-            UpdateToolTransform(targetEntity, cameraManager, true, false, false);
+            UpdateToolTransform(targetEntity, camera,true, false, false);
 
             toolScale = targetEntity.GetRelativePosition(camera).Length() *
                         MathHelper.DegreesToRadians(camera.Fov) * camera.AspectRatio * 0.01f;
@@ -119,7 +121,7 @@ public class ScaleTool : ToolBase
                 UpdateAxisVisibility(current, camera);
             },
             true);
-        Transform(Tool, cameraManager);
+        Transform(Tool, observatory);
     }
 
     private void TransformEntityScale(Entity targetEntity, Camera camera, Vector3F rayPlaneInterPoint)

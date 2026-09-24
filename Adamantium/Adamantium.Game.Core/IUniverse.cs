@@ -13,8 +13,6 @@ namespace Adamantium.Game.Core
         
         IReadOnlyList<UniverseOutput> Outputs { get; }
         
-        UniverseOutput ActiveOutput { get; }
-        
         UniverseOutput MainOutput { get; }
 
         public void InitializeUniverse();
@@ -59,5 +57,10 @@ namespace Adamantium.Game.Core
         public event EventHandler Initialized;
 
         public event EventHandler FrameFinished;
+
+        /// <summary>
+        /// Raised once per frame, before the update, when the frame's outputs are settled: added, removed and resized.
+        /// </summary>
+        public event EventHandler OutputsSettled;
     }
 }

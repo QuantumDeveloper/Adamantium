@@ -1,10 +1,10 @@
 ﻿using System;
-using Adamantium.Engine.Managers;
 using Adamantium.Engine.Services;
 using Adamantium.Engine.Templates.Lights;
 using Adamantium.ECS;
 using Adamantium.ECS.Components;
 using Adamantium.ECS.Components.Extensions;
+using Adamantium.Game.Core;
 using Adamantium.Game.Core.Input;
 using Adamantium.Mathematics;
 
@@ -34,20 +34,22 @@ public class SpotLightTool : LightToolBase
         anchorBackward = Tool.Get("AnchorPointBackward");
     }
 
-    public override void Process(Entity targetEntity, CameraManager cameraManager, InputWormhole inputManager)
+    public override void Process(Entity targetEntity, Observatory observatory)
     {
+        var output = observatory.PointerOutput;
+        var inputManager = output.Input;
         if (!CheckTargetEntity(targetEntity))
             return;
 
         HighlightSelectedTool(false);
-        var camera = cameraManager.UserControlledCamera;
+        var camera = output.Camera;
 
         SetIsLocked(inputManager);
 
         if (!IsLocked)
         {
             Tool.IsEnabled = true;
-            UpdateToolTransform(targetEntity, cameraManager, false, true, true);
+            UpdateToolTransform(targetEntity, camera,false, true, true);
 
             var collisionMode = CollisionMode.CollidersOnly;
 
@@ -89,7 +91,7 @@ public class SpotLightTool : LightToolBase
             }
         }
 
-        Transform(Tool, cameraManager);
+        Transform(Tool, observatory);
     }
 
     private void ScaleSpotLight(Entity lightToTransform, Camera camera, Vector3F rayPlaneInterPoint)
@@ -168,9 +170,8 @@ public class SpotLightTool : LightToolBase
         selectedTool.IsSelected = value;
     }
 
-    protected override void UpdateToolTransform(Entity target, CameraManager cameraManager, bool isLocalAxis, bool useTargetCenter, bool calculateTransform)
+    protected override void UpdateToolTransform(Entity target, Camera camera, bool isLocalAxis, bool useTargetCenter, bool calculateTransform)
     {
-        var camera = cameraManager.UserControlledCamera;
         // Set tool to the local coordinates center of the target Entity (not geometrical center)
         if (useTargetCenter)
         {

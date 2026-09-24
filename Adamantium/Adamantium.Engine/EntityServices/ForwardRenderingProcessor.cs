@@ -38,9 +38,7 @@ public class ForwardRenderingProcessor : RenderingProcessor
     
     public override void Draw(AppTime gameTime)
     {
-        // Resolve the active camera ONCE per frame, not once per entity in the traversal below - it is invariant for the
-        // whole draw and GetActive takes a lock + dictionary lookup.
-        ActiveCamera = CameraManager.GetActive(Window);
+        ActiveCamera = Window.Camera;
         if (ActiveCamera == null) return;
 
         foreach (var entity in Entities)
@@ -174,10 +172,7 @@ public class ForwardRenderingProcessor : RenderingProcessor
 
     protected void DrawLights(Camera activeCamera)
     {
-        if (CameraManager.UserControlledCamera == ActiveCamera)
-        {
-//                LightService.DrawDebugLight(ToolsService.SelectedEntity, BasicEffect, CameraService, ActiveCamera, DeferredDevice, GameTime);
-        }
+//            LightService.DrawDebugLight(ToolsService.SelectedEntity, BasicEffect, CameraService, ActiveCamera, DeferredDevice, GameTime);
     }
 
     protected void DrawCommonTools(Camera activeCamera)
@@ -348,10 +343,7 @@ public class ForwardRenderingProcessor : RenderingProcessor
 //            DeferredDevice.BlendState = DeferredDevice.BlendStates.NonPremultiplied;
 //            DeferredDevice.DepthStencilState = DeferredDevice.DepthStencilStates.DepthEnableGreater;
 
-        if (ActiveCamera == CameraManager.UserControlledCamera)
-        {
-            DrawTools(ActiveCamera);
-        }
+        DrawTools(ActiveCamera);
 
         DrawLights(ActiveCamera);
 

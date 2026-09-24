@@ -1,5 +1,6 @@
 ﻿using Adamantium.Core;
 using Adamantium.Core.Events;
+using Adamantium.ECS.Components;
 using Adamantium.Game.Core.Input;
 using Adamantium.Game.Core.Payloads;
 using Adamantium.Graphics.Core;
@@ -8,7 +9,6 @@ using Adamantium.Graphics.Core.Presentation;
 using Adamantium.Imaging;
 using Adamantium.Mathematics;
 using Adamantium.UI.Controls;
-using Adamantium.UI.Core;
 using Adamantium.Vulkan.Core;
 using Rectangle = Adamantium.Mathematics.Rectangle;
 
@@ -19,7 +19,11 @@ namespace Adamantium.Game.Core
     /// </summary>
     public abstract class UniverseOutput : DisposableObject
     {
-        public Guid Id { get; } 
+        private Camera[] cameras = [];
+        private readonly object camerasLock = new object();
+        private Camera camera;
+
+        public Guid Id { get; }
 
         public IGraphicsDevice GraphicsDevice { get; private set; }
         
@@ -52,13 +56,24 @@ namespace Adamantium.Game.Core
         public abstract object NativeWindow { get; }
 
         /// <summary>
-        /// Defines is <see cref="UniverseOutput"/> currently displayed
+        /// Whether the output is on screen, and if not, why.
         /// </summary>
-        public abstract Boolean IsVisible { get; }
-        
-        public abstract bool IsActive { get; } 
-        
-        public abstract WindowState State { get; set; }
+        public abstract OutputState State { get; }
+
+        /// <summary>
+        /// On screen: rendered and presented.
+        /// </summary>
+        public bool IsVisible => State == OutputState.Shown;
+
+        /// <summary>
+        /// Receives the keyboard: keyboard focus in the active OS window.
+        /// </summary>
+        public abstract bool IsKeyboardFocused { get; }
+
+        /// <summary>
+        /// The pointer is over the surface, or the surface holds it during a drag.
+        /// </summary>
+        public abstract bool IsPointerOver { get; }
 
         internal abstract bool CanHandle(OutputContext gameContext);
 
@@ -218,16 +233,6 @@ namespace Adamantium.Game.Core
         }
 
         /// <summary>
-        /// Occurs when window got focus
-        /// </summary>
-        public event Action<UniverseOutput> Activated;
-
-        /// <summary>
-        /// Occurs when window lost focus
-        /// </summary>
-        public event Action<UniverseOutput> Deactivated;
-
-        /// <summary>
         /// Occurs when window size has changed
         /// </summary>
         public event Action<UniverseOutputSizeChangedPayload> SizeChanged;
@@ -250,7 +255,7 @@ namespace Adamantium.Game.Core
         /// <summary>
         /// Occurs when window state changed
         /// </summary>
-        public Action<WindowStatePayload> StateChanged;
+        public Action<OutputState> StateChanged;
 
         internal void OnClosed()
         {
@@ -293,25 +298,86 @@ namespace Adamantium.Game.Core
             Input?.OnMouseInput(args);
         }
 
-        internal void OnActivated()
-        {
-            Activated?.Invoke(this);
-        }
-
-        internal void OnDeactivated()
-        {
-            Deactivated?.Invoke(this);
-        }
-        
         protected void UpdateViewportAndScissor(uint width, uint height)
         {
             Viewport.Width = width;
             Viewport.Height = height;
-            
+
             Scissor.Extent = new Extent2D();
             Scissor.Extent.Width = width;
             Scissor.Extent.Height = height;
             Scissor.Offset = new Offset2D();
+
+            lock (camerasLock)
+            {
+                var viewpoints = cameras;
+                for (int i = 0; i < viewpoints.Length; i++)
+                {
+                    FitCamera(viewpoints[i], width, height);
+                }
+            }
+        }
+
+        /// <summary>
+        /// Viewpoints this output can show. Each is a live camera in the scene, and one camera may serve several
+        /// outputs of the same size.
+        /// </summary>
+        public IReadOnlyList<Camera> Cameras => cameras;
+
+        /// <summary>
+        /// The viewpoint the output shows now. Setting a camera the output does not have yet adds it to <see cref="Cameras"/>.
+        /// </summary>
+        public Camera Camera
+        {
+            get => camera;
+            set
+            {
+                if (value != null)
+                {
+                    AddCamera(value);
+                }
+                camera = value;
+            }
+        }
+
+        public void AddCamera(Camera viewpoint)
+        {
+            lock (camerasLock)
+            {
+                if (Array.IndexOf(cameras, viewpoint) >= 0)
+                {
+                    return;
+                }
+
+                FitCamera(viewpoint, Width, Height);
+                cameras = [..cameras, viewpoint];
+            }
+        }
+
+        public void RemoveCamera(Camera viewpoint)
+        {
+            lock (camerasLock)
+            {
+                var index = Array.IndexOf(cameras, viewpoint);
+                if (index < 0)
+                {
+                    return;
+                }
+
+                cameras = [..cameras[..index], ..cameras[(index + 1)..]];
+
+                if (camera == viewpoint)
+                {
+                    camera = cameras.Length > 0 ? cameras[0] : null;
+                }
+            }
+        }
+
+        private static void FitCamera(Camera viewpoint, uint width, uint height)
+        {
+            viewpoint.Width = width;
+            viewpoint.Height = height;
+            viewpoint.Initialize();
         }
 
         /// <summary>

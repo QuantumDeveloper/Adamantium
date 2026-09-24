@@ -314,13 +314,35 @@ namespace Adamantium.Game.Core
             }
         }
         
-        /// <summary>
-        /// Defines is <see cref="UniverseOutput"/> currently displayed
-        /// </summary>
-        // Attachment as well as Visibility: a surface taken out of the visual tree - a game panel on a tab that is no
-        // longer the selected one - is not on screen, yet keeps reporting Visible, and nobody else ever says otherwise.
-        public override bool IsVisible =>
-            InputComponent.Visibility == Visibility.Visible && InputComponent.IsAttachedToVisualTree;
+        public override OutputState State
+        {
+            get
+            {
+                if (HostWindow is { State: WindowState.Minimized })
+                {
+                    return OutputState.Minimized;
+                }
+
+                if (!InputComponent.IsAttachedToVisualTree)
+                {
+                    return OutputState.OutOfView;
+                }
+
+                if (InputComponent.Visibility != Visibility.Visible)
+                {
+                    return OutputState.Hidden;
+                }
+
+                return OutputState.Shown;
+            }
+        }
+
+        public override bool IsKeyboardFocused => InputComponent.IsKeyboardFocused && HostWindow is { IsActive: true };
+
+        public override bool IsPointerOver =>
+            InputComponent.IsMouseDirectlyOver || ReferenceEquals(Mouse.Captured, InputComponent);
+
+        protected IWindow HostWindow => InputComponent as IWindow ?? InputComponent.RootVisual as IWindow;
 
         internal override void Resize(uint width, uint height)
         {

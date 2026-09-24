@@ -1,9 +1,9 @@
-﻿using Adamantium.Engine.Managers;
-using Adamantium.Engine.Services;
+﻿using Adamantium.Engine.Services;
 using Adamantium.Engine.Templates.Tools;
 using Adamantium.ECS;
 using Adamantium.ECS.Components;
 using Adamantium.ECS.Components.Extensions;
+using Adamantium.Game.Core;
 using Adamantium.Game.Core.Input;
 using Adamantium.Mathematics;
 
@@ -37,20 +37,22 @@ public class RotationTool: ToolBase
         centralManipulator = Tool.Get("CentralManipulator");
     }
 
-    public override void Process(Entity targetEntity, CameraManager cameraManager, InputWormhole inputManager)
+    public override void Process(Entity targetEntity, Observatory observatory)
     {
+        var output = observatory.PointerOutput;
+        var inputManager = output.Input;
         if (!CheckTargetEntity(targetEntity))
             return;
 
         HighlightSelectedTool(false);
-        var camera = cameraManager.UserControlledCamera;
+        var camera = output.Camera;
 
         SetIsLocked(inputManager);
 
         if (!IsLocked)
         {
             Tool.IsEnabled = true;
-            UpdateToolTransform(targetEntity, cameraManager, LocalTransformEnabled, false, true);
+            UpdateToolTransform(targetEntity, camera,LocalTransformEnabled, false, true);
 
             Tool.TraverseByLayer(
                 (current) =>
@@ -58,7 +60,7 @@ public class RotationTool: ToolBase
                     TransformRotationTool(current, camera);
                 },
                 true);
-            Transform(Tool, cameraManager);
+            Transform(Tool, observatory);
 
             var collisionMode = CollisionMode.Mixed;
 
@@ -92,7 +94,7 @@ public class RotationTool: ToolBase
                         TransformRotationTool(current, camera);
                     },
                     true);
-                Transform(Tool, cameraManager);
+                Transform(Tool, observatory);
             }
         }
     }

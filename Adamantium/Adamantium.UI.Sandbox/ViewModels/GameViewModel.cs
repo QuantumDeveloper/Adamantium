@@ -59,7 +59,7 @@ public partial class GameViewModel : TabPageViewModel
         Fps = _game.RenderFps;
         FrameCostMs = _game.DrawTimeMs;
 
-        if (_game.CameraManager?.UserControlledCamera is not { } camera) return;
+        if (_game.MainOutput?.Camera is not { } camera) return;
 
         if (_home == null)
         {
@@ -81,7 +81,7 @@ public partial class GameViewModel : TabPageViewModel
     /// <summary>Puts the camera back where it started - the way out of being lost in a world with no landmarks.</summary>
     [Command] private void ResetCamera()
     {
-        if (_home is not { } home || _game?.CameraManager?.UserControlledCamera is not { } camera) return;
+        if (_home is not { } home || _game?.MainOutput?.Camera is not { } camera) return;
 
         // Flown, not teleported - and the rotation first, because both share the field that records where the travel
         // started. The orientation gizmo mirrors the camera, so it swings back along with it.
@@ -95,7 +95,7 @@ public partial class GameViewModel : TabPageViewModel
     {
         _handed = value;
 
-        if (_game?.CameraManager?.UserControlledCamera is { } camera) camera.Velocity = value;
+        if (_game?.MainOutput?.Camera is { } camera) camera.Velocity = value;
     }
 
     [Bindable, Affects(nameof(MenuButtonText), nameof(MouseLookEnabled))] private bool _isMenuVisible = true;

@@ -1,11 +1,11 @@
 ﻿using System;
 using System.Diagnostics;
-using Adamantium.Engine.Managers;
 using Adamantium.Engine.Services;
 using Adamantium.Engine.Templates.Lights;
 using Adamantium.ECS;
 using Adamantium.ECS.Components;
 using Adamantium.ECS.Components.Extensions;
+using Adamantium.Game.Core;
 using Adamantium.Game.Core.Input;
 using Adamantium.Mathematics;
 
@@ -36,20 +36,22 @@ public class PointLightTool : LightToolBase
         anchorDown = Tool.Get("AnchorPointDown");
     }
 
-    public override void Process(Entity targetEntity, CameraManager cameraManager, InputWormhole inputManager)
+    public override void Process(Entity targetEntity, Observatory observatory)
     {
+        var output = observatory.PointerOutput;
+        var inputManager = output.Input;
         if (!CheckTargetEntity(targetEntity))
             return;
 
         HighlightSelectedTool(false);
-        var camera = cameraManager.UserControlledCamera;
+        var camera = output.Camera;
 
         SetIsLocked(inputManager);
 
         if (!IsLocked)
         {
             Tool.IsEnabled = true;
-            UpdateToolTransform(targetEntity, cameraManager, false, true, true);
+            UpdateToolTransform(targetEntity, camera,false, true, true);
 
             var collisionMode = CollisionMode.CollidersOnly;
 
@@ -91,7 +93,7 @@ public class PointLightTool : LightToolBase
             }
         }
 
-        Transform(Tool, cameraManager);
+        Transform(Tool, observatory);
     }
 
     private void ScalePointLight(Entity lightToTransform, InputWormhole input, Vector3F rayPlaneInterPoint)
@@ -149,9 +151,8 @@ public class PointLightTool : LightToolBase
         selectedTool.IsSelected = value;
     }
 
-    protected override void UpdateToolTransform(Entity target, CameraManager cameraManager, bool isLocalAxis, bool useTargetCenter, bool calculateTransform)
+    protected override void UpdateToolTransform(Entity target, Camera camera, bool isLocalAxis, bool useTargetCenter, bool calculateTransform)
     {
-        var camera = cameraManager.UserControlledCamera;
         // Set tool to the local coordinates center of the target Entity (not geometrical center)
         if (useTargetCenter)
         {

@@ -392,7 +392,20 @@ public class MouseDevice
         if (ReferenceEquals(_hoverRoot, rootComponent)) _hoverRoot = null;
         AncestorState.Transition(DirectlyOver, null, Mouse.MouseEnterEvent, Mouse.MouseLeaveEvent,
             evt => new MouseEventArgs(this, inputModifiers, timestamp) { RoutedEvent = evt });
-        DirectlyOver = null;
+        ChangeDirectlyOver(null, inputModifiers, timestamp);
+    }
+
+    private void ChangeDirectlyOver(IInputComponent newOver, InputModifiers modifiers, uint timestamp)
+    {
+        var previous = DirectlyOver;
+        if (ReferenceEquals(previous, newOver))
+        {
+            return;
+        }
+
+        DirectlyOver = newOver;
+        previous?.RaiseEvent(new MouseEventArgs(this, modifiers, timestamp) { RoutedEvent = Mouse.DirectlyOverLeaveEvent });
+        newOver?.RaiseEvent(new MouseEventArgs(this, modifiers, timestamp) { RoutedEvent = Mouse.DirectlyOverEnterEvent });
     }
 
     private void MouseMove(IInputComponent rootComponent, Vector2 p, InputModifiers inputModifiers, uint timestamp)
@@ -457,7 +470,7 @@ public class MouseDevice
         var newOver = component ?? root;
         AncestorState.Transition(DirectlyOver, newOver, Mouse.MouseEnterEvent, Mouse.MouseLeaveEvent,
             evt => new MouseEventArgs(this, modifiers, timestamp) { RoutedEvent = evt });
-        DirectlyOver = newOver;
+        ChangeDirectlyOver(newOver, modifiers, timestamp);
         return DirectlyOver;
     }
 

@@ -1,7 +1,7 @@
 ﻿using Adamantium.ECS;
 using Adamantium.Mathematics;
 
-namespace Adamantium.Engine.Templates.CameraTemplates;
+namespace Adamantium.Game.Core;
 
 public class CameraTemplate
 {

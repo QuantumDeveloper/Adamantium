@@ -1,9 +1,9 @@
 ﻿using System;
-using Adamantium.Engine.Managers;
 using Adamantium.Engine.Services;
 using Adamantium.ECS;
 using Adamantium.ECS.Components;
 using Adamantium.ECS.Components.Extensions;
+using Adamantium.Game.Core;
 using Adamantium.Game.Core.Input;
 using Adamantium.Mathematics;
 
@@ -112,7 +112,10 @@ public abstract class ToolBase
         }
     }
 
-    public abstract void Process(Entity targetEntity, CameraManager cameraManager, InputWormhole inputManager);
+    /// <summary>
+    /// Picks and drags in the output under the pointer, and places the tool for the camera of every visible output.
+    /// </summary>
+    public abstract void Process(Entity targetEntity, Observatory observatory);
 
     protected bool GetRayPlaneIntersectionPoint(Camera camera, InputWormhole inputManager, out Vector3 intersectionPoint)
     {
@@ -129,12 +132,18 @@ public abstract class ToolBase
         return intersects;
     }
 
-    protected void Transform(Entity entity, CameraManager cameraManager)
+    protected void Transform(Entity entity, Observatory observatory)
     {
+        var outputs = observatory.VisibleOutputs;
         entity.TraverseInDepth(current =>
         {
-            foreach (var activeCamera in cameraManager.ActiveCameras)
+            for (int i = 0; i < outputs.Count; i++)
             {
+                if (outputs[i].Camera is not { } activeCamera)
+                {
+                    continue;
+                }
+
                 current.Transform.CalculateFinalTransform(activeCamera, Vector3F.Zero, Matrix4x4F.Identity);
             }
         }, true);
@@ -179,9 +188,8 @@ public abstract class ToolBase
         }
     }
 
-    protected virtual void UpdateToolTransform(Entity target, CameraManager cameraManager, bool isLocalAxis, bool useTargetCenter, bool calculateTransform)
+    protected virtual void UpdateToolTransform(Entity target, Camera camera, bool isLocalAxis, bool useTargetCenter, bool calculateTransform)
     {
-        var camera = cameraManager.UserControlledCamera;
         // Set tool to the local coordinates center of the target Entity (not geometrical center)
         if (useTargetCenter)
         {

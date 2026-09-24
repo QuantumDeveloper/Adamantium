@@ -2,7 +2,6 @@ using System;
 using Adamantium.Core;
 using Adamantium.Engine.Managers;
 using Adamantium.ECS;
-using Adamantium.Game.Core;
 using Serilog;
 
 namespace Adamantium.Engine.EntityServices;
@@ -14,13 +13,11 @@ public class ToolsService : EntityService
 {
     private ToolsManager tools;
     private LightManager lightManager;
-    private CameraManager cameraManager;
-    private IUniverse universe;
+    private Observatory observatory;
 
     public ToolsService(EntityWorld world)
         : base(world)
     {
-        // After TransformService: the tools pick against this frame's transforms, not the last one's.
         Priority = 1;
     }
 
@@ -32,15 +29,14 @@ public class ToolsService : EntityService
     {
         tools = EntityWorld.DependencyResolver.Resolve<ToolsManager>();
         lightManager = EntityWorld.DependencyResolver.Resolve<LightManager>();
-        cameraManager = EntityWorld.DependencyResolver.Resolve<CameraManager>();
-        universe = EntityWorld.DependencyResolver.Resolve<IUniverse>();
+        observatory = EntityWorld.DependencyResolver.Resolve<Observatory>();
     }
 
     public override void Update(AppTime gameTime)
     {
         try
         {
-            tools.Update(Entities, cameraManager, lightManager, universe.ActiveOutput?.Input);
+            tools.Update(Entities, observatory, lightManager);
             lightManager.Update();
         }
         catch (Exception ex)

@@ -1,8 +1,9 @@
-﻿using Adamantium.Engine.Managers;
-using Adamantium.Engine.Services;
+﻿using Adamantium.Engine.Services;
 using Adamantium.Engine.Templates.Lights;
 using Adamantium.ECS;
+using Adamantium.ECS.Components;
 using Adamantium.ECS.Components.Extensions;
+using Adamantium.Game.Core;
 using Adamantium.Game.Core.Input;
 
 namespace Adamantium.Engine.Tools;
@@ -14,20 +15,22 @@ public class DirectionalLightTool : LightToolBase
         Tool = new DirectionalLightVisualTemplate().BuildEntity(null, "Directional");
     }
 
-    public override void Process(Entity targetEntity, CameraManager cameraManager, InputWormhole inputManager)
+    public override void Process(Entity targetEntity, Observatory observatory)
     {
+        var output = observatory.PointerOutput;
+        var inputManager = output.Input;
         if (!CheckTargetEntity(targetEntity))
             return;
 
         HighlightSelectedTool(false);
-        var camera = cameraManager.UserControlledCamera;
+        var camera = output.Camera;
 
         SetIsLocked(inputManager);
 
         if (!IsLocked)
         {
             Tool.IsEnabled = true;
-            UpdateToolTransform(targetEntity, cameraManager, false, true, true);
+            UpdateToolTransform(targetEntity, camera,false, true, true);
 
             var collisionMode = CollisionMode.CollidersOnly;
 
@@ -57,6 +60,6 @@ public class DirectionalLightTool : LightToolBase
             }
         }
 
-        Transform(Tool, cameraManager);
+        Transform(Tool, observatory);
     }
 }

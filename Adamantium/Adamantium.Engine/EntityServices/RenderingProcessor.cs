@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using Adamantium.Engine.Managers;
 using Adamantium.ECS;
 using Adamantium.ECS.Components;
 using Adamantium.Game.Core;
@@ -22,7 +21,6 @@ public class RenderingProcessor : EntityProcessor<RenderingService>, IDisposable
     protected UniverseOutput Window { get; set; }
 
     protected InputWormhole InputManager => Window.Input;
-    protected CameraManager CameraManager { get; set; }
 
     protected SpriteBatch SpriteBatch { get; set; }
 
@@ -58,7 +56,6 @@ public class RenderingProcessor : EntityProcessor<RenderingService>, IDisposable
         // Window.ParametersChanged += Window_ParametersChanged;
         //Window.StateChanged += StateChanged;
         Window.SizeChanged += WindowOnSizeChanged;
-        CameraManager = EntityWorld.DependencyResolver.Resolve<CameraManager>();
         //SpriteBatch = new SpriteBatch(GraphicsDevice, 80000);
         LoadContent();
     }

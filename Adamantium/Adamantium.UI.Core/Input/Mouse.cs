@@ -32,6 +32,14 @@ public static class Mouse
    public static readonly RoutedEvent LostMouseCaptureEvent = EventManager.RegisterRoutedEvent("LostMouseCapture",
       RoutingStrategy.Bubble, typeof(MouseEventHandler), typeof(Mouse));
 
+   /// <summary>Raised on the element that became the one directly under the pointer.</summary>
+   public static readonly RoutedEvent DirectlyOverEnterEvent = EventManager.RegisterRoutedEvent("DirectlyOverEnter",
+      RoutingStrategy.Direct, typeof(MouseEventHandler), typeof(Mouse));
+
+   /// <summary>Raised on the element that stopped being the one directly under the pointer.</summary>
+   public static readonly RoutedEvent DirectlyOverLeaveEvent = EventManager.RegisterRoutedEvent("DirectlyOverLeave",
+      RoutingStrategy.Direct, typeof(MouseEventHandler), typeof(Mouse));
+
    //TODO: deside leave it as bubble or make it direct event
    public static readonly RoutedEvent RawMouseMoveEvent = EventManager.RegisterRoutedEvent("RawMouseMove",
       RoutingStrategy.Direct, typeof (RawMouseEventHandler), typeof (Mouse));

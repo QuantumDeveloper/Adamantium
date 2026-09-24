@@ -1,9 +1,9 @@
-﻿using Adamantium.Engine.Managers;
-using Adamantium.Engine.Services;
+﻿using Adamantium.Engine.Services;
 using Adamantium.Engine.Templates.Tools;
 using Adamantium.ECS;
 using Adamantium.ECS.Components;
 using Adamantium.ECS.Components.Extensions;
+using Adamantium.Game.Core;
 using Adamantium.Game.Core.Input;
 using Adamantium.Mathematics;
 
@@ -46,13 +46,15 @@ public class MoveTool: ToolBase
         centralManipulator = Tool.Get(CentralManipulatorName);
     }
 
-    public override void Process(Entity targetEntity, CameraManager cameraManager, InputWormhole inputManager)
+    public override void Process(Entity targetEntity, Observatory observatory)
     {
+        var output = observatory.PointerOutput;
+        var inputManager = output.Input;
         if (!CheckTargetEntity(targetEntity))
             return;
 
         HighlightSelectedTool(false);
-        var camera = cameraManager.UserControlledCamera;
+        var camera = output.Camera;
 
         if (inputManager.IsMouseButtonReleased(MouseButton.Left))
         {
@@ -63,7 +65,7 @@ public class MoveTool: ToolBase
         if (!IsLocked)
         {
             Tool.IsEnabled = true;
-            UpdateToolTransform(targetEntity, cameraManager, LocalTransformEnabled, true, true);
+            UpdateToolTransform(targetEntity, camera,LocalTransformEnabled, true, true);
             var collisionMode = CollisionMode.Mixed;
 
             toolIntersectionResult = Tool.Intersects(
@@ -109,7 +111,7 @@ public class MoveTool: ToolBase
                 UpdateAxisVisibility(current, camera);
             },
             true);
-        Transform(Tool, cameraManager);
+        Transform(Tool, observatory);
     }
 
     private void TransformEntityPosition(Entity entityToTransform, Camera camera, Vector3F rayPlaneInterPoint)

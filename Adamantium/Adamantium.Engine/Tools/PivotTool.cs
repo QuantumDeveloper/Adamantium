@@ -1,6 +1,4 @@
 ﻿using System;
-using Adamantium.Engine.Managers;
-using Adamantium.Engine.Services;
 using Adamantium.Engine.Templates.Tools;
 using Adamantium.ECS;
 using Adamantium.ECS.Components;
@@ -63,13 +61,15 @@ public class PivotTool: ToolBase
         pivotPoint = Tool.Get(PivotPointName);
     }
 
-    public override void Process(Entity targetEntity, CameraManager cameraManager, InputWormhole inputManager)
+    public override void Process(Entity targetEntity, Observatory observatory)
     {
+        var output = observatory.PointerOutput;
+        var inputManager = output.Input;
         if (!CheckTargetEntity(targetEntity))
             return;
 
         HighlightSelectedTool(false);
-        var camera = cameraManager.UserControlledCamera;
+        var camera = output.Camera;
 
         if (inputManager.IsMouseButtonReleased(MouseButton.Left))
         {
@@ -80,7 +80,7 @@ public class PivotTool: ToolBase
         if (!IsLocked)
         {
             Tool.IsEnabled = true;
-            UpdateToolTransform(targetEntity, cameraManager, false, true, false);
+            UpdateToolTransform(targetEntity, camera,false, true, false);
             Tool.Transform.Rotation = targetEntity.Transform.PivotRotation;
             Tool.TraverseByLayer(
                 current =>
@@ -135,7 +135,7 @@ public class PivotTool: ToolBase
             }
         }
 
-        Transform(Tool, cameraManager);
+        Transform(Tool, observatory);
     }
 
     protected override void UpdateAxisVisibility(Entity current, Camera camera)
@@ -291,9 +291,8 @@ public class PivotTool: ToolBase
         }
     }
 
-    protected virtual void UpdateToolTransform(Entity target, CameraManager cameraManager, bool isLocalAxis, bool useTargetCenter, bool calculateTransform)
+    protected override void UpdateToolTransform(Entity target, Camera camera, bool isLocalAxis, bool useTargetCenter, bool calculateTransform)
     {
-        var camera = cameraManager.UserControlledCamera;
         // Set tool to the local coordinates center of the target Entity (not geometrical center)
         Tool.TraverseByLayer(current =>
         {

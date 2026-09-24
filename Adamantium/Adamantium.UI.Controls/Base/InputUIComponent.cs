@@ -114,6 +114,12 @@ public class InputUIComponent : MeasurableUIComponent, IInputComponent
         Keyboard.PreviewKeyUpEvent.RegisterClassHandler<IInputComponent>(new KeyEventHandler(PreviewKeyUpHandler));
         Mouse.MouseEnterEvent.RegisterClassHandler<IInputComponent>(new MouseEventHandler(MouseEnterHandler));
         Mouse.MouseLeaveEvent.RegisterClassHandler<IInputComponent>(new MouseEventHandler(MouseLeaveHandler));
+        Mouse.DirectlyOverEnterEvent.RegisterClassHandler<IInputComponent>(new MouseEventHandler(DirectlyOverEnterHandler));
+        Mouse.DirectlyOverLeaveEvent.RegisterClassHandler<IInputComponent>(new MouseEventHandler(DirectlyOverLeaveHandler));
+        Keyboard.GotKeyboardFocusEvent.RegisterClassHandler<IInputComponent>(
+            new KeyboardGotFocusEventHandler(GotKeyboardFocusHandler));
+        Keyboard.LostKeyboardFocusEvent.RegisterClassHandler<IInputComponent>(
+            new KeyboardFocusChangedEventHandler(LostKeyboardFocusHandler));
         Mouse.PreviewMouseDownEvent.RegisterClassHandler<IInputComponent>(new MouseButtonEventHandler(PreviewMouseDownHandler));
         Mouse.MouseDownEvent.RegisterClassHandler<IInputComponent>(new MouseButtonEventHandler(MouseDownHandler));
         Mouse.PreviewMouseUpEvent.RegisterClassHandler<IInputComponent>(new MouseButtonEventHandler(PreviewMouseUpHandler));
@@ -758,6 +764,38 @@ public class InputUIComponent : MeasurableUIComponent, IInputComponent
         if (sender is InputUIComponent ui && ui.IsMouseOver)
         {
             ui.OnMouseLeave(e);
+        }
+    }
+
+    private static void DirectlyOverEnterHandler(object sender, MouseEventArgs e)
+    {
+        if (sender is InputUIComponent ui)
+        {
+            ui.IsMouseDirectlyOver = true;
+        }
+    }
+
+    private static void DirectlyOverLeaveHandler(object sender, MouseEventArgs e)
+    {
+        if (sender is InputUIComponent ui)
+        {
+            ui.IsMouseDirectlyOver = false;
+        }
+    }
+
+    private static void GotKeyboardFocusHandler(object sender, KeyboardGotFocusEventArgs e)
+    {
+        if (sender is InputUIComponent ui && ReferenceEquals(e.OriginalSource, ui))
+        {
+            ui.IsKeyboardFocused = true;
+        }
+    }
+
+    private static void LostKeyboardFocusHandler(object sender, KeyboardFocusChangedEventArgs e)
+    {
+        if (sender is InputUIComponent ui && ReferenceEquals(e.OriginalSource, ui))
+        {
+            ui.IsKeyboardFocused = false;
         }
     }
 

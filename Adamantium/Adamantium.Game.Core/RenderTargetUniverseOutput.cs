@@ -56,8 +56,6 @@ public class RenderTargetUniverseOutput : UIUniverseOutput
         nativeWindow = (RenderTargetPanel)OutputContext.Context;
         InputComponent = nativeWindow;
         nativeWindow.SizeChanged += NativeWindowOnSizeChanged;
-        nativeWindow.GotFocus += NativeWindow_GotFocus;
-        nativeWindow.LostFocus += NativeWindow_LostFocus;
         Description = new UniverseOutputDescription(PresenterType.RenderTarget);
 
         Width = (uint)nativeWindow.ActualWidth;
@@ -155,23 +153,9 @@ public class RenderTargetUniverseOutput : UIUniverseOutput
         UpdateViewportAndScissor(width, height);
         var sizePayload = new UniverseOutputSizeChangedPayload(this, new Adamantium.Mathematics.Size(width, height));
         RaiseSizeChangedEvent(sizePayload);
-        // Also publish on the aggregator: CameraManager rebuilds the projection (aspect ratio) off THIS event, not the
-        // local SizeChanged C# event. Width/Height are already set above, so UpdateDimensions reads the new size. Without
-        // this the game's projection never re-aspects on a panel resize.
-        EventAggregator.GetEvent<UniverseOutputSizeChangedEvent>().Publish(sizePayload);
         ResizeRequested = true;
         EventAggregator.GetEvent<UniverseOutputChangesRequestedEvent>().Publish(new UniverseOutputParametersPayload(this, Description, ChangeReason.Resize));
         // The surface is re-created on the next CopyOutput (size mismatch) and re-handed to the control.
-    }
-
-    private void NativeWindow_GotFocus(object sender, RoutedEventArgs e)
-    {
-        OnActivated();
-    }
-
-    private void NativeWindow_LostFocus(object sender, RoutedEventArgs e)
-    {
-        OnDeactivated();
     }
 
     public override UniverseOutputDescription Description { get; protected set; }
@@ -180,10 +164,6 @@ public class RenderTargetUniverseOutput : UIUniverseOutput
     /// Underlying control for rendering
     /// </summary>
     public override object NativeWindow => nativeWindow;
-
-    public override bool IsActive => InputComponent.IsFocused;
-
-    public override WindowState State { get; set; }
 
     internal override bool CanHandle(OutputContext gameContext)
     {
@@ -195,8 +175,6 @@ public class RenderTargetUniverseOutput : UIUniverseOutput
         if (!CanHandle(context)) return;
 
         nativeWindow.SizeChanged -= NativeWindowOnSizeChanged;
-        nativeWindow.GotFocus -= NativeWindow_GotFocus;
-        nativeWindow.LostFocus -= NativeWindow_LostFocus;
         ReleaseSurface();
         Initialize(context);
     }

@@ -46,11 +46,6 @@ namespace Adamantium.Game.Core
         public UniverseOutput MainWindow { get; protected set; }
 
         /// <summary>
-        /// Current focused <see cref="UniverseOutput"/>
-        /// </summary>
-        public UniverseOutput ActiveWindow { get; private set; }
-
-        /// <summary>
         /// Read only collection of <see cref="UniverseOutput"/>s
         /// </summary>
         public IReadOnlyList<UniverseOutput> Outputs => outputs;
@@ -196,15 +191,11 @@ namespace Adamantium.Game.Core
 
         private void SubscribeToEvents(UniverseOutput wnd)
         {
-            wnd.Activated += Window_Activated;
-            wnd.Deactivated += Window_Deactivated;
             wnd.Closed += Wnd_Closed;
         }
 
         private void UnsubscribeFromEvents(UniverseOutput wnd)
         {
-            wnd.Activated -= Window_Activated;
-            wnd.Deactivated -= Window_Deactivated;
             wnd.Closed -= Wnd_Closed;
         }
 
@@ -248,19 +239,6 @@ namespace Adamantium.Game.Core
             }
         }
 
-        private void Window_Deactivated(UniverseOutput output)
-        {
-            OnDeactivated(output);
-            ActiveWindow = null;
-        }
-
-        private void Window_Activated(UniverseOutput output)
-        {
-            ActiveWindow = output;
-            OnActivated(ActiveWindow);
-        }
-
-        // Through the same queue a closed window takes, so the output is unsubscribed and its removal announced.
         public void RemoveOutput(OutputContext context)
         {
             if (contextToWindow.Remove(context, out var window))
@@ -269,22 +247,9 @@ namespace Adamantium.Game.Core
             }
         }
 
-        private void OnActivated(UniverseOutput output)
-        {
-            _eventAggregator.GetEvent<UniverseOutputActivatedEvent>().Publish(output);
-        }
-
-        private void OnDeactivated(UniverseOutput output)
-        {
-            _eventAggregator.GetEvent<UniverseOutputDeactivatedEvent>().Publish(output);
-        }
-
         private void OnWindowSizeChanged(UniverseOutput wnd)
         {
             wnd?.OnWindowSizeChanged();
-            
-            // eventAggregator.GetEvent<UniverseOutputSizeChangedEvent>()
-            //     .Publish(new UniverseOutputSizeChangedPayload(wnd, new Size(wnd.Width, wnd.Height)));
         }
 
         /// <summary>
@@ -319,7 +284,6 @@ namespace Adamantium.Game.Core
                 }
                 outputs.Clear();
                 MainWindow = null;
-                ActiveWindow = null;
                 contextToWindow.Clear();
             }
         }

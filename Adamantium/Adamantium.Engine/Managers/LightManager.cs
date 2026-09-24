@@ -8,6 +8,7 @@ using Adamantium.ECS;
 using Adamantium.ECS.Components;
 using Adamantium.ECS.Components.Extensions;
 using Adamantium.Engine.Rendering;
+using Adamantium.Game.Core;
 using Adamantium.Game.Core.Input;
 using Adamantium.Graphics;
 using Adamantium.Graphics.Core.Models;
@@ -363,7 +364,7 @@ public class LightManager
         geometryCache.DrawMesh(device, spotLightRenderer);
     }
 
-    public bool ProcessLight(Entity lightEntity, CameraManager cameraManager, InputWormhole inputManager)
+    public bool ProcessLight(Entity lightEntity, Observatory observatory)
     {
         if (!Contains(lightEntity))
             return false;
@@ -389,6 +390,6 @@ public class LightManager
                 break;
         }
 
-        return currentToolBase.Process(lightEntity, light, cameraManager, inputManager);
+        return currentToolBase.Process(lightEntity, light, observatory);
     }
 }

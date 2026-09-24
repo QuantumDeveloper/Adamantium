@@ -7,8 +7,8 @@ using Adamantium.Core.Events;
 using Adamantium.Engine;
 using Adamantium.Engine.Compiler.Models;
 using Adamantium.Engine.EntityServices;
-using Adamantium.Engine.Managers;
 using Adamantium.ECS;
+using Adamantium.ECS.Components;
 using Adamantium.Game.Core;
 using Adamantium.Game.Core.Events;
 using Adamantium.Game.Core.Input;
@@ -17,6 +17,7 @@ using Adamantium.Graphics.Core;
 using Adamantium.Graphics.Core.Content;
 using Adamantium.Graphics.Core.Models;
 using Adamantium.Imaging;
+using Adamantium.Mathematics;
 using Adamantium.UI;
 using Adamantium.UI.Core;
 using Adamantium.UI.Services;
@@ -86,6 +87,7 @@ public class Universe : PropertyChangedBase, IUniverse
             
         EventAggregator = Container.Resolve<IEventAggregator>();
         EventAggregator.GetEvent<UniverseOutputRemovedEvent>().Subscribe(OnOutputRemoved);
+        EventAggregator.GetEvent<UniverseOutputCreatedEvent>().Subscribe(OnOutputCreated);
         var factory = Container.Resolve<IGraphicsDeviceFactory>();
 
         if (mode is UniverseMode.Standalone or UniverseMode.Primary)
@@ -119,7 +121,6 @@ public class Universe : PropertyChangedBase, IUniverse
         
     public EntityWorld EntityWorld { get; }
         
-    public CameraManager CameraManager { get; private set; }
     public IGraphicsDeviceService GraphicsDeviceService { get; set; }
 
     public bool IsInitialized { get; private set; }
@@ -154,10 +155,6 @@ public class Universe : PropertyChangedBase, IUniverse
     /// </summary>
     public IReadOnlyList<UniverseOutput> Outputs => gamePlatform.Outputs;
 
-    /// <summary>
-    /// Current focused <see cref="UniverseOutput"/>
-    /// </summary>
-    public UniverseOutput ActiveOutput => gamePlatform.ActiveWindow;
 
     /// <summary>
     /// Main <see cref="UniverseOutput"/>
@@ -212,7 +209,6 @@ public class Universe : PropertyChangedBase, IUniverse
 
     protected virtual void Initialize()
     {
-        CameraManager = new CameraManager(this);
     }
         
     private void Game_Stopped(object sender, EventArgs e)
@@ -393,7 +389,6 @@ public class Universe : PropertyChangedBase, IUniverse
             throw new ArgumentNullException(nameof(newContext));
         }
 
-        // Nothing on the old context: the game still has to end up on the new one.
         if (!contextsMapping.Remove(oldContext, out var gameContext))
         {
             if (!contextsMapping.ContainsKey(newContext))
@@ -637,6 +632,7 @@ public class Universe : PropertyChangedBase, IUniverse
     protected virtual void MakePreparations()
     {
         gamePlatform.MakePreparationsForNextFrame();
+        OutputsSettled?.Invoke(this, EventArgs.Empty);
     }
 
     private void DisposeGraphicsDeviceEvents()
@@ -674,6 +670,16 @@ public class Universe : PropertyChangedBase, IUniverse
         return unloadContentCollector.Collect(disposeArg);
     }
 
+    private void OnOutputCreated(UniverseOutput output)
+    {
+        var entity = new CameraTemplate().BuildEntity(
+            null, $"Main camera for {output.Name}", Vector3.Zero, Vector3.ForwardLH, -Vector3.Up,
+            output.Width, output.Height, 0.1f, 1000000.0f);
+        entity.Transform.Position = new Vector3(0, 0, -20);
+        EntityWorld.EntityManager.AddEntity(entity);
+        output.Camera = entity.GetComponent<Camera>();
+    }
+
     private void OnOutputRemoved(UniverseOutput output)
     {
         RemoveRenderProcessor(output);
@@ -705,6 +711,7 @@ public class Universe : PropertyChangedBase, IUniverse
 
     public event EventHandler Initialized;
     public event EventHandler FrameFinished;
+    public event EventHandler OutputsSettled;
     public event EventHandler<EventArgs> Started;
     public event EventHandler<EventArgs> ShuttingDown;
     public event EventHandler<EventArgs> Stopped;

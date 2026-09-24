@@ -1,6 +1,5 @@
 ﻿using System;
 using Adamantium.Core;
-using Adamantium.Engine.Managers;
 using Adamantium.ECS;
 using Adamantium.ECS.Components;
 using Adamantium.Game;
@@ -26,7 +25,6 @@ public class RenderingService : EntityService
     public UniverseOutput Window { get; }
 
     protected InputWormhole InputManager => Window.Input;
-    protected CameraManager CameraManager { get; }
         
     //protected SpriteBatch SpriteBatch;
 
@@ -43,20 +41,13 @@ public class RenderingService : EntityService
         Window = window;
         Window.ParametersChanging += Window_ParametersChanging;
         Window.ParametersChanged += Window_ParametersChanged;
-        Window.StateChanged += StateChanged;
         Window.SizeChanged += WindowOnSizeChanged;
-        CameraManager = EntityWorld.DependencyResolver.Resolve<CameraManager>();
         //SpriteBatch = new SpriteBatch(GraphicsDevice, 80000);
     }
 
     private void WindowOnSizeChanged(UniverseOutputSizeChangedPayload obj)
     {
         //Window.UpdatePresenter();
-    }
-
-    private void StateChanged(WindowStatePayload obj)
-    {
-            
     }
 
     private void Window_ParametersChanged(UniverseOutputParametersPayload payload)
@@ -147,7 +138,7 @@ public class RenderingService : EntityService
             ShowDebugOutput = !ShowDebugOutput;
         }
 
-        ActiveCamera = CameraManager.GetActive(Window);
+        ActiveCamera = Window.Camera;
 
         DrawProcessors(gameTime);
     }

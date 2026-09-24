@@ -64,11 +64,19 @@ public class KeyboardDevice
       }
       if (component != FocusedComponent)
       {
+         var previous = FocusedComponent;
          KeyboardFocusChangedEventArgs args = new KeyboardFocusChangedEventArgs(FocusedComponent, component);
          args.RoutedEvent = Keyboard.PreviewGotKeyboardFocusEvent;
          FocusedComponent?.RaiseEvent(args);
 
          FocusedComponent = component;
+
+         if (previous != null)
+         {
+            var lost = new KeyboardFocusChangedEventArgs(previous, component);
+            lost.RoutedEvent = Keyboard.LostKeyboardFocusEvent;
+            previous.RaiseEvent(lost);
+         }
 
          KeyboardGotFocusEventArgs e = new KeyboardGotFocusEventArgs(FocusedComponent, component, navigationMethod, modifiers);
          e.RoutedEvent = Keyboard.GotKeyboardFocusEvent;

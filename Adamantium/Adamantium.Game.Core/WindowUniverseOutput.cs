@@ -25,16 +25,9 @@ namespace Adamantium.Game.Core
             Initialize(gameContext);
         }
 
-        public override bool IsActive => window.IsActive;
+        public override bool IsKeyboardFocused => window.IsActive;
 
-        public override WindowState State
-        {
-            get => window.State;
-            set
-            {
-                window.State = value;
-            }
-        }
+        public override bool IsPointerOver => InputComponent.IsMouseOver;
 
         internal override bool CanHandle(OutputContext gameContext)
         {
@@ -61,8 +54,7 @@ namespace Adamantium.Game.Core
 
         private void WindowOnStateChanged(object sender, StateChangedEventArgs e)
         {
-            State = window.State;
-            StateChanged?.Invoke(new WindowStatePayload(State));
+            StateChanged?.Invoke(State);
         }
 
         private void WindowOnClientSizeChanged(object sender, SizeChangedEventArgs e)

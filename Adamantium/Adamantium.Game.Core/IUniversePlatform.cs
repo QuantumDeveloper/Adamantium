@@ -10,8 +10,6 @@ namespace Adamantium.Game.Core
 
         UniverseOutput MainWindow { get; }
 
-        UniverseOutput ActiveWindow { get; }
-
         IReadOnlyList<UniverseOutput> Outputs { get; }
         
         bool HasOutputs { get; }

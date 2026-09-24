@@ -1,9 +1,0 @@
-﻿using Adamantium.Core.Events;
-
-namespace Adamantium.Game.Core.Events
-{
-    public class UniverseOutputDeactivatedEvent : BasicAggregatorEvent<UniverseOutput>
-    {
-        
-    }
-}

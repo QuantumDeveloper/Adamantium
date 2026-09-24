@@ -18,7 +18,7 @@ public class UniverseService : IUniverseService
 
     public UniverseService()
     {
-        _universes = new List<UniverseKey>();
+        _universes = [];
     }
 
     public IReadOnlyList<IUniverse> Universes
@@ -61,7 +61,10 @@ public class UniverseService : IUniverseService
         {
             Parallel.ForEach(_universes, (item) =>
             {
-                if (item.Service != renderService)  return;
+                if (item.Service != renderService)
+                {
+                    return;
+                }
 
                 item.Universe.RunOnce(time);
             });
@@ -78,9 +81,10 @@ public class UniverseService : IUniverseService
         {
             foreach (var output in universe.Outputs)
             {
-                // A whole frame's worth of pixels into a surface nobody samples: an output off the visual tree - a game
-                // panel whose tab is not the selected one - drew nothing this frame and has no viewer for it either.
-                if (!output.IsVisible) continue;
+                if (!output.IsVisible)
+                {
+                    continue;
+                }
 
                 output.CopyOutput(graphicsDevice);
             }
@@ -119,7 +123,10 @@ public class UniverseService : IUniverseService
 
         public static bool operator == (UniverseKey key1, UniverseKey key2)
         {
-            if (key1 == null || key2 == null) return false;
+            if (key1 == null || key2 == null)
+            {
+                return false;
+            }
 
             return key1 == key2;
         }

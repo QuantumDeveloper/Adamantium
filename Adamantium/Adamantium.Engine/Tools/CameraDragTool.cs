@@ -1,8 +1,5 @@
-﻿using Adamantium.Engine.Managers;
-using Adamantium.Engine.Services;
-using Adamantium.ECS;
+﻿using Adamantium.ECS;
 using Adamantium.ECS.Components;
-using Adamantium.Game.Core.Input;
 using Adamantium.Mathematics;
 
 namespace Adamantium.Engine.Tools;
@@ -15,9 +12,11 @@ public class CameraDragTool: ToolBase
     {
     }
 
-    public override void Process(Entity targetEntity, CameraManager cameraManager, InputWormhole inputManager)
+    public override void Process(Entity targetEntity, Observatory observatory)
     {
-        var camera = cameraManager.UserControlledCamera;
+        var output = observatory.PointerOutput;
+        var inputManager = output.Input;
+        var camera = output.Camera;
 
         SetIsLocked(inputManager);
 

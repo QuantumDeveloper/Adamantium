@@ -1,9 +1,10 @@
 ﻿using System;
+using System.Collections.Generic;
 using Adamantium.Core;
-using Adamantium.Engine.Managers;
 using Adamantium.ECS;
 using Adamantium.ECS.Components;
 using Adamantium.ECS.Components.Extensions;
+using Adamantium.Game.Core;
 using Adamantium.Mathematics;
 using Serilog;
 
@@ -11,7 +12,8 @@ namespace Adamantium.Engine.EntityServices;
 
 public class TransformService : EntityService
 {
-    private CameraManager cameraManager;
+    private IUniverse universe;
+    private readonly List<Camera> cameras = [];
 
     public Boolean IsPaused { get; set; }
 
@@ -27,7 +29,7 @@ public class TransformService : EntityService
 
     public override void Initialize()
     {
-        cameraManager = EntityWorld.DependencyResolver.Resolve<CameraManager>();
+        universe = EntityWorld.DependencyResolver.Resolve<IUniverse>();
     }
 
     public override void Update(AppTime gameTime)
@@ -35,6 +37,7 @@ public class TransformService : EntityService
         var entities = Entities;
         try
         {
+            universe.CollectCurrentCameras(cameras);
             foreach (var entity in entities)
             {
                 Transform(entity, gameTime);
@@ -55,7 +58,7 @@ public class TransformService : EntityService
             var dirty = transform.IsWorldDirty;
             Collider[] colliders = null;
 
-            foreach (var camera in cameraManager.ActiveCameras)
+            foreach (var camera in cameras)
             {
                 if (camera.Owner == current)
                 {

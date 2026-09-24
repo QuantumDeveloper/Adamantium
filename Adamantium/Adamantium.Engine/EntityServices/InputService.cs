@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Globalization;
 using Adamantium.Core;
 using Adamantium.Engine.Managers;
@@ -18,20 +18,19 @@ public class InputService : EntityService
 {
     private Entity userControlledEntity;
     private Entity selectedEntity;
-
-    public Boolean InstrumentsEnabled { get; set; }
-
     //private AudioManager audioManager;
     private ToolsManager toolsManager;
-    private IUniversePlatform gamePlatform;
+    private Observatory observatory;
 
     public InputService(EntityWorld world) : base(world)
     {
         toolsManager = DependencyResolver.Resolve<ToolsManager>();
+        observatory = DependencyResolver.Resolve<Observatory>();
         EntityWorld.EntityManager.EntityRemoved += EntityManagerEntityRemoved;
         //audioManager = new AudioManager();
-        gamePlatform = world.DependencyResolver.Resolve<IUniversePlatform>();
     }
+
+    public Boolean InstrumentsEnabled { get; set; }
 
     public override void UnloadContent()
     {
@@ -51,38 +50,33 @@ public class InputService : EntityService
     /// is selected.</summary>
     public Entity UserControlledEntity { get; set; }
 
+    /// <summary>
+    /// The mouse turns and zooms the camera of the output under the pointer, the keys and gamepad drive the camera of
+    /// the output taking the keyboard - which may be another output, or none. Every visible camera is updated either way.
+    /// </summary>
     public override void Update(AppTime gameTime)
     {
-        // The editor's SELECTION first, then whatever the application put the player in charge of. Only the first half
-        // was read, so an application that never opens a tool panel had no subject at all - and every key that follows
-        // one (the third-person modes) quietly did nothing.
         userControlledEntity = toolsManager.SelectedEntity ?? UserControlledEntity;
-        var cameraController = DependencyResolver.Resolve<CameraManager>();
 
-        var currentCamera = cameraController?.UserControlledCamera;
-        if (currentCamera == null)
+        if (observatory.PointerOutput is { Camera: { } pointerCamera } pointerOutput)
         {
-            return;
+            HandlePointer(pointerOutput.Input, pointerCamera, gameTime);
         }
 
-        // No active output, no input - but a camera following its subject keeps following it.
-        var inputManager = gamePlatform.ActiveWindow?.Input;
-        if (inputManager == null)
+        if (observatory.KeyboardOutput is { Camera: { } keyboardCamera } keyboardOutput)
         {
-            currentCamera.Update(gameTime);
-            return;
+            HandleKeyboard(keyboardOutput, keyboardCamera, gameTime);
         }
 
-        //currentCamera.Velocity = 1000;
+        var cameras = observatory.CurrentCameras;
+        for (int i = 0; i < cameras.Count; i++)
+        {
+            cameras[i].Update(gameTime);
+        }
+    }
 
-        //if (currentCamera.Type == CameraType.Free || currentCamera.Type == CameraType.Special)
-        //{
-        //    userControlledEntity = currentCamera.Owner;
-        //}
-        var gamepadState = inputManager.GetGamepadState(0);
-        Double cameraMovementSpeed = currentCamera.Velocity * gameTime.FrameTime;
-        float rotationAngle = currentCamera.RotationSpeed * (float)gameTime.FrameTime;
-            
+    private void HandlePointer(InputWormhole inputManager, Camera currentCamera, AppTime gameTime)
+    {
         if (inputManager.IsMouseButtonDown(MouseButton.Right))
         {
             currentCamera.RotateRelativeXY(
@@ -96,10 +90,14 @@ public class InputService : EntityService
         {
             currentCamera.TranslateForward(inputManager.MouseWheelDelta * currentCamera.Velocity * gameTime.FrameTime);
         }
+    }
 
-        /**********************************************************************
-        /* Controls the rotation/move speed of the camera and mouse sensitivity
-        /*********************************************************************/
+    private void HandleKeyboard(UniverseOutput output, Camera currentCamera, AppTime gameTime)
+    {
+        var inputManager = output.Input;
+        var gamepadState = inputManager.GetGamepadState(0);
+        Double cameraMovementSpeed = currentCamera.Velocity * gameTime.FrameTime;
+        float rotationAngle = currentCamera.RotationSpeed * (float)gameTime.FrameTime;
 
         if (inputManager.IsKeyPressed(Keys.Divide))
         {
@@ -139,9 +137,6 @@ public class InputService : EntityService
             currentCamera.MouseSensitivity += 0.1f;
         }
 
-
-        //Gamepad input
-        /**********************************************************************/
         if (gamepadState.RightThumb.X != 0)
         {
             currentCamera.RotateUp(-rotationAngle * gamepadState.RightThumb.X);
@@ -171,89 +166,66 @@ public class InputService : EntityService
         {
             currentCamera.TranslateRight(gamepadState.LeftThumb.X * cameraMovementSpeed);
         }
-            
-        /******************************************************************/
-
-        /**********************************************************************
-                       Controls the rotation/move of the camera
-        /*********************************************************************/
 
         if (inputManager.IsKeyDown(Keys.RightArrow) || inputManager.IsKeyDown(Keys.NumPad6))
         {
             currentCamera.RotateUp(-rotationAngle);
-            //userControlledEntity?.Transform.RotateUp(-rotationAngle, RotationUnits.Degrees);
         }
 
         if (inputManager.IsKeyDown(Keys.LeftArrow) || inputManager.IsKeyDown(Keys.NumPad4))
         {
             currentCamera.RotateUp(rotationAngle);
-            //userControlledEntity?.Transform.RotateUp(rotationAngle, RotationUnits.Degrees);
         }
 
         if (inputManager.IsKeyDown(Keys.UpArrow) || inputManager.IsKeyDown(Keys.NumPad8))
         {
             currentCamera.RotateRight(-rotationAngle);
-            //userControlledEntity?.Transform.RotateRight(rotationAngle, RotationUnits.Degrees);
         }
 
         if (inputManager.IsKeyDown(Keys.DownArrow) || inputManager.IsKeyDown(Keys.NumPad5))
         {
             currentCamera.RotateRight(rotationAngle);
-            //userControlledEntity?.Transform.RotateRight(-rotationAngle, RotationUnits.Degrees);
         }
 
         if (inputManager.IsKeyDown(Keys.PageUp))
         {
             currentCamera.RotateForward(rotationAngle);
-            //userControlledEntity?.Transform.RotateForward(rotationAngle, RotationUnits.Degrees);
         }
 
         if (inputManager.IsKeyDown(Keys.PageDown))
         {
             currentCamera.RotateForward(-rotationAngle);
-            //userControlledEntity?.Transform.RotateForward(-rotationAngle, RotationUnits.Degrees);
         }
 
         if (inputManager.IsKeyDown(Keys.W))
         {
             currentCamera.TranslateForward(cameraMovementSpeed);
-            //userControlledEntity?.Transform.TranslateForward(-cameraMovementSpeed);
         }
 
         if (inputManager.IsKeyDown(Keys.S))
         {
             currentCamera.TranslateForward(-cameraMovementSpeed);
-            //userControlledEntity?.Transform.TranslateForward(cameraMovementSpeed);
         }
 
         if (inputManager.IsKeyDown(Keys.A))
         {
             currentCamera.TranslateRight(-cameraMovementSpeed);
-            //userControlledEntity?.Transform.TranslateRight(-cameraMovementSpeed);
         }
 
         if (inputManager.IsKeyDown(Keys.D))
         {
             currentCamera.TranslateRight(cameraMovementSpeed);
-            //userControlledEntity?.Transform.TranslateRight(cameraMovementSpeed);
         }
 
         if (inputManager.IsKeyDown(Keys.Q))
         {
             currentCamera.TranslateUp(cameraMovementSpeed);
-            //userControlledEntity?.Transform.TranslateUp(-cameraMovementSpeed);
         }
 
         if (inputManager.IsKeyDown(Keys.E))
         {
             currentCamera.TranslateUp(-cameraMovementSpeed);
-            //userControlledEntity?.Transform.TranslateUp(cameraMovementSpeed);
         }
-
-
-        /**********************************************************************
-        /* Controls the type of the camera
-        /*********************************************************************/
 
         if (inputManager.IsKeyPressed(Keys.F1))
         {
@@ -263,20 +235,11 @@ public class InputService : EntityService
             }
         }
 
-        if (inputManager.IsKeyPressed(Keys.F2))
-        {
-            // @TODO - think this mode through and implement
-            /*UserControlledCamera.CameraType = CameraType.FirstPerson;
-                  decimal radius = 2000;
-                  SetFirstPersonCamera(UserControlledCamera, UserControlledCamera.Offset, UserControlledCamera.Rotation, radius);*/
-        }
-
-        // PRESSED, not held: F3 re-entered third person on every frame the key was down, rebuilding the orbit from
-        // scratch each time - which is what a held key looked like it was doing wrong.
         if (inputManager.IsKeyPressed(Keys.F3))
         {
-            if (cameraController.SetUserControlled(toolsManager.SelectedEntity))
+            if (toolsManager.SelectedEntity?.GetComponent<Camera>() is { } selectedCamera)
             {
+                output.Camera = selectedCamera;
                 toolsManager.SelectedEntity = null;
             }
             else
@@ -295,7 +258,6 @@ public class InputService : EntityService
             Follow(currentCamera, userControlledEntity, new Vector3F(-10, 0, 0), CameraType.ThirdPersonLocked);
         }
 
-        // for camera look backwards
         if (inputManager.IsKeyPressed(Keys.C))
         {
             if ((currentCamera.Type == CameraType.ThirdPersonFree) ||
@@ -314,9 +276,6 @@ public class InputService : EntityService
             }
         }
 
-        // Final ViewMatrix update after all the changes
-        currentCamera.Update(gameTime);
-
         if (inputManager.IsKeyPressed(Keys.F11))
         {
             toolsManager.SelectedEntity?.SetWireFrame();
@@ -324,33 +283,30 @@ public class InputService : EntityService
 
         if (inputManager.IsKeyPressed(Keys.F12))
         {
-            foreach (var window in gamePlatform.Outputs)
+            foreach (var window in observatory.Outputs)
             {
                 var filename = $"Screenshot_{window.Name}" + DateTime.Now.ToString("dd_MM_yyyy hh_mm_ss_ffff", CultureInfo.InvariantCulture) + ".jpg";
                 window?.TakeScreenshotAsync(filename, ImageFileType.Png);
             }
         }
-
-        if (inputManager.IsKeyDown(Keys.F10))
-        {
-            //audioManager.Play();
-        }
-
-        if (inputManager.IsKeyReleased(Keys.F10))
-        {
-            //audioManager.Stop();
-        }
     }
 
-    // Only when it changes something: the old guards compared the camera's OWN entity against the subject, never
-    // equal, so every press rebuilt the orbit.
     private void Follow(Camera camera, Entity subject, Vector3F relativeRotation, CameraType type)
     {
-        if (subject == null) return;
+        if (subject == null)
+        {
+            return;
+        }
 
-        if (FollowsWholeObject) subject = RootOf(subject);
+        if (FollowsWholeObject)
+        {
+            subject = RootOf(subject);
+        }
 
-        if (camera.Type == type && camera.Subject == subject) return;
+        if (camera.Type == type && camera.Subject == subject)
+        {
+            return;
+        }
 
         camera.SetThirdPersonCamera(subject, relativeRotation, type);
     }
@@ -358,17 +314,27 @@ public class InputService : EntityService
     private static Entity RootOf(Entity entity)
     {
         var root = entity;
-        while (root.Owner != null) root = root.Owner;
+        while (root.Owner != null)
+        {
+            root = root.Owner;
+        }
 
         return root;
     }
 
     private void EntityManagerEntityRemoved(object sender, EntityEventArgs e)
     {
-        var cameraService = DependencyResolver.Resolve<CameraManager>();
-        if (e.Entity == cameraService.UserControlledCamera.Owner)
+        var outputs = observatory.Outputs;
+        for (int i = 0; i < outputs.Count; i++)
         {
-            cameraService.UserControlledCamera.Type = CameraType.Free;
+            var cameras = outputs[i].Cameras;
+            for (int j = 0; j < cameras.Count; j++)
+            {
+                if (e.Entity == cameras[j].Owner)
+                {
+                    cameras[j].Type = CameraType.Free;
+                }
+            }
         }
     }
 }

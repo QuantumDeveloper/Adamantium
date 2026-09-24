@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Threading.Tasks;
+using Adamantium.Engine;
 using Adamantium.Engine.EntityServices;
 using Adamantium.Engine.Managers;
 using Adamantium.Engine.Templates;
@@ -42,9 +43,9 @@ namespace Adamantium.UI.Sandbox
         protected override void Initialize()
         {
             base.Initialize();
-            // Editing tools are the demo's choice, not the game's: created before the services that resolve them.
             Container.RegisterInstance<ToolsManager>(new ToolsManager(EntityWorld));
             Container.RegisterInstance<LightManager>(new LightManager(EntityWorld));
+            Container.RegisterInstance<Observatory>(new Observatory(this, EntityWorld));
             InitializeGameResources();
         }
 

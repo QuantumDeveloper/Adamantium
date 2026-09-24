@@ -1,7 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using Adamantium.Engine.Managers;
-using Adamantium.Engine.Services;
 using Adamantium.Engine.Templates.Tools;
 using Adamantium.ECS;
 using Adamantium.ECS.Components;
@@ -39,14 +37,20 @@ public class OrientationTool: ToolBase
         stepDown = Tool.Get("StepDownManipulator");
     }
 
-    public override void Process(Entity targetEntity, CameraManager cameraManager, InputWormhole inputManager)
+    public override void Process(Entity targetEntity, Observatory observatory)
     {
+        var outputs = observatory.VisibleOutputs;
         Tool.TraverseByLayer(current =>
         {
             var colliders = current.GetComponents<Collider>();
 
-            foreach (var camera in cameraManager.ActiveCameras)
+            for (int i = 0; i < outputs.Count; i++)
             {
+                if (outputs[i].Camera is not { } camera)
+                {
+                    continue;
+                }
+
                 TransformOrientationTool(current, camera);
 
                 foreach (var collider in colliders)
@@ -59,9 +63,10 @@ public class OrientationTool: ToolBase
             }
         }, true);
 
-        // Without input the gizmo is only placed; picking and dragging need a pointer.
-        var userCamera = cameraManager.UserControlledCamera;
-        if (userCamera == null || inputManager == null) return;
+        if (observatory.PointerOutput is not { Camera: { } userCamera, Input: { CanLocatePointer: true } inputManager })
+        {
+            return;
+        }
 
         // While a part is HELD the pointer is pinned and hidden, so there is nothing to pick with - the grab stands
         // until the button comes up, and the highlight stays on what was grabbed.
