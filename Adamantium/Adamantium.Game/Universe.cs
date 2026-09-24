@@ -4,21 +4,17 @@ using System.Threading;
 using Adamantium.Core;
 using Adamantium.Core.DependencyInjection;
 using Adamantium.Core.Events;
-using Adamantium.Engine;
 using Adamantium.Engine.Compiler.Models;
-using Adamantium.Engine.EntityServices;
 using Adamantium.ECS;
 using Adamantium.ECS.Components;
 using Adamantium.Game.Core;
 using Adamantium.Game.Core.Events;
-using Adamantium.Game.Core.Input;
 using Adamantium.Graphics;
 using Adamantium.Graphics.Core;
 using Adamantium.Graphics.Core.Content;
 using Adamantium.Graphics.Core.Models;
 using Adamantium.Imaging;
 using Adamantium.Mathematics;
-using Adamantium.UI;
 using Adamantium.UI.Core;
 using Adamantium.UI.Services;
 using Serilog;
@@ -27,7 +23,7 @@ namespace Adamantium.Game;
 
 public class Universe : PropertyChangedBase, IUniverse
 {
-    private readonly Dictionary<UniverseOutput, EntityService> drawSystems;
+    private readonly Dictionary<UniverseOutput, EntityService> drawSystems = [];
 
     private readonly DisposeCollector unloadContentCollector;
         
@@ -113,7 +109,6 @@ public class Universe : PropertyChangedBase, IUniverse
         Container.RegisterInstance<EntityWorld>(EntityWorld);
             
         Stopped += Game_Stopped;
-        drawSystems = new Dictionary<UniverseOutput, EntityService>();
         gameLoopThread = new Thread(StartGameLoop);
     }
         
@@ -220,17 +215,19 @@ public class Universe : PropertyChangedBase, IUniverse
     {
         lock (drawSystems)
         {
-            if (drawSystems.ContainsKey(window))
+            if (drawSystems.Remove(window, out var system))
             {
-                EntityWorld.RemoveService(drawSystems[window]);
-                drawSystems.Remove(window);
+                EntityWorld.RemoveService(system);
             }
         }
     }
 
-    public T CreateRenderService<T>(UniverseOutput window) where T : RenderingService
+    /// <summary>
+    /// Creates the service that draws <paramref name="window"/>; it is removed together with the output.
+    /// </summary>
+    public T CreateRenderService<T>(UniverseOutput window) where T : EntityService
     {
-        var system = EntityWorld.CreateService<T>(new object[] { EntityWorld, window });
+        var system = EntityWorld.CreateService<T>(EntityWorld, window);
         lock (drawSystems)
         {
             drawSystems.Add(window, system);

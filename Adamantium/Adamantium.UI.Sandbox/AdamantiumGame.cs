@@ -17,8 +17,11 @@ namespace Adamantium.UI.Sandbox
 {
     public class AdamantiumGame : Universe
     {
+        private Task _startupLoad;
+        private InputService _inputService;
+
         public AdamantiumGame(
-            bool enableDynamicRendering, 
+            bool enableDynamicRendering,
             bool enableDebug) :
             base(UniverseMode.Primary, enableDebug)
         {
@@ -26,7 +29,7 @@ namespace Adamantium.UI.Sandbox
         }
 
         public AdamantiumGame(
-            IGraphicsDeviceService graphicsDeviceService, 
+            IGraphicsDeviceService graphicsDeviceService,
             bool enableDebug) :
             base(UniverseMode.Slave, enableDebug, graphicsDeviceService)
         {
@@ -35,7 +38,7 @@ namespace Adamantium.UI.Sandbox
 
         private void OnWindowCreated(UniverseOutput output)
         {
-            var renderingService = EntityWorld.CreateService<RenderingService>(EntityWorld, output);
+            var renderingService = CreateRenderService<RenderingService>(output);
             var processor = new ForwardRenderingProcessor();
             renderingService.AttachProcessor(processor);
         }
@@ -56,10 +59,6 @@ namespace Adamantium.UI.Sandbox
             // also what keeps this from starting a second load - LoadContent runs again when the device is recreated.
             _startupLoad ??= LoadModels();
         }
-
-        private Task _startupLoad;
-
-        private InputService _inputService;
 
         private void InitializeGameResources()
         {
