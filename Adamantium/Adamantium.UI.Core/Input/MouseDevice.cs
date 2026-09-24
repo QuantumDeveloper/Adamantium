@@ -1,4 +1,4 @@
-﻿using Adamantium.Mathematics;
+using Adamantium.Mathematics;
 using Adamantium.UI.Core.Input.Raw;
 
 namespace Adamantium.UI.Core.Input;
@@ -27,44 +27,33 @@ public class MouseDevice
 
     private PixelPoint Position;
 
-    // The window the current Position was measured against (set on every raw event). GetPosition falls back to it when the
-    // relativeTo element has NO VisualParent path to a window - i.e. it lives on a popup overlay (a detached logical child).
+    // The window Position was measured against: popup-overlay content has no visual path to a window.
     private IInputComponent _positionRoot;
 
-    /// <summary>The window the pointer is actually OVER, as the OS sees it: the platform delivers a move to the topmost
-    /// window under the cursor and a LeaveWindow when it goes. Needed because hover is recomputed geometrically from the
-    /// SCREEN position (see RefreshMouseOver), which on its own cannot tell that another, opaque window is covering the
-    /// point - so a background window kept lighting up controls under a window in front of it. Clicks never had the
-    /// problem: those arrive already addressed to a window by the OS.</summary>
+    // The window the OS says the pointer is over: hover is recomputed from the screen position, which cannot tell that
+    // another window covers the point.
     private IInputComponent _hoverRoot;
 
     private static MouseDevice currentDevice;
-        
+
     public static MouseDevice CurrentDevice => currentDevice ??= new MouseDevice();
 
+    /// <summary>Captures the mouse for <paramref name="component"/>; null releases it. Raises Lost/GotMouseCapture, so a
+    /// control learns when the OS revoked its capture.</summary>
     public bool Capture(IInputComponent component)
     {
-        // A null component releases the current capture. Routing (MouseMove/MouseDown/MouseUp) honours Captured, so a
-        // control that captures on press keeps receiving move/up even when the pointer leaves it.
         var previous = Captured;
         if (ReferenceEquals(previous, component)) return component != null;
         Captured = component;
 
-        // Raise Lost/GotMouseCapture so a captured control learns its capture went away - whether we released it or the OS
-        // revoked it (WM_CAPTURECHANGED: another app, a screenshot overlay, Alt-Tab). Without this a drag that relied on
-        // capture could hang forever when capture was yanked from under it.
         previous?.RaiseEvent(new MouseEventArgs(this, InputModifiers.None, 0) { RoutedEvent = Mouse.LostMouseCaptureEvent });
         component?.RaiseEvent(new MouseEventArgs(this, InputModifiers.None, 0) { RoutedEvent = Mouse.GotMouseCaptureEvent });
         return component != null;
     }
 
     /// <summary>
-    /// Mirror the app's mouse capture (<see cref="Captured"/>) to the OS for the given window worker. A platform window
-    /// worker calls this AFTER processing a mouse event; the platform-specific acquire/release is the worker's
-    /// <see cref="IWindowWorkerService.SetMouseCapture"/>. Shared here so every platform gets the same behaviour -
-    /// without OS capture the window stops receiving move/up once the pointer leaves it, freezing a drag and dropping
-    /// the off-window release. <paramref name="osCaptured"/> is the worker's own "currently holds OS capture" flag,
-    /// updated here so the call only fires on a transition.
+    /// Mirrors <see cref="Captured"/> to the OS after a mouse event, so a drag keeps its moves and release off the window.
+    /// <paramref name="osCaptured"/> is the worker's own flag; the call fires only on a transition.
     /// </summary>
     public void SyncOsMouseCapture(IWindowWorkerService worker, ref bool osCaptured)
     {
@@ -77,32 +66,18 @@ public class MouseDevice
 
     public Vector2 GetPosition(IInputComponent relativeTo)
     {
-        // Walk up to the root (window) that owns the screen<->client transform.
         IUIComponent root = relativeTo;
         while (root.VisualParent != null)
         {
             root = root.VisualParent;
         }
 
-        // Convert the PHYSICAL screen position to LOGICAL client coords FIRST (PointToClient divides by the DPI scale),
-        // THEN subtract the elements' logical Bounds.Location down the chain - all in the same DIP space. The old order
-        // subtracted logical offsets straight off the physical screen position and converted after, mixing units: correct
-        // only at 100% DPI, and increasingly wrong (by the DPI scale) the further an element sits from the window origin -
-        // which made a picker on a scaled second monitor unusable.
-        // Popup-overlay content is a DETACHED logical child (no VisualParent path to the window), so the walk above stops at
-        // the overlay root, NOT the window. Use the window the Position was measured against for the screen->client + DPI
-        // conversion; the overlay child's Bounds.Location is already window-space, so the offset walk below stays correct.
-        // Without this, GetPosition inside a popup is garbage and drag controls (ColorPicker / Slider / ColorWheel) die there.
+        // To logical client coords first, then the logical offsets: mixing physical and logical units broke off 100% DPI.
+        // A popup's root is not a window, so the window Position was measured against converts it.
         var clientRoot = root is IWindow ? root : ((_positionRoot as IUIComponent) ?? root);
         var p = clientRoot.PointToClient(Position);
 
-        // A RENDER TRANSFORM on the way up means the offsets alone no longer say where the element is - the same reason
-        // the hit test has to undo them. Then the composed transform is the only honest answer, and inverting it is
-        // what TranslatePoint already does. Asked only when there IS one: every ordinary control keeps the plain walk.
-        //
-        // Without this a button inside something scaled - a node on a zoomed canvas - was FOUND by the pointer and then
-        // decided the release had landed outside itself, because it measured that with these offsets. It highlighted
-        // under the pointer and did nothing when clicked.
+        // Under a render transform the offsets no longer say where the element is: invert the composed transform.
         if (Transformed(relativeTo))
         {
             var local = Vector3F.TransformCoordinate(new Vector3F((float)p.X, (float)p.Y, 0),
@@ -132,11 +107,8 @@ public class MouseDevice
     }
 
     /// <summary>
-    /// Feed the pointer position from an OS-DRIVEN drag (a native drop target's DragOver). During such a drag the drag
-    /// SOURCE - another application - owns the mouse, so no move message reaches us and <see cref="Position"/> would
-    /// stay where the pointer last was: every <see cref="GetPosition"/> in the drop machinery (insertion caret,
-    /// auto-scroll, hit-test) would read a stale point. The native callback knows the real screen point, so it publishes
-    /// it here and the whole drag-over path keeps working unchanged. Call on the UI loop thread.
+    /// Feeds the pointer position from an OS-driven drag, where another application owns the mouse and no move reaches
+    /// us. Call on the UI loop thread.
     /// </summary>
     public void SetExternalPosition(IInputComponent root, PixelPoint screenPoint)
     {
@@ -154,7 +126,7 @@ public class MouseDevice
 
     }
 
-    /// <summary>Where the pointer is on the DESKTOP: the live OS position when a platform is registered, else the
+    /// <summary>Where the pointer is on the desktop: the live OS position when a platform is registered, else the
     /// last point an input event carried.</summary>
     public PixelPoint GetScreenPosition() => Mouse.Platform?.Position ?? Position;
 
@@ -170,13 +142,13 @@ public class MouseDevice
     public void ProcessEvent(RawMouseEventArgs e)
     {
         Position = e.RootComponent.PointToScreen(e.Position);
-        _positionRoot = e.RootComponent;   // remembered for GetPosition on detached popup-overlay content
+        _positionRoot = e.RootComponent;
         UpdateButtonStates(e.InputModifiers);
         var button = MouseButtons.None;
         switch (e.EventType)
         {
             case RawMouseEventType.MouseMove:
-                _hoverRoot = e.RootComponent;   // the OS routed this move here, so this window is the one under the cursor
+                _hoverRoot = e.RootComponent;   // the OS routed this move here
                 MouseMove(e.RootComponent, e.Position, e.InputModifiers, e.Timestamp);
                 break;
             case RawMouseEventType.LeaveWindow:
@@ -324,56 +296,36 @@ public class MouseDevice
         }
     }
 
-    // Hit-test the OPEN POPUPS first (they render - and so receive input - above the main content, newest on top), then
-    // fall through to the window content. Without this a popup's contents (a DropDown list, a menu) are click-through.
-    // boundsForContent=false (click routing): pixel-accurate hit - a shape's real geometry, a panel's visible background -
-    // so a click in a transparent gap falls through to what's really behind. true (the mouse-over chain): bounds
-    // containment - the pointer over a gap between transparent tiles is still geometrically inside its container
-    // (a ScrollViewer), so IsMouseOver must NOT fall through to an ANCESTOR's background, which would drop the container
-    // from the over-chain and restart its auto-hide fade every few frames (the hover FPS drop on a big grid).
+    // Open popups first, newest on top, then the window content. boundsForContent: false is the pixel-accurate click
+    // hit; true is bounds containment for the hover chain, so a transparent gap does not drop its container from it.
     private static IInputComponent HitTestTopmost(IInputComponent rootComponent, Vector2 p, bool boundsForContent = false)
     {
         if (rootComponent is IWindow window)
         {
-            // A popup ROOT is usually a plain container (a Border) that is NOT itself an IInputComponent - but its
-            // children (the list items) are. Hit-test the root as an IUIComponent so the walk descends into them.
             var popups = window.PopupRoots;
             for (var i = popups.Count - 1; i >= 0; i--)
             {
-                // A popup that is not a TARGET does not absorb either. A tooltip is the case: it is a label that
-                // follows the pointer, and standing under it, it took the hover - and the press - away from the very
-                // control it is describing. The button's highlight blinked on and off and the click went nowhere.
+                // A popup that is no target absorbs nothing: a tooltip under the pointer took the click from its control.
                 if (!popups[i].IsHitTestVisible) continue;
 
                 if (InputExtensions.HitTest(popups[i], p) is { } popupHit)
                     return popupHit;
-                // Click landed on the popup's own OPAQUE card, not one of its child controls (a SlidePanel/menu root is a
-                // Border, which HitTest lets clicks fall through - fine for content, WRONG for an overlay). A panel/menu is
-                // opaque to the mouse: ABSORB the click within its bounds so it can't reach the window content behind it
-                // (e.g. the title bar's close button showing through the diagnostics SlidePanel). Returning the root cast to
-                // IInputComponent (may be null = nothing routed) still stops the fall-through to the content below.
+                // Its own card absorbs the click, so nothing behind the popup gets it.
                 if (popups[i].ClipRectangle.Contains(p))
                     return popups[i] as IInputComponent;
             }
         }
-        
+
         var pixel = InputExtensions.HitTest(rootComponent, p);
         if (!boundsForContent) return pixel;
 
-        // Mouse-over (boundsForContent): PREFER the pixel-accurate hit so a real control keeps precise hover + click (a
-        // CheckBox/RadioButton/Button whose IsMouseOver drives its hover trigger and its release-click gate). Fall back to
-        // the geometric bounds hit ONLY when the pixel hit fell THROUGH to an ANCESTOR of it - i.e. the pointer sits in a
-        // transparent gap (between tiles) and pixel-testing resolved to the container behind them; there the bounds hit is
-        // the more specific content element, so taking it keeps the over-chain anchored (no ScrollViewer IsMouseOver
-        // flicker / auto-hide restart). Blanket-geometric (the previous behaviour) broke controls: it returned transparent
-        // overlay/descendant parts a pixel test skips, mis-driving their IsMouseOver-based hover + click.
+        // The pixel hit, unless it fell through a transparent gap to an ancestor of the bounds hit.
         var bounds = InputExtensions.HitTestBounds(rootComponent, p);
         if (pixel == null) return bounds;
         if (bounds != null && !ReferenceEquals(pixel, bounds) && IsAncestorOf(pixel, bounds)) return bounds;
         return pixel;
     }
 
-    // Is <paramref name="ancestor"/> a strict visual ancestor of <paramref name="node"/>? Walks the visual parent chain.
     private static bool IsAncestorOf(IInputComponent ancestor, IInputComponent node)
     {
         var parent = (node as IUIComponent)?.VisualParent;
@@ -387,8 +339,7 @@ public class MouseDevice
 
     private void LeaveWindow(IInputComponent rootComponent, Vector2 p, InputModifiers inputModifiers, uint timestamp)
     {
-        // Mouse left the window entirely: everything in the hovered chain leaves, nothing enters - so IsMouseOver is
-        // cleared along the whole chain, not just the root (where it used to stick on inner elements).
+        // The whole hovered chain leaves, not just the root.
         if (ReferenceEquals(_hoverRoot, rootComponent)) _hoverRoot = null;
         AncestorState.Transition(DirectlyOver, null, Mouse.MouseEnterEvent, Mouse.MouseLeaveEvent,
             evt => new MouseEventArgs(this, inputModifiers, timestamp) { RoutedEvent = evt });
@@ -418,11 +369,7 @@ public class MouseDevice
         }
         else
         {
-            // The captured element stays the mouse-over target even when the pointer wanders off it (dragging a thumb
-            // past its own bounds, a fast drag outrunning the thumb): hit-test within the capture, but fall back to the
-            // captured element itself. Without the fallback HitTest returns null once the pointer leaves the thumb, the
-            // over-chain collapses to the root, and every ancestor (a ScrollViewer's IsMouseOver, a Button's hover, ...)
-            // spuriously goes false mid-drag - which made an overlay scrollbar fade out from under the dragging cursor.
+            // The captured element stays the hover target off its bounds, or every ancestor's IsMouseOver drops mid-drag.
             var element = Captured.HitTest(p) ?? Captured;
             SetMouseOver(rootComponent, element, inputModifiers, timestamp);
             source = Captured;
@@ -433,20 +380,12 @@ public class MouseDevice
         source.RaiseEvent(args);
     }
 
-    /// <summary>Re-decide what the pointer is over when the CONTENT under it has moved, not the pointer. Hover says what
-    /// is under the cursor NOW, and a list scrolled by the keyboard or the wheel slides its rows under a cursor that
-    /// never moves: no Enter and no Leave arrive, so the highlight stays on the row that has left - and a recycled
-    /// container carries it off to a row nobody is pointing at. Called once a layout pass has SETTLED, which is exactly
-    /// when the answer can have changed.
-    /// <para>Ignored while something holds the capture: there the captured element is the mouse-over target by
-    /// definition (a thumb being dragged past its own bounds), and re-deciding would take that away mid-gesture.</para></summary>
+    /// <summary>Re-decides hover when the content under a still pointer has moved (a list scrolled by keyboard or wheel).
+    /// Call once layout has settled; ignored while something holds the capture.</summary>
     public void RefreshMouseOver(IInputComponent root)
     {
         if (Captured != null || root is not IRootVisualComponent client) return;
-        // Only the window the pointer is genuinely over may re-evaluate hover. This runs on every layout update, from
-        // EVERY window, and works from the screen position alone - so without this gate a window behind an opaque one
-        // still found the cursor inside its own bounds and highlighted whatever sat under it. Hover bled through; the
-        // click did not, which is exactly how it looked.
+        // Only the window the pointer is over, or hover bleeds through from a window behind.
         if (!ReferenceEquals(root, _hoverRoot)) return;
 
         SetMouseOver(root, client.PointToClient(Position), InputModifiers.None, 0);
@@ -454,17 +393,12 @@ public class MouseDevice
 
     private IInputComponent SetMouseOver(IInputComponent rootComponent, Vector2 p, InputModifiers modifiers, uint timestamp)
     {
-        // Mouse-over is GEOMETRIC: bounds containment, so the over-chain doesn't fall through a transparent gap to an
-        // ancestor's background (see HitTestTopmost). Click routing (MouseDown/etc.) still uses the pixel-accurate hit.
         var element = HitTestTopmost(rootComponent, p, boundsForContent: true);
         return SetMouseOver(rootComponent, element, modifiers, timestamp);
     }
 
-    // IsMouseOver is true for an element when the pointer is over it OR any of its visual descendants (WPF semantics).
-    // MouseEnter/MouseLeave are Direct routed events, so they must be raised individually along the ancestor chain - not
-    // just on the single deepest hit element. Otherwise a control whose hit target is one of its own template parts
-    // (e.g. a templated Button) never sees its own IsMouseOver change, so element-level triggers on it never fire while
-    // template/part triggers do. AncestorState does the chain diff (reused by the other "...Within"/"...Over" states).
+    // MouseEnter/Leave are Direct events, raised along the whole ancestor chain (WPF IsMouseOver semantics), so a
+    // templated control sees its own IsMouseOver change when a part is hit.
     private IInputComponent SetMouseOver(IInputComponent root, IInputComponent component, InputModifiers modifiers, uint timestamp)
     {
         var newOver = component ?? root;
@@ -480,13 +414,7 @@ public class MouseDevice
 
         if (hit != null)
         {
-            // Elapsed since the previous click = timestamp - lastClickTime (NOT the reverse: both are uint, so the wrong
-            // order underflows to a huge value and reset ALWAYS fired, pinning clickCount at 1 - double-clicks never
-            // registered anywhere). uint subtraction also wraps correctly across the GetMessageTime rollover.
-            // ...and the second click must also land in the SAME PLACE. A double click is two clicks on one thing, not
-            // two in quick succession anywhere: without the box, a run of quick clicks across a surface kept counting up
-            // (1, 2, 3, 4...), so anything that acts on the second one fired on a click that was aimed somewhere else
-            // entirely - a line placed vertex by vertex ended itself on the second vertex.
+            // timestamp - lastClickTime, not the reverse: uint wraps. And the second click must land in the same place.
             var box = PlatformSettings.DoubleClickSize;
             var moved = Math.Abs(p.X - lastClickPosition.X) > box.Width ||
                         Math.Abs(p.Y - lastClickPosition.Y) > box.Height;
@@ -559,9 +487,7 @@ public class MouseDevice
         var hit = HitTestTopmost(rootComponent, p);
         if (hit == null) return;
 
-        // Tunnel (Preview) THEN bubble (Main) on ONE args object, exactly as MouseDown does, so a PreviewMouseWheel
-        // handler's Handled carries into the bubbling MouseWheel and suppresses it. Previously only the bubble was raised,
-        // so PreviewMouseWheel never fired at all.
+        // One args object, so a handled Preview suppresses the bubble.
         var args = new MouseWheelEventArgs(this, modifiers, wheelDelta, timestemp, isHorizontal) { RoutedEvent = Mouse.PreviewMouseWheelEvent };
         hit.RaiseEvent(args);
         args.RoutedEvent = Mouse.MouseWheelEvent;

@@ -91,9 +91,8 @@ public static class Mouse
    public static MouseButtonState XButton1 => PrimaryDevice.XButton1;
    public static MouseButtonState XButton2 => PrimaryDevice.XButton2;
 
-   /// <summary>The platform that answers live pointer queries, registered once at startup. Null before it is - the
-   /// position then falls back to the last one an input event carried, which is right for everything except a query
-   /// made while ANOTHER application owns the pointer.</summary>
+   /// <summary>The platform that answers live pointer queries, registered at startup. Null falls back to the last
+   /// position an input event carried.</summary>
    public static INativeMouse Platform { get; set; }
 
    /// <summary>Where the pointer is on the DESKTOP - see <see cref="PixelPoint"/>. It is not a logical point and cannot
@@ -124,9 +123,8 @@ public static class Mouse
       }
    }
 
-   // App-wide cursor override (WPF's Mouse.OverrideCursor): while set, it wins over per-element hover cursors and the
-   // WM_SETCURSOR default - the mechanism a drag uses to show its Copy/Move/No feedback. Applied immediately on set so it
-   // changes live (no wait for the next hover move); clear to null to restore normal per-element cursors.
+   /// <summary>An app-wide cursor that wins over per-element ones while set - how a drag shows its feedback. Null
+   /// restores them.</summary>
    public static Cursor OverrideCursor
    {
       get => PrimaryDevice.OverrideCursor;

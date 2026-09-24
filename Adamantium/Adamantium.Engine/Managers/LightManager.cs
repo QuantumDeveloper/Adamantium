@@ -91,8 +91,7 @@ public class LightManager
         //Task.Run(() => CreateLightsVisual());
     }
 
-    // Lights change only on add/remove, not per frame, so rebuild the typed lists only when marked dirty instead of
-    // re-running three LINQ scans + three list allocations every frame.
+    // Lights change only on add/remove, so the typed lists are rebuilt only when dirty.
     private bool _lightsDirty = true;
 
     public void Update()

@@ -93,34 +93,26 @@ public class KeyboardDevice
    }
 
    /// <summary>
-   /// Checks is key generally pressed
+   /// Whether the key is down.
    /// </summary>
-   /// <param name="key"></param>
-   /// <returns></returns>
    public bool IsKeyDown(Key key)
    {
-      // Ask the OS when we can (the live, physical state), and fall back to what our own events have tracked - which is
-      // right whenever messages are flowing, and the best we can do when no platform is registered.
+      // The OS's live state when there is a platform, else what our own events tracked.
       if (Keyboard.Platform is { } platform) return platform.IsKeyDown(key);
       return keyStates.TryGetValue(key, out var tracked) && tracked.CurrentState == KeyState.Down;
    }
 
    /// <summary>
-   /// Checks is key generally up
+   /// Whether the key is up.
    /// </summary>
-   /// <param name="key"></param>
-   /// <returns></returns>
    public bool IsKeyUp(Key key)
    {
       return !IsKeyDown(key);
    }
 
    /// <summary>
-   /// Returns value indicating is current key is repeatedly pressed or just once
+   /// Whether the key is held and repeating, not just pressed. False when nothing is focused.
    /// </summary>
-   /// <param name="key">Key to look for</param>
-   /// <returns>Returns true if key is pressed not for the first time, otherwise value is false</returns>
-   /// <remarks>If FocusedElement element is null, return value will be false</remarks>
    public bool IsRepeated(Key key)
    {
       if (keyStates.ContainsKey(key))
@@ -132,11 +124,8 @@ public class KeyboardDevice
    }
 
    /// <summary>
-   /// Returns time in milliseconds between the current system uptime and last pressing time
+   /// Milliseconds since the key was pressed. 0 when nothing is focused.
    /// </summary>
-   /// <param name="key">Key to look for</param>
-   /// <returns>Return value is in milliseconds</returns>
-   /// <remarks>If FocusedElement element is null, return value will be 0</remarks>
    public UInt64 GetPressTime(Key key)
    {
       if (keyStates.ContainsKey(key))
@@ -144,8 +133,7 @@ public class KeyboardDevice
          var parameters = keyStates[key];
          if (parameters.CurrentState == KeyState.Down)
          {
-            // Both sides are milliseconds since boot, but the press time arrives 32-bit (that is what a raw event
-            // carries), so subtract in 32-bit too - otherwise the answer goes wild once uptime passes the ~49-day wrap.
+            // In 32 bits, like the raw event's press time, or it goes wild past the ~49-day wrap.
             return unchecked((uint)Environment.TickCount64 - parameters.PressTime);
          }
       }
@@ -157,10 +145,8 @@ public class KeyboardDevice
       return Keyboard.Platform?.IsKeyToggled(key) ?? false;
    }
 
-   /// <summary>Delivers a raw key/text event. <paramref name="fallback"/> is where a key goes when NOTHING is focused -
-   /// the window itself: a window opens with no focused element, and dropping the key there left the keyboard dead until
-   /// something had been clicked. The window is the root of the route, which is exactly where navigation listens, so the
-   /// first Tab can step into the tree.</summary>
+   /// <summary>Delivers a raw key/text event. <paramref name="fallback"/> - the window - takes a key when nothing is
+   /// focused, so the first Tab can step into the tree.</summary>
    public void ProcessEvent(RawInputEventArgs eventArgs, IInputComponent fallback = null)
    {
       var target = FocusedComponent ?? fallback;
@@ -206,9 +192,7 @@ public class KeyboardDevice
          }
          else if (eventArgs is RawTextInputEventArgs inputArgs && !string.IsNullOrEmpty(inputArgs.Text))
          {
-            // Typed character(s) from the OS (WM_CHAR, already filtered to >= space in the Win32 worker). Deliver as the
-            // tunnel PREVIEW first (so a container can pre-empt it), then the bubbling TextInput. A TextBox consumes this
-            // to insert text; controls that don't handle it simply ignore it.
+            // Preview first, so a container can pre-empt the text, then the bubbling TextInput.
             var textArgs = new TextInputEventArgs(inputArgs.Text)
             {
                RoutedEvent = Keyboard.PreviewTextInputEvent

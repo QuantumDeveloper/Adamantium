@@ -41,9 +41,8 @@ public class InputService : EntityService
     public override bool IsRenderingService => false;
     public override EntityServiceType ServiceType => EntityServiceType.Update;
 
-    /// <summary>Whether the third-person keys follow the WHOLE object or the exact entity that was picked. Picking
-    /// hands back a mesh, which for a single model is rarely what "follow it" means - but one carriage of a train is,
-    /// so an editor turns this off and decides for itself.</summary>
+    /// <summary>Whether the third-person keys follow the whole object or the exact entity picked. An editor turns it off
+    /// and decides for itself.</summary>
     public bool FollowsWholeObject { get; set; } = true;
 
     /// <summary>The entity the application put the player in charge of - what the third-person keys follow when nothing

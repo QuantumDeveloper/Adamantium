@@ -8,10 +8,8 @@ using Adamantium.Game.Core;
 namespace Adamantium.Engine;
 
 /// <summary>
-/// The editor's view of the universe: its outputs, the one taking the keyboard and the one under the pointer, and the
-/// cameras seen through them. A plain object to pass wherever it is needed. What it answers is a snapshot taken once
-/// per frame, right after the outputs are settled, so a whole frame sees one consistent picture; the snapshot is
-/// immutable and can be read from any thread, and a new one is made only when something has actually changed.
+/// The editor's view of the universe: its outputs, the ones taking keyboard and pointer, and the cameras seen through
+/// them. An immutable snapshot taken once per frame after the outputs settle, readable from any thread.
 /// </summary>
 public class Observatory
 {

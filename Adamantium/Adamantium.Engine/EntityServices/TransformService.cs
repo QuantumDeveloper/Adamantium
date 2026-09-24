@@ -66,11 +66,8 @@ public class TransformService : EntityService
                 }
 
                 var metadata = transform.GetMetadata(camera);
-                // Recompute this (node, camera) ONLY when an input to its world matrix changed: the node's own transform
-                // (dirty - also set below when its PARENT moved), the CAMERA position (the world is camera-relative; note a
-                // rotating camera does NOT move, so mouse-look costs nothing), the shared pivot, or a first-ever compute.
-                // A static scene therefore skips the whole matrix + collider pass instead of rebuilding it every frame.
-                // WORLD position: a parented camera's local offset barely changes while its subject flies.
+                // Only when an input to the world matrix changed - the node or its parent, the camera position, the pivot -
+                // so a static scene skips the pass. World position: a parented camera's local offset barely changes.
                 if (!dirty && metadata.Computed
                     && metadata.LastCameraPosition == camera.WorldPosition
                     && metadata.LastPivotCorrection == generalCenter)

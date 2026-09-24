@@ -100,9 +100,7 @@ namespace Adamantium.UI.Sandbox
             }
         }
 
-        /// <summary>Loads a model file and adds it to the scene - the runtime "load model" path the game menu uses. The
-        /// model becomes the subject the camera can follow: in a scene with one thing in it, that thing is the one the
-        /// third-person modes are about.</summary>
+        /// <summary>Loads a model file into the scene and makes it the subject the camera follows.</summary>
         public async Task<Entity> LoadAndAddModel(string pathToFile)
         {
             var entity = await ImportModel(pathToFile);

@@ -68,8 +68,7 @@ public class OrientationTool: ToolBase
             return;
         }
 
-        // While a part is HELD the pointer is pinned and hidden, so there is nothing to pick with - the grab stands
-        // until the button comes up, and the highlight stays on what was grabbed.
+        // A held part keeps the grab until release: the pointer is pinned, so there is nothing to pick with.
         if (grabbed != null)
         {
             grabbed.Transform.GetMetadata(userCamera).IsSelected = true;
@@ -77,9 +76,7 @@ public class OrientationTool: ToolBase
             return;
         }
 
-        // ONCE, and only after every part has its matrix and bounds. This ran INSIDE the loop above - once per part,
-        // each call overwriting the last - so a click read whichever part the traversal ended on rather than the
-        // nearest hit, and the same spot answered a different axis each time. NEAREST wins, like every other tool.
+        // Once, after every part has its matrix: the nearest hit wins.
         toolIntersectionResult = Tool.Intersects(userCamera, inputManager.RelativePosition, false,
             userCamera.UiProjection, CollisionMode.IgnoreNonGeometryParts, CompareOrder.Less, 0, false);
 
@@ -91,14 +88,11 @@ public class OrientationTool: ToolBase
 
         grabbed = toolIntersectionResult.Entity;
         travelled = 0;
-        // Takes the pointer for the duration: hidden, pinned, and reporting raw motion. Without it a drag would end
-        // the moment the cursor reached the edge of the screen.
+        // Or the drag ends at the screen edge.
         inputManager.HoldPointer(true);
     }
 
-    // A grab on the gizmo ORBITS the view, the way Blender's does - which is where the cube's edge and corner views
-    // went: a drag reaches any angle, not one of twenty-six. A press that never travelled is a click, so the canonical
-    // views stay one tap away; that is also why the click fires on RELEASE and not on the press.
+    // A drag orbits the view, as in Blender; a press that never travelled is a click, so it fires on release.
     private void Drag(Camera camera, InputWormhole inputManager)
     {
         var delta = inputManager.RawMouseDelta;
@@ -109,7 +103,7 @@ public class OrientationTool: ToolBase
 
             if (travelled > ClickSlack)
             {
-                // Takes over from a turn still playing - otherwise the animation keeps writing what the drag changes.
+                // Or a turn still playing overwrites the drag.
                 camera.CancelTravel();
                 camera.RotateRelativeXY(delta.Y * DragDegreesPerPixel, -delta.X * DragDegreesPerPixel);
             }
@@ -134,42 +128,32 @@ public class OrientationTool: ToolBase
 
     private void TransformOrientationTool(Entity current, Camera camera)
     {
-        // Far enough in for the step arrows to have room: at 60 the gizmo touched the panel's edge and was clipped.
+        // Room for the step arrows: at 60 the gizmo was clipped by the panel edge.
         var relativePosition = new Vector3F(camera.Width - 120, 120, 150f);
 
-        // World axes seen from the camera - that is the whole transform. There used to be an "orientation.X = -X"
-        // after this: not a rotation but a MIRROR of the model, which left the picture handed the opposite way to the
-        // maths, so a click on the arrow you saw turned to the axis you did not.
-        // The STEP arrows are not axes: they are screen furniture, so they keep still while the gizmo turns.
+        // World axes seen from the camera, and nothing more. The step arrows are screen furniture and keep still.
         var orientation = IsStepArrow(current) ? QuaternionF.Identity : QuaternionF.Conjugate(camera.Rotation);
 
-        // The part's own place WITHIN the gizmo, folded in ahead of the scale and the spin so it rides with the whole.
-        // Parts share their meshes - this is the only thing that tells one ball, arm or arrow from the next.
+        // The part's place within the gizmo, ahead of the scale and spin: parts share meshes, so this tells them apart.
         var world = Matrix4x4F.RotationQuaternion(current.Transform.Rotation) *
                     Matrix4x4F.Translation((Vector3F)current.Transform.Position) *
                     Matrix4x4F.Scaling(current.Transform.Scale) *
                     Matrix4x4F.RotationQuaternion(orientation);
 
-        // NO Y flip on the way out. THIS WORLD'S UP IS -Y: the viewport height is positive (no Vulkan flip) and
-        // PerspectiveFovY carries a positive M22, so view +Y lands at the BOTTOM of the screen - which is why a
-        // correctly authored model stands the right way up. The gizmo draws world axes, so its +Y ball belongs at the
-        // bottom too, and it already agrees with the scene it annotates.
+        // No Y flip: this world's up is -Y, so the +Y ball belongs at the bottom, as in the scene.
         var metadata = current.Transform.GetMetadata(camera);
         metadata.WorldMatrixF = world * Matrix4x4F.Translation(relativePosition);
         metadata.RelativePosition = relativePosition;
     }
 
-    // THE WORLD's up, never the camera's. Referencing the camera's axes folds whatever roll the view has accumulated
-    // back into the next turn, so the axes drift a little further every click. Looking straight down leaves the world
-    // up with nothing to say, and +Z takes over - the same convention a top view has always had on a map.
+    // The world's up, not the camera's, or accumulated roll drifts into every turn. Looking straight down, +Z takes over.
     private static Vector3F UpOf(Vector3F forward) =>
         Math.Abs(Vector3F.Dot(Vector3F.Up, forward)) > 0.99f ? Vector3F.ForwardLH : Vector3F.Up;
 
     private bool IsStepArrow(Entity entity) =>
         entity == stepRight || entity == stepLeft || entity == stepUp || entity == stepDown;
 
-    // A step turns the view about a SCREEN axis - right/left about the screen's vertical, up/down about its
-    // horizontal - which is what makes four presses walk a full circle whatever the cube currently shows.
+    // About a screen axis, so four presses walk a full circle whatever the view.
     private QuaternionF StepOf(Entity arrow)
     {
         var quarter = MathHelper.DegreesToRadians(StepDegrees);
@@ -188,13 +172,12 @@ public class OrientationTool: ToolBase
     {
         if (IsStepArrow(selectedTool))
         {
-            // Composed on the RIGHT of the view rotation: the axis is then the camera's own, so the turn is relative
-            // to what is on screen rather than to the world.
+            // On the right of the view rotation: the axis is the camera's own.
             camera.RotateAroundSelectedObject(camera.Rotation * StepOf(selectedTool), RotationMilliseconds);
             return;
         }
 
-        // The hub puts the axes back where the world has them - the way out of a view you cannot read any more.
+        // The hub restores the world axes.
         if (selectedTool == home)
         {
             camera.RotateAroundSelectedObject(QuaternionF.Identity, RotationMilliseconds);

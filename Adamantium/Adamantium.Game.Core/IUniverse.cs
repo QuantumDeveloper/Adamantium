@@ -22,7 +22,7 @@ namespace Adamantium.Game.Core
         public void Submit();
         
         /// <summary>
-        /// Game services which could be added to the game
+        /// The container the whole process shares.
         /// </summary>
         public IDependencyContainer Container { get; }
 
@@ -32,8 +32,7 @@ namespace Adamantium.Game.Core
         public Boolean IsFixedTimeStep { get; set; }
 
         /// <summary>
-        /// Gets or set time step for limitation of rendering frequency
-        /// <remarks>value must be in seconds</remarks>
+        /// Seconds per frame at <see cref="DesiredFPS"/>.
         /// </summary>
         public Double TimeStep { get; }
         

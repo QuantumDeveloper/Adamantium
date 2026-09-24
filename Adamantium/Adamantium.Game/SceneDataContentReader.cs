@@ -8,12 +8,8 @@ using Adamantium.Graphics.Core.Models;
 namespace Adamantium.Game;
 
 /// <summary>
-/// Loads a model into engine-native <see cref="SceneData"/>. A baked artifact (.aemf) is deserialized via
-/// <see cref="SceneDataSerializer"/>; a raw model file (Collada/OBJ/3DS) is parsed by the
-/// <see cref="ModelConverter"/>. Which one is used is decided by the resolver (see
-/// <see cref="CookedContentResolver"/>, which prefers cooked content), so this reader just branches on the
-/// resolved file's extension. Assembling an <c>Entity</c> from the result stays the caller's job
-/// (e.g. <c>EntityImportTemplate</c>), so the reader remains pure.
+/// Loads a model into <see cref="SceneData"/>: a baked .aemf through <see cref="SceneDataSerializer"/>, a raw model
+/// through <see cref="ModelConverter"/>. The resolver picks the file; building an Entity from it is the caller's job.
 /// </summary>
 public class SceneDataContentReader : IContentReader
 {
@@ -40,10 +36,8 @@ public class SceneDataContentReader : IContentReader
         return Task.FromResult((object)scene);
     }
 
-    // A baked scene stores only the RELATIVE reference the model file wrote (Image.FilePath is not persisted - an
-    // absolute path of the baking machine points nowhere after the first move). Resolving it is this reader's job,
-    // and the anchor is the file we ACTUALLY opened, not the logical asset name: a cooked artifact lives in the
-    // output folder with its textures copied beside it, which the logical name knows nothing about.
+    // A baked scene keeps only relative image paths; they resolve against the file actually opened, since a cooked
+    // artifact has its textures beside it.
     private static void PointImagesAtTheModel(SceneData scene, string assetPath)
     {
         if (scene.Images == null || string.IsNullOrEmpty(assetPath)) return;

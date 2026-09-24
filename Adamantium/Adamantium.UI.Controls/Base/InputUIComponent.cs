@@ -21,9 +21,6 @@ public class InputUIComponent : MeasurableUIComponent, IInputComponent
     public static readonly RoutedEvent InitializedEvent = EventManager.RegisterRoutedEvent(nameof(Initialized),
         RoutingStrategy.Direct, typeof(RoutedEventHandler), typeof(UIComponent));
 
-    // TextInputEvent / PreviewTextInputEvent moved to Core (Keyboard) so the Core KeyboardDevice can raise them; the CLR
-    // event wrappers below now bind to Keyboard.TextInputEvent / Keyboard.PreviewTextInputEvent.
-
     public static readonly RoutedEvent MouseLeftButtonDownEvent =
         EventManager.RegisterRoutedEvent( nameof(MouseLeftButtonDown),
             RoutingStrategy.Direct, typeof(MouseButtonEventHandler), typeof(UIComponent));
@@ -153,16 +150,13 @@ public class InputUIComponent : MeasurableUIComponent, IInputComponent
 
         MouseRightButtonUpEvent.RegisterClassHandler<IInputComponent>(new MouseButtonEventHandler(OpenContextMenuHandler));
 
-        // Keyboard navigation is a static service, and a static class registers nothing until something touches it.
-        // Here is the one place guaranteed to run before any element exists.
+        // The one place guaranteed to run before any element exists.
         KeyboardNavigation.Register();
-        // ...and the one fact it cannot work out for itself: which window an element hosted on the OVERLAY belongs to.
-        // Such an element has no visual path back, and only the popup layer knows the way - see Popup.HostOf.
+        // An overlay element has no visual path back to its window; only the popup layer knows it.
         KeyboardNavigation.HostOf = element => Popup.HostOf(element);
     }
 
-    // A right-click on an element with a ContextMenu (its own or an ancestor's) opens it at the cursor. The right-button-up
-    // event is Direct (fires on the deepest target), so walk up to the first element that carries a ContextMenu.
+    // Right-button-up is Direct, so the walk up finds the nearest ContextMenu.
     private static void OpenContextMenuHandler(object sender, MouseButtonEventArgs e)
     {
         if (e.Handled) return;
@@ -179,10 +173,6 @@ public class InputUIComponent : MeasurableUIComponent, IInputComponent
         AdamantiumProperty.RegisterReadOnly(nameof(IsFocused),
             typeof(Boolean), typeof(InputUIComponent), new PropertyMetadata(false));
 
-    // A REGULAR (bindable) tooltip on every input element - like WPF's FrameworkElement.ToolTip (distinct from the
-    // ToolTipService.ToolTip attached form, kept for advanced/non-input targets). Being a real registered property, it
-    // resolves for binding (ToolTip="{Binding}"); its change is forwarded to the shared hover service so both forms drive
-    // one code path.
     public static readonly AdamantiumProperty ToolTipProperty = AdamantiumProperty.Register(nameof(ToolTip),
         typeof(object), typeof(InputUIComponent), new PropertyMetadata(null, OnToolTipChanged));
 
@@ -191,9 +181,8 @@ public class InputUIComponent : MeasurableUIComponent, IInputComponent
         if (a is InputUIComponent c) ToolTipService.SetToolTip(c, e.NewValue);
     }
 
-    /// <summary>A right-click flyout for this element (WPF's FrameworkElement.ContextMenu): set it and it opens at the
-    /// cursor on right-button-up. Kept connected as a logical child so it is themed (its template + popup build) and
-    /// inherits DataContext; it is zero-size inline (its rows live in the popup overlay), so it doesn't affect layout.</summary>
+    /// <summary>A right-click flyout, opened at the cursor on right-button-up. A logical child, so it is themed and
+    /// inherits DataContext.</summary>
     public static readonly AdamantiumProperty ContextMenuProperty = AdamantiumProperty.Register(nameof(ContextMenu),
         typeof(Adamantium.UI.Controls.ContextMenu), typeof(InputUIComponent), new PropertyMetadata(null, OnContextMenuChanged));
 
@@ -210,11 +199,8 @@ public class InputUIComponent : MeasurableUIComponent, IInputComponent
         if (e.NewValue is Adamantium.UI.Controls.ContextMenu menu) host.AddLogicalChild(menu);
     }
 
-    // Default FALSE (as in WPF's UIElement): most elements - panels, presenters, decorators, text, shapes, plain
-    // containers - are NOT keyboard-focus targets. Genuinely interactive controls opt IN via OverrideMetadata(true)
-    // in their own static ctor (ButtonBase, TextBoxBase, Slider, Selector items, ...). This keeps the focus walk from
-    // a clicked template part landing on some passive container instead of the owning control, WITHOUT having to
-    // remember to opt every new container OUT.
+    // False by default, as in WPF: interactive controls opt in, so a clicked template part never lands the focus on a
+    // passive container.
     public static readonly AdamantiumProperty FocusableProperty = AdamantiumProperty.Register(nameof(Focusable),
         typeof(Boolean), typeof(InputUIComponent), new PropertyMetadata(false));
     
@@ -226,26 +212,18 @@ public class InputUIComponent : MeasurableUIComponent, IInputComponent
         AdamantiumProperty.RegisterReadOnly(nameof(IsMouseOver),
             typeof(Boolean), typeof(InputUIComponent), new PropertyMetadata(false));
 
-    /// <summary>The focus is on this element OR on something inside it. What a composite control needs: a NumericUpDown
-    /// is never itself focused - its editor is - so IsFocused is false on it while the user is very much in it.</summary>
+    /// <summary>The focus is on this element or inside it - what a composite control, whose editor holds the focus, asks.</summary>
     public static readonly AdamantiumProperty IsKeyboardFocusWithinProperty =
         AdamantiumProperty.RegisterReadOnly(nameof(IsKeyboardFocusWithin),
             typeof(Boolean), typeof(InputUIComponent), new PropertyMetadata(false));
 
-    /// <summary>...and the focus got there BY KEYBOARD, which is when a focus ring is worth drawing. A ring that also
-    /// appeared on every click would be noise: the click already said where you are.</summary>
+    /// <summary>The focus got here by keyboard - when a focus ring is worth drawing.</summary>
     public static readonly AdamantiumProperty IsFocusVisibleProperty =
         AdamantiumProperty.RegisterReadOnly(nameof(IsFocusVisible),
             typeof(Boolean), typeof(InputUIComponent), new PropertyMetadata(false));
 
-    /// <summary>What the focus ring on THIS control looks like: a <see cref="Style"/> applied to the
-    /// <see cref="FocusAdorner"/> the keyboard puts on it - the same shape WPF's FocusVisualStyle has.
-    /// <para>Null (the default) means the theme's own <c>FocusAdorner</c> style decides, which is where the ring is
-    /// described for the whole application. Set this - from a style, like anything else - only where one control needs
-    /// a different one: a tighter ring on a dense toolbar. It is applied AFTER the theme, so its setters win.</para>
-    /// <para>NO ring is a style with no <c>Template</c> - for a control that shows the focus its own way (an editor
-    /// that accents its own border), so the two never say the same thing twice. That is why there is no separate
-    /// on/off switch: the ring a control shows IS this style, and a style that draws nothing shows nothing.</para></summary>
+    /// <summary>A style for this control's <see cref="FocusAdorner"/>, applied after the theme's. Null leaves the theme's
+    /// ring; a style with no Template shows none.</summary>
     public static readonly AdamantiumProperty FocusVisualStyleProperty = AdamantiumProperty.Register(
         nameof(FocusVisualStyle), typeof(Style), typeof(InputUIComponent), new PropertyMetadata(null));
 
@@ -263,10 +241,7 @@ public class InputUIComponent : MeasurableUIComponent, IInputComponent
         AdamantiumProperty.RegisterReadOnly(nameof(IsInitialized),
             typeof(Boolean), typeof(InputUIComponent), new PropertyMetadata(false, OnIsInitializedChanged));
 
-    // Mirrored into a plain field, as ZIndex and Visibility are, and for the same reason: the WRITE happens once in a
-    // component's life while the READ happens once per node on every attach walk, and a property read cost 0.43 us -
-    // 2.1 ms of a 9.3 ms walk over 4857 nodes, the largest item in it. The property stays: it is public surface a
-    // trigger or a binding may name from markup, which no search of this repository could rule out.
+    // Mirrored in a field: read per node on every attach walk, where a property read was the largest cost.
     private bool _isInitialized;
 
     /// <summary>A one-way latch: false until the component first joins a visual tree, true for ever after.</summary>
@@ -308,8 +283,7 @@ public class InputUIComponent : MeasurableUIComponent, IInputComponent
     }
     
 
-    /// <summary>Content shown as a hover tooltip - a string, or any UI content. A regular, bindable property (WPF's
-    /// FrameworkElement.ToolTip); its change is forwarded to the shared <see cref="ToolTipService"/> that shows the card.</summary>
+    /// <summary>Content shown as a hover tooltip - a string or any UI content. Bindable; shown by <see cref="ToolTipService"/>.</summary>
     public object ToolTip
     {
         get => GetValue<object>(ToolTipProperty);
@@ -691,9 +665,7 @@ public class InputUIComponent : MeasurableUIComponent, IInputComponent
         ui?.OnLostFocus(e);
     }
 
-    // The keyboard is subscribed ONCE, here, like the mouse and the focus - and handed to a virtual, so a control that
-    // wants a key overrides OnKeyDown instead of registering a class handler of its own. It runs on every element the
-    // key bubbles through, each with itself as sender, which is what lets a control claim a key its child ignored.
+    // Subscribed once and handed to a virtual: a control overrides OnKeyDown instead of registering a class handler.
     private static void KeyDownHandler(object sender, KeyEventArgs e)
     {
         (sender as InputUIComponent)?.OnKeyDown(e);
@@ -714,8 +686,7 @@ public class InputUIComponent : MeasurableUIComponent, IInputComponent
         (sender as InputUIComponent)?.OnPreviewKeyUp(e);
     }
 
-    /// <summary>A key travelling up through this element. Set <see cref="RoutedEventArgs.Handled"/> to claim it - that
-    /// is the whole contract with navigation, which only ever gets the keys nobody claimed.</summary>
+    /// <summary>A key bubbling through this element. Handled claims it; navigation gets only the keys nobody claimed.</summary>
     protected virtual void OnKeyDown(KeyEventArgs e)
     {
     }
@@ -724,9 +695,8 @@ public class InputUIComponent : MeasurableUIComponent, IInputComponent
     {
     }
 
-    /// <summary>The same key on the way DOWN, before anything inside this element sees it - what a composite control
-    /// takes a key with when its own editor would otherwise claim it first (an arrow key stepping a numeric's value
-    /// rather than the caret inside its text box).</summary>
+    /// <summary>The key on the way down, before anything inside sees it - how a composite control takes a key its own
+    /// editor would claim first.</summary>
     protected virtual void OnPreviewKeyDown(KeyEventArgs e)
     {
     }
@@ -735,8 +705,7 @@ public class InputUIComponent : MeasurableUIComponent, IInputComponent
     {
     }
 
-    // Raised individually on each element that JOINED or LEFT the focused element's ancestor chain, so the state is
-    // simply set - there is no chain to walk here, that already happened.
+    // Raised on each element that joined or left the focused chain, so the state is simply set.
     private static void GotKeyboardFocusWithinHandler(object sender, RoutedEventArgs e)
     {
         if (sender is not InputUIComponent ui) return;
@@ -867,19 +836,10 @@ public class InputUIComponent : MeasurableUIComponent, IInputComponent
         }
     }
 
-    // The SECOND press of a double click, raised here for the same reason the per-button events are: this runs once per
-    // element as the press travels its route, so an ancestor sees a double click on its descendant, exactly as it sees
-    // the press itself.
-    //
-    // The count is the device's - it is worked out from the time between two presses on the same element, which is the
-    // only place that knowledge exists. Nothing else can raise this: a platform's own double-click message carries no
-    // count, and surfacing one would double-count the press it stands for.
-    //
-    // Raised with its OWN args, like every other promotion here, so handling the double click does NOT mark the press
-    // handled - a control that answers both must say so on both.
+    // Its own args: handling the double click does not mark the press handled.
     private static void RaiseDoubleClick(IInputComponent input, MouseButtonEventArgs e, RoutedEvent routedEvent)
     {
-        // Exactly two. A third and fourth press keep counting up, and they are not further double clicks.
+        // Exactly two: a third press is not another double click.
         if (e.ClickCount != 2) return;
 
         input.RaiseEvent(new MouseButtonEventArgs(e.MouseDevice, e.ChangedButton, e.ButtonState, e.Modifiers, e.Timestamp)
@@ -1086,8 +1046,7 @@ public class InputUIComponent : MeasurableUIComponent, IInputComponent
     {
          base.OnAttachedToVisualTree(e);
 
-         // A one-way latch - nothing ever puts it back. Writing it on every later attach cost a full trip through the
-         // property system per node to set the value that was already there.
+         // A one-way latch: rewriting it per attach cost a property-system trip per node.
          if (!IsInitialized) IsInitialized = true;
     }
 
@@ -1095,8 +1054,6 @@ public class InputUIComponent : MeasurableUIComponent, IInputComponent
     {
         if (!IsInitialized) return null;
 
-        // The shared walk: it bridges template boundaries by TemplatedParent, and it STOPS - the loop this replaces
-        // dereferenced its way past the root and threw for anything not under a window yet.
         return this.GetSelfAndLogicalAncestors().OfType<IWindow>().FirstOrDefault();
     }
     
@@ -1104,8 +1061,7 @@ public class InputUIComponent : MeasurableUIComponent, IInputComponent
     {
         if (a is not InputUIComponent ui) return;
 
-        // Resolved value, not e.NewValue - the same rule the other mirrored properties follow (a trigger exit writes
-        // UnsetValue, which is not a bool).
+        // Resolved value, not e.NewValue: a trigger exit writes UnsetValue.
         ui._isInitialized = ui.GetValue<bool>(IsInitializedProperty);
 
         if (!ui._isInitialized) return;
@@ -1226,20 +1182,12 @@ public class InputUIComponent : MeasurableUIComponent, IInputComponent
         if (IsFocused && FocusManager.IsFocusVisible)
         {
             AdornerHost()?.AdornerLayer.SetFocus(FocusVisualOwner());
-            // Tabbing past the bottom of a scrolled list left the focus ring somewhere off screen: the focus moved, the
-            // viewport did not. So the element the keyboard just landed on scrolls itself into sight, the minimum
-            // needed, through every enclosing viewer. Gated on IsFocusVisible - the same flag the ring uses - because
-            // it means "the keyboard put you here"; a CLICK needs no scrolling (you clicked what you could see), and
-            // scrolling under a click would move the thing out from under the cursor mid-gesture.
+            // Keyboard only: scrolling under a click would move the target from under the cursor.
             (FocusVisualOwner() as UIComponent)?.BringIntoView();
         }
     }
 
-    /// <summary>The control the focus ring belongs to: a focused TEMPLATE PART marks the control it is part of, never
-    /// itself. The keyboard is in a NumericUpDown - not in "the text box inside its frame" - and a ring around that
-    /// editor draws a second box inside the control's own one, around a part the user does not think of as a control at
-    /// all. Content authored in a view has no templated parent, so it rings itself (measured: a page's buttons, check
-    /// boxes and drop-downs all report none, while the numeric's editor reports the numeric).</summary>
+    // A focused template part rings the control it belongs to, not itself.
     private InputUIComponent FocusVisualOwner()
     {
         var owner = this;
@@ -1252,14 +1200,11 @@ public class InputUIComponent : MeasurableUIComponent, IInputComponent
     protected virtual void OnLostFocus(RoutedEventArgs e)
     {
         IsFocused = false;
-        // The move announces Lost before Got, so clearing here and setting there leaves exactly one ring - and none at
-        // all when the focus was taken by a click, which says where you are without any help.
+        // Lost comes before Got, so exactly one ring remains.
         AdornerHost()?.AdornerLayer.SetFocus(null);
     }
 
-    // The ring goes on the WINDOW's adorner layer, not into this control's template: a template is a thing that can be
-    // forgotten, and a control whose template forgot it would silently have no focus visual at all. One implementation
-    // there covers every control, and draws above the content - so a control that clips its own children still shows it.
+    // The window's adorner layer, not the template: one implementation for every control, drawn above any clipping.
     private IAdornerHost AdornerHost()
     {
         for (IUIComponent node = this; node != null; node = node.VisualParent)
@@ -1268,15 +1213,11 @@ public class InputUIComponent : MeasurableUIComponent, IInputComponent
                 return host;
         }
 
-        // Nothing above: this element is hosted on the OVERLAY - a menu row, a drop-down's list - whose content has no
-        // visual path back to the window at all. The popup recorded which window it was hosted in, so ask it; without
-        // this the keyboard could move about inside an open popup with nothing to show for it.
+        // On the overlay: no visual path back, so the popup names its window.
         return Popup.HostOf(this) as IAdornerHost;
     }
 
-    /// <summary>Leaving the tree gives up the focus. A control taken off screen - the page a tab swap replaced, a row a
-    /// list stopped realizing - cannot go on holding the keyboard: Tab would keep walking that dead tree, and every stop
-    /// on the way is invisible. The detach walks the whole subtree, so a focused descendant is covered too.</summary>
+    /// <summary>Leaving the tree gives up the focus, or Tab would keep walking a tree that is off screen.</summary>
     protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
     {
         base.OnDetachedFromVisualTree(e);
@@ -1293,10 +1234,7 @@ public class InputUIComponent : MeasurableUIComponent, IInputComponent
     {
         IsMouseOver = false;
 
-        // THE POINTER IS NOW OVER WHAT HELD THIS, and that is not an enter: a parent whose child the pointer was in
-        // never left it, so nothing would speak for the cursor and the grip's double arrow stayed on the screen until
-        // something unrelated was entered. The parent's own cursor is the inherited one, which is the right answer for
-        // every case in between. A drag has the pointer captured and dresses it itself, so it is left alone.
+        // Back over the parent, which raises no enter: it restores its cursor. A captured drag dresses the pointer itself.
         if (IsMouseCaptured || VisualParent is not UIComponent parent) return;
 
         Mouse.Cursor = parent.Cursor;
