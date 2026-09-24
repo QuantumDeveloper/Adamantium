@@ -35,6 +35,26 @@ public class SatellitesTests
     }
 
     [Test]
+    public void TryGet_ReturnsTheInstance_WhenItIsThere()
+    {
+        var satellites = new Satellites();
+        var probe = new Probe();
+        satellites.Add<IProbe>(probe);
+
+        Assert.That(satellites.TryGet<IProbe>(out var found), Is.True);
+        Assert.That(found, Is.SameAs(probe));
+    }
+
+    [Test]
+    public void TryGet_ReturnsFalse_WhenNothingWasAdded()
+    {
+        var satellites = new Satellites();
+
+        Assert.That(satellites.TryGet<IProbe>(out var found), Is.False);
+        Assert.That(found, Is.Null);
+    }
+
+    [Test]
     public void Add_Throws_WhenTheTypeIsAlreadyThere()
     {
         var satellites = new Satellites();

@@ -16,6 +16,7 @@ public class ToolsManager
     private CollisionResult result = new CollisionResult();
     private float limitDistance = 0.06f;
     private ToolBase currentTool = null;
+    private readonly LightManager lightManager;
     private bool _lightProcessingResult;
     private bool _isDraggingEnabled;
     private bool _isMoveToolEnabled;
@@ -42,8 +43,19 @@ public class ToolsManager
 
     public String Text { get; private set; }
 
-    public ToolsManager(EntityWorld entityWorld)
+    /// <summary>
+    /// Tools that pick, move, rotate and scale entities; lights are neither picked nor edited.
+    /// </summary>
+    public ToolsManager(EntityWorld entityWorld) : this(entityWorld, null)
     {
+    }
+
+    /// <summary>
+    /// Tools that also pick lights and edit them through <paramref name="lightManager"/>.
+    /// </summary>
+    public ToolsManager(EntityWorld entityWorld, LightManager lightManager)
+    {
+        this.lightManager = lightManager;
         CameraDragTool = new CameraDragTool(nameof(CameraDragTool));
         MoveTool = new MoveTool(false, 1.0f, new Vector3F(2));
         RotationTool = new RotationTool(false, 2.0f, new Vector3F(2));
@@ -160,11 +172,11 @@ public class ToolsManager
     /// <summary>
     /// Picks and drags in the output under the pointer; places the gizmos for the camera of every visible output.
     /// </summary>
-    public void Update(IEnumerable<Entity> entities, Observatory observatory, LightManager lightManager)
+    public void Update(IEnumerable<Entity> entities, Observatory observatory)
     {
         if (observatory.PointerOutput is { Camera: not null, Input.CanLocatePointer: true })
         {
-            ProcessTools(entities, observatory, lightManager);
+            ProcessTools(entities, observatory);
         }
         else
         {
@@ -187,9 +199,11 @@ public class ToolsManager
             });
 
         Text = "Current selected entity: " + SelectedEntity + "\n";
+
+        lightManager?.Update();
     }
 
-    private void ProcessTools(IEnumerable<Entity> entities, Observatory observatory, LightManager lightManager)
+    private void ProcessTools(IEnumerable<Entity> entities, Observatory observatory)
     {
         CollisionMode collisionMode = CollisionMode.IgnoreNonGeometryParts;
         var output = observatory.PointerOutput;
@@ -203,11 +217,11 @@ public class ToolsManager
         if (!currentTool.IsLocked && !_lightProcessingResult)
         {
             result = CheckEntityIntersection(entities, camera, inputManager.RelativePosition, collisionMode);
-            var lightResult = lightManager.Intersects(camera, inputManager.RelativePosition, collisionMode);
-            var cameraResult = observatory.CameraGizmo.Intersects(collisionMode);
-
-            result.ValidateAgainst(lightResult);
-            result.ValidateAgainst(cameraResult);
+            if (lightManager != null)
+            {
+                result.ValidateAgainst(lightManager.Intersects(camera, inputManager.RelativePosition, collisionMode));
+            }
+            result.ValidateAgainst(observatory.CameraGizmo.Intersects(collisionMode));
 
         }
 
@@ -219,7 +233,7 @@ public class ToolsManager
             currentTool.Process(SelectedEntity, observatory);
         }
 
-        if (!currentTool.IsLocked)
+        if (lightManager != null && !currentTool.IsLocked)
         {
             _lightProcessingResult = lightManager.ProcessLight(SelectedEntity, observatory);
         }

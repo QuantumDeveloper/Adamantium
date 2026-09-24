@@ -13,9 +13,10 @@ namespace Adamantium.Graphics.Core.Content
         private readonly Dictionary<AssetKey, object> assetLockers;
         protected readonly Dictionary<AssetKey, object> LoadedAssets;
 
-        public ContentManager(IDependencyResolver serviceProvider)
+        public ContentManager(IDependencyResolver serviceProvider, Satellites satellites)
         {
             ServiceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
+            Satellites = satellites ?? throw new ArgumentNullException(nameof(satellites));
             RootDirectory = String.Empty;
             Resolvers = new List<IContentResolver>();
             Readers = new Dictionary<Type, IContentReader>();
@@ -28,6 +29,8 @@ namespace Adamantium.Graphics.Core.Content
         /// </summary>
         /// <value>The service provider.</value>
         public IDependencyResolver ServiceProvider { get; protected set; }
+
+        public Satellites Satellites { get; }
 
         public String RootDirectory { get; set; }
 

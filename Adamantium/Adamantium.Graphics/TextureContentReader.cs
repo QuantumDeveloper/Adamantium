@@ -12,7 +12,7 @@ public class TextureContentReader : IContentReader
 {
     public Task<object> ReadContentAsync(IContentManager contentManager, ContentReaderParameters parameters)
     {
-        var device = (GraphicsDevice)contentManager.ServiceProvider.Resolve<IGraphicsDeviceService>().ResourceLoaderDevice;
+        var device = (GraphicsDevice)contentManager.Satellites.Get<IGraphicsDeviceService>().ResourceLoaderDevice;
         var texture = Texture.Load(device, parameters.AssetPath);
         return Task.FromResult((object)texture);
     }

@@ -8,8 +8,6 @@ using Adamantium.ECS;
 using Adamantium.ECS.Components;
 using Adamantium.ECS.Components.Extensions;
 using Adamantium.Engine.Rendering;
-using Adamantium.Game.Core;
-using Adamantium.Game.Core.Input;
 using Adamantium.Graphics;
 using Adamantium.Graphics.Core.Models;
 using Adamantium.Mathematics;
@@ -203,7 +201,7 @@ public class LightManager
     {
         lock (_syncObj)
         {
-            CollisionResult collisionResult = new CollisionResult(CompareOrder.Less);
+            var collisionResult = new CollisionResult(CompareOrder.Less);
             var projectionMatrix = camera.ProjectionMatrix;
             foreach (var light in lights)
             {

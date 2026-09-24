@@ -46,9 +46,8 @@ namespace Adamantium.UI.Sandbox
         protected override void Initialize()
         {
             base.Initialize();
-            Container.RegisterInstance<ToolsManager>(new ToolsManager(EntityWorld));
-            Container.RegisterInstance<LightManager>(new LightManager(EntityWorld));
-            Container.RegisterInstance<Observatory>(new Observatory(this, EntityWorld));
+            Satellites.Add(new ToolsManager(EntityWorld));
+            Satellites.Add(new Observatory(this, EntityWorld));
             InitializeGameResources();
         }
 

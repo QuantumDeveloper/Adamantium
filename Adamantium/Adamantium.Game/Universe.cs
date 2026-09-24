@@ -66,13 +66,14 @@ public class Universe : PropertyChangedBase, IUniverse
         contextsMapping = new Dictionary<Object, OutputContext>();
         IsFixedTimeStep = false;
         DesiredFPS = 60;
-        Content = new ContentManager(Container);
+        Satellites = new Satellites();
+        Content = new ContentManager(Container, Satellites);
         // Cooked artifacts (.aemf etc.) take precedence over raw source; falls back to the file system.
         Content.Resolvers.Add(new CookedContentResolver());
         Content.Resolvers.Add(new FileSystemContentResolver());
         Content.Resolvers.Add(new EffectContentResolver());
         // Model files -> SceneData (runtime parse); image files -> GPU Texture for material maps. The texture reader
-        // resolves the device lazily from ServiceProvider at load time (ResourceLoaderDevice exists by then).
+        // takes the device lazily from the universe's Satellites at load time (ResourceLoaderDevice exists by then).
         Content.Readers.Add(typeof(SceneData), new SceneDataContentReader());
         Content.Readers.Add(typeof(Texture), new TextureContentReader());
             
@@ -97,16 +98,15 @@ public class Universe : PropertyChangedBase, IUniverse
         }
             
         gamePlatform = new UniversePlatform(this);
-        EntityWorld = new EntityWorld(Container);
-            
-        Container.RegisterInstance<ModelConverter>(ModelConverter);
-        Container.RegisterInstance<IContentManager>(Content);
-        Container.RegisterInstance<IUniversePlatform>(gamePlatform);
-        Container.RegisterInstance<IUniverse>(this);
-        Container.RegisterInstance<IAdamantiumApplication>(this);
-        Container.RegisterInstance<IGraphicsDeviceService>(GraphicsDeviceService);
-        Container.RegisterInstance<EntityWorld>(EntityWorld);
-            
+        EntityWorld = new EntityWorld(Container, Satellites);
+
+        Satellites.Add<IUniverse>(this);
+        Satellites.Add<IAdamantiumApplication>(this);
+        Satellites.Add<IUniversePlatform>(gamePlatform);
+        Satellites.Add<IContentManager>(Content);
+        Satellites.Add(ModelConverter);
+        Satellites.Add<IGraphicsDeviceService>(GraphicsDeviceService);
+
         Stopped += Game_Stopped;
         gameLoopThread = new Thread(StartGameLoop);
     }
@@ -114,7 +114,13 @@ public class Universe : PropertyChangedBase, IUniverse
     protected IEventAggregator EventAggregator { get; }
         
     public EntityWorld EntityWorld { get; }
-        
+
+    /// <summary>
+    /// What this universe has its own of: itself, its content, its platform, its graphics device service. Its
+    /// services reach them through <see cref="Adamantium.ECS.EntityWorld.Satellites"/>.
+    /// </summary>
+    public Satellites Satellites { get; }
+
     public IGraphicsDeviceService GraphicsDeviceService { get; set; }
 
     public bool IsInitialized { get; private set; }

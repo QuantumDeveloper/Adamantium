@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Threading.Tasks;
+using Adamantium.Core;
 using Adamantium.Core.DependencyInjection;
 
 namespace Adamantium.Graphics.Core.Content
@@ -15,7 +16,13 @@ namespace Adamantium.Graphics.Core.Content
       /// used to instantiate a content.
       /// </remarks>
       IDependencyResolver ServiceProvider { get; }
-      
+
+      /// <summary>
+      /// The one-of-a-kind objects of the content's owner - its graphics device service, say - for a reader that needs
+      /// them. <see cref="ServiceProvider"/> holds only what is shared by the whole process.
+      /// </summary>
+      Satellites Satellites { get; }
+
       /// <summary>
       /// Checks if the specified assets exists.
       /// </summary>

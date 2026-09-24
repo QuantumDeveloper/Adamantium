@@ -24,8 +24,8 @@ public class InputService : EntityService
 
     public InputService(EntityWorld world) : base(world)
     {
-        toolsManager = DependencyResolver.Resolve<ToolsManager>();
-        observatory = DependencyResolver.Resolve<Observatory>();
+        toolsManager = EntityWorld.Satellites.Get<ToolsManager>();
+        observatory = EntityWorld.Satellites.Get<Observatory>();
         EntityWorld.EntityManager.EntityRemoved += EntityManagerEntityRemoved;
         //audioManager = new AudioManager();
     }

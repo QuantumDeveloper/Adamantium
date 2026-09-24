@@ -50,11 +50,8 @@ public class RenderingProcessor : EntityProcessor<RenderingService>, IDisposable
         GraphicsDevice = AssociatedService.GraphicsDevice;
         GraphicsDeviceService.DeviceChangeBegin += DeviceChangeBegin;
         GraphicsDeviceService.DeviceChangeEnd += DeviceChangeEnd;
-        Content = EntityWorld.DependencyResolver.Resolve<IContentManager>();
+        Content = EntityWorld.Satellites.Get<IContentManager>();
         Window = AssociatedService.Window;
-        // Window.ParametersChanging += Window_ParametersChanging;
-        // Window.ParametersChanged += Window_ParametersChanged;
-        //Window.StateChanged += StateChanged;
         Window.SizeChanged += WindowOnSizeChanged;
         //SpriteBatch = new SpriteBatch(GraphicsDevice, 80000);
         LoadContent();

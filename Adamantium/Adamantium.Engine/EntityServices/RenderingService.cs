@@ -33,11 +33,11 @@ public class RenderingService : EntityService
 
     public RenderingService(EntityWorld world, UniverseOutput window) : base(world)
     {
-        GraphicsDeviceService = world.DependencyResolver.Resolve<IGraphicsDeviceService>();
+        GraphicsDeviceService = world.Satellites.Get<IGraphicsDeviceService>();
         GraphicsDeviceService.DeviceChangeBegin += DeviceChangeBegin;
         GraphicsDeviceService.DeviceChangeEnd += DeviceChangeEnd;
         GraphicsDevice = window.GraphicsDevice;
-        Content = world.DependencyResolver.Resolve<IContentManager>();
+        Content = world.Satellites.Get<IContentManager>();
         Window = window;
         Window.ParametersChanging += Window_ParametersChanging;
         Window.ParametersChanged += Window_ParametersChanged;

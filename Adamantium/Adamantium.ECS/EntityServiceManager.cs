@@ -4,7 +4,6 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Adamantium.Core.DependencyInjection;
-using Adamantium.Graphics.Core;
 
 namespace Adamantium.ECS
 {
@@ -70,7 +69,7 @@ namespace Adamantium.ECS
         
         internal void InitializeResources()
         {
-            appService = Container.Resolve<IAdamantiumApplication>();
+            appService = EntityWorld.Satellites.Get<IAdamantiumApplication>();
             appService.Started += OnServiceStarted;
             appService.ShuttingDown += OnServiceShuttingDown;
         }

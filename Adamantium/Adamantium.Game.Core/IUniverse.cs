@@ -1,15 +1,18 @@
 ﻿using Adamantium.Core;
 using Adamantium.Core.DependencyInjection;
 using Adamantium.ECS;
-using Adamantium.Graphics;
-using Adamantium.Graphics.Core;
 
 namespace Adamantium.Game.Core
 {
     public interface IUniverse : IAdamantiumApplication
     {
         EntityWorld EntityWorld { get; }
-        
+
+        /// <summary>
+        /// What this universe has its own of, as opposed to what the whole process shares through <see cref="Container"/>.
+        /// </summary>
+        Satellites Satellites { get; }
+
         IReadOnlyList<UniverseOutput> Outputs { get; }
         
         UniverseOutput MainOutput { get; }

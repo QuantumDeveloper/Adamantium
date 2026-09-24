@@ -21,7 +21,6 @@ using Adamantium.UI.Core.Graphics;
 using Adamantium.UI.Core.Input;
 using Adamantium.UI.Core.Media.Animation;
 using Adamantium.UI.Core.Rendering;
-using Adamantium.UI.Core.Input;
 using Adamantium.UI.Platforms.Windows;
 using Adamantium.UI.Core.Resources;
 using Adamantium.UI.Core.RoutedEvents;
@@ -32,7 +31,6 @@ using Adamantium.UI.Controls.Docking;
 using Adamantium.UI.Controls.Navigation;
 using Adamantium.UI.Navigation;
 using Adamantium.UI.Platforms.MacOS;
-using Adamantium.UI.Platforms.Windows;
 using Adamantium.UI.Rendering;
 using Adamantium.UI.Services;
 using Adamantium.UI.Themes.FluentTheme;
@@ -64,9 +62,6 @@ public abstract class UIApplication : FundamentalUIComponent, IAdamantiumApplica
     private Thread applicationLoopThread;
     private CancellationTokenSource cancellationTokenSource;
 
-    // Phase 3.3 render thread (RenderThreadOptions.RenderThreadEnabled). The loop thread does Update + Record and hands the
-    // recorded frame over WITHOUT waiting for it, so the next Update overlaps the render thread's apply + present.
-    //
     // The frames themselves travel as DOUBLE-BUFFERED packets inside each window's RenderCache (a queue of deltas the applier
     // drains); this channel is only the WAKE-UP. It is bounded to ONE token and written with TryWrite, so a loop that gets
     // ahead by several frames does not pile up signals - the render thread wakes once and drains every packet published since.
@@ -115,7 +110,9 @@ public abstract class UIApplication : FundamentalUIComponent, IAdamantiumApplica
         Container.RegisterSingleton<IResourceFactory, ResourceFactory>();
         Container.RegisterSingleton<IGraphicsContext, GraphicsContext>();
         GraphicsContext = Container.Resolve<IGraphicsContext>();
-        EntityWorld = new EntityWorld(Container);
+        var satellites = new Satellites();
+        satellites.Add<IAdamantiumApplication>(this);
+        EntityWorld = new EntityWorld(Container, satellites);
         RegisterBasicServices(Container);
         
         applicationLoopThread = new Thread(ApplicationLoopThread);

@@ -28,7 +28,23 @@ public sealed class Satellites
     }
 
     /// <summary>
-    /// The satellite put in under <typeparamref name="T"/>; throws when there is none.
+    /// The satellite put in under <typeparamref name="T"/>, for something that may be absent; false when there is none.
+    /// </summary>
+    public bool TryGet<T>(out T satellite) where T : class
+    {
+        if (items.TryGetValue(typeof(T), out var item))
+        {
+            satellite = (T)item;
+            return true;
+        }
+
+        satellite = null;
+        return false;
+    }
+
+    /// <summary>
+    /// The satellite put in under <typeparamref name="T"/>, for something that must be there; throws, naming the type,
+    /// when there is none.
     /// </summary>
     public T Get<T>() where T : class
     {

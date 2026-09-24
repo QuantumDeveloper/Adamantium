@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using Adamantium.Core;
 using Adamantium.Core.DependencyInjection;
 using Adamantium.ECS.Templates;
 
@@ -8,9 +9,10 @@ namespace Adamantium.ECS
 {
     public class EntityWorld
     {
-        public EntityWorld(IDependencyResolver container)
+        public EntityWorld(IDependencyResolver container, Satellites satellites)
         {
             DependencyResolver = container ?? throw new ArgumentNullException($"{nameof(container)} should not be null");
+            Satellites = satellites ?? throw new ArgumentNullException($"{nameof(satellites)} should not be null");
             EntityManager = new EntityManager(this);
             ServiceManager = new EntityServiceManager(this);
             ServiceManager.FrameEnded += FrameEnded;
@@ -20,6 +22,11 @@ namespace Adamantium.ECS
         public EntityManager EntityManager { get; }
         public EntityServiceManager ServiceManager { get; }
         public IDependencyResolver DependencyResolver { get; }
+
+        /// <summary>
+        /// The one-of-a-kind objects of whoever owns this world - its universe, or the application.
+        /// </summary>
+        public Satellites Satellites { get; }
 
         public void Initialize()
         {

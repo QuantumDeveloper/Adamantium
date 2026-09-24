@@ -12,7 +12,6 @@ namespace Adamantium.Engine.EntityServices;
 public class ToolsService : EntityService
 {
     private ToolsManager tools;
-    private LightManager lightManager;
     private Observatory observatory;
 
     public ToolsService(EntityWorld world)
@@ -27,17 +26,15 @@ public class ToolsService : EntityService
 
     public override void Initialize()
     {
-        tools = EntityWorld.DependencyResolver.Resolve<ToolsManager>();
-        lightManager = EntityWorld.DependencyResolver.Resolve<LightManager>();
-        observatory = EntityWorld.DependencyResolver.Resolve<Observatory>();
+        tools = EntityWorld.Satellites.Get<ToolsManager>();
+        observatory = EntityWorld.Satellites.Get<Observatory>();
     }
 
     public override void Update(AppTime gameTime)
     {
         try
         {
-            tools.Update(Entities, observatory, lightManager);
-            lightManager.Update();
+            tools.Update(Entities, observatory);
         }
         catch (Exception ex)
         {

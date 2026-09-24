@@ -96,7 +96,7 @@ namespace Adamantium.Game.Core
 
         private void Initialized(object sender, EventArgs e)
         {
-            GraphicsDeviceService = Universe.Container.Resolve<IGraphicsDeviceService>();
+            GraphicsDeviceService = Universe.Satellites.Get<IGraphicsDeviceService>();
             GraphicsDeviceService.DeviceChangeEnd += DeviceChangeEnd;
         }
 

@@ -29,7 +29,7 @@ public class TransformService : EntityService
 
     public override void Initialize()
     {
-        universe = EntityWorld.DependencyResolver.Resolve<IUniverse>();
+        universe = EntityWorld.Satellites.Get<IUniverse>();
     }
 
     public override void Update(AppTime gameTime)
