@@ -93,52 +93,5 @@ public class UniverseService : IUniverseService
 
     public event Action<IUniverse> OnUniverseAdded;
 
-    private class UniverseKey
-    {
-        public UniverseKey(string name, IWindow window, EntityService service, IUniverse universe)
-        {
-            Name = name;
-            Window = window;
-            Service = service;
-            Universe = universe;
-        }
-
-        public string Name { get; }
-
-        public IWindow Window { get; }
-
-        public EntityService Service { get; }
-
-        public IUniverse Universe { get; }
-
-        public override bool Equals(object obj)
-        {
-            if (obj is UniverseKey key)
-            {
-                return this == key;
-            }
-
-            return false;
-        }
-
-        public static bool operator == (UniverseKey key1, UniverseKey key2)
-        {
-            if (key1 == null || key2 == null)
-            {
-                return false;
-            }
-
-            return key1 == key2;
-        }
-
-        public static bool operator !=(UniverseKey key1, UniverseKey key2)
-        {
-            return !(key1 == key2);
-        }
-
-        public override int GetHashCode()
-        {
-            return HashCode.Combine(Name.GetHashCode(), Window.GetHashCode(), Service.GetHashCode(), Universe.GetHashCode());
-        }
-    }
+    private sealed record UniverseKey(string Name, IWindow Window, EntityService Service, IUniverse Universe);
 }
