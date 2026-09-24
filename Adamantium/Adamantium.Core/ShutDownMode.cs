@@ -1,4 +1,4 @@
-﻿namespace Adamantium.UI.Core;
+﻿namespace Adamantium.Core;
 
 /// <summary>
 /// Shutdown mode for Application
