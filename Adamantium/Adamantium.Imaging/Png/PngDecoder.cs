@@ -213,7 +213,7 @@ namespace Adamantium.Imaging.Png
                     case "tRNS":
                         ReadtRNSChunk(state, chunkSize);
                         break;
-                    case "bkGD":
+                    case "bKGD":
                         ReadbKGDChunk(state, chunkSize);
                         break;
                     case "tEXt":
@@ -246,7 +246,7 @@ namespace Adamantium.Imaging.Png
                     /*it's not an implemented chunk type, so ignore it: skip over the data*/
                     default:
                         /*error: unknown critical chunk (5th bit of first byte of chunk type is 0)*/
-                        if (!state.DecoderSettings.IgnoreCritical)
+                        if (IsCritical(chunkType) && !state.DecoderSettings.IgnoreCritical)
                         {
                             state.Error = 69;
                         }
@@ -262,6 +262,9 @@ namespace Adamantium.Imaging.Png
 
             return state.Error;
         }
+
+        // An ancillary chunk (lower-case first letter) may be skipped; only an unknown critical one is an error.
+        private static bool IsCritical(string chunkType) => chunkType.Length > 0 && (chunkType[0] & 0x20) == 0;
 
         private void ReadPLTEChunk(PngState state, uint chunkSize)
         {

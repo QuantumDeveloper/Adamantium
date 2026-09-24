@@ -22,6 +22,9 @@
 		<ProjectReference Include="..\Adamantium.Mathematics\Adamantium.Mathematics.csproj" />
 	</ItemGroup>
 	<ItemGroup>
+		<InternalsVisibleTo Include="Adamantium.ImagingTests" />
+	</ItemGroup>
+	<ItemGroup>
 	  <Compile Remove="obj\**" />
 	</ItemGroup>
 	<ItemGroup>

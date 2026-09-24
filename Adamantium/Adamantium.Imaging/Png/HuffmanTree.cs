@@ -230,45 +230,6 @@ namespace Adamantium.Imaging.Png
             return MakeFromLength(tree, bitlen, NumDistanceSymbols, 15);
         }
 
-        /*
-        returns the code, or (unsigned)(-1) if error happened
-        bitlength is the length of the complete buffer, in bits (so its byte length times 8)
-        */
-        public static int DecodeSymbol(byte[] inputData, ref int bitPointer, HuffmanTree codeTree, int bitLength)
-        {
-            uint treepos = 0, ct;
-            for (; ; )
-            {
-                if (bitPointer >= bitLength)
-                {
-                    /*error: end of input memory reached without endcode*/
-                    return -1;
-                }
-                /*
-                decode the symbol from the tree. The "readBitFromStream" code is inlined in
-                the expression below because this is the biggest bottleneck while decoding
-                */
-                ct = codeTree.Tree2D[(treepos << 1) + (uint)((inputData[bitPointer >> 3] >> (bitPointer & 0x7)) & 1)];
-                ++bitPointer;
-                if (ct < codeTree.Numcodes)
-                {
-                    /*the symbol is decoded, return it*/
-                    return (int)ct;
-                }
-                else
-                {
-                    /*symbol not yet decoded, instead move tree position*/
-                    treepos = ct - codeTree.Numcodes;
-                }
-
-                if (treepos >= codeTree.Numcodes)
-                {
-                    /*error: it appeared outside the codetree*/
-                    return -1;
-                }
-            }
-        }
-
         public static uint MakeFromFrequences(HuffmanTree tree, uint[] frequencies, int mincodes, int numcodes, uint maxbitlen)
         {
             uint error = 0;
