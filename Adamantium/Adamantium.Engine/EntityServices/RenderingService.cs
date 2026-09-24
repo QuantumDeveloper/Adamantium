@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using Adamantium.Core;
 using Adamantium.ECS;
 using Adamantium.ECS.Components;
@@ -18,15 +18,12 @@ public class RenderingService : EntityService
     public override bool IsRenderingService => true;
     public override EntityServiceType ServiceType => EntityServiceType.Render;
 
-    // Present runs on its own phase, so a skipped BeginDraw does not skip it: without this a hidden output would keep
-    // handing the panel the one frame it drew before its tab went away.
+    // Present is a phase of its own that a skipped BeginDraw does not skip: a hidden output must not present its last frame.
     public override bool CanDisplayContent => Window.IsVisible;
     protected IContentManager Content { get; }
     public UniverseOutput Window { get; }
 
     protected InputWormhole InputManager => Window.Input;
-        
-    //protected SpriteBatch SpriteBatch;
 
     protected Camera ActiveCamera { get; set; }
     protected bool ShowDebugOutput { get; set; }
@@ -42,12 +39,10 @@ public class RenderingService : EntityService
         Window.ParametersChanging += Window_ParametersChanging;
         Window.ParametersChanged += Window_ParametersChanged;
         Window.SizeChanged += WindowOnSizeChanged;
-        //SpriteBatch = new SpriteBatch(GraphicsDevice, 80000);
     }
 
     private void WindowOnSizeChanged(UniverseOutputSizeChangedPayload obj)
     {
-        //Window.UpdatePresenter();
     }
 
     private void Window_ParametersChanged(UniverseOutputParametersPayload payload)
@@ -78,12 +73,10 @@ public class RenderingService : EntityService
 
     protected virtual void OnDeviceChangeBegin()
     {
-        //SpriteBatch?.Dispose();
     }
 
     protected virtual void OnDeviceChangeEnd()
     {
-        //SpriteBatch = new SpriteBatch(GraphicsDevice, 25000);
     }
 
     public virtual void CreateSystemResources()
@@ -91,32 +84,22 @@ public class RenderingService : EntityService
 
     public override bool BeginDraw()
     {
-        // Nothing to draw into while the output is off screen, and the whole sequence (Draw/EndDraw/Submit) is skipped
-        // by returning false here - which is also what keeps a hidden output from presenting a frame nobody asked for.
+        // False skips Draw, EndDraw and Submit - and a present of a frame nobody sees.
         if (!Window.IsVisible || !Window.IsUpToDate())
         {
             return false;
         }
 
-        // Render targets/depth are consumed by GraphicsDevice.BeginDraw() itself (it transitions them and begins
-        // rendering on them), so they must be bound BEFORE it — otherwise the very first frame transitions a null
-        // target (NRE). This mirrors the working UI path (WindowRenderService.BeginDraw). Viewports/scissors are
-        // recorded into the command buffer, so they must stay AFTER BeginDraw() has started it.
+        // Before GraphicsDevice.BeginDraw, which transitions the targets: a null one fails the very first frame.
         GraphicsDevice.SetRenderTargets(Window.Presenter.RenderTarget);
         GraphicsDevice.SetDepthBuffer(Window.Presenter.DepthBuffer);
-        // Rasterization sample count must match the presenter's MSAA attachments, otherwise vkCmdSetRasterizationSamplesEXT
-        // stays at 1 while the render target is multisampled -> undefined rasterization (model not drawn on NVIDIA).
-        // The UI path does the same in WindowRenderService.BeginDraw.
+        // Must match the presenter's MSAA, or the model is not rasterized.
         GraphicsDevice.MSAALevel = Window.Presenter.MSAALevel;
-        // The game frame is an opaque scene presented into a UI panel that can be drawn semi-transparently. Mask
-        // ALPHA writes so the cleared alpha (1.0) is preserved across all game draws -> the shared surface is fully
-        // opaque -> the panel can scale it by its own Opacity (the model's own fragments would otherwise carry the
-        // unsampled-texture alpha ~0 and the panel would only ever show a faint outline / can't be made translucent).
+        // Alpha is not written, so the cleared 1 stays and the panel can fade the frame with its own Opacity.
         GraphicsDevice.ColorComponentFlags = Adamantium.Vulkan.Core.ColorComponentFlagBits.RBit |
                                              Adamantium.Vulkan.Core.ColorComponentFlagBits.GBit |
                                              Adamantium.Vulkan.Core.ColorComponentFlagBits.BBit;
-        // The game scene is opaque (the model writes solid texels); render it with an opaque blend equation, not
-        // whatever blend state the UI pass left set (an alpha/premultiplied blend collapsed the model to black).
+        // An opaque scene must not inherit the blend the UI pass left set.
         GraphicsDevice.ColorBlendEquation = Adamantium.Graphics.Core.ColorBlendEquations.Opaque;
 
         if (!GraphicsDevice.BeginDraw())
@@ -124,6 +107,7 @@ public class RenderingService : EntityService
             return false;
         }
 
+        // Recorded into the command buffer, so only after BeginDraw.
         GraphicsDevice.SetViewports(Window.Viewport);
         GraphicsDevice.SetScissors(Window.Scissor);
         return true;
