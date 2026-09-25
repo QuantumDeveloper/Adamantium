@@ -11,6 +11,13 @@ public class Mesh
 {
     private const int StripIndicesSeparator = -1;
     private MeshContour defaultMeshContour;
+    private bool isModified;
+    private int version;
+    private TriangleTree triangleTree;
+    private int triangleTreeVersion;
+    private ConvexHull convexHull;
+    private int convexHullVersion;
+    private Vector3[] convexHullPoints;
 
     public static int RoundPrecision => 4;
     
@@ -83,7 +90,18 @@ public class Mesh
 
     public bool IsOptimized { get; private set; }
 
-    public bool IsModified { get; private set; }
+    public bool IsModified
+    {
+        get => isModified;
+        private set
+        {
+            isModified = value;
+            if (value)
+            {
+                version++;
+            }
+        }
+    }
 
     public string MaterialID { get; set; }
 
@@ -111,6 +129,43 @@ public class Mesh
     public void AcceptChanges()
     {
         IsModified = false;
+    }
+
+    /// <summary>
+    /// The mesh's triangles sorted for ray tests: built on first use and again after the geometry changes, so a mesh
+    /// that is never picked never pays for it.
+    /// </summary>
+    public TriangleTree GetTriangleTree()
+    {
+        if (triangleTree == null || triangleTreeVersion != version || !triangleTree.Describes(Points, Indices, MeshTopology))
+        {
+            triangleTree = new TriangleTree(Points, Indices, MeshTopology);
+            triangleTreeVersion = version;
+        }
+
+        return triangleTree;
+    }
+
+    /// <summary>
+    /// The convex hull of the mesh's points, in the mesh's own space: built on first use and again after the points
+    /// change, and shared by every entity that draws this mesh.
+    /// </summary>
+    public ConvexHull GetConvexHull()
+    {
+        if (convexHull == null || convexHullVersion != version || !ReferenceEquals(convexHullPoints, Points))
+        {
+            var points = new Vector3F[Points.Length];
+            for (int i = 0; i < points.Length; i++)
+            {
+                points[i] = Points[i];
+            }
+
+            convexHull = ConvexHull.FromPoints(points);
+            convexHullVersion = version;
+            convexHullPoints = Points;
+        }
+
+        return convexHull;
     }
 
     public bool HasIndices => Indices.Length > 0;
@@ -399,6 +454,28 @@ public class Mesh
         return this;
     }
 
+    /// <summary>
+    /// A line mesh through this mesh's contours, for an outline drawn in 3D: the contours themselves are flat and only an
+    /// outline stroke reads them.
+    /// </summary>
+    public Mesh ContoursToLines()
+    {
+        var points = new List<Vector3>();
+        foreach (var contour in Contours)
+        {
+            var outline = contour.Points;
+            var count = contour.IsGeometryClosed ? outline.Length : outline.Length - 1;
+            for (int i = 0; i < count; i++)
+            {
+                var next = outline[(i + 1) % outline.Length];
+                points.Add(new Vector3(outline[i].X, outline[i].Y, 0));
+                points.Add(new Vector3(next.X, next.Y, 0));
+            }
+        }
+
+        return new Mesh(PrimitiveType.LineList).SetPoints(points);
+    }
+
     public Mesh Merge(Mesh mesh)
     {
         return Merge(new []{new MergeInstance(mesh, Matrix4x4.Identity, false)});
@@ -416,10 +493,17 @@ public class Mesh
         return Merge(instances);
     }
 
+    /// <summary>
+    /// Appends the instances' geometry. Normals survive only when every part has them; texture coordinates when any part
+    /// has them, zero where a part has none. What is not merged is dropped rather than left out of step with the points.
+    /// </summary>
     public Mesh Merge(MergeInstance[] instances, bool forceOptimization = false)
     {
         var positions = new List<Vector3>(Points);
-        var uv0 = new List<Vector2F>(UV0);
+        var normals = new List<Vector3F>(Normals.Length == Points.Length ? Normals : []);
+        var everyHasNormals = Normals.Length == Points.Length;
+        var uv0 = new List<Vector2F>(UV0.Length == Points.Length ? UV0 : new Vector2F[Points.Length]);
+        var anyHasUv0 = UV0.Length == Points.Length && Points.Length > 0;
         List<int> indices = new List<int>(Indices);
         int indexShift = Points.Length;
         foreach (var instance in instances)
@@ -434,33 +518,73 @@ public class Mesh
                 instance.Mesh.Optimize();
             }
 
-            var transformed = instance.Mesh.Points;
+            var mesh = instance.Mesh;
+            var transformed = mesh.Points;
             if (instance.ApplyTransform)
             {
                 transformed = ApplyTransform(transformed, instance.Transform);
             }
 
-            if (!instance.Mesh.HasIndices)
+            if (!mesh.HasIndices)
             {
-                instance.Mesh.GenerateBasicIndices();
+                mesh.GenerateBasicIndices();
             }
 
             positions.AddRange(transformed);
-            uv0.AddRange(instance.Mesh.UV0);
-            var instancePositions = instance.Mesh.Points;
+
+            if (everyHasNormals && mesh.Normals.Length == mesh.Points.Length)
+            {
+                normals.AddRange(instance.ApplyTransform ? TransformedNormals(mesh.Normals, instance.Transform) : mesh.Normals);
+            }
+            else
+            {
+                everyHasNormals = false;
+            }
+
+            if (mesh.UV0.Length == mesh.Points.Length && mesh.Points.Length > 0)
+            {
+                uv0.AddRange(mesh.UV0);
+                anyHasUv0 = true;
+            }
+            else
+            {
+                uv0.AddRange(new Vector2F[mesh.Points.Length]);
+            }
+
             int startIndex = indices.Count;
-            indices.AddRange(instance.Mesh.Indices);
+            indices.AddRange(mesh.Indices);
             if (MeshTopology == PrimitiveType.LineStrip || MeshTopology == PrimitiveType.TriangleStrip)
             {
                 indices.Add(StripIndicesSeparator);
             }
             ShiftIndices(indices, startIndex, indexShift);
-            indexShift += instancePositions.Length;
+            indexShift += mesh.Points.Length;
         }
 
         SetPoints(positions);
-        SetUVs(0, uv0);
         SetIndices(indices);
+
+        if (everyHasNormals && normals.Count > 0)
+        {
+            SetNormals(normals);
+        }
+        else
+        {
+            Normals = [];
+            Semantic &= ~VertexSemantic.Normal;
+        }
+
+        if (anyHasUv0)
+        {
+            SetUVs(0, uv0);
+        }
+        else
+        {
+            UV0 = [];
+            Semantic &= ~VertexSemantic.UV0;
+        }
+
+        DropAttributesOutOfStep();
 
         if (forceOptimization)
         {
@@ -468,6 +592,67 @@ public class Mesh
         }
 
         return this;
+    }
+
+    private static Vector3F[] TransformedNormals(Vector3F[] normals, Matrix4x4 transform)
+    {
+        if (transform.IsIdentity)
+        {
+            return normals;
+        }
+
+        var normalMatrix = Matrix4x4.Transpose(Matrix4x4.Invert(transform));
+        var turned = new Vector3F[normals.Length];
+        for (int i = 0; i < normals.Length; i++)
+        {
+            var normal = (Vector3)normals[i];
+            Vector3.TransformNormal(ref normal, ref normalMatrix, out normal);
+            turned[i] = (Vector3F)Vector3.Normalize(normal);
+        }
+
+        return turned;
+    }
+
+    private void DropAttributesOutOfStep()
+    {
+        var count = Points.Length;
+        if (Colors.Length != count)
+        {
+            Colors = [];
+            Semantic &= ~VertexSemantic.Color;
+        }
+
+        if (UV1.Length != count)
+        {
+            UV1 = [];
+            Semantic &= ~VertexSemantic.UV1;
+        }
+
+        if (UV2.Length != count)
+        {
+            UV2 = [];
+            Semantic &= ~VertexSemantic.UV2;
+        }
+
+        if (UV3.Length != count)
+        {
+            UV3 = [];
+            Semantic &= ~VertexSemantic.UV3;
+        }
+
+        if (Tangents.Length != count || BiTangents.Length != count)
+        {
+            Tangents = [];
+            BiTangents = [];
+            Semantic &= ~VertexSemantic.TangentBiNormal;
+        }
+
+        if (JointIndices.Length != count || JointWeights.Length != count)
+        {
+            JointIndices = [];
+            JointWeights = [];
+            Semantic &= ~(VertexSemantic.JointIndices | VertexSemantic.JointWeights);
+        }
     }
 
     private void ShiftIndices(List<int> indices, int startIndex, int shiftValue)
@@ -543,14 +728,7 @@ public class Mesh
     // Normals follow the inverse transpose, which is what keeps them perpendicular through a non-uniform scale.
     private void TransformNormals(ref Matrix4x4 transform)
     {
-        var normalMatrix = Matrix4x4.Transpose(Matrix4x4.Invert(transform));
-
-        for (int i = 0; i < Normals.Length; i++)
-        {
-            var normal = (Vector3)Normals[i];
-            Vector3.TransformNormal(ref normal, ref normalMatrix, out normal);
-            Normals[i] = (Vector3F)Vector3.Normalize(normal);
-        }
+        Normals = TransformedNormals(Normals, transform);
     }
 
     public void Clear()
@@ -1193,6 +1371,7 @@ public class Mesh
             ReverseWinding();
         }
 
+        IsModified = true;
         return this;
     }
 
