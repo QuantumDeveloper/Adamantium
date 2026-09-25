@@ -13,6 +13,12 @@ float4 instanceColor[64];
 float4x4 viewProjection;
 // The selection outline's width as a clip-space offset per unit of w, along x and along y.
 float2 outlineStep;
+// A line's width in pixels, one per copy in x (and for a ring, 1 in y when only its front half shows); lines are spread
+// on screen, so the viewport's size in pixels too.
+float4 instanceLine[64];
+float2 viewportSize;
+// A ring's normal (xyz) and radius (w), one per copy.
+float4 instanceRing[64];
 sampler sampleType;
 Texture2D shaderTexture;
 float4 foregroundColor;
@@ -134,39 +140,172 @@ float4 BasicLit_PS(PS_OUTPUT_BASIC input) : SV_TARGET
     return float4(saturate(shade), input.color.a);
 }
 
-struct PS_OUTPUT_ORBIT
+struct PS_OUTPUT_LINE
 {
     float4 position : SV_POSITION;
     float4 color : COLOR0;
-    float3 fromCenter : TEXCOORD0;
-    float3 toCenter : TEXCOORD1;
+    noperspective float across : TEXCOORD0;
+    nointerpolation float halfWidth : TEXCOORD1;
 };
 
-// A ring of the rotation gizmo: its copy's center rides the translation row of the copy's matrix, and the eye sits at
-// the origin of the camera-relative space the placement is in.
-PS_OUTPUT_ORBIT OrbitInstanced_VS(MESH_VERTEX input, uint instanceId : SV_InstanceID)
+// A segment of a line mesh turned into a quad (LineRibbon): the corner's own end is the position, the other end rides
+// the normal, uv0 is the side and which end. The quad is spread on screen to the copy's width and a pixel more for the
+// smoothing, and runs half a width past each end, so the segments of a polyline close over their joints.
+PS_OUTPUT_LINE SdfLineInstanced_VS(MESH_VERTEX input, uint instanceId : SV_InstanceID)
 {
-    PS_OUTPUT_ORBIT output;
+    PS_OUTPUT_LINE output;
+
+    float4x4 placement = instanceWorld[instanceId];
+    float4 own = mul(float4(input.position.xyz, 1.0f), placement);
+    float4 ownClip = mul(own, viewProjection);
+    float4 otherClip = mul(mul(float4(input.normal, 1.0f), placement), viewProjection);
+
+    float2 halfViewport = viewportSize * 0.5f;
+    float2 ownPixel = ownClip.xy / ownClip.w * halfViewport;
+    float2 otherPixel = otherClip.xy / otherClip.w * halfViewport;
+    bool atStart = input.uv0.y < 0.5f;
+    float2 along = atStart ? otherPixel - ownPixel : ownPixel - otherPixel;
+    float span = length(along);
+    along = span > 1e-4f ? along / span : float2(1.0f, 0.0f);
+    float2 across = float2(-along.y, along.x);
+
+    float halfWidth = instanceLine[instanceId].x * 0.5f;
+    float reach = halfWidth + 1.0f;
+    float2 pixel = ownPixel + across * (input.uv0.x * reach) + along * (atStart ? -halfWidth : halfWidth);
+
+    output.position = float4(pixel / halfViewport * ownClip.w, ownClip.z, ownClip.w);
+    output.color = instanceColor[instanceId];
+    output.across = input.uv0.x * reach;
+    output.halfWidth = halfWidth;
+    return output;
+}
+
+// Full inside the line's width, fading out over its last pixel on either side.
+float4 SdfLine_PS(PS_OUTPUT_LINE input) : SV_TARGET
+{
+    float coverage = saturate(input.halfWidth + 0.5f - abs(input.across));
+    return float4(input.color.rgb, input.color.a * coverage);
+}
+
+struct PS_OUTPUT_RING
+{
+    float4 position : SV_POSITION;
+    float4 color : COLOR0;
+    float3 world : TEXCOORD0;
+    nointerpolation float3 center : TEXCOORD1;
+    nointerpolation float4 ring : TEXCOORD2;
+    nointerpolation float2 stroke : TEXCOORD3;
+};
+
+// A ring drawn as the circle it is. The copy's matrix places a square facing the eye round the ring, its translation is
+// the ring's center; instanceRing holds the ring's normal and radius, instanceLine its width and whether only the half
+// on the eye's side shows. Everything is in the camera-relative space the eye sits at the origin of.
+PS_OUTPUT_RING SdfRingInstanced_VS(MESH_VERTEX input, uint instanceId : SV_InstanceID)
+{
+    PS_OUTPUT_RING output;
 
     float4x4 placement = instanceWorld[instanceId];
     float4 world = mul(float4(input.position.xyz, 1.0f), placement);
     output.position = mul(world, viewProjection);
     output.color = instanceColor[instanceId];
-    output.fromCenter = world.xyz - placement[3].xyz;
-    output.toCenter = placement[3].xyz;
+    output.world = world.xyz;
+    output.center = placement[3].xyz;
+    output.ring = instanceRing[instanceId];
+    output.stroke = float2(instanceLine[instanceId].x * 0.5f, instanceLine[instanceId].y);
     return output;
 }
 
-// Only the half of the ring on the eye's side of the ball: split across the sight to the center, not the exact
-// silhouette, which would leave less than half of a tilted ring and nothing of one that faces the eye.
-float4 Orbit_PS(PS_OUTPUT_ORBIT input) : SV_TARGET
+static const float Pi = 3.14159265f;
+
+float RayDistance(float3 p, float3 dir)
 {
-    if (dot(input.fromCenter, input.toCenter) > 0.0f)
+    return length(p - dir * dot(p, dir));
+}
+
+// The point of the half ring c + r (u cos t + v sin t), t in [0, pi], nearest the ray from the eye along dir: a scan
+// finds the valley, then Newton steps, halved until they come closer, settle in it.
+float3 NearestOnHalfRing(float3 dir, float3 c, float3 u, float3 v, float r)
+{
+    float theta = 0.0f;
+    float nearest = 1e30f;
+    for (int k = 0; k < 24; k++)
+    {
+        float probe = Pi * k / 23.0f;
+        float d = RayDistance(c + (u * cos(probe) + v * sin(probe)) * r, dir);
+        if (d < nearest)
+        {
+            nearest = d;
+            theta = probe;
+        }
+    }
+
+    for (int i = 0; i < 5; i++)
+    {
+        float s, co;
+        sincos(theta, s, co);
+        float3 p = c + (u * co + v * s) * r;
+        float3 dp = (v * co - u * s) * r;
+        float3 ddp = -(u * co + v * s) * r;
+        float pd = dot(p, dir);
+        float dpd = dot(dp, dir);
+        float f1 = dot(p, dp) - pd * dpd;
+        float f2 = dot(dp, dp) + dot(p, ddp) - dpd * dpd - pd * dot(ddp, dir);
+        float step = f2 > 1e-12f ? f1 / f2 : sign(f1) * 0.1f;
+        for (int h = 0; h < 6; h++)
+        {
+            float next = theta - step;
+            float d = RayDistance(c + (u * cos(next) + v * sin(next)) * r, dir);
+            if (d < nearest)
+            {
+                theta = next;
+                nearest = d;
+                break;
+            }
+
+            step *= 0.5f;
+        }
+    }
+
+    theta = clamp(theta, 0.0f, Pi);
+    return c + (u * cos(theta) + v * sin(theta)) * r;
+}
+
+// The pixel's distance to the true circle, in pixels, turned into coverage. The half on the eye's side is split across
+// the sight to the center, not at the ball's silhouette, which would leave less than half of a tilted ring and nothing
+// of one that faces the eye.
+float4 SdfRing_PS(PS_OUTPUT_RING input) : SV_TARGET
+{
+    float footprint = max(length(ddx(input.world)), length(ddy(input.world))) / length(input.world);
+    float3 dir = normalize(input.world);
+    float3 c = input.center;
+    float3 n = input.ring.xyz;
+    float r = input.ring.w;
+
+    float3 toEye = -c - n * dot(-c, n);
+    float3 v = dot(toEye, toEye) > 1e-12f * r * r
+        ? normalize(toEye)
+        : normalize(cross(n, abs(n.x) < 0.9f ? float3(1.0f, 0.0f, 0.0f) : float3(0.0f, 1.0f, 0.0f)));
+    float3 u = cross(n, v);
+
+    float3 p = NearestOnHalfRing(dir, c, u, v, r);
+    if (input.stroke.y < 0.5f)
+    {
+        float3 back = NearestOnHalfRing(dir, c, u, -v, r);
+        if (RayDistance(back, dir) < RayDistance(p, dir))
+        {
+            p = back;
+        }
+    }
+
+    float depth = dot(p, dir);
+    float distance = RayDistance(p, dir) / (footprint * depth);
+    float coverage = depth > 0.0f ? saturate(input.stroke.x + 0.5f - distance) : 0.0f;
+    if (coverage <= 0.0f)
     {
         discard;
     }
 
-    return input.color;
+    return float4(input.color.rgb, input.color.a * coverage);
 }
 
 // The selection outline: every copy drawn once per direction, shifted that way by the outline's width on screen, and
@@ -367,16 +506,24 @@ technique Basic
         PixelShader = BasicVertexColored_PS;
     }
 
-    pass OrbitInstanced
-    {
-        VertexShader = OrbitInstanced_VS;
-        PixelShader = Orbit_PS;
-    }
-
     pass OutlineInstanced
     {
         VertexShader = OutlineInstanced_VS;
         PixelShader = BasicVertexColored_PS;
+    }
+
+    // Lines a width in pixels wide with smooth edges, drawn from a LineRibbon.
+    pass SdfLineInstanced
+    {
+        VertexShader = SdfLineInstanced_VS;
+        PixelShader = SdfLine_PS;
+    }
+
+    // Rings drawn as circles: each pixel's distance to the true circle, see SdfRing_PS.
+    pass SdfRingInstanced
+    {
+        VertexShader = SdfRingInstanced_VS;
+        PixelShader = SdfRing_PS;
     }
     
     pass SmallGlyph

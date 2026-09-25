@@ -4,7 +4,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Adamantium.Core;
 using Adamantium.ECS;
-using Adamantium.Game.Core;
+using Adamantium.Game;
 using Adamantium.Graphics.Core;
 using Adamantium.UI.Core;
 using Adamantium.UI.EntityServices;

@@ -1,7 +1,7 @@
 using Adamantium.Core;
 using Adamantium.Core.DependencyInjection;
 using Adamantium.ECS;
-using Adamantium.Game.Core;
+using Adamantium.Game;
 
 namespace Adamantium.UI.Universes;
 

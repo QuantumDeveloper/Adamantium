@@ -3,7 +3,7 @@ using Adamantium.Core;
 using Adamantium.ECS;
 using Adamantium.ECS.Components.Extensions;
 using Adamantium.Engine.EntityServices;
-using Adamantium.Game.Core.Input;
+using Adamantium.Game.Input;
 
 namespace Adamantium.Engine.Tools;
 
@@ -26,7 +26,7 @@ public abstract class ToolProcessor : EditorProcessor
 
     public override int Order => 100;
 
-    /// <summary>How close to a line of a handle the pointer has to be to take it, in pixels.</summary>
+    /// <summary>How close to a line of a handle the pointer has to be to take it, in points: pixels at 100% scale.</summary>
     public float PickAperture { get; set; } = 6;
 
     public override void Update(AppTime gameTime)
@@ -62,13 +62,13 @@ public abstract class ToolProcessor : EditorProcessor
             dragged = null;
         }
 
-        if (Tools.IsPointerTaken)
+        if (Tools.IsPointerTaken || input.IsMouseButtonDown(MouseButton.Right))
         {
             Highlight(null, null);
             return;
         }
 
-        var hit = PickHandles(ray, out var owner);
+        var hit = PickHandles(ray, PickAperture * camera.PixelsPerPoint, out var owner);
         Highlight(owner, hit.Entity);
         var under = hit.IsHit ? default : Tools.PickEntity(ray);
         Tools.Hovered = under.Entity;
@@ -122,13 +122,13 @@ public abstract class ToolProcessor : EditorProcessor
         }
     }
 
-    private PickHit PickHandles(in PickRay ray, out Handles owner)
+    private PickHit PickHandles(in PickRay ray, float aperture, out Handles owner)
     {
         owner = null;
         var nearest = default(PickHit);
         for (int i = 0; i < active.Count; i++)
         {
-            var hit = active[i].Shape.Pick(ray, PickMode.Colliders | PickMode.Lines, PickAperture);
+            var hit = active[i].Pick(ray, aperture);
             if (hit.IsHit && (!nearest.IsHit || hit.Depth < nearest.Depth))
             {
                 nearest = hit;

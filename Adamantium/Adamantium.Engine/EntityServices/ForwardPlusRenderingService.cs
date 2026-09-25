@@ -2,7 +2,6 @@
 using Adamantium.ECS;
 using Adamantium.ECS.Components;
 using Adamantium.Game;
-using Adamantium.Game.Core;
 
 //using Texture2D = Adamantium.Graphics.Texture2D;
 

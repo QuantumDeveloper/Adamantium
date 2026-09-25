@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using Adamantium.Engine.Managers;
 using Adamantium.ECS;
 using Adamantium.ECS.Components;
-using Adamantium.Game.Core;
+using Adamantium.Game;
 
 namespace Adamantium.Engine;
 

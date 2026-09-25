@@ -9,8 +9,7 @@ using Adamantium.Engine.Tools;
 using Adamantium.ECS.Components;
 using Adamantium.ECS;
 using Adamantium.Game;
-using Adamantium.Game.Core;
-using Adamantium.Game.Core.Events;
+using Adamantium.Game.Events;
 using Adamantium.Graphics.Core;
 using Adamantium.Graphics.Core.Content;
 using Adamantium.Graphics.Core.Models;
@@ -28,15 +27,6 @@ namespace Adamantium.UI.Sandbox
         private Task _startupLoad;
         private InputService _inputService;
         private ToolsService _tools;
-
-        public AdamantiumGame(
-            bool enableDynamicRendering,
-            bool enableDebug,
-            IDependencyContainer container) :
-            base(UniverseMode.Primary, enableDebug, container)
-        {
-            EventAggregator.GetEvent<UniverseOutputCreatedEvent>().Subscribe(OnWindowCreated);
-        }
 
         public AdamantiumGame(
             IGraphicsDeviceService graphicsDeviceService,

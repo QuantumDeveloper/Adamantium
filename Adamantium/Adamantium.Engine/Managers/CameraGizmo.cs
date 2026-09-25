@@ -4,7 +4,7 @@ using Adamantium.Engine.Templates.CameraTemplates;
 using Adamantium.ECS;
 using Adamantium.ECS.Components;
 using Adamantium.ECS.Components.Extensions;
-using Adamantium.Game.Core;
+using Adamantium.Game;
 using Adamantium.Graphics;
 using Adamantium.Graphics.Core.EffectsFramework;
 using Adamantium.Mathematics;

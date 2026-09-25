@@ -49,7 +49,7 @@ public class ScaleHandles : Handles
     {
         var at = PivotInWorld(target);
         var axes = AxesOf(target);
-        PlaceShape(camera, at, axes, Pixels * UnitsPerPixel(camera, at) / Length);
+        PlaceShape(camera, at, axes, Pixels * UnitsPerPoint(camera, at) / Length);
         HideArmsFacingEye(right, up, forward, axes, at, camera);
         HideSquaresEdgeOn(rightUp, rightForward, upForward, axes, at, camera);
     }
@@ -66,7 +66,7 @@ public class ScaleHandles : Handles
             var facing = FacingCamera(ray.Camera);
             viewRight = Axis(facing, Vector3F.UnitX);
             viewForward = Axis(facing, Vector3F.UnitZ);
-            size = Pixels * UnitsPerPixel(ray.Camera, anchor);
+            size = Pixels * UnitsPerPoint(ray.Camera, anchor);
             OnPlane(ray.Ray, origin, viewForward, out startHit);
             return;
         }

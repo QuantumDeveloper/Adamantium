@@ -80,17 +80,120 @@ public class HandlesTests
     }
 
     [Test]
-    public void Rotate_AboutAnAxis_TurnsTheGrabbedPointToThePointer()
+    public void Rotate_AlongARing_TurnsARadianPerRadiusOnScreen()
     {
         var scene = new ToolScene();
         var target = ToolScene.Target(At);
         var handles = new RotationHandles();
+        handles.Place(target, scene.Camera);
+        var radius = RingRadius(handles, "ForwardAxisOrbit", scene);
+        var grab = scene.PixelOf(At + new Vector3(radius, 0, 0));
+        var along = Vector2F.Normalize(scene.PixelOf(At + new Vector3(radius, radius * 0.01, 0)) - grab);
 
-        Drag(scene, handles, target, "ForwardAxisOrbit", At + new Vector3(1, 0, 0), At + new Vector3(0, 1, 0));
+        handles.BeginDrag(target, handles.Shape.Get("ForwardAxisOrbit"), scene.RayAt(grab));
+        handles.Drag(target, scene.RayAt(grab + along * 20));
 
         var turned = Vector3F.TransformNormal(Vector3F.UnitX, target.Transform.GetLocalMatrixF());
-        AssertNear((Vector3)turned, new Vector3(0, 1, 0));
+        Assert.That(Math.Atan2(turned.Y, turned.X), Is.EqualTo(20.0 / handles.Pixels).Within(1e-3));
+        Assert.That(turned.Z, Is.EqualTo(0).Within(1e-4));
         AssertNear(target.Transform.Position, At);
+    }
+
+    [Test]
+    public void Rotate_ARingSeenEdgeOn_StillTurns()
+    {
+        var scene = new ToolScene();
+        var target = ToolScene.Target(At);
+        var handles = new RotationHandles();
+        handles.Place(target, scene.Camera);
+        var radius = RingRadius(handles, "RightAxisOrbit", scene);
+        var grab = scene.PixelOf(At + new Vector3(0, radius * 0.5, -radius * Math.Sqrt(0.75)));
+        var along = Vector2F.Normalize(scene.PixelOf(At) - grab);
+
+        handles.BeginDrag(target, handles.Shape.Get("RightAxisOrbit"), scene.RayAt(grab));
+        handles.Drag(target, scene.RayAt(grab + along * 20));
+
+        var turned = Vector3F.TransformNormal(Vector3F.UnitY, target.Transform.GetLocalMatrixF());
+        Assert.That(Math.Abs(Math.Atan2(turned.Z, turned.Y)), Is.EqualTo(20.0 / handles.Pixels).Within(1e-3));
+        Assert.That(turned.X, Is.EqualTo(0).Within(1e-4));
+    }
+
+    [Test]
+    public void Rotate_TheBall_TurnsEvenlyFromTheBlackCircleInward()
+    {
+        var scene = new ToolScene();
+        var target = ToolScene.Target(At);
+        var handles = new RotationHandles();
+        handles.Place(target, scene.Camera);
+        var direction = Vector2F.Normalize(new Vector2F(1, 1));
+        var start = scene.PixelOf(At) + direction * handles.Pixels * 1.05f;
+        handles.BeginDrag(target, handles.Shape.Get("CentralManipulator"), scene.RayAt(start));
+
+        var previous = 0.0;
+        var step = 0.0;
+        for (int i = 1; i <= 12; i++)
+        {
+            handles.Drag(target, scene.RayAt(start - direction * (2 * i)));
+            var angle = 2 * Math.Acos(Math.Clamp(Math.Abs(target.Transform.Rotation.W), 0, 1));
+            var now = angle - previous;
+            Assert.That(now, Is.GreaterThan(0), $"step {i}");
+            if (i > 1)
+            {
+                Assert.That(now, Is.LessThan(step * 1.5), $"step {i}: {now} after {step}");
+            }
+
+            step = now;
+            previous = angle;
+        }
+    }
+
+    [Test]
+    public void Rotate_Pick_TakesWhatIsDrawnNearestThePointer()
+    {
+        var scene = new ToolScene();
+        var handles = new RotationHandles();
+        handles.Place(ToolScene.Target(At), scene.Camera);
+        var center = scene.PixelOf(At);
+        var diagonal = Vector2F.Normalize(new Vector2F(1, 1)) * handles.Pixels;
+
+        Assert.That(PickedAt(handles, scene, center + diagonal * 1.125f), Is.EqualTo("CurrentViewManipulator"));
+        Assert.That(PickedAt(handles, scene, center + diagonal * 1.05f), Is.EqualTo("CentralManipulator"));
+        Assert.That(PickedAt(handles, scene, center + diagonal), Is.EqualTo("ForwardAxisOrbit"));
+        Assert.That(PickedAt(handles, scene, center + diagonal * 0.5f), Is.EqualTo("CentralManipulator"));
+        Assert.That(PickedAt(handles, scene, center + diagonal * 1.3f), Is.Null);
+    }
+
+    [Test]
+    public void Rotate_Pick_NeverTakesTheHalfOfARingThatIsNotDrawn()
+    {
+        AssertPicksOnlyDrawnHalves(new RotationHandles(), "AxisOrbit", 120);
+    }
+
+    [Test]
+    public void Pivot_Pick_NeverTakesTheHalfOfARingThatIsNotDrawn()
+    {
+        AssertPicksOnlyDrawnHalves(new PivotHandles(), "Orbit", 70);
+    }
+
+    [Test]
+    public void Pivot_ARingSeenEdgeOn_StillTurnsThePivot()
+    {
+        var scene = new ToolScene();
+        var target = ToolScene.Target(At);
+        var handles = new PivotHandles();
+        handles.Place(target, scene.Camera);
+        var radius = RingRadius(handles, "RightOrbit", scene);
+        var radiusPixels = (scene.PixelOf(At + new Vector3(0, radius, 0)) - scene.PixelOf(At)).Length();
+        var grab = scene.PixelOf(At + new Vector3(0, radius * 0.5, -radius * Math.Sqrt(0.75)));
+        var along = Vector2F.Normalize(scene.PixelOf(At) - grab);
+
+        handles.BeginDrag(target, handles.Shape.Get("RightOrbit"), scene.RayAt(grab));
+        handles.Drag(target, scene.RayAt(grab + along * 20));
+
+        var turned = Vector3F.Transform(Vector3F.UnitY, target.Transform.PivotRotation);
+        Assert.That(Math.Abs(Math.Atan2(turned.Z, turned.Y)), Is.EqualTo(20.0 / radiusPixels).Within(1).Percent);
+        Assert.That(turned.X, Is.EqualTo(0).Within(1e-4));
+        AssertNear(target.Transform.Pivot, At);
     }
 
     [Test]
@@ -188,6 +291,47 @@ public class HandlesTests
         handles.Place(target, scene.Camera);
         handles.BeginDrag(target, handles.Shape.Get(part), scene.RayAt(from));
         handles.Drag(target, scene.RayAt(to));
+    }
+
+    // Over a grid of pixels round the handles, seen at a slant: every ring the pick takes is taken on its drawn half.
+    private static void AssertPicksOnlyDrawnHalves(Handles handles, string ringSuffix, int reach)
+    {
+        var scene = new ToolScene();
+        scene.LookFrom(At + new Vector3(-6, -5, -8), At);
+        handles.Place(ToolScene.Target(At), scene.Camera);
+        var center = scene.PixelOf(At);
+        var rings = 0;
+
+        for (int y = -reach; y <= reach; y += 3)
+        {
+            for (int x = -reach; x <= reach; x += 3)
+            {
+                var hit = handles.Pick(scene.RayAt(center + new Vector2F(x, y)), 6);
+                if (!hit.IsHit || !hit.Entity.Name.EndsWith(ringSuffix))
+                {
+                    continue;
+                }
+
+                rings++;
+                var ringCenter = hit.Entity.Transform.GetMetadata(scene.Camera).WorldMatrixF.TranslationVector;
+                Assert.That(Vector3F.Dot(hit.Point - ringCenter, ringCenter), Is.LessThanOrEqualTo(1e-3f), $"{hit.Entity.Name} at {x},{y}");
+            }
+        }
+
+        Assert.That(rings, Is.GreaterThan(0));
+    }
+
+    private static string PickedAt(Handles handles, ToolScene scene, Vector2F pixel)
+    {
+        var hit = handles.Pick(scene.RayAt(pixel), 6);
+        return hit.IsHit ? hit.Entity.Name : null;
+    }
+
+    private static double RingRadius(Handles handles, string part, ToolScene scene)
+    {
+        var world = handles.Shape.Get(part).Transform.GetMetadata(scene.Camera).WorldMatrixF;
+        var rim = Vector3F.TransformCoordinate((Vector3F)handles.Shape.Get(part).GetComponent<MeshData>().Mesh.Points[0], world);
+        return (rim - world.TranslationVector).Length();
     }
 
     private static bool IsShown(Handles handles, string part, ToolScene scene)

@@ -6,14 +6,15 @@ using Adamantium.ECS.Components;
 using Adamantium.ECS.Components.Extensions;
 using Adamantium.Engine.EntityServices;
 using Adamantium.Engine.Templates.Tools;
-using Adamantium.Game.Core.Input;
+using Adamantium.Game.Input;
 using Adamantium.Mathematics;
 
 namespace Adamantium.Engine.Tools;
 
 /// <summary>
 /// The world axes in a corner of every output: a click on a ball looks along that axis, an arrow turns the view a
-/// quarter, a drag orbits it. It takes the pointer before any tool does.
+/// quarter, a drag orbits it, a double click on the center turns it back to where it started. It takes the pointer
+/// before any tool does.
 /// </summary>
 public class OrientationCube : EditorProcessor
 {
@@ -89,6 +90,11 @@ public class OrientationCube : EditorProcessor
             return;
         }
 
+        if (hit.Entity == home && input.MouseClickCount(MouseButton.Left) >= 2)
+        {
+            camera.RotateAroundSelectedObject(QuaternionF.Identity, RotationMilliseconds);
+        }
+
         grabbed = hit.Entity;
         travelled = 0;
         input.HoldPointer(true);
@@ -131,13 +137,15 @@ public class OrientationCube : EditorProcessor
 
     private void Place(Entity current, Camera camera)
     {
-        var relativePosition = new Vector3F(camera.Width - 120, 120, 150f);
+        var scale = camera.PixelsPerPoint;
+        var relativePosition = new Vector3F(camera.Width - 120 * scale, 120 * scale, 150f);
         var orientation = IsStepArrow(current) ? QuaternionF.Identity : QuaternionF.Conjugate(camera.Rotation);
 
         var world = Matrix4x4F.RotationQuaternion(current.Transform.Rotation) *
                     Matrix4x4F.Translation((Vector3F)current.Transform.Position) *
                     Matrix4x4F.Scaling(current.Transform.Scale) *
-                    Matrix4x4F.RotationQuaternion(orientation);
+                    Matrix4x4F.RotationQuaternion(orientation) *
+                    Matrix4x4F.Scaling(scale);
 
         var metadata = current.Transform.GetMetadata(camera);
         metadata.WorldMatrixF = world * Matrix4x4F.Translation(relativePosition);
@@ -186,12 +194,6 @@ public class OrientationCube : EditorProcessor
         if (IsStepArrow(part))
         {
             camera.RotateAroundSelectedObject(camera.Rotation * StepOf(part), RotationMilliseconds);
-            return;
-        }
-
-        if (part == home)
-        {
-            camera.RotateAroundSelectedObject(QuaternionF.Identity, RotationMilliseconds);
             return;
         }
 

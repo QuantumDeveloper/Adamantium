@@ -1,6 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
-using Adamantium.Game.Core;
+using Adamantium.Game;
 using Adamantium.Graphics;
 using Adamantium.Graphics.Core;
 using Adamantium.Mathematics;

@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using Adamantium.Core;
 using Adamantium.ECS;
-using Adamantium.Game.Core;
+using Adamantium.Game;
 using Adamantium.Graphics;
 using Adamantium.Graphics.Core;
 using Adamantium.UI.Controls;

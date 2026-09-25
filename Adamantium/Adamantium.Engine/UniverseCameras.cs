@@ -1,6 +1,6 @@
 using System.Collections.Generic;
 using Adamantium.ECS.Components;
-using Adamantium.Game.Core;
+using Adamantium.Game;
 
 namespace Adamantium.Engine;
 

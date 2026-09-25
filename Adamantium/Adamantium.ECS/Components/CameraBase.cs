@@ -125,6 +125,12 @@ namespace Adamantium.ECS.Components
             set => SetProperty(ref height, value);
         }
 
+        /// <summary>
+        /// Pixels per point on the output the camera draws into, as its host's scale gives it: <see cref="Width"/> and
+        /// <see cref="Height"/> are pixels, sizes meant to look the same at any scale are points.
+        /// </summary>
+        public float PixelsPerPoint { get; set; } = 1;
+
         public float TanFov
         {
             get => tanFov;
@@ -293,7 +299,7 @@ namespace Adamantium.ECS.Components
         public abstract void SetFreeCamera(Vector3 position, Vector3 lookAt, Vector3 up);
 
         ///<summary>
-        ///Sets camera as Free without any parameters
+        ///Sets camera as Free where it stands, looking where it looks.
         ///</summary>
         public abstract void SetFreeCamera();
 
@@ -355,7 +361,7 @@ namespace Adamantium.ECS.Components
         public abstract void SetThirdPersonLookBackwards(bool lookBackwards);
 
         ///<summary>
-        ///Resets all third person related properties and set the camera type to Free.
+        ///Resets all third person related properties and set the camera type to Free; the view stays as it was.
         ///</summary>
         public abstract void DeleteThirdPersonConfig();
 

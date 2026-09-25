@@ -8,6 +8,8 @@ using Adamantium.Engine.Tools;
 using Adamantium.FX;
 using Adamantium.Graphics.Core;
 using Adamantium.Graphics.Core.EffectsFramework;
+using Adamantium.Graphics.Core.Models;
+using Adamantium.Graphics.Core.Vertices;
 using Adamantium.Mathematics;
 using Adamantium.Vulkan.Core;
 
@@ -22,10 +24,17 @@ public class EditorOverlayProcessor : RenderingProcessor
     private const int InstanceCapacity = 64;
     private const int OutlineDirections = 8;
 
+    private static readonly Mesh RingSquare = new Mesh(PrimitiveType.TriangleList)
+        .SetPoints(new[] { new Vector3(-1, -1, 0), new Vector3(1, -1, 0), new Vector3(-1, 1, 0), new Vector3(1, 1, 0) })
+        .SetIndices(new[] { 0, 1, 2, 2, 1, 3 });
+
     private readonly ToolsService tools;
     private readonly List<Part> parts = [];
     private readonly Matrix4x4F[] instanceWorld = new Matrix4x4F[InstanceCapacity];
     private readonly Vector4F[] instanceColors = new Vector4F[InstanceCapacity];
+    private readonly Vector4F[] instanceLines = new Vector4F[InstanceCapacity];
+    private readonly Vector4F[] instanceRings = new Vector4F[InstanceCapacity];
+    private readonly Dictionary<Mesh, Ribbon> ribbons = [];
     private bool[] drawn = [];
     private uint outlineMark;
     private BasicEffect effect;
@@ -40,6 +49,11 @@ public class EditorOverlayProcessor : RenderingProcessor
 
     /// <summary>The camera the frame is drawn with.</summary>
     public Camera Camera => ActiveCamera;
+
+    /// <summary>How wide lines are drawn, in points: pixels at 100% scale, always a whole number of pixels on screen.</summary>
+    public float LineWidth { get; set; } = 2;
+
+    private float LinePixels => MathF.Max(1, MathF.Round(LineWidth * ActiveCamera.PixelsPerPoint));
 
     protected override void CreateDeviceResources()
     {
@@ -78,14 +92,63 @@ public class EditorOverlayProcessor : RenderingProcessor
     {
     }
 
-    /// <summary>
-    /// Draws an entity and what is under it in the scene, in front of everything the scene drew. A ring drawn with
-    /// <paramref name="frontHalf"/> keeps only the half that faces the eye, as the rings round a ball do.
-    /// </summary>
-    public void DrawInScene(Entity root, bool frontHalf = false)
+    /// <summary>Draws an entity and what is under it in the scene, in front of everything the scene drew.</summary>
+    public void DrawInScene(Entity root)
     {
         Collect(root);
-        DrawParts(ActiveCamera.ViewProjectionMatrix, true, frontHalf ? Look.FrontHalf : Look.Shaded);
+        DrawParts(ActiveCamera.ViewProjectionMatrix, true, Look.Shaded);
+    }
+
+    /// <summary>
+    /// Draws a ring - a line mesh round a circle, flat in its own space - as the circle itself, in front of everything
+    /// the scene drew: each pixel's distance to the true circle, so the edge is even at any turn. The center lands on the
+    /// pixel grid and the radius is whole pixels, so a line along it covers whole pixels. With
+    /// <paramref name="frontHalf"/> only the half on the eye's side of its center shows, as the rings round a ball do.
+    /// </summary>
+    public void DrawRing(Entity ring, bool frontHalf)
+    {
+        var transformation = ring.Transform.GetMetadata(ActiveCamera);
+        var mesh = ring.GetComponent<MeshData>()?.Mesh;
+        if (!transformation.Enabled || !ring.Visible || mesh == null)
+        {
+            return;
+        }
+
+        var world = transformation.WorldMatrixF;
+        var extent = (Vector3F)mesh.Bounds.HalfExtent;
+        var axis = extent.X <= extent.Y && extent.X <= extent.Z ? Vector3F.UnitX
+            : extent.Y <= extent.Z ? Vector3F.UnitY
+            : Vector3F.UnitZ;
+        var inPlane = axis == Vector3F.UnitX ? Vector3F.UnitY : Vector3F.UnitX;
+        var pixels = LinePixels;
+        var center = ScreenSpace.OnPixelGrid(
+            Vector3F.TransformCoordinate((Vector3F)mesh.Bounds.Center, world), ActiveCamera, pixels % 2 == 0 ? 0 : 0.5f);
+        var unitsPerPixel = ScreenSpace.UnitsPerPixel(ActiveCamera, (Vector3)center + ActiveCamera.WorldPosition);
+        var normal = Vector3F.Normalize(Vector3F.TransformNormal(axis, world));
+        var radius = Math.Max(extent.X, Math.Max(extent.Y, extent.Z)) * Vector3F.TransformNormal(inPlane, world).Length();
+        radius = MathF.Round(radius / unitsPerPixel) * unitsPerPixel;
+
+        var near = Math.Min(radius / center.Length(), 0.9f);
+        var reach = radius / MathF.Sqrt(1 - near * near) + (pixels + 4) * unitsPerPixel;
+        instanceWorld[0] = Matrix4x4F.Scaling(reach)
+                           * Matrix4x4F.RotationQuaternion(ScreenSpace.Facing(ActiveCamera))
+                           * Matrix4x4F.Translation(center);
+        instanceColors[0] = ColorOf(ring, transformation);
+        instanceLines[0] = new Vector4F(pixels, frontHalf ? 1 : 0, 0, 0);
+        instanceRings[0] = new Vector4F(normal, radius);
+
+        effect.ViewProjection.SetValue(ActiveCamera.ViewProjectionMatrix);
+        effect.InstanceWorld.SetValue(instanceWorld);
+        effect.InstanceColor.SetValue(instanceColors);
+        effect.InstanceLine.SetValue(instanceLines);
+        effect.InstanceRing.SetValue(instanceRings);
+        effect.BasicSdfRingInstancedPass.Apply();
+
+        var blend = GraphicsDevice.ColorBlendEquation;
+        GraphicsDevice.ColorBlendEquation = ColorBlendEquations.AlphaBlend;
+        geometry.GetOrCreate(RingSquare, typeof(MeshVertex))
+            .Draw(GraphicsDevice, new RenderState(false, CullModeFlagBits.None, false, false, null), 1);
+        GraphicsDevice.ColorBlendEquation = blend;
     }
 
     /// <summary>Draws an entity laid out in the output's pixels.</summary>
@@ -96,10 +159,10 @@ public class EditorOverlayProcessor : RenderingProcessor
     }
 
     /// <summary>
-    /// Outlines an entity and what is under it: a band <paramref name="pixels"/> wide round their joint silhouette, in
+    /// Outlines an entity and what is under it: a band <paramref name="points"/> wide round their joint silhouette, in
     /// front of everything the scene drew.
     /// </summary>
-    public void DrawOutline(Entity root, Vector4F color, float pixels)
+    public void DrawOutline(Entity root, Vector4F color, float points)
     {
         Collect(root);
         if (parts.Count == 0)
@@ -125,6 +188,7 @@ public class EditorOverlayProcessor : RenderingProcessor
         GraphicsDevice.StencilPassOp = StencilOp.Keep;
         GraphicsDevice.StencilWriteMask = 0;
         GraphicsDevice.ColorComponentFlags = colorMask;
+        var pixels = points * ActiveCamera.PixelsPerPoint;
         effect.OutlineStep.SetValue(new Vector2F(2 * pixels / ActiveCamera.Width, 2 * pixels / ActiveCamera.Height));
         DrawParts(ActiveCamera.ViewProjectionMatrix, true, Look.Outline);
 
@@ -142,12 +206,7 @@ public class EditorOverlayProcessor : RenderingProcessor
                 return;
             }
 
-            var material = current.GetComponent<Material>();
-            var color = material == null
-                ? Colors.White.ToVector4()
-                : transformation.IsSelected || current.IsSelected
-                    ? material.HighlightColor
-                    : new Vector4F(material.MeshColor, material.Transparency);
+            var color = ColorOf(current, transformation);
 
             foreach (var data in current.GetComponents<MeshData>())
             {
@@ -157,10 +216,23 @@ public class EditorOverlayProcessor : RenderingProcessor
                 }
 
                 var topology = data.Mesh.MeshTopology;
-                var flat = topology == PrimitiveType.LineList || topology == PrimitiveType.LineStrip || !data.Mesh.IsNormalsPresent;
-                parts.Add(new Part(data, transformation.WorldMatrixF, color, flat));
+                var line = topology == PrimitiveType.LineList || topology == PrimitiveType.LineStrip;
+                parts.Add(new Part(data, transformation.WorldMatrixF, color, line || !data.Mesh.IsNormalsPresent, line));
             }
         }, true);
+    }
+
+    private static Vector4F ColorOf(Entity current, TransformMetaData transformation)
+    {
+        var material = current.GetComponent<Material>();
+        if (material == null)
+        {
+            return Colors.White.ToVector4();
+        }
+
+        return transformation.IsSelected || current.IsSelected
+            ? material.HighlightColor
+            : new Vector4F(material.MeshColor, material.Transparency);
     }
 
     private void DrawParts(Matrix4x4F viewProjection, bool inFront, Look look)
@@ -200,15 +272,22 @@ public class EditorOverlayProcessor : RenderingProcessor
 
                 instanceWorld[count] = parts[j].World;
                 instanceColors[count] = parts[j].Color;
+                instanceLines[count] = new Vector4F(LinePixels, 0, 0, 0);
                 drawn[j] = true;
                 ++count;
             }
 
             effect.InstanceWorld.SetValue(instanceWorld);
             effect.InstanceColor.SetValue(instanceColors);
-            PassFor(look, head.Flat).Apply();
-
             var instances = (uint)(count * directions);
+
+            if (head.Line && look == Look.Shaded)
+            {
+                DrawRibbon(head.Data, inFront, (uint)count);
+                continue;
+            }
+
+            PassFor(look, head.Flat).Apply();
             if (inFront)
             {
                 var data = head.Data;
@@ -222,13 +301,39 @@ public class EditorOverlayProcessor : RenderingProcessor
         }
     }
 
+    private void DrawRibbon(MeshData data, bool inFront, uint instances)
+    {
+        effect.InstanceLine.SetValue(instanceLines);
+        effect.ViewportSize.SetValue(new Vector2F(ActiveCamera.Width, ActiveCamera.Height));
+        effect.BasicSdfLineInstancedPass.Apply();
+
+        var state = inFront
+            ? new RenderState(false, CullModeFlagBits.None, false, false, null)
+            : new RenderState(false, CullModeFlagBits.None, data.DepthTestEnabled, data.DepthWriteEnabled, null);
+        var blend = GraphicsDevice.ColorBlendEquation;
+        GraphicsDevice.ColorBlendEquation = ColorBlendEquations.AlphaBlend;
+        geometry.GetOrCreate(RibbonOf(data.Mesh), data.ResolveVertexType()).Draw(GraphicsDevice, state, instances);
+        GraphicsDevice.ColorBlendEquation = blend;
+    }
+
+    private Mesh RibbonOf(Mesh lines)
+    {
+        if (!ribbons.TryGetValue(lines, out var ribbon) || !ReferenceEquals(ribbon.Points, lines.Points)
+            || !ReferenceEquals(ribbon.Indices, lines.Indices))
+        {
+            ribbon = new Ribbon(lines.Points, lines.Indices, LineRibbon.Build(lines));
+            ribbons[lines] = ribbon;
+        }
+
+        return ribbon.Mesh;
+    }
+
     private IEffectPass PassFor(Look look, bool flat)
     {
         return look switch
         {
             Look.Outline => effect.BasicOutlineInstancedPass,
             Look.Mask => effect.BasicFlatInstancedPass,
-            Look.FrontHalf when flat => effect.BasicOrbitInstancedPass,
             _ => flat ? effect.BasicFlatInstancedPass : effect.BasicLitInstancedPass
         };
     }
@@ -236,10 +341,11 @@ public class EditorOverlayProcessor : RenderingProcessor
     private enum Look
     {
         Shaded,
-        FrontHalf,
         Mask,
         Outline
     }
 
-    private readonly record struct Part(MeshData Data, Matrix4x4F World, Vector4F Color, bool Flat);
+    private readonly record struct Part(MeshData Data, Matrix4x4F World, Vector4F Color, bool Flat, bool Line);
+
+    private readonly record struct Ribbon(Vector3[] Points, int[] Indices, Mesh Mesh);
 }

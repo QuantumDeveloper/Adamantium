@@ -41,7 +41,7 @@ public class MoveHandles : Handles
     public override void Place(Entity target, Camera camera)
     {
         var at = PivotInWorld(target);
-        PlaceShape(camera, at, QuaternionF.Identity, Pixels * UnitsPerPixel(camera, at) / Length);
+        PlaceShape(camera, at, QuaternionF.Identity, Pixels * UnitsPerPoint(camera, at) / Length);
         HideArmsFacingEye(right, up, forward, QuaternionF.Identity, at, camera);
         HideSquaresEdgeOn(rightUp, rightForward, upForward, QuaternionF.Identity, at, camera);
         TurnSquaresToEye(QuaternionF.Identity, at, camera);

@@ -1,6 +1,6 @@
 using System;
 using Adamantium.Core.DependencyInjection;
-using Adamantium.Game.Core.Input;
+using Adamantium.Game.Input;
 using Adamantium.Graphics;
 using Adamantium.Graphics.Core;
 

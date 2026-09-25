@@ -1,7 +1,7 @@
 using System.Reflection;
 using System.Text.RegularExpressions;
 using Adamantium.Core;
-using Adamantium.Game.Core;
+using Adamantium.Game;
 using Adamantium.Graphics.Core;
 using Adamantium.Mathematics;
 using Adamantium.UI.Controls.Adorners;

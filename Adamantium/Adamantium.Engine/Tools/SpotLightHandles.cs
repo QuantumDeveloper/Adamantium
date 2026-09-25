@@ -13,7 +13,7 @@ namespace Adamantium.Engine.Tools;
 /// </summary>
 public class SpotLightHandles : Handles
 {
-    private const float AnchorPixels = 9;
+    private const float AnchorPoints = 9;
     private const float Smallest = 0.01f;
 
     private static readonly float SmallestAngle = MathHelper.DegreesToRadians(1f);
@@ -54,12 +54,12 @@ public class SpotLightHandles : Handles
         metadata.Enabled = true;
 
         var baseCenter = at + (Vector3)(direction * light.Range);
-        PlaceAt(end, baseCenter, AnchorPixels, camera);
+        PlaceAt(end, baseCenter, AnchorPoints, camera);
 
         var sides = SidesOf(orientation);
         for (int i = 0; i < rim.Length; i++)
         {
-            PlaceAt(rim[i], baseCenter + (Vector3)(sides[i] * radius), AnchorPixels, camera);
+            PlaceAt(rim[i], baseCenter + (Vector3)(sides[i] * radius), AnchorPoints, camera);
         }
     }
 

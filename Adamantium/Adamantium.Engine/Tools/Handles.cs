@@ -23,7 +23,7 @@ public abstract class Handles
 
     public Entity Shape { get; }
 
-    /// <summary>How big the handles look, in pixels.</summary>
+    /// <summary>How big the handles look, in points: pixels at 100% scale.</summary>
     public float Pixels { get; set; } = 110;
 
     /// <summary>Whether these handles work on <paramref name="target"/>.</summary>
@@ -44,6 +44,12 @@ public abstract class Handles
     public virtual void Draw(EditorOverlayProcessor overlay)
     {
         overlay.DrawInScene(Shape);
+    }
+
+    /// <summary>The part of the handles a press along <paramref name="ray"/> would take; by default the nearest along it.</summary>
+    public virtual PickHit Pick(in PickRay ray, float aperture)
+    {
+        return Shape.Pick(ray, PickMode.Colliders | PickMode.Lines, aperture);
     }
 
     /// <summary>Lights up what dragging <paramref name="handle"/> would move; null lights up nothing.</summary>
@@ -96,6 +102,11 @@ public abstract class Handles
         return ScreenSpace.UnitsPerPixel(camera, worldPoint);
     }
 
+    protected static float UnitsPerPoint(CameraBase camera, Vector3 worldPoint)
+    {
+        return ScreenSpace.UnitsPerPoint(camera, worldPoint);
+    }
+
     protected static Vector3F InRender(Vector3 worldPoint, CameraBase camera)
     {
         return ScreenSpace.InRender(worldPoint, camera);
@@ -128,10 +139,10 @@ public abstract class Handles
         return QuaternionF.RotationAxis(Vector3F.Normalize(axis), (float)Math.Acos(Math.Clamp(cosine, -1f, 1f)));
     }
 
-    protected static void PlaceAt(Entity part, Vector3 worldPoint, float pixels, CameraBase camera)
+    protected static void PlaceAt(Entity part, Vector3 worldPoint, float points, CameraBase camera)
     {
         var metadata = part.Transform.GetMetadata(camera);
-        metadata.WorldMatrixF = Matrix4x4F.Scaling(pixels * UnitsPerPixel(camera, worldPoint))
+        metadata.WorldMatrixF = Matrix4x4F.Scaling(points * UnitsPerPoint(camera, worldPoint))
                                 * Matrix4x4F.Translation(InRender(worldPoint, camera));
         metadata.Enabled = true;
     }
@@ -161,10 +172,139 @@ public abstract class Handles
 
     protected static void DrawOrbit(EditorOverlayProcessor overlay, Entity orbit, Vector3F axis)
     {
-        var world = orbit.Transform.GetMetadata(overlay.Camera).WorldMatrixF;
+        overlay.DrawRing(orbit, !FacesEye(orbit.Transform.GetMetadata(overlay.Camera).WorldMatrixF, axis));
+    }
+
+    /// <summary>
+    /// Whether a ring about <paramref name="axis"/> faces the eye; <see cref="DrawOrbit"/> then draws all of it, else only
+    /// the half on the eye's side of its center.
+    /// </summary>
+    protected static bool FacesEye(in Matrix4x4F world, Vector3F axis)
+    {
         var sight = Vector3F.Normalize(world.TranslationVector);
         var normal = Vector3F.Normalize(Vector3F.TransformNormal(axis, world));
-        overlay.DrawInScene(orbit, Math.Abs(Vector3F.Dot(normal, sight)) < FacingEye);
+        return Math.Abs(Vector3F.Dot(normal, sight)) >= FacingEye;
+    }
+
+    /// <summary>
+    /// The point of a ring's shown part nearest <paramref name="pick"/> on screen, taken when it passes closer than
+    /// <paramref name="gap"/> pixels, which then narrows to it. <paramref name="drawnHalfAxis"/> is the ring's axis in
+    /// its own space as given to <see cref="DrawOrbit"/>; null for a ring drawn whole.
+    /// </summary>
+    protected static void NearestOnRing(in PickRay pick, Entity ring, Vector3F? drawnHalfAxis, ref PickHit nearest, ref float gap)
+    {
+        var metadata = ring.Transform.GetMetadata(pick.Camera);
+        if (!metadata.Enabled)
+        {
+            return;
+        }
+
+        var world = metadata.WorldMatrixF;
+        var center = world.TranslationVector;
+        var whole = drawnHalfAxis is not { } halfAxis || FacesEye(world, halfAxis);
+        var mesh = ring.GetComponent<MeshData>().Mesh;
+        var points = mesh.Points;
+        var indices = mesh.Indices;
+        var count = mesh.HasIndices ? indices.Length : points.Length;
+        var ray = pick.Ray;
+
+        for (int i = 0; i + 1 < count; i += 2)
+        {
+            var start = Vector3F.TransformCoordinate((Vector3F)points[mesh.HasIndices ? indices[i] : i], world);
+            var end = Vector3F.TransformCoordinate((Vector3F)points[mesh.HasIndices ? indices[i + 1] : i + 1], world);
+            if (!whole)
+            {
+                var startBehind = Vector3F.Dot(start - center, center);
+                var endBehind = Vector3F.Dot(end - center, center);
+                if (startBehind > 0 && endBehind > 0)
+                {
+                    continue;
+                }
+
+                if (startBehind > 0 || endBehind > 0)
+                {
+                    var cut = start + (end - start) * (startBehind / (startBehind - endBehind));
+                    if (startBehind > 0)
+                    {
+                        start = cut;
+                    }
+                    else
+                    {
+                        end = cut;
+                    }
+                }
+            }
+
+            var distance = Collision.RayIntersectsLineSegment(ref ray, start, end, out var point);
+            var depth = Vector3F.Dot(point - ray.Position, ray.Direction);
+            if (depth < 0)
+            {
+                continue;
+            }
+
+            var pixels = distance / pick.PixelSize(depth);
+            if (pixels < gap)
+            {
+                gap = pixels;
+                nearest = new PickHit(ring, point, depth);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Turning by a ring, as in Unity: the pointer's way along the ring's tangent where it was grabbed, a radian per
+    /// radius on screen - even for a ring seen edge-on.
+    /// </summary>
+    protected sealed class RingDrag
+    {
+        private Vector2F startPixel;
+        private Vector2F tangentOnScreen;
+        private float radiusInPixels;
+
+        /// <summary>
+        /// Grabs <paramref name="ring"/>, turning about <paramref name="axis"/> in the camera-relative space, where
+        /// <paramref name="ray"/> passes nearest its shown part. <paramref name="origin"/> is the ring's center there.
+        /// </summary>
+        public void Begin(in PickRay ray, Entity ring, Vector3F? drawnHalfAxis, Vector3F axis, Vector3F origin)
+        {
+            var grab = default(PickHit);
+            var gap = float.MaxValue;
+            NearestOnRing(ray, ring, drawnHalfAxis, ref grab, ref gap);
+            startPixel = PointerPixel(ray, origin);
+            tangentOnScreen = Vector2F.Zero;
+            if (!grab.IsHit)
+            {
+                return;
+            }
+
+            var radial = grab.Point - origin;
+            var unitsPerPixel = UnitsPerPixel(ray.Camera, (Vector3)origin + ray.Camera.WorldPosition);
+            radiusInPixels = radial.Length() / unitsPerPixel;
+            var tangent = Vector3F.Normalize(Vector3F.Cross(axis, radial)) * unitsPerPixel;
+            var onScreen = ScreenSpace.ToPixel(grab.Point + tangent, ray.Camera) - ScreenSpace.ToPixel(grab.Point, ray.Camera);
+            if (onScreen.LengthSquared() > 1e-6f)
+            {
+                tangentOnScreen = Vector2F.Normalize(onScreen);
+            }
+        }
+
+        /// <summary>The turn so far, in radians; 0 when the grab found no way along the ring on screen.</summary>
+        public float Angle(in PickRay ray, Vector3F origin)
+        {
+            if (tangentOnScreen == Vector2F.Zero || radiusInPixels <= 0)
+            {
+                return 0;
+            }
+
+            return Vector2F.Dot(PointerPixel(ray, origin) - startPixel, tangentOnScreen) / radiusInPixels;
+        }
+
+        private static Vector2F PointerPixel(in PickRay pick, Vector3F origin)
+        {
+            var ray = pick.Ray;
+            var depth = Math.Max(Vector3F.Dot(origin - ray.Position, ray.Direction), 0);
+            return ScreenSpace.ToPixel(ray.Position + ray.Direction * depth, pick.Camera);
+        }
     }
 
     protected static void HideSquaresEdgeOn(Entity rightUp, Entity rightForward, Entity upForward, QuaternionF axes, Vector3 at, CameraBase camera)

@@ -1,14 +1,15 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using Adamantium.Core.Events;
-using Adamantium.Game.Core;
-using Adamantium.Game.Core.Input;
+using Adamantium.Game;
+using Adamantium.Game.Input;
 using Adamantium.Graphics.Core;
 using Adamantium.Imaging;
 using Adamantium.Mathematics;
 using Adamantium.UI.Controls;
 using Adamantium.UI.Core;
 using Adamantium.UI.Core.Input;
-using GameMouseButtons = Adamantium.Game.Core.Input.MouseButton;
+using GameMouseButtons = Adamantium.Game.Input.MouseButton;
 
 
 namespace Adamantium.UI.Universes
@@ -16,6 +17,7 @@ namespace Adamantium.UI.Universes
     public abstract class UIUniverseOutput : UniverseOutput
     {
         private OutputCursor cursor;
+        private IWindow scaleSource;
         
         public override UniverseOutputDescription Description { get; protected set; }
 
@@ -36,7 +38,15 @@ namespace Adamantium.UI.Universes
         public override Vector2F PointToSurface(Vector2F absolute)
         {
             var point = UIExtensions.PointToClient(InputComponent, new PixelPoint((int)absolute.X, (int)absolute.Y));
-            return new Vector2F((float)point.X, (float)point.Y);
+            return new Vector2F((float)point.X, (float)point.Y) * PixelsPerPoint;
+        }
+
+        /// <summary>The host window's scale, pixels per point; 1 while the surface has no window.</summary>
+        protected float HostScale => HostWindow is { } window ? (float)window.DpiScale.X : 1;
+
+        /// <summary>The host window moved to a screen of another scale; <see cref="HostScale"/> has the new one.</summary>
+        protected virtual void OnHostScaleChanged()
+        {
         }
 
         // The same relative mode the surface's own mouse-look engages: it enters and leaves on the window's own thread
@@ -252,6 +262,17 @@ namespace Adamantium.UI.Universes
         
         protected virtual void InitializeInternal(OutputContext context)
         {
+            if (scaleSource != null)
+            {
+                scaleSource.DpiChanged -= HostDpiChanged;
+            }
+
+            scaleSource = HostWindow;
+            if (scaleSource != null)
+            {
+                scaleSource.DpiChanged += HostDpiChanged;
+            }
+
             InputComponent.KeyDown += WindowOnKeyDown;
             InputComponent.KeyUp += WindowOnKeyUp;
             InputComponent.MouseDown += OnMouseDown;
@@ -352,6 +373,11 @@ namespace Adamantium.UI.Universes
 
         protected IWindow HostWindow => InputComponent as IWindow ?? InputComponent.RootVisual as IWindow;
 
+        private void HostDpiChanged(object sender, EventArgs e)
+        {
+            OnHostScaleChanged();
+        }
+
         private void OnMouseMove(object sender, UnboundMouseEventArgs e)
         {
             var mouseInput = new MouseInput();
@@ -381,6 +407,7 @@ namespace Adamantium.UI.Universes
             var mouseInput = new MouseInput();
             mouseInput.InputType = InputType.Down;
             mouseInput.Button = MouseTranslationKeys[e.ChangedButton];
+            mouseInput.ClickCount = e.ClickCount;
             OnMouseInput(mouseInput);
         }
 

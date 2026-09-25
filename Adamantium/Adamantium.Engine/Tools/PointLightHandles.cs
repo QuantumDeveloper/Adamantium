@@ -13,7 +13,7 @@ namespace Adamantium.Engine.Tools;
 /// </summary>
 public class PointLightHandles : Handles
 {
-    private const float AnchorPixels = 9;
+    private const float AnchorPoints = 9;
     private const float Smallest = 0.01f;
 
     private static readonly Vector3F[] Directions =
@@ -52,7 +52,7 @@ public class PointLightHandles : Handles
 
         for (int i = 0; i < anchors.Length; i++)
         {
-            PlaceAt(anchors[i], at + (Vector3)(Directions[i] * range), AnchorPixels, camera);
+            PlaceAt(anchors[i], at + (Vector3)(Directions[i] * range), AnchorPoints, camera);
         }
     }
 

@@ -709,11 +709,18 @@ namespace Adamantium.ECS.Components
         /// <inheritdoc />
         public override void DeleteThirdPersonConfig()
         {
-            Type = CameraType.Free;
+            if (Type.IsThirdPerson())
+            {
+                ViewMatrix.Decompose(out _, out var looking, out _);
+                Rotation = looking;
+            }
 
-            // Fold the offset back into world: it only meant something relative to the subject.
-            if (Owner?.Owner is { } was) Owner.Transform.Position = was.GetCenterAbsolute() + Owner.Transform.Position;
-            if (Owner != null) Owner.Owner = null;
+            Type = CameraType.Free;
+            if (Owner?.Owner != null)
+            {
+                Owner.Transform.Position = Owner.Transform.WorldPosition;
+                Owner.Owner = null;
+            }
         }
     }
 }

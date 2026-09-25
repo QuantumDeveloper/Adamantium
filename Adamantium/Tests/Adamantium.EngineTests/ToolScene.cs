@@ -22,9 +22,26 @@ internal sealed class ToolScene
 
     public PickRay RayAt(Vector3 worldPoint)
     {
+        return RayAt(PixelOf(worldPoint));
+    }
+
+    public PickRay RayAt(Vector2F pixel)
+    {
+        return PickRay.FromCamera(Camera, pixel);
+    }
+
+    public Vector2F PixelOf(Vector3 worldPoint)
+    {
         var inRender = (Vector3F)(worldPoint - Camera.WorldPosition);
         var pixel = Vector3F.Project(inRender, 0, 0, Width, Height, 0, 1, Camera.ViewMatrix * Camera.ProjectionMatrix);
-        return PickRay.FromCamera(Camera, new Vector2F(pixel.X, pixel.Y));
+        return new Vector2F(pixel.X, pixel.Y);
+    }
+
+    public void LookFrom(Vector3 eye, Vector3 at)
+    {
+        Camera.Owner.Transform.Position = eye;
+        Camera.SetFreeLookAt(at);
+        Camera.Update(new AppTime());
     }
 
     public static Entity Target(Vector3 position)

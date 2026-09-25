@@ -27,7 +27,7 @@ public class EntityIcons : EditorProcessor
     private readonly HashSet<Entity> seen = [];
     private readonly List<Entity> gone = [];
 
-    /// <summary>How big an icon looks, in pixels.</summary>
+    /// <summary>How big an icon looks, in points: pixels at 100% scale.</summary>
     public float Pixels { get; set; } = 36;
 
     public bool ShowsLights { get; set; } = true;
@@ -154,7 +154,7 @@ public class EntityIcons : EditorProcessor
         }
 
         var at = target.Transform.WorldPosition;
-        var size = Pixels * ScreenSpace.UnitsPerPixel(camera, at);
+        var size = Pixels * ScreenSpace.UnitsPerPoint(camera, at);
         metadata.WorldMatrixF = Matrix4x4F.Scaling(size, -size, size)
                                 * Matrix4x4F.RotationQuaternion(ScreenSpace.Facing(camera))
                                 * Matrix4x4F.Translation(ScreenSpace.InRender(at, camera));

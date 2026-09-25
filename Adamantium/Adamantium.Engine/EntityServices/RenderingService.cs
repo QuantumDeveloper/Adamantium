@@ -3,12 +3,11 @@ using Adamantium.Core;
 using Adamantium.ECS;
 using Adamantium.ECS.Components;
 using Adamantium.Game;
-using Adamantium.Game.Core;
-using Adamantium.Game.Core.Input;
-using Adamantium.Game.Core.Payloads;
+using Adamantium.Game.Input;
+using Adamantium.Game.Payloads;
 using Adamantium.Graphics.Core;
 using Adamantium.Graphics.Core.Content;
-using Keys = Adamantium.Game.Core.Input.Keys;
+using Keys = Adamantium.Game.Input.Keys;
 
 namespace Adamantium.Engine.EntityServices;
 

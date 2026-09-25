@@ -13,7 +13,7 @@ public class SelectionOutline : EditorProcessor
 
     public Vector4F HoverColor { get; set; } = Colors.White.ToVector4();
 
-    /// <summary>How wide the outline is, in pixels.</summary>
+    /// <summary>How wide the outline is, in points: pixels at 100% scale.</summary>
     public float Pixels { get; set; } = 2;
 
     public override void DrawOverlay(EditorOverlayProcessor overlay)

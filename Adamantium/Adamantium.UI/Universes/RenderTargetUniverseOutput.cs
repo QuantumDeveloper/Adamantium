@@ -1,8 +1,6 @@
 using System;
 using Adamantium.Core.Events;
-using Adamantium.Game.Core;
-using Adamantium.Game.Core.Events;
-using Adamantium.Game.Core.Payloads;
+using Adamantium.Game;
 using Adamantium.Graphics;
 using Adamantium.Graphics.Core;
 using Adamantium.Graphics.Core.Presentation;
@@ -57,8 +55,9 @@ public class RenderTargetUniverseOutput : UIUniverseOutput
         nativeWindow.SizeChanged += NativeWindowOnSizeChanged;
         Description = new UniverseOutputDescription(PresenterType.RenderTarget);
 
-        Width = (uint)nativeWindow.ActualWidth;
-        Height = (uint)nativeWindow.ActualHeight;
+        PixelsPerPoint = HostScale;
+        Width = InPixels(nativeWindow.ActualWidth);
+        Height = InPixels(nativeWindow.ActualHeight);
         ClientBounds = new Rectangle(0, 0, (int)Description.Width, (int)Description.Height);
         UpdateViewportAndScissor((uint)ClientBounds.Width, (uint)ClientBounds.Height);
         base.InitializeInternal(context);
@@ -140,14 +139,25 @@ public class RenderTargetUniverseOutput : UIUniverseOutput
     private void NativeWindowOnSizeChanged(object sender, SizeChangedEventArgs e)
     {
         // SizeChanged bubbles up from children, so the size is read from the panel itself, not from e.NewSize.
-        var width = (uint)nativeWindow.ActualWidth;
-        var height = (uint)nativeWindow.ActualHeight;
+        var width = InPixels(nativeWindow.ActualWidth);
+        var height = InPixels(nativeWindow.ActualHeight);
         if (width == Width && height == Height)
         {
             return;
         }
 
         RequestResize(width, height);
+    }
+
+    protected override void OnHostScaleChanged()
+    {
+        PixelsPerPoint = HostScale;
+        RequestResize(InPixels(nativeWindow.ActualWidth), InPixels(nativeWindow.ActualHeight));
+    }
+
+    private uint InPixels(double points)
+    {
+        return (uint)Math.Round(points * PixelsPerPoint);
     }
 
     public override UniverseOutputDescription Description { get; protected set; }

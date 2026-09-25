@@ -6,8 +6,7 @@ using Adamantium.Core.DependencyInjection;
 using Adamantium.Engine.Compiler.Models;
 using Adamantium.ECS;
 using Adamantium.ECS.Components;
-using Adamantium.Game.Core;
-using Adamantium.Game.Core.Events;
+using Adamantium.Game.Events;
 using Adamantium.Graphics;
 using Adamantium.Graphics.Core;
 using Adamantium.Graphics.Core.Content;
@@ -85,7 +84,7 @@ public class Universe : PropertyChangedBase, IUniverse
         EventAggregator.GetEvent<UniverseOutputCreatedEvent>().Subscribe(OnOutputCreated);
         var factory = Container.Resolve<IGraphicsDeviceFactory>();
 
-        if (mode is UniverseMode.Standalone or UniverseMode.Primary)
+        if (mode == UniverseMode.Standalone)
         {
             GraphicsDeviceService = new GraphicsDeviceService(factory, enableDebug);
             //GraphicsDeviceService.CreateMainDevice("Game", enableDynamicRendering);
@@ -543,7 +542,7 @@ public class Universe : PropertyChangedBase, IUniverse
     {
         if (IsInitialized) return;
             
-        if (Mode is UniverseMode.Standalone or UniverseMode.Primary)
+        if (Mode == UniverseMode.Standalone)
         {
             GraphicsDeviceService.CreateMainDevice("");
         }
@@ -702,7 +701,7 @@ public class Universe : PropertyChangedBase, IUniverse
             DisposeGraphicsDeviceEvents();
 
             // Only a service this universe made is its to dispose; a hosted universe shares its host's.
-            if (Mode is UniverseMode.Standalone or UniverseMode.Primary)
+            if (Mode == UniverseMode.Standalone)
             {
                 (GraphicsDeviceService as IDisposable)?.Dispose();
             }

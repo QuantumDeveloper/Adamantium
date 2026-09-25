@@ -23,6 +23,7 @@ public class PivotHandles : Handles
     private readonly Entity forwardOrbit;
     private readonly Entity point;
     private readonly Entity central;
+    private readonly RingDrag ringDrag = new();
     private Vector3 anchor;
     private Vector3 startPivot;
     private QuaternionF startPivotRotation;
@@ -42,6 +43,9 @@ public class PivotHandles : Handles
         forwardOrbit = Shape.Get("ForwardOrbit");
         point = Shape.Get("PivotPoint");
         central = Shape.Get("CentralManipulator");
+        rightOrbit.IgnoreInCollisionDetection = true;
+        upOrbit.IgnoreInCollisionDetection = true;
+        forwardOrbit.IgnoreInCollisionDetection = true;
     }
 
     private enum Kind
@@ -54,7 +58,7 @@ public class PivotHandles : Handles
     public override void Place(Entity target, Camera camera)
     {
         var at = PivotInWorld(target);
-        var scale = Pixels * UnitsPerPixel(camera, at) / Length;
+        var scale = Pixels * UnitsPerPoint(camera, at) / Length;
         var axes = AxesOf(target);
         PlaceShape(camera, at, axes, scale);
         HideArmsFacingEye(moveRight, moveUp, moveForward, axes, at, camera);
@@ -64,6 +68,17 @@ public class PivotHandles : Handles
                      * Matrix4x4F.Translation(InRender(at, camera));
         PlacePart(point, facing, camera);
         PlacePart(central, facing, camera);
+    }
+
+    /// <summary>The rings by what of them is drawn nearest the pointer on screen, the rest as usual; the nearer wins.</summary>
+    public override PickHit Pick(in PickRay ray, float aperture)
+    {
+        var ring = default(PickHit);
+        var gap = aperture;
+        NearestOnRing(ray, rightOrbit, Vector3F.UnitX, ref ring, ref gap);
+        NearestOnRing(ray, upOrbit, Vector3F.UnitY, ref ring, ref gap);
+        NearestOnRing(ray, forwardOrbit, Vector3F.UnitZ, ref ring, ref gap);
+        return PickHit.Nearest(base.Pick(ray, aperture), ring);
     }
 
     public override void BeginDrag(Entity target, Entity handle, in PickRay ray)
@@ -87,11 +102,11 @@ public class PivotHandles : Handles
         if (handle == rightOrbit || handle == upOrbit || handle == forwardOrbit)
         {
             kind = Kind.Turn;
-            direction = Axis(axes, handle == rightOrbit ? Vector3F.UnitX
+            var local = handle == rightOrbit ? Vector3F.UnitX
                 : handle == upOrbit ? Vector3F.UnitY
-                : Vector3F.UnitZ);
-            OnPlane(ray.Ray, origin, direction, out var turned);
-            startVector = turned - origin;
+                : Vector3F.UnitZ;
+            direction = Axis(axes, local);
+            ringDrag.Begin(ray, handle, local, direction, origin);
             return;
         }
 
@@ -126,13 +141,9 @@ public class PivotHandles : Handles
             }
             default:
             {
-                if (OnPlane(ray.Ray, origin, direction, out var hit))
-                {
-                    var angle = AngleAbout(startVector, hit - origin, direction);
-                    var inParent = Vector3F.Normalize(ToParent(target, direction));
-                    target.Transform.PivotRotation = QuaternionF.Multiply(QuaternionF.RotationAxis(inParent, angle), startPivotRotation);
-                }
-
+                var inParent = Vector3F.Normalize(ToParent(target, direction));
+                var turn = QuaternionF.RotationAxis(inParent, ringDrag.Angle(ray, origin));
+                target.Transform.PivotRotation = QuaternionF.Multiply(turn, startPivotRotation);
                 break;
             }
         }

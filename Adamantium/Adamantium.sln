@@ -115,8 +115,6 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Adamantium.UI.Markup", "Ada
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Adamantium.UI.Generators", "Adamantium.UI.Generators\Adamantium.UI.Generators.csproj", "{F8435D84-664B-4B65-94BB-4D867F6FF2F6}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Adamantium.Game.Core", "Adamantium.Game.Core\Adamantium.Game.Core.csproj", "{E74790EB-75A8-4D70-ABD4-EDB61C4209CD}"
-EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Adamantium.EffectsCompiler", "Adamantium.EffectsCompiler\Adamantium.EffectsCompiler.csproj", "{E0093086-D17A-490E-93DB-AB9B73EF18A0}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Adamantium.Engine.Generators", "Adamantium.Engine.Generators\Adamantium.Engine.Generators.csproj", "{4B40C0E5-C9E4-49BF-A045-CD7F319ACB20}"
@@ -445,22 +443,6 @@ Global
 		{F8435D84-664B-4B65-94BB-4D867F6FF2F6}.Release|x64.Build.0 = Release|x64
 		{F8435D84-664B-4B65-94BB-4D867F6FF2F6}.Release|x86.ActiveCfg = Release|x64
 		{F8435D84-664B-4B65-94BB-4D867F6FF2F6}.Release|x86.Build.0 = Release|x64
-		{E74790EB-75A8-4D70-ABD4-EDB61C4209CD}.Debug|Any CPU.ActiveCfg = Debug|x64
-		{E74790EB-75A8-4D70-ABD4-EDB61C4209CD}.Debug|Any CPU.Build.0 = Debug|x64
-		{E74790EB-75A8-4D70-ABD4-EDB61C4209CD}.Debug|arm64.ActiveCfg = Debug|x64
-		{E74790EB-75A8-4D70-ABD4-EDB61C4209CD}.Debug|arm64.Build.0 = Debug|x64
-		{E74790EB-75A8-4D70-ABD4-EDB61C4209CD}.Debug|x64.ActiveCfg = Debug|x64
-		{E74790EB-75A8-4D70-ABD4-EDB61C4209CD}.Debug|x64.Build.0 = Debug|x64
-		{E74790EB-75A8-4D70-ABD4-EDB61C4209CD}.Debug|x86.ActiveCfg = Debug|x64
-		{E74790EB-75A8-4D70-ABD4-EDB61C4209CD}.Debug|x86.Build.0 = Debug|x64
-		{E74790EB-75A8-4D70-ABD4-EDB61C4209CD}.Release|Any CPU.ActiveCfg = Release|x64
-		{E74790EB-75A8-4D70-ABD4-EDB61C4209CD}.Release|Any CPU.Build.0 = Release|x64
-		{E74790EB-75A8-4D70-ABD4-EDB61C4209CD}.Release|arm64.ActiveCfg = Release|x64
-		{E74790EB-75A8-4D70-ABD4-EDB61C4209CD}.Release|arm64.Build.0 = Release|x64
-		{E74790EB-75A8-4D70-ABD4-EDB61C4209CD}.Release|x64.ActiveCfg = Release|x64
-		{E74790EB-75A8-4D70-ABD4-EDB61C4209CD}.Release|x64.Build.0 = Release|x64
-		{E74790EB-75A8-4D70-ABD4-EDB61C4209CD}.Release|x86.ActiveCfg = Release|x64
-		{E74790EB-75A8-4D70-ABD4-EDB61C4209CD}.Release|x86.Build.0 = Release|x64
 		{E0093086-D17A-490E-93DB-AB9B73EF18A0}.Debug|Any CPU.ActiveCfg = Debug|x64
 		{E0093086-D17A-490E-93DB-AB9B73EF18A0}.Debug|Any CPU.Build.0 = Debug|x64
 		{E0093086-D17A-490E-93DB-AB9B73EF18A0}.Debug|arm64.ActiveCfg = Debug|x64

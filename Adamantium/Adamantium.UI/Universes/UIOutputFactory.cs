@@ -1,5 +1,5 @@
 using System;
-using Adamantium.Game.Core;
+using Adamantium.Game;
 using Adamantium.Graphics.Core;
 using Adamantium.Imaging;
 using Adamantium.UI.Controls.Panels;
