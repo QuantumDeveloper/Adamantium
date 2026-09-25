@@ -7,13 +7,15 @@ namespace Adamantium.Mathematics
     /// <summary>
     /// Bounding volume using an oriented bounding box.
     /// </summary>
-    public struct OrientedBoundingBox : IEquatable<OrientedBoundingBox>
+    public struct OrientedBoundingBox : IEquatable<OrientedBoundingBox>, IConvexShape
     {
         #region Constants
         public const int CornerCount = 8;
 
         // Epsilon value used in ray tests, where a ray might hit the box almost edge-on.
         const float RAY_EPSILON = 1e-20F;
+
+        private const float ParallelEdges = 1e-6f;
         #endregion
 
         #region Fields
@@ -325,9 +327,7 @@ namespace Adamantium.Mathematics
             // implementation. Note that this is very slow, since BoundingFrustum builds various data structures
             // for this test that it caches internally. To speed it up, you could convert the box to a frustum
             // just once and re-use that frustum for repeated tests.
-            BoundingFrustum temp = ConvertToFrustum();
-            //return temp.Contains(frustum);
-            return ContainmentType.Contains;
+            return ConvertToFrustum().Contains(frustum);
         }
 
         /// <summary>
@@ -376,7 +376,7 @@ namespace Adamantium.Mathematics
             Vector3F LB1;
             Vector3F.TransformCoordinate(ref L1, ref invTrans, out LB1);
             Vector3F LB2;
-            Vector3F.TransformCoordinate(ref L1, ref invTrans, out LB2);
+            Vector3F.TransformCoordinate(ref L2, ref invTrans, out LB2);
 
             // Get line midpoint and extent
             var LMid = (LB1 + LB2) * 0.5f;
@@ -495,6 +495,18 @@ namespace Adamantium.Mathematics
             return dx * dx + dy * dy + dz * dz < r * r;
         }
 
+        /// <summary>Whether the box and a capsule share a point.</summary>
+        public bool Intersects(ref BoundingCapsule capsule)
+        {
+            return Gjk.Intersects(this, capsule);
+        }
+
+        /// <summary>Whether the box and a convex hull share a point.</summary>
+        public bool Intersects(ConvexHull hull)
+        {
+            return Gjk.Intersects(this, hull);
+        }
+
         /// <summary>
         /// Test whether a BoundingSphere contains, intersects, or is disjoint from a OrientedBoundingBox
         /// </summary>
@@ -565,7 +577,7 @@ namespace Adamantium.Mathematics
 
             if (axisDotDir >= -RAY_EPSILON && axisDotDir <= RAY_EPSILON)
             {
-                if ((-axisDotOrigin - HalfExtent.X) > 0.0 || (-axisDotOrigin + HalfExtent.X) > 0.0f)
+                if ((-axisDotOrigin - HalfExtent.X) > 0.0 || (-axisDotOrigin + HalfExtent.X) < 0.0f)
                     return null;
             }
             else
@@ -596,7 +608,7 @@ namespace Adamantium.Mathematics
 
             if (axisDotDir >= -RAY_EPSILON && axisDotDir <= RAY_EPSILON)
             {
-                if ((-axisDotOrigin - HalfExtent.Y) > 0.0 || (-axisDotOrigin + HalfExtent.Y) > 0.0f)
+                if ((-axisDotOrigin - HalfExtent.Y) > 0.0 || (-axisDotOrigin + HalfExtent.Y) < 0.0f)
                     return null;
             }
             else
@@ -627,7 +639,7 @@ namespace Adamantium.Mathematics
 
             if (axisDotDir >= -RAY_EPSILON && axisDotDir <= RAY_EPSILON)
             {
-                if ((-axisDotOrigin - HalfExtent.Z) > 0.0 || (-axisDotOrigin + HalfExtent.Z) > 0.0f)
+                if ((-axisDotOrigin - HalfExtent.Z) > 0.0 || (-axisDotOrigin + HalfExtent.Z) < 0.0f)
                     return null;
             }
             else
@@ -652,7 +664,7 @@ namespace Adamantium.Mathematics
                     return null;
             }
 
-            return t_min;
+            return Math.Max(t_min, 0);
         }
 
         /// <summary>
@@ -765,6 +777,18 @@ namespace Adamantium.Mathematics
             return corners;
         }
 
+        public Vector3F Support(Vector3F direction)
+        {
+            var m = Matrix4x4F.RotationQuaternion(Orientation);
+            var x = m.Right * HalfExtent.X;
+            var y = m.Up * HalfExtent.Y;
+            var z = m.Forward * HalfExtent.Z;
+            return Center
+                   + (Vector3F.Dot(direction, x) >= 0 ? x : -x)
+                   + (Vector3F.Dot(direction, y) >= 0 ? y : -y)
+                   + (Vector3F.Dot(direction, z) >= 0 ? z : -z);
+        }
+
         /// <summary>
         /// Get the axis-aligned <see cref="BoundingBox"/> which contains all <see cref="OrientedBoundingBox"/> corners.
         /// </summary>
@@ -864,23 +888,23 @@ namespace Adamantium.Mathematics
             // of the tests and products simplify away.
 
             // Check for separation along the axes of box A
-            if (mB_TA.X >= hA.X + Math.Abs(hx_B.X) + Math.Abs(hy_B.X) + Math.Abs(hz_B.X))
+            if (mB_TA.X > hA.X + Math.Abs(hx_B.X) + Math.Abs(hy_B.X) + Math.Abs(hz_B.X))
                 return ContainmentType.Disjoint;
 
-            if (mB_TA.Y >= hA.Y + Math.Abs(hx_B.Y) + Math.Abs(hy_B.Y) + Math.Abs(hz_B.Y))
+            if (mB_TA.Y > hA.Y + Math.Abs(hx_B.Y) + Math.Abs(hy_B.Y) + Math.Abs(hz_B.Y))
                 return ContainmentType.Disjoint;
 
-            if (mB_TA.Z >= hA.Z + Math.Abs(hx_B.Z) + Math.Abs(hy_B.Z) + Math.Abs(hz_B.Z))
+            if (mB_TA.Z > hA.Z + Math.Abs(hx_B.Z) + Math.Abs(hy_B.Z) + Math.Abs(hz_B.Z))
                 return ContainmentType.Disjoint;
 
             // Check for separation along the axes box B, hx_B/hy_B/hz_B
-            if (Math.Abs(Vector3F.Dot(mB_T, bX)) >= Math.Abs(hA.X * bX.X) + Math.Abs(hA.Y * bX.Y) + Math.Abs(hA.Z * bX.Z) + hB.X)
+            if (Math.Abs(Vector3F.Dot(mB_T, bX)) > Math.Abs(hA.X * bX.X) + Math.Abs(hA.Y * bX.Y) + Math.Abs(hA.Z * bX.Z) + hB.X)
                 return ContainmentType.Disjoint;
 
-            if (Math.Abs(Vector3F.Dot(mB_T, bY)) >= Math.Abs(hA.X * bY.X) + Math.Abs(hA.Y * bY.Y) + Math.Abs(hA.Z * bY.Z) + hB.Y)
+            if (Math.Abs(Vector3F.Dot(mB_T, bY)) > Math.Abs(hA.X * bY.X) + Math.Abs(hA.Y * bY.Y) + Math.Abs(hA.Z * bY.Z) + hB.Y)
                 return ContainmentType.Disjoint;
 
-            if (Math.Abs(Vector3F.Dot(mB_T, bZ)) >= Math.Abs(hA.X * bZ.X) + Math.Abs(hA.Y * bZ.Y) + Math.Abs(hA.Z * bZ.Z) + hB.Z)
+            if (Math.Abs(Vector3F.Dot(mB_T, bZ)) > Math.Abs(hA.X * bZ.X) + Math.Abs(hA.Y * bZ.Y) + Math.Abs(hA.Z * bZ.Z) + hB.Z)
                 return ContainmentType.Disjoint;
 
             // Check for separation in plane containing an axis of box A and and axis of box B
@@ -893,47 +917,47 @@ namespace Adamantium.Mathematics
 
             // a.X ^ b.X = (1,0,0) ^ bX
             axis = new Vector3F(0, -bX.Z, bX.Y);
-            if (Math.Abs(Vector3F.Dot(mB_T, axis)) >= Math.Abs(hA.Y * axis.Y) + Math.Abs(hA.Z * axis.Z) + Math.Abs(Vector3F.Dot(axis, hy_B)) + Math.Abs(Vector3F.Dot(axis, hz_B)))
+            if (axis.LengthSquared() > ParallelEdges && Math.Abs(Vector3F.Dot(mB_T, axis)) >Math.Abs(hA.Y * axis.Y) + Math.Abs(hA.Z * axis.Z) + Math.Abs(Vector3F.Dot(axis, hy_B)) + Math.Abs(Vector3F.Dot(axis, hz_B)))
                 return ContainmentType.Disjoint;
 
             // a.X ^ b.Y = (1,0,0) ^ bY
             axis = new Vector3F(0, -bY.Z, bY.Y);
-            if (Math.Abs(Vector3F.Dot(mB_T, axis)) >= Math.Abs(hA.Y * axis.Y) + Math.Abs(hA.Z * axis.Z) + Math.Abs(Vector3F.Dot(axis, hz_B)) + Math.Abs(Vector3F.Dot(axis, hx_B)))
+            if (axis.LengthSquared() > ParallelEdges && Math.Abs(Vector3F.Dot(mB_T, axis)) >Math.Abs(hA.Y * axis.Y) + Math.Abs(hA.Z * axis.Z) + Math.Abs(Vector3F.Dot(axis, hz_B)) + Math.Abs(Vector3F.Dot(axis, hx_B)))
                 return ContainmentType.Disjoint;
 
             // a.X ^ b.Z = (1,0,0) ^ bZ
             axis = new Vector3F(0, -bZ.Z, bZ.Y);
-            if (Math.Abs(Vector3F.Dot(mB_T, axis)) >= Math.Abs(hA.Y * axis.Y) + Math.Abs(hA.Z * axis.Z) + Math.Abs(Vector3F.Dot(axis, hx_B)) + Math.Abs(Vector3F.Dot(axis, hy_B)))
+            if (axis.LengthSquared() > ParallelEdges && Math.Abs(Vector3F.Dot(mB_T, axis)) >Math.Abs(hA.Y * axis.Y) + Math.Abs(hA.Z * axis.Z) + Math.Abs(Vector3F.Dot(axis, hx_B)) + Math.Abs(Vector3F.Dot(axis, hy_B)))
                 return ContainmentType.Disjoint;
 
             // a.Y ^ b.X = (0,1,0) ^ bX
             axis = new Vector3F(bX.Z, 0, -bX.X);
-            if (Math.Abs(Vector3F.Dot(mB_T, axis)) >= Math.Abs(hA.Z * axis.Z) + Math.Abs(hA.X * axis.X) + Math.Abs(Vector3F.Dot(axis, hy_B)) + Math.Abs(Vector3F.Dot(axis, hz_B)))
+            if (axis.LengthSquared() > ParallelEdges && Math.Abs(Vector3F.Dot(mB_T, axis)) >Math.Abs(hA.Z * axis.Z) + Math.Abs(hA.X * axis.X) + Math.Abs(Vector3F.Dot(axis, hy_B)) + Math.Abs(Vector3F.Dot(axis, hz_B)))
                 return ContainmentType.Disjoint;
 
             // a.Y ^ b.Y = (0,1,0) ^ bY
             axis = new Vector3F(bY.Z, 0, -bY.X);
-            if (Math.Abs(Vector3F.Dot(mB_T, axis)) >= Math.Abs(hA.Z * axis.Z) + Math.Abs(hA.X * axis.X) + Math.Abs(Vector3F.Dot(axis, hz_B)) + Math.Abs(Vector3F.Dot(axis, hx_B)))
+            if (axis.LengthSquared() > ParallelEdges && Math.Abs(Vector3F.Dot(mB_T, axis)) >Math.Abs(hA.Z * axis.Z) + Math.Abs(hA.X * axis.X) + Math.Abs(Vector3F.Dot(axis, hz_B)) + Math.Abs(Vector3F.Dot(axis, hx_B)))
                 return ContainmentType.Disjoint;
 
             // a.Y ^ b.Z = (0,1,0) ^ bZ
             axis = new Vector3F(bZ.Z, 0, -bZ.X);
-            if (Math.Abs(Vector3F.Dot(mB_T, axis)) >= Math.Abs(hA.Z * axis.Z) + Math.Abs(hA.X * axis.X) + Math.Abs(Vector3F.Dot(axis, hx_B)) + Math.Abs(Vector3F.Dot(axis, hy_B)))
+            if (axis.LengthSquared() > ParallelEdges && Math.Abs(Vector3F.Dot(mB_T, axis)) >Math.Abs(hA.Z * axis.Z) + Math.Abs(hA.X * axis.X) + Math.Abs(Vector3F.Dot(axis, hx_B)) + Math.Abs(Vector3F.Dot(axis, hy_B)))
                 return ContainmentType.Disjoint;
 
             // a.Z ^ b.X = (0,0,1) ^ bX
             axis = new Vector3F(-bX.Y, bX.X, 0);
-            if (Math.Abs(Vector3F.Dot(mB_T, axis)) >= Math.Abs(hA.X * axis.X) + Math.Abs(hA.Y * axis.Y) + Math.Abs(Vector3F.Dot(axis, hy_B)) + Math.Abs(Vector3F.Dot(axis, hz_B)))
+            if (axis.LengthSquared() > ParallelEdges && Math.Abs(Vector3F.Dot(mB_T, axis)) >Math.Abs(hA.X * axis.X) + Math.Abs(hA.Y * axis.Y) + Math.Abs(Vector3F.Dot(axis, hy_B)) + Math.Abs(Vector3F.Dot(axis, hz_B)))
                 return ContainmentType.Disjoint;
 
             // a.Z ^ b.Y = (0,0,1) ^ bY
             axis = new Vector3F(-bY.Y, bY.X, 0);
-            if (Math.Abs(Vector3F.Dot(mB_T, axis)) >= Math.Abs(hA.X * axis.X) + Math.Abs(hA.Y * axis.Y) + Math.Abs(Vector3F.Dot(axis, hz_B)) + Math.Abs(Vector3F.Dot(axis, hx_B)))
+            if (axis.LengthSquared() > ParallelEdges && Math.Abs(Vector3F.Dot(mB_T, axis)) >Math.Abs(hA.X * axis.X) + Math.Abs(hA.Y * axis.Y) + Math.Abs(Vector3F.Dot(axis, hz_B)) + Math.Abs(Vector3F.Dot(axis, hx_B)))
                 return ContainmentType.Disjoint;
 
             // a.Z ^ b.Z = (0,0,1) ^ bZ
             axis = new Vector3F(-bZ.Y, bZ.X, 0);
-            if (Math.Abs(Vector3F.Dot(mB_T, axis)) >= Math.Abs(hA.X * axis.X) + Math.Abs(hA.Y * axis.Y) + Math.Abs(Vector3F.Dot(axis, hx_B)) + Math.Abs(Vector3F.Dot(axis, hy_B)))
+            if (axis.LengthSquared() > ParallelEdges && Math.Abs(Vector3F.Dot(mB_T, axis)) >Math.Abs(hA.X * axis.X) + Math.Abs(hA.Y * axis.Y) + Math.Abs(Vector3F.Dot(axis, hx_B)) + Math.Abs(Vector3F.Dot(axis, hy_B)))
                 return ContainmentType.Disjoint;
 
             return ContainmentType.Intersects;
@@ -959,7 +983,7 @@ namespace Adamantium.Mathematics
             temp.M13 *= sz; temp.M23 *= sz; temp.M33 *= sz;
             temp.TranslationVector = Vector3F.UnitZ * 0.5f + Vector3F.TransformNormal(-Center, temp);
 
-            return new BoundingFrustum(temp);
+            return new BoundingFrustum(temp, true);
         }
         #endregion
 

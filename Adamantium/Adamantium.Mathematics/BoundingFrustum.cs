@@ -3,7 +3,7 @@ using System.Text;
 
 namespace Adamantium.Mathematics
 {
-   public class BoundingFrustum:IEquatable<BoundingFrustum>
+   public class BoundingFrustum:IEquatable<BoundingFrustum>, IConvexShape
    {
       #region Private Fields
 
@@ -97,7 +97,7 @@ namespace Adamantium.Mathematics
             {
                continue;
             }
-            
+
             GetBoxToPlanePVertexNVertex(ref box, ref plane.Normal, out p, out n);
             if (Collision.PlaneIntersectsPoint(ref plane, ref p) == PlaneIntersectionType.Back)
             {
@@ -108,7 +108,6 @@ namespace Adamantium.Mathematics
             if (Collision.PlaneIntersectsPoint(ref plane, ref n) == PlaneIntersectionType.Back)
             {
                result = ContainmentType.Intersects;
-               return;
             }
          }
       }
@@ -148,7 +147,7 @@ namespace Adamantium.Mathematics
             frustum.Intersects(ref planes[i], out planeIntersectionType);
             switch (planeIntersectionType)
             {
-               case PlaneIntersectionType.Front:
+               case PlaneIntersectionType.Back:
                   return ContainmentType.Disjoint;
                case PlaneIntersectionType.Intersecting:
                   intersects = true;
@@ -205,27 +204,141 @@ namespace Adamantium.Mathematics
          }
       }
 
+      public Vector3F Support(Vector3F direction)
+      {
+         var best = corners[0];
+         var reach = Vector3F.Dot(best, direction);
+         for (int i = 1; i < corners.Length; i++)
+         {
+            var along = Vector3F.Dot(corners[i], direction);
+            if (along > reach)
+            {
+               reach = along;
+               best = corners[i];
+            }
+         }
+
+         return best;
+      }
+
+      public ContainmentType Contains(ref OrientedBoundingBox box)
+      {
+         var result = ContainmentType.Contains;
+         for (int i = 0; i < PlaneCount; i++)
+         {
+            if (!EnableFarPlaneCheck && planes[i] == Far)
+            {
+               continue;
+            }
+
+            switch (box.Intersects(ref planes[i]))
+            {
+               case PlaneIntersectionType.Back:
+                  return ContainmentType.Disjoint;
+               case PlaneIntersectionType.Intersecting:
+                  result = ContainmentType.Intersects;
+                  break;
+            }
+         }
+
+         return result;
+      }
+
+      public ContainmentType Contains(ConvexHull hull)
+      {
+         var result = ContainmentType.Contains;
+         for (int i = 0; i < PlaneCount; i++)
+         {
+            if (!EnableFarPlaneCheck && planes[i] == Far)
+            {
+               continue;
+            }
+
+            switch (hull.Intersects(ref planes[i]))
+            {
+               case PlaneIntersectionType.Back:
+                  return ContainmentType.Disjoint;
+               case PlaneIntersectionType.Intersecting:
+                  result = ContainmentType.Intersects;
+                  break;
+            }
+         }
+
+         return result;
+      }
+
+      public bool Intersects(ref OrientedBoundingBox box)
+      {
+         return Contains(ref box) != ContainmentType.Disjoint;
+      }
+
+      public bool Intersects(ref BoundingCapsule capsule)
+      {
+         return Contains(ref capsule) != ContainmentType.Disjoint;
+      }
+
+      public bool Intersects(ConvexHull hull)
+      {
+         return Contains(hull) != ContainmentType.Disjoint;
+      }
+
+      public ContainmentType Contains(ref BoundingCapsule capsule)
+      {
+         var result = ContainmentType.Contains;
+         for (int i = 0; i < PlaneCount; i++)
+         {
+            if (!EnableFarPlaneCheck && planes[i] == Far)
+            {
+               continue;
+            }
+
+            var start = Plane.DotCoordinate(planes[i], capsule.Start);
+            var end = Plane.DotCoordinate(planes[i], capsule.End);
+            if (Math.Max(start, end) < -capsule.Radius)
+            {
+               return ContainmentType.Disjoint;
+            }
+
+            if (Math.Min(start, end) < capsule.Radius)
+            {
+               result = ContainmentType.Intersects;
+            }
+         }
+
+         return result;
+      }
+
       public ContainmentType Contains(Vector3F[] points)
       {
+         var result = ContainmentType.Contains;
          for (int p = 0; p < PlaneCount; p++)
          {
-            bool cont = false;
             if (!EnableFarPlaneCheck && planes[p] == Far)
             {
                continue;
             }
+
+            var inside = 0;
             for (int k = 0; k < points.Length; k++)
             {
                if (planes[p][0] * points[k].X + planes[p][1] * points[k].Y + planes[p][2] * points[k].Z + planes[p][3] >= 0)
                {
-                  cont = true;
-                  break;
+                  inside++;
                }
             }
-            if (cont) continue;
-            return ContainmentType.Disjoint;
+
+            if (inside == 0)
+            {
+               return ContainmentType.Disjoint;
+            }
+
+            if (inside < points.Length)
+            {
+               result = ContainmentType.Intersects;
+            }
          }
-         return ContainmentType.Contains;
+
+         return result;
       }
 
       public ContainmentType Contains(ref Vector3F point)
@@ -359,10 +472,10 @@ namespace Adamantium.Mathematics
 
       private void CreatePlanes()
       {
-         planes[0][0] = viewProjection.M14 + viewProjection.M13;
-         planes[0][1] = viewProjection.M24 + viewProjection.M23;
-         planes[0][2] = viewProjection.M34 + viewProjection.M33;
-         planes[0][3] = viewProjection.M44 + viewProjection.M43;
+         planes[0][0] = viewProjection.M13;
+         planes[0][1] = viewProjection.M23;
+         planes[0][2] = viewProjection.M33;
+         planes[0][3] = viewProjection.M43;
          planes[0].Normalize();
 
          planes[1][0] = viewProjection.M14 - viewProjection.M13;
