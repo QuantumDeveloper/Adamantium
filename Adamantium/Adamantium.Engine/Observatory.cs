@@ -29,7 +29,7 @@ public class Observatory
         {
             scratchByState[i] = [];
         }
-        CameraGizmo = new CameraGizmo(entityWorld, this);
+        CameraGizmo = new CameraGizmo(entityWorld);
         TakeSnapshot();
         universe.OutputsSettled += OnOutputsSettled;
     }

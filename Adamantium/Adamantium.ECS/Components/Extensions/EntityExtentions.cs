@@ -28,13 +28,12 @@ namespace Adamantium.ECS.Components.Extensions
 
         public static Vector3 GetCenterAbsolute(this Entity owner)
         {
-            // WORLD, through the parents - it used to read the entity's own Position, which is relative to its parent.
             var transform = owner.Transform;
             var collision = owner.GetComponent<Collider>();
 
             return collision == null
                 ? transform.WorldPosition
-                : transform.WorldPosition + (collision.LocalCenter * transform.Scale);
+                : (Vector3)Vector3F.TransformCoordinate(collision.LocalCenter, transform.GetWorldMatrixF());
         }
 
         public static Vector3F GetLocalCenter(this Entity owner)

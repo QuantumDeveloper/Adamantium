@@ -52,7 +52,11 @@ namespace Adamantium.ECS.Components
 
         public Double CurrentVelocity { get; set; }
 
+        /// <summary>How far one wheel notch moves a free camera, in seconds of travel at its <see cref="Velocity"/>.</summary>
         public Double WheelVelocity { get; set; }
+
+        /// <summary>How much one wheel notch closes the distance to the subject a camera orbits: it is divided by this.</summary>
+        public Double ZoomStep { get; set; } = 1.15;
 
         public Single RotationSpeed { get; set; }
 

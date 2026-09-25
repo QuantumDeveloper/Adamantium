@@ -1,7 +1,6 @@
 using System;
 using System.Globalization;
 using Adamantium.Core;
-using Adamantium.Engine.Managers;
 using Adamantium.Engine.Services;
 using Adamantium.ECS;
 using Adamantium.ECS.Components;
@@ -16,15 +15,17 @@ namespace Adamantium.Engine.EntityServices;
 
 public class InputService : EntityService
 {
+    private const double WheelNotch = 120;
+
     private Entity userControlledEntity;
     private Entity selectedEntity;
     //private AudioManager audioManager;
-    private ToolsManager toolsManager;
+    private Selection selection;
     private Observatory observatory;
 
     public InputService(EntityWorld world) : base(world)
     {
-        toolsManager = EntityWorld.Satellites.Get<ToolsManager>();
+        selection = EntityWorld.Satellites.Get<Selection>();
         observatory = EntityWorld.Satellites.Get<Observatory>();
         EntityWorld.EntityManager.EntityRemoved += EntityManagerEntityRemoved;
         //audioManager = new AudioManager();
@@ -55,7 +56,7 @@ public class InputService : EntityService
     /// </summary>
     public override void Update(AppTime gameTime)
     {
-        userControlledEntity = toolsManager.SelectedEntity ?? UserControlledEntity;
+        userControlledEntity = selection.Current ?? UserControlledEntity;
 
         if (observatory.PointerOutput is { Camera: { } pointerCamera } pointerOutput)
         {
@@ -85,9 +86,9 @@ public class InputService : EntityService
                 (float)gameTime.FrameTime);
         }
 
-        if (inputManager.MouseWheelDelta != 0 && currentCamera.Type != CameraType.FirstPerson)
+        if (inputManager.MouseWheelDelta != 0)
         {
-            currentCamera.TranslateForward(inputManager.MouseWheelDelta * currentCamera.Velocity * gameTime.FrameTime);
+            currentCamera.Zoom(inputManager.MouseWheelDelta / WheelNotch);
         }
     }
 
@@ -236,10 +237,10 @@ public class InputService : EntityService
 
         if (inputManager.IsKeyPressed(Keys.F3))
         {
-            if (toolsManager.SelectedEntity?.GetComponent<Camera>() is { } selectedCamera)
+            if (selection.Current?.GetComponent<Camera>() is { } selectedCamera)
             {
                 output.Camera = selectedCamera;
-                toolsManager.SelectedEntity = null;
+                selection.Current = null;
             }
             else
             {
@@ -277,7 +278,7 @@ public class InputService : EntityService
 
         if (inputManager.IsKeyPressed(Keys.F11))
         {
-            toolsManager.SelectedEntity?.SetWireFrame();
+            selection.Current?.SetWireFrame();
         }
 
         if (inputManager.IsKeyPressed(Keys.F12))

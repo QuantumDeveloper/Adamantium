@@ -192,7 +192,7 @@ namespace Adamantium.ECS.Components
 
         private void BuildPerspectiveFovY(float zNear, float zFar)
         {
-            PerspectiveProjection = Matrix4x4F.PerspectiveFovY(Fov, (float)Width / Height, zNear, zFar);
+            PerspectiveProjection = Matrix4x4F.PerspectiveFovY(MathHelper.DegreesToRadians(Fov), (float)Width / Height, zNear, zFar);
         }
 
         private void GetAxisFromViewMatrix()
@@ -416,6 +416,23 @@ namespace Adamantium.ECS.Components
             else
             {
                 Radius -= relativeZ;
+            }
+        }
+
+        /// <summary>
+        /// Wheel notches, forward positive: a camera orbiting a subject comes closer by <see cref="CameraBase.ZoomStep"/>
+        /// a notch, never nearer than twice its near plane; a free camera moves along its view by
+        /// <see cref="CameraBase.WheelVelocity"/> seconds of travel a notch.
+        /// </summary>
+        public void Zoom(double notches)
+        {
+            if (Type == CameraType.Free)
+            {
+                TranslateForward(notches * Velocity * WheelVelocity);
+            }
+            else if (Type.IsThirdPerson())
+            {
+                Radius = Math.Max(Radius * Math.Pow(ZoomStep, -notches), ZNear * 2);
             }
         }
 

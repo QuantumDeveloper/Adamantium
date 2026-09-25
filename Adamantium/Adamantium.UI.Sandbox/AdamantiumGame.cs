@@ -2,8 +2,10 @@
 using System.Threading.Tasks;
 using Adamantium.Engine;
 using Adamantium.Engine.EntityServices;
-using Adamantium.Engine.Managers;
 using Adamantium.Engine.Templates;
+using Adamantium.Engine.Templates.Lights;
+using Adamantium.Engine.Tools;
+using Adamantium.ECS.Components;
 using Adamantium.ECS;
 using Adamantium.Game;
 using Adamantium.Game.Core;
@@ -17,8 +19,14 @@ namespace Adamantium.UI.Sandbox
 {
     public class AdamantiumGame : Universe
     {
+        private readonly SelectTool _selectTool = new();
+        private readonly MoveTool _moveTool = new();
+        private readonly RotationTool _rotationTool = new();
+        private readonly ScaleTool _scaleTool = new();
+        private readonly PivotTool _pivotTool = new();
         private Task _startupLoad;
         private InputService _inputService;
+        private ToolsService _tools;
 
         public AdamantiumGame(
             bool enableDynamicRendering,
@@ -39,16 +47,29 @@ namespace Adamantium.UI.Sandbox
         private void OnWindowCreated(UniverseOutput output)
         {
             var renderingService = CreateRenderService<RenderingService>(output);
-            var processor = new ForwardRenderingProcessor();
-            renderingService.AttachProcessor(processor);
+            renderingService.AttachProcessor(new ForwardRenderingProcessor());
+            renderingService.AttachProcessor(new EditorOverlayProcessor(_tools));
         }
 
         protected override void Initialize()
         {
             base.Initialize();
-            Satellites.Add(new ToolsManager(EntityWorld));
+            Satellites.Add(new Selection());
             Satellites.Add(new Observatory(this, EntityWorld));
             InitializeGameResources();
+        }
+
+        /// <summary>The tool the mouse works with from the next frame on.</summary>
+        public void UseTool(EditTool tool)
+        {
+            _tools.Tool = tool switch
+            {
+                EditTool.Move => _moveTool,
+                EditTool.Rotate => _rotationTool,
+                EditTool.Scale => _scaleTool,
+                EditTool.Pivot => _pivotTool,
+                _ => _selectTool
+            };
         }
 
         protected override void LoadContent()
@@ -65,7 +86,12 @@ namespace Adamantium.UI.Sandbox
             {
                 _inputService = EntityWorld.CreateService<InputService>(EntityWorld);
                 EntityWorld.CreateService<TransformService>(EntityWorld);
-                EntityWorld.CreateService<ToolsService>(EntityWorld);
+                _tools = EntityWorld.CreateService<ToolsService>(EntityWorld);
+                _tools.AttachProcessor(new SelectionOutline());
+                _tools.AttachProcessor(new EntityIcons());
+                _tools.AttachProcessor(new OrientationCube());
+                _tools.Tool = _selectTool;
+                AddLightsAndCamera();
             }
             catch (Exception exception)
             {
@@ -73,10 +99,29 @@ namespace Adamantium.UI.Sandbox
             }
         }
 
+        private void AddLightsAndCamera()
+        {
+            var point = new LightTemplate().BuildEntity(null, "Point light", LightType.Point);
+            point.Transform.Position = new Vector3(-5, -4, 2);
+            point.GetComponent<Light>().Range = 6;
+            EntityWorld.EntityManager.AddEntity(point);
+
+            var spot = new LightTemplate().BuildEntity(null, "Spot light", LightType.Spot);
+            spot.Transform.Position = new Vector3(5, -6, 6);
+            spot.Transform.Rotation = QuaternionF.RotationAxis(Vector3F.UnitX, MathHelper.DegreesToRadians(180));
+            var spotLight = spot.GetComponent<Light>();
+            spotLight.Range = 8;
+            spotLight.OuterSpotAngle = MathHelper.DegreesToRadians(30);
+            EntityWorld.EntityManager.AddEntity(spot);
+
+            var camera = new CameraTemplate().BuildEntity(null, "Scene camera", new Vector3(8, -3, -4), Vector3.ForwardLH, -Vector3.Up, 800, 600, 0.1f, 1000f);
+            EntityWorld.EntityManager.AddEntity(camera);
+        }
+
         public Task<Entity> ImportModel(SceneData scene)
         {
             return Task.Run(() =>
-                EntityWorld.CreateEntityFromTemplate(new EntityImportTemplate(scene, Content, new Vector3(0, 0, 2500))));
+                EntityWorld.CreateEntityFromTemplate(new EntityImportTemplate(scene, Content, new Vector3(0, 0, 6))));
         }
 
         public async Task<Entity> ImportModel(String pathToFile, ContentLoadOptions options = null)

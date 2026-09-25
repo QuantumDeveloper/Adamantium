@@ -11,6 +11,8 @@ float transparency;
 float4x4 instanceWorld[64];
 float4 instanceColor[64];
 float4x4 viewProjection;
+// The selection outline's width as a clip-space offset per unit of w, along x and along y.
+float2 outlineStep;
 sampler sampleType;
 Texture2D shaderTexture;
 float4 foregroundColor;
@@ -130,6 +132,61 @@ float4 BasicLit_PS(PS_OUTPUT_BASIC input) : SV_TARGET
 
     float3 shade = input.color.rgb * (0.42f + 0.58f * lambert + rim) + specular;
     return float4(saturate(shade), input.color.a);
+}
+
+struct PS_OUTPUT_ORBIT
+{
+    float4 position : SV_POSITION;
+    float4 color : COLOR0;
+    float3 fromCenter : TEXCOORD0;
+    float3 toCenter : TEXCOORD1;
+};
+
+// A ring of the rotation gizmo: its copy's center rides the translation row of the copy's matrix, and the eye sits at
+// the origin of the camera-relative space the placement is in.
+PS_OUTPUT_ORBIT OrbitInstanced_VS(MESH_VERTEX input, uint instanceId : SV_InstanceID)
+{
+    PS_OUTPUT_ORBIT output;
+
+    float4x4 placement = instanceWorld[instanceId];
+    float4 world = mul(float4(input.position.xyz, 1.0f), placement);
+    output.position = mul(world, viewProjection);
+    output.color = instanceColor[instanceId];
+    output.fromCenter = world.xyz - placement[3].xyz;
+    output.toCenter = placement[3].xyz;
+    return output;
+}
+
+// Only the half of the ring on the eye's side of the ball: split across the sight to the center, not the exact
+// silhouette, which would leave less than half of a tilted ring and nothing of one that faces the eye.
+float4 Orbit_PS(PS_OUTPUT_ORBIT input) : SV_TARGET
+{
+    if (dot(input.fromCenter, input.toCenter) > 0.0f)
+    {
+        discard;
+    }
+
+    return input.color;
+}
+
+// The selection outline: every copy drawn once per direction, shifted that way by the outline's width on screen, and
+// the stencil keeps only what lands outside the selection itself. Copy k's placement and colour sit at k / directions.
+static const uint outlineDirections = 8;
+
+PS_OUTPUT_BASIC OutlineInstanced_VS(MESH_VERTEX input, uint instanceId : SV_InstanceID)
+{
+    PS_OUTPUT_BASIC output;
+
+    uint copy = instanceId / outlineDirections;
+    float angle = (instanceId % outlineDirections) * (6.2831853f / outlineDirections);
+    float4 position = mul(mul(float4(input.position.xyz, 1.0f), instanceWorld[copy]), viewProjection);
+    position.xy += float2(cos(angle), sin(angle)) * outlineStep * position.w;
+
+    output.position = position;
+    output.uv = input.uv0;
+    output.color = instanceColor[copy];
+    output.normal = input.normal;
+    return output;
 }
 
 float4 BasicColored_PS(PS_OUTPUT_BASIC input) : SV_TARGET
@@ -301,6 +358,25 @@ technique Basic
     {
         VertexShader = BasicLitInstanced_VS;
         PixelShader = BasicLit_PS;
+    }
+
+    // Lines have no normals to light: flat colour, placed the same way.
+    pass FlatInstanced
+    {
+        VertexShader = BasicLitInstanced_VS;
+        PixelShader = BasicVertexColored_PS;
+    }
+
+    pass OrbitInstanced
+    {
+        VertexShader = OrbitInstanced_VS;
+        PixelShader = Orbit_PS;
+    }
+
+    pass OutlineInstanced
+    {
+        VertexShader = OutlineInstanced_VS;
+        PixelShader = BasicVertexColored_PS;
     }
     
     pass SmallGlyph

@@ -20,6 +20,7 @@ public partial class GameViewModel : TabPageViewModel
     internal void AttachGame(AdamantiumGame game)
     {
         _game = game;
+        _game.UseTool(Tool);
         Status = "Game ready";
 
         // A rebuilt view brings a new game with a new camera: its home and speed are taken afresh on the next pulse.
@@ -41,13 +42,12 @@ public partial class GameViewModel : TabPageViewModel
 
     [Bindable] private double _frameCostMs;
 
-    /// <summary>How fast the camera travels through the world, in units per second. The engine's own default of 1 is a
-    /// crawl at this scene's scale, so the demo asks for something a person can fly with.</summary>
-    [Bindable] private double _cameraSpeed = 50;
+    /// <summary>How fast the camera travels through the world, in meters per second.</summary>
+    [Bindable] private double _cameraSpeed = 0.5;
 
     // What we last handed the camera. The game doubles and halves the velocity on its own keys (numpad + / -), so
     // anything else found there came from the keyboard and the box should follow it rather than fight it.
-    private double _handed = 50;
+    private double _handed = 0.5;
 
     // Where the camera stood the first time we saw it. Remembered rather than assumed: whatever the engine placed it
     // at IS home, and that is the one place a lost person can be put back.
@@ -98,6 +98,53 @@ public partial class GameViewModel : TabPageViewModel
         _handed = value;
 
         if (_game?.MainOutput?.Camera is { } camera) camera.Velocity = value;
+    }
+
+    /// <summary>The tool the mouse works with in the game.</summary>
+    [Bindable, Affects(nameof(IsSelecting), nameof(IsMoving), nameof(IsRotating), nameof(IsScaling), nameof(IsMovingPivot))]
+    private EditTool _tool = EditTool.Select;
+
+    public bool IsSelecting
+    {
+        get => Tool == EditTool.Select;
+        set => Choose(EditTool.Select, value);
+    }
+
+    public bool IsMoving
+    {
+        get => Tool == EditTool.Move;
+        set => Choose(EditTool.Move, value);
+    }
+
+    public bool IsRotating
+    {
+        get => Tool == EditTool.Rotate;
+        set => Choose(EditTool.Rotate, value);
+    }
+
+    public bool IsScaling
+    {
+        get => Tool == EditTool.Scale;
+        set => Choose(EditTool.Scale, value);
+    }
+
+    public bool IsMovingPivot
+    {
+        get => Tool == EditTool.Pivot;
+        set => Choose(EditTool.Pivot, value);
+    }
+
+    private void Choose(EditTool tool, bool chosen)
+    {
+        if (chosen)
+        {
+            Tool = tool;
+        }
+    }
+
+    partial void OnToolChanged(EditTool value)
+    {
+        _game?.UseTool(value);
     }
 
     [Bindable, Affects(nameof(MenuButtonText), nameof(MouseLookEnabled))] private bool _isMenuVisible = true;

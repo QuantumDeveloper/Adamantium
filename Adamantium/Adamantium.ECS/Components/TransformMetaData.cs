@@ -22,7 +22,6 @@ public class TransformMetaData
     // (the world matrix depends on camera POSITION, not its rotation - rotation lives in the per-frame view matrix).
     public bool Computed { get; set; }
     public Vector3 LastCameraPosition { get; set; }
-    public Vector3F LastPivotCorrection { get; set; }
 
     public Vector3F RelativePosition { get; set; }
 

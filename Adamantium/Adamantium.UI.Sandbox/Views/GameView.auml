@@ -19,10 +19,47 @@
             <TextBlock Text="Camera speed" MarginTop="10" MarginBottom="4"
                        Foreground="{ResourceReference TextFillColorSecondary}"/>
             <NumericUpDown Value="{Binding CameraSpeed, Mode=TwoWay}"
-                           Width="120" Minimum="0.01" Maximum="10000"
-                           SmallChange="1" LargeChange="10" StringFormat="N2"/>
+                           Width="120"
+                           Minimum="0.01"
+                           Maximum="100"
+                           SmallChange="0.01"
+                           LargeChange="0.1"
+                           StringFormat="N2"/>
             <Button Content="Reset camera" Command="{Binding ResetCameraCommand}"
                     Width="120" Height="30" MarginTop="10"/>
+            <TextBlock Text="Tool"
+                       MarginTop="10"
+                       MarginBottom="4"
+                       Foreground="{ResourceReference TextFillColorSecondary}"/>
+            <RadioButton Classes="Toggle"
+                         GroupName="GameTool"
+                         Content="Select"
+                         Width="120"
+                         IsChecked="{Binding IsSelecting, Mode=TwoWay}"/>
+            <RadioButton Classes="Toggle"
+                         GroupName="GameTool"
+                         Content="Move"
+                         Width="120"
+                         MarginTop="4"
+                         IsChecked="{Binding IsMoving, Mode=TwoWay}"/>
+            <RadioButton Classes="Toggle"
+                         GroupName="GameTool"
+                         Content="Rotate"
+                         Width="120"
+                         MarginTop="4"
+                         IsChecked="{Binding IsRotating, Mode=TwoWay}"/>
+            <RadioButton Classes="Toggle"
+                         GroupName="GameTool"
+                         Content="Scale"
+                         Width="120"
+                         MarginTop="4"
+                         IsChecked="{Binding IsScaling, Mode=TwoWay}"/>
+            <RadioButton Classes="Toggle"
+                         GroupName="GameTool"
+                         Content="Pivot"
+                         Width="120"
+                         MarginTop="4"
+                         IsChecked="{Binding IsMovingPivot, Mode=TwoWay}"/>
         </StackPanel>
 
         <!-- What the GAME'S OWN rendering costs, opposite corner - not the rate the panel ticks it at, which would

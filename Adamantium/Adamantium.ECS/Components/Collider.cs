@@ -1,4 +1,5 @@
-﻿using Adamantium.ECS.Components;
+﻿using System;
+using Adamantium.ECS.Components;
 using Adamantium.Graphics.Core.Models;
 using Adamantium.Mathematics;
 
@@ -69,5 +70,35 @@ namespace Adamantium.ECS.Components
         public abstract bool Intersects(ref Ray ray, out Vector3F point);
 
         public abstract bool IntersectsForCamera(Camera camera, ref Ray ray, out Vector3F point);
+
+        /// <summary>
+        /// The collider where its entity stands in the world, as a shape <see cref="Gjk"/> can test; null while it holds
+        /// nothing.
+        /// </summary>
+        public abstract IConvexShape GetWorldShape();
+
+        /// <summary>Whether this collider and <paramref name="other"/> share a point where their entities stand.</summary>
+        public bool Intersects(Collider other)
+        {
+            var first = GetWorldShape();
+            var second = other.GetWorldShape();
+            return first != null && second != null && Gjk.Intersects(first, second);
+        }
+
+        protected Matrix4x4F PlacementOf(Entity part)
+        {
+            var placement = Matrix4x4F.Identity;
+            for (var at = part; at != Owner; at = at.Owner)
+            {
+                if (at == null)
+                {
+                    throw new ArgumentException("Only a collider of this entity or of one under it can be merged in.");
+                }
+
+                placement *= at.Transform.GetLocalMatrixF();
+            }
+
+            return placement;
+        }
     }
 }

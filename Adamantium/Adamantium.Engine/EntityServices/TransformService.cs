@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using Adamantium.Core;
 using Adamantium.ECS;
 using Adamantium.ECS.Components;
-using Adamantium.ECS.Components.Extensions;
 using Adamantium.Game.Core;
 using Adamantium.Mathematics;
 using Serilog;
@@ -51,7 +50,6 @@ public class TransformService : EntityService
         
     private void Transform(Entity entity, AppTime gameTime)
     {
-        var generalCenter = entity.GetLocalCenter();
         entity.TraverseInDepth(current =>
         {
             var transform = current.Transform;
@@ -66,11 +64,10 @@ public class TransformService : EntityService
                 }
 
                 var metadata = transform.GetMetadata(camera);
-                // Only when an input to the world matrix changed - the node or its parent, the camera position, the pivot -
+                // Only when an input to the world matrix changed - the node or its parent, the camera position -
                 // so a static scene skips the pass. World position: a parented camera's local offset barely changes.
                 if (!dirty && metadata.Computed
-                    && metadata.LastCameraPosition == camera.WorldPosition
-                    && metadata.LastPivotCorrection == generalCenter)
+                    && metadata.LastCameraPosition == camera.WorldPosition)
                 {
                     continue;
                 }
@@ -79,7 +76,7 @@ public class TransformService : EntityService
                 var parentWorld = current.Owner?.Transform != null
                     ? current.Owner.Transform.GetMetadata(camera).AbsoluteWorld
                     : Matrix4x4F.Identity;
-                transform.CalculateFinalTransform(camera, generalCenter, parentWorld);
+                transform.CalculateFinalTransform(camera, parentWorld);
 
                 // Collider bounds ride the same world matrix, so refresh them exactly when it was recomputed (fetch the
                 // list lazily so a fully-static node allocates nothing).

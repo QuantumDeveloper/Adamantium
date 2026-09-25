@@ -86,6 +86,11 @@ namespace Adamantium.ECS.Components
          return sphere.Intersects(ref ray, out point);
       }
 
+      public override IConvexShape GetWorldShape()
+      {
+         return sphere.Transform(Owner.Transform.GetWorldMatrixF());
+      }
+
        public override bool IntersectsForCamera(Camera camera, ref Ray ray, out Vector3F point)
        {
            point = Vector3F.Zero;

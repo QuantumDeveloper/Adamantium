@@ -29,7 +29,7 @@ public class RotationToolTemplate:BaseToolTemplate
             0,
             360,
             true,
-            tessellation);
+            tessellation).ContoursToLines();
 
         var yAxisMeshManipulator = zAxisMeshManipulator.Clone(Matrix4x4.RotationX(MathHelper.DegreesToRadians(90)));
         var xAxisMeshManipulator = yAxisMeshManipulator.Clone(Matrix4x4.RotationZ(MathHelper.DegreesToRadians(90)));
@@ -41,7 +41,7 @@ public class RotationToolTemplate:BaseToolTemplate
             0,
             360,
             true,
-            tessellation);
+            tessellation).ContoursToLines();
 
         var currentViewCircleMesh = Shapes.Ellipse.GenerateGeometry(
             GeometryType.Outlined,
@@ -50,7 +50,7 @@ public class RotationToolTemplate:BaseToolTemplate
             0,
             360,
             true,
-            tessellation);
+            tessellation).ContoursToLines();
 
         var centralSphere = Shapes.Sphere.GenerateGeometry(GeometryType.Solid, SphereType.UVSphere, maxDiameter - 0.05f, tessellation);
         var centralPart = BuildSubEntity(root, "CentralManipulator", centralSphere, Colors.LightGray, BoundingVolume.Sphere, 0.1f);

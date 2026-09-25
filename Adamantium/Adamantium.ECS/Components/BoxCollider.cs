@@ -10,6 +10,8 @@ namespace Adamantium.ECS.Components
     public class BoxCollider : Collider
     {
         private OrientedBoundingBox obb;
+        private bool hasBox;
+
         public BoxCollider()
         {
             ColliderData = new Dictionary<CameraBase, OrientedBoundingBox>();
@@ -66,21 +68,32 @@ namespace Adamantium.ECS.Components
         public override void CalculateFromMesh(Mesh mesh)
         {
             obb = mesh.Bounds;
+            hasBox = true;
             base.CalculateFromMesh(mesh);
         }
 
         public void CalculateFromPoints(Vector3F[] points)
         {
             obb = OrientedBoundingBox.FromPoints(points);
+            hasBox = true;
             Bounds = Bounds.FromBoundingBox(obb);
         }
 
+        /// <summary>
+        /// Grows the box to take in <paramref name="collider"/> of this entity or of one under it, as it stands here.
+        /// </summary>
         public override void Merge(Collider collider)
         {
-            var bounds = collider.Bounds;
-            var obb0 = (OrientedBoundingBox)bounds;
-            obb = OrientedBoundingBox.Merge(ref obb, ref obb0);
+            OrientedBoundingBox part = collider.Bounds;
+            var corners = part.Transform(PlacementOf(collider.Owner)).GetCorners();
+            obb = hasBox ? OrientedBoundingBox.Merge(ref obb, corners) : OrientedBoundingBox.FromPoints(corners);
+            hasBox = true;
             Bounds = Bounds.FromBoundingBox(obb);
+        }
+
+        public override IConvexShape GetWorldShape()
+        {
+            return obb.Transform(Owner.Transform.GetWorldMatrixF());
         }
 
         public override bool Intersects(ref Ray ray, out Vector3F point)

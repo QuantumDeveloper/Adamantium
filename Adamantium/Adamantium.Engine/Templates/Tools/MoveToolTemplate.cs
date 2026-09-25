@@ -54,7 +54,7 @@ public class MoveToolTemplate : BaseToolTemplate
          quarterPart,
          quarterPart,
          1,
-         Matrix4x4.Translation(axisLength - quarterPart, 0, axisLength - quarterPart));
+         Matrix4x4.Translation(quarterPart, 0, quarterPart));
 
       BuildSubEntity(root, "RightForwardManipulator", xzPlane, Colors.Orange, BoundingVolume.OrientedBox);
 
@@ -63,7 +63,7 @@ public class MoveToolTemplate : BaseToolTemplate
          quarterPart,
          quarterPart,
          1,
-         Matrix4x4.RotationX(MathHelper.DegreesToRadians(90)) * Matrix4x4.Translation(axisLength - quarterPart, axisLength - quarterPart, 0));
+         Matrix4x4.RotationX(MathHelper.DegreesToRadians(90)) * Matrix4x4.Translation(quarterPart, quarterPart, 0));
 
       BuildSubEntity(root, "RightUpManipulator", xyPlane, Colors.DarkOrchid, BoundingVolume.OrientedBox);
 
@@ -73,7 +73,7 @@ public class MoveToolTemplate : BaseToolTemplate
          quarterPart,
          quarterPart,
          1,
-         Matrix4x4.RotationQuaternion(rot) * Matrix4x4.Translation(0, axisLength - quarterPart, axisLength - quarterPart));
+         Matrix4x4.RotationQuaternion(rot) * Matrix4x4.Translation(0, quarterPart, quarterPart));
 
       BuildSubEntity(root, "UpForwardManipulator", zyPlane, Colors.CornflowerBlue, BoundingVolume.OrientedBox);
 
