@@ -1,15 +1,16 @@
-﻿using Adamantium.Core.Events;
+﻿using System;
+using Adamantium.Core.Events;
+using Adamantium.Game.Core;
 using Adamantium.Game.Core.Payloads;
 using Adamantium.Graphics;
 using Adamantium.Graphics.Core.Presentation;
 using Adamantium.Mathematics;
-using Adamantium.UI;
 using Adamantium.UI.Controls;
 using Adamantium.UI.Core;
 using Adamantium.UI.Core.RoutedEvents;
 using Rectangle = Adamantium.Mathematics.Rectangle;
 
-namespace Adamantium.Game.Core
+namespace Adamantium.UI.Universes
 {
     public class WindowUniverseOutput : UIUniverseOutput
     {
@@ -29,7 +30,7 @@ namespace Adamantium.Game.Core
 
         public override bool IsPointerOver => InputComponent.IsMouseOver;
 
-        internal override bool CanHandle(OutputContext gameContext)
+        protected override bool CanHandle(OutputContext gameContext)
         {
             return gameContext.Context is IWindow && window != null;
         }
@@ -66,7 +67,7 @@ namespace Adamantium.Game.Core
             window.Arrange(new Rect(window.DesiredSize));
         }
 
-        internal override void SwitchContext(OutputContext context)
+        protected override void SwitchContext(OutputContext context)
         {
             if (!CanHandle(context)) return;
             

@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Threading.Tasks;
+using Adamantium.Core.DependencyInjection;
 using Adamantium.Engine;
 using Adamantium.Engine.EntityServices;
 using Adamantium.Engine.Templates;
@@ -30,16 +31,18 @@ namespace Adamantium.UI.Sandbox
 
         public AdamantiumGame(
             bool enableDynamicRendering,
-            bool enableDebug) :
-            base(UniverseMode.Primary, enableDebug)
+            bool enableDebug,
+            IDependencyContainer container) :
+            base(UniverseMode.Primary, enableDebug, container)
         {
             EventAggregator.GetEvent<UniverseOutputCreatedEvent>().Subscribe(OnWindowCreated);
         }
 
         public AdamantiumGame(
             IGraphicsDeviceService graphicsDeviceService,
-            bool enableDebug) :
-            base(UniverseMode.Slave, enableDebug, graphicsDeviceService)
+            bool enableDebug,
+            IDependencyContainer container) :
+            base(UniverseMode.Slave, enableDebug, container, graphicsDeviceService)
         {
             EventAggregator.GetEvent<UniverseOutputCreatedEvent>().Subscribe(OnWindowCreated);
         }

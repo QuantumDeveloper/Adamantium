@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using Object = System.Object;
 
 namespace Adamantium.Game.Core
@@ -58,7 +59,7 @@ namespace Adamantium.Game.Core
 
        public override int GetHashCode()
        {
-           return Context.GetHashCode();
+           return RuntimeHelpers.GetHashCode(Context);
        }
    }
 }

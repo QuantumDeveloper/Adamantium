@@ -1,4 +1,6 @@
+using System;
 using Adamantium.Core.Events;
+using Adamantium.Game.Core;
 using Adamantium.Game.Core.Events;
 using Adamantium.Game.Core.Payloads;
 using Adamantium.Graphics;
@@ -9,7 +11,7 @@ using Adamantium.UI.Controls.Panels;
 using Adamantium.UI.Core.RoutedEvents;
 using Rectangle = Adamantium.Mathematics.Rectangle;
 
-namespace Adamantium.Game.Core;
+namespace Adamantium.UI.Universes;
 
 /// <summary>
 /// An output that presents into a <see cref="RenderTargetPanel"/>: the frame is copied into an exportable
@@ -118,7 +120,7 @@ public class RenderTargetUniverseOutput : UIUniverseOutput
         base.Dispose(disposeManagedResources);
     }
 
-    internal override void ReleaseDeviceResources()
+    protected override void ReleaseDeviceResources()
     {
         ReleaseSurface();
         base.ReleaseDeviceResources();
@@ -155,12 +157,12 @@ public class RenderTargetUniverseOutput : UIUniverseOutput
     /// </summary>
     public override object NativeWindow => nativeWindow;
 
-    internal override bool CanHandle(OutputContext gameContext)
+    protected override bool CanHandle(OutputContext gameContext)
     {
         return gameContext.Context is RenderTargetPanel && nativeWindow != null;
     }
 
-    internal override void SwitchContext(OutputContext context)
+    protected override void SwitchContext(OutputContext context)
     {
         if (!CanHandle(context)) return;
 

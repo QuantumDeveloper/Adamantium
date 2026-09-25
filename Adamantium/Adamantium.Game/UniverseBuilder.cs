@@ -1,30 +1,26 @@
+using System;
 using Adamantium.Core.DependencyInjection;
-using Adamantium.Game.Core;
 using Adamantium.Game.Core.Input;
 using Adamantium.Graphics;
 using Adamantium.Graphics.Core;
-using Adamantium.UI.Core;
-using Adamantium.UI.Platforms.MacOS;
-using Adamantium.UI.Platforms.Windows;
 
 namespace Adamantium.Game;
 
 public static class UniverseBuilder
 {
+    /// <summary>
+    /// Adds what the engine itself needs and the host has not registered. The surfaces and the windows are the host's.
+    /// </summary>
     public static void Build(IDependencyContainer container)
     {
-        container.RegisterSingleton<IGraphicsDeviceFactory, GraphicsDeviceFactory>();
-        container.RegisterSingleton<IOutputFactory, UIOutputFactory>();
-        container.RegisterSingleton<IWindowingPlatform, UIWindowingPlatform>();
-        switch (Configuration.Platform)
+        if (!container.IsRegistered<IGraphicsDeviceFactory>())
         {
-            case Platform.Windows:
-                WindowsPlatform.Initialize(container);
-                container.RegisterSingleton<IGamepadFactory, XBoxGamepadFactory>();
-                break;
-            case Platform.OSX:
-                MacOSPlatform.Initialize(container);
-                break;
+            container.RegisterSingleton<IGraphicsDeviceFactory, GraphicsDeviceFactory>();
+        }
+
+        if (OperatingSystem.IsWindows() && !container.IsRegistered<IGamepadFactory>())
+        {
+            container.RegisterSingleton<IGamepadFactory, XBoxGamepadFactory>();
         }
     }
 }

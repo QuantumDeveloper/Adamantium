@@ -1,4 +1,4 @@
-using Adamantium.Game;
+using Adamantium.UI.Universes;
 
 namespace Adamantium.UI.Designer.Host;
 

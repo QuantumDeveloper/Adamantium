@@ -1,4 +1,6 @@
-﻿using Adamantium.Core.Events;
+﻿using System.Collections.Generic;
+using Adamantium.Core.Events;
+using Adamantium.Game.Core;
 using Adamantium.Game.Core.Input;
 using Adamantium.Graphics.Core;
 using Adamantium.Imaging;
@@ -9,7 +11,7 @@ using Adamantium.UI.Core.Input;
 using GameMouseButtons = Adamantium.Game.Core.Input.MouseButton;
 
 
-namespace Adamantium.Game.Core
+namespace Adamantium.UI.Universes
 {
     public abstract class UIUniverseOutput : UniverseOutput
     {

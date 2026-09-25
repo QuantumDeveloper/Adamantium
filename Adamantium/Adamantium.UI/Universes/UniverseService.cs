@@ -9,7 +9,7 @@ using Adamantium.Graphics.Core;
 using Adamantium.UI.Core;
 using Adamantium.UI.EntityServices;
 
-namespace Adamantium.Game;
+namespace Adamantium.UI.Universes;
 
 public class UniverseService : IUniverseService
 {

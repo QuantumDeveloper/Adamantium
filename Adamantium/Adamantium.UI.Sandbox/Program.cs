@@ -2149,7 +2149,7 @@ public class Program
     {
         var service = Adamantium.UI.UIApplication.Current?.Container
             ?.Resolve<Adamantium.Graphics.Core.IGraphicsDeviceService>();
-        var main = (service as Adamantium.UI.Services.GraphicsDeviceService)?.MainGraphicsDevice;
+        var main = (service as Adamantium.Game.GraphicsDeviceService)?.MainGraphicsDevice;
         if (main == null) return "no device";
 
         return $"swapchainMaintenance {main.SupportsSwapchainMaintenance} | presentWait {main.SupportsPresentWait}"

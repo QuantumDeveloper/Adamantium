@@ -1,7 +1,7 @@
 using System.Reflection;
 using System.Text.RegularExpressions;
 using Adamantium.Core;
-using Adamantium.Game;
+using Adamantium.Game.Core;
 using Adamantium.Graphics.Core;
 using Adamantium.Mathematics;
 using Adamantium.UI.Controls.Adorners;
@@ -14,6 +14,7 @@ using Adamantium.UI.Core.Media.Animation;
 using Adamantium.UI.Extensions;
 using Adamantium.UI.EntityServices;
 using Adamantium.UI.Markup.AST;
+using Adamantium.UI.Universes;
 
 namespace Adamantium.UI.Designer.Host;
 
@@ -28,6 +29,7 @@ public sealed class DesignerSession : IDisposable
 {
     private readonly DesignerApplication _app;
     private readonly IGraphicsDevice _device;
+    private readonly IGraphicsDeviceService _deviceService;
     private readonly IUniverseService _gameService;
 
     // One render service for the whole designer session: ONE device (the shared _device) + one renderer/presenter,
@@ -74,9 +76,16 @@ public sealed class DesignerSession : IDisposable
         // Tell design-unsafe code (game-hosting behaviors etc.) it is running in the previewer, so it stays dormant.
         Design.IsDesignMode = true;
 
-        // Load every engine assembly so reflection type resolution can see all control types.
-        foreach (var dll in Directory.GetFiles(AppContext.BaseDirectory, "Adamantium*.dll"))
+        // Every engine assembly of the host's own closure, not every dll in its folder: a leftover of an older build
+        // would shadow the previewed project's fresh copy of the same assembly.
+        var trusted = ((string)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES"))?.Split(Path.PathSeparator) ?? [];
+        foreach (var dll in trusted)
         {
+            if (!Path.GetFileName(dll).StartsWith("Adamantium", StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
             try { Assembly.LoadFrom(dll); } catch { /* ignore unloadable */ }
         }
 
@@ -87,15 +96,17 @@ public sealed class DesignerSession : IDisposable
         // design-aware behavior can resolve IUniverseService and host a game in the preview (see DriveDesignTimeGames).
         _gameService = new UniverseService();
         _app.Container.RegisterInstance<IUniverseService>(_gameService);
+        _app.Container.RegisterSingleton<IOutputFactory, UIOutputFactory>();
+        _app.Container.RegisterSingleton<IWindowingPlatform, UIWindowingPlatform>();
 
         // Headless: nothing opens a window, so trigger device creation explicitly. Vulkan validation is OPT-IN via
         // ADAMANTIUM_DESIGNER_GRAPHICS_DEBUG=1: when on, the layers report the REAL cause behind a device-lost (bad
         // descriptor/resource/sync) into the host log + error badge. It is OFF by default because on the dev NVIDIA
         // driver the validation layer's interception of vkCreateShadersEXT (shader objects) DETERMINISTICALLY
         // access-violates, which would crash the host before any render - so forcing it on makes the designer useless.
-        var deviceService = _app.Container.Resolve<IGraphicsDeviceService>();
-        deviceService.IsInDebugMode = Environment.GetEnvironmentVariable("ADAMANTIUM_DESIGNER_GRAPHICS_DEBUG") == "1";
-        deviceService.CreateMainDevice("Designer");
+        _deviceService = _app.Container.Resolve<IGraphicsDeviceService>();
+        _deviceService.IsInDebugMode = Environment.GetEnvironmentVariable("ADAMANTIUM_DESIGNER_GRAPHICS_DEBUG") == "1";
+        _deviceService.CreateMainDevice("Designer");
 
         // Same as UIApplication.LoadThemes() (skipped because we never call Run()): without a theme the controls
         // have no templates/brushes and render nothing.
@@ -556,6 +567,8 @@ public sealed class DesignerSession : IDisposable
                 game.Submit();
             }
             _device.DeviceWaitIdle();
+            // The app's EndScene does this; without it the games' per-frame buffer pools never reset and fill the BAR.
+            _deviceService.RaiseFrameFinished();
             Thread.Sleep(8);   // let the async content-load tasks make progress between frames
         }
         _device.DeviceWaitIdle();

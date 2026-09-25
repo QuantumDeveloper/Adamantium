@@ -40,7 +40,7 @@ namespace Adamantium.Game.Core
 
         public GameWindowType Type => (GameWindowType)Description.PresenterType;
 
-        public OutputContext OutputContext { get; internal set; }
+        public OutputContext OutputContext { get; protected set; }
 
         public static OutputCursor DefaultCursor = OutputCursor.Arrow;
         
@@ -79,9 +79,9 @@ namespace Adamantium.Game.Core
         /// </summary>
         public abstract bool IsPointerOver { get; }
 
-        internal abstract bool CanHandle(OutputContext gameContext);
+        protected abstract bool CanHandle(OutputContext gameContext);
 
-        internal abstract void SwitchContext(OutputContext context);
+        protected internal abstract void SwitchContext(OutputContext context);
         
         private void GenerateWindowName()
         {
@@ -153,7 +153,7 @@ namespace Adamantium.Game.Core
         }
 
         // While the old device is still alive: the presenter goes with it, and the output is not drawn until it has a new one.
-        internal virtual void ReleaseDeviceResources()
+        protected internal virtual void ReleaseDeviceResources()
         {
             Presenter = null;
         }
@@ -259,12 +259,12 @@ namespace Adamantium.Game.Core
             SizeChanged?.Invoke(new UniverseOutputSizeChangedPayload(this, new Size(Width, Height)));
         }
 
-        internal void OnKeyInput(KeyboardInput args)
+        protected void OnKeyInput(KeyboardInput args)
         {
             Input?.OnKeyboardInput(args);
         }
 
-        internal void OnMouseInput(MouseInput args)
+        protected void OnMouseInput(MouseInput args)
         {
             Input?.OnMouseInput(args);
         }

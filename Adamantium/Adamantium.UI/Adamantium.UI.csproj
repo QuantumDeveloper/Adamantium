@@ -24,6 +24,7 @@
 
 	<ItemGroup>
 		<ProjectReference Include="..\Adamantium.ECS\Adamantium.ECS.csproj" />
+		<ProjectReference Include="..\Adamantium.Game\Adamantium.Game.csproj" />
 		<ProjectReference Include="..\Adamantium.ProceduralGeometry\Adamantium.ProceduralGeometry.csproj" />
 		<ProjectReference Include="..\Adamantium.MacOS\Adamantium.MacOS.csproj" />
 		<ProjectReference Include="..\Adamantium.UI.Controls\Adamantium.UI.Controls.csproj" />

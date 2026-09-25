@@ -4,7 +4,6 @@ using Adamantium.Game.Core;
 using Adamantium.Graphics;
 using Adamantium.Graphics.Core;
 using Adamantium.Mathematics;
-using Adamantium.UI;
 using Adamantium.UI.Controls;
 using Adamantium.UI.Controls.Adorners;
 using Adamantium.UI.Core;
@@ -13,7 +12,7 @@ using Adamantium.UI.Core.RoutedEvents;
 using Adamantium.UI.Events;
 using Adamantium.UI.Rendering;
 
-namespace Adamantium.Game;
+namespace Adamantium.UI.Universes;
 
 public class VirtualWindow : ContentControl, IVirtualWindow, IAdornerHost, IPopupHost
 {

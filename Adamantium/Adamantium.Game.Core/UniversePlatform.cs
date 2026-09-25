@@ -1,6 +1,5 @@
 ﻿using Adamantium.Core;
 using Adamantium.Core.Collections;
-using Adamantium.Core.Events;
 using Adamantium.Game.Core.Events;
 using Adamantium.Game.Core.Input;
 using Adamantium.Game.Core.Payloads;
@@ -18,7 +17,7 @@ namespace Adamantium.Game.Core
     {
         private List<UniverseOutput> windowsToAdd;
         private List<UniverseOutput> windowsToRemove;
-        private readonly IEventAggregator _eventAggregator;
+        private readonly IUniverseEventAggregator _eventAggregator;
         private readonly IOutputFactory outputFactory;
         private readonly IWindowingPlatform windowingPlatform;
         private Dictionary<OutputContext, UniverseOutput> contextToWindow;
@@ -65,7 +64,7 @@ namespace Adamantium.Game.Core
             Universe = universe;
             universe.Initialized += Initialized;
 
-            _eventAggregator = universe.Container.Resolve<IEventAggregator>();
+            _eventAggregator = universe.Satellites.Get<IUniverseEventAggregator>();
             outputFactory = universe.Container.Resolve<IOutputFactory>();
             windowingPlatform = universe.Container.Resolve<IWindowingPlatform>();
             gamepads = new GamepadHub(universe.Container.Resolve<IGamepadFactory>());
@@ -303,7 +302,7 @@ namespace Adamantium.Game.Core
 
         public UniverseOutput CreateOutput(uint width = 1280, uint height = 720)
         {
-            var wnd = windowingPlatform.CreateWindow(width, height);
+            var wnd = windowingPlatform.CreateWindow(width, height, _eventAggregator);
             windowsToAdd.Add(wnd);
             return wnd;
         }
@@ -318,7 +317,7 @@ namespace Adamantium.Game.Core
                 return null;
             }
 
-            var wnd = outputFactory.Create(context);
+            var wnd = outputFactory.Create(context, _eventAggregator);
             contextToWindow.Add(context, wnd);
             windowsToAdd.Add(wnd);
             return wnd;
@@ -345,7 +344,7 @@ namespace Adamantium.Game.Core
             var gameContext = new OutputContext(context);
             if (!contextToWindow.ContainsKey(gameContext))
             {
-                var wnd = outputFactory.Create(gameContext, surfaceFormat, depthFormat, msaaLevel);
+                var wnd = outputFactory.Create(gameContext, _eventAggregator, surfaceFormat, depthFormat, msaaLevel);
                 contextToWindow.Add(gameContext, wnd);
                 windowsToAdd.Add(wnd);
                 return wnd;

@@ -1,4 +1,4 @@
-namespace Adamantium.Game;
+namespace Adamantium.UI.Universes;
 
 public class VirtualWindowWorker
 {

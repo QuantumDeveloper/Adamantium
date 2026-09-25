@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Threading;
 using Adamantium.Core;
 using Adamantium.Core.DependencyInjection;
-using Adamantium.Core.Events;
 using Adamantium.Engine.Compiler.Models;
 using Adamantium.ECS;
 using Adamantium.ECS.Components;
@@ -15,7 +14,6 @@ using Adamantium.Graphics.Core.Content;
 using Adamantium.Graphics.Core.Models;
 using Adamantium.Imaging;
 using Adamantium.Mathematics;
-using Adamantium.UI.Services;
 using Serilog;
 
 namespace Adamantium.Game;
@@ -48,15 +46,18 @@ public class Universe : PropertyChangedBase, IUniverse
 
     private readonly Dictionary<Object, OutputContext> contextsMapping;
         
+    /// <summary>
+    /// <paramref name="container"/> is the process's: the host has registered its surfaces and windows there.
+    /// </summary>
     public Universe(
         UniverseMode mode,
-        bool enableDebug, 
-        IGraphicsDeviceService graphicsDeviceService = null, 
-        IDependencyContainer container = null)
+        bool enableDebug,
+        IDependencyContainer container,
+        IGraphicsDeviceService graphicsDeviceService = null)
     {
         Mode = mode;
 
-        Container = container ?? new AdamantiumDependencyContainer();
+        Container = container ?? throw new ArgumentNullException(nameof(container));
         UniverseBuilder.Build(Container);
             
         appTime = new AppTime();
@@ -78,7 +79,8 @@ public class Universe : PropertyChangedBase, IUniverse
         unloadContentCollector = new DisposeCollector();
         ShutDownMode = ShutDownMode.OnMainWindowClosed;
             
-        EventAggregator = Container.Resolve<IEventAggregator>();
+        EventAggregator = new UniverseEventAggregator();
+        Satellites.Add<IUniverseEventAggregator>(EventAggregator);
         EventAggregator.GetEvent<UniverseOutputRemovedEvent>().Subscribe(OnOutputRemoved);
         EventAggregator.GetEvent<UniverseOutputCreatedEvent>().Subscribe(OnOutputCreated);
         var factory = Container.Resolve<IGraphicsDeviceFactory>();
@@ -108,7 +110,7 @@ public class Universe : PropertyChangedBase, IUniverse
         gameLoopThread = new Thread(StartGameLoop);
     }
         
-    protected IEventAggregator EventAggregator { get; }
+    protected IUniverseEventAggregator EventAggregator { get; }
         
     public EntityWorld EntityWorld { get; }
 

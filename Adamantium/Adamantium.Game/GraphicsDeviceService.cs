@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using Adamantium.Core;
 using Adamantium.Graphics.Core;
 
-namespace Adamantium.UI.Services;
+namespace Adamantium.Game;
 
 public sealed class GraphicsDeviceService : PropertyChangedBase, IGraphicsDeviceService
 {

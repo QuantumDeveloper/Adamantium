@@ -1,6 +1,5 @@
 using System;
 using System.Linq;
-using Adamantium.Game;
 using Adamantium.Graphics.Core;
 using Adamantium.UI;
 using Adamantium.UI.Controls.Panels;
@@ -8,6 +7,7 @@ using Adamantium.UI.Core;
 using Adamantium.UI.Core.Behaviors;
 using Adamantium.UI.Core.RoutedEvents;
 using Adamantium.UI.EntityServices;
+using Adamantium.UI.Universes;
 
 namespace Adamantium.UI.Sandbox.Behaviors;
 
@@ -53,7 +53,7 @@ public class GameHostBehavior : Behavior<RenderTargetPanel>
 
             // No render service: the designer drives it directly.
             var game = gameService.CreateUniverse<AdamantiumGame>(
-                "AdamantiumGame", panel.RootVisual as IWindow, null, graphicsDeviceService, app.EnableGraphicsDebug);
+                "AdamantiumGame", panel.RootVisual as IWindow, null, graphicsDeviceService, app.EnableGraphicsDebug, app.Container);
             game.CreateOutputFromContext(panel);
             _gameAttached = true;
             _gameService = gameService;
@@ -105,7 +105,7 @@ public class GameHostBehavior : Behavior<RenderTargetPanel>
             .FirstOrDefault(x => x.Window == window);
 
         var game = gameService.CreateUniverse<AdamantiumGame>(
-            "AdamantiumGame", window, renderService, graphicsDeviceService, app.EnableGraphicsDebug);
+            "AdamantiumGame", window, renderService, graphicsDeviceService, app.EnableGraphicsDebug, app.Container);
         game.CreateOutputFromContext(panel);
         _gameAttached = true;
         _gameService = gameService;

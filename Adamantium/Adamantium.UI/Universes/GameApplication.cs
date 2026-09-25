@@ -2,9 +2,8 @@ using Adamantium.Core;
 using Adamantium.Core.DependencyInjection;
 using Adamantium.ECS;
 using Adamantium.Game.Core;
-using Adamantium.UI;
 
-namespace Adamantium.Game;
+namespace Adamantium.UI.Universes;
 
 public abstract class GameApplication : UIApplication
 {
@@ -43,6 +42,8 @@ public abstract class GameApplication : UIApplication
     {
         base.RegisterServices(containerRegistry);
         containerRegistry.RegisterSingleton<IUniverseService>(UniverseService);
+        containerRegistry.RegisterSingleton<IOutputFactory, UIOutputFactory>();
+        containerRegistry.RegisterSingleton<IWindowingPlatform, UIWindowingPlatform>();
     }
 
     protected override void OnBeforeEndScene()

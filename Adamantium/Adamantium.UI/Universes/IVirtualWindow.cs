@@ -3,7 +3,7 @@ using Adamantium.Game.Core;
 using Adamantium.UI.Controls;
 using Adamantium.UI.Core;
 
-namespace Adamantium.Game;
+namespace Adamantium.UI.Universes;
 
 public interface IVirtualWindow : IWindow
 {

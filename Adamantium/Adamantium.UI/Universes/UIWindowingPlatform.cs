@@ -1,29 +1,28 @@
-using Adamantium.Core.Events;
+using System.Threading;
+using Adamantium.Game.Core;
 using Adamantium.UI.Controls;
 using Adamantium.UI.Platforms;
 
-namespace Adamantium.Game.Core;
+namespace Adamantium.UI.Universes;
 
 /// <summary>
 /// The UI's windows and the UI's message loop.
 /// </summary>
 public class UIWindowingPlatform : IWindowingPlatform
 {
-    private readonly IEventAggregator eventAggregator;
     private readonly IApplicationPlatform applicationPlatform;
 
-    public UIWindowingPlatform(IEventAggregator eventAggregator, IApplicationPlatform applicationPlatform)
+    public UIWindowingPlatform(IApplicationPlatform applicationPlatform)
     {
-        this.eventAggregator = eventAggregator;
         this.applicationPlatform = applicationPlatform;
     }
 
-    public UniverseOutput CreateWindow(uint width, uint height)
+    public UniverseOutput CreateWindow(uint width, uint height, IUniverseEventAggregator events)
     {
         var window = new Window();
         window.Width = width;
         window.Height = height;
-        return new WindowUniverseOutput(eventAggregator, new OutputContext(window));
+        return new WindowUniverseOutput(events, new OutputContext(window));
     }
 
     public void Run(CancellationToken token)
