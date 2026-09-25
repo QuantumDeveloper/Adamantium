@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using Adamantium.Core;
 using Adamantium.ECS;
 using Adamantium.ECS.Components;
-using Adamantium.Game;
+using Adamantium.Multiverse;
 using Adamantium.Mathematics;
 using Serilog;
 
@@ -31,7 +31,7 @@ public class TransformService : EntityService
         universe = EntityWorld.Satellites.Get<IUniverse>();
     }
 
-    public override void Update(AppTime gameTime)
+    public override void Update(AppTime appTime)
     {
         var entities = Entities;
         try
@@ -39,7 +39,7 @@ public class TransformService : EntityService
             universe.CollectCurrentCameras(cameras);
             foreach (var entity in entities)
             {
-                Transform(entity, gameTime);
+                Transform(entity, appTime);
             }
         }
         catch (Exception ex)
@@ -48,7 +48,7 @@ public class TransformService : EntityService
         }
     }
         
-    private void Transform(Entity entity, AppTime gameTime)
+    private void Transform(Entity entity, AppTime appTime)
     {
         entity.TraverseInDepth(current =>
         {
@@ -102,8 +102,8 @@ public class TransformService : EntityService
                 }
             }
 
-            current.GetComponent<AnimationComponent>()?.Update(gameTime);
-            current.GetComponent<AnimationController>()?.Update(gameTime);
+            current.GetComponent<AnimationComponent>()?.Update(appTime);
+            current.GetComponent<AnimationController>()?.Update(appTime);
         });
     }
 }

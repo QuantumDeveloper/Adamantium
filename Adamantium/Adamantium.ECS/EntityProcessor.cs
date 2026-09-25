@@ -10,7 +10,7 @@ public abstract class EntityProcessor<T>: IEntityProcessor where T: class, IEnti
 
     public bool IsEnabled { get; set; } = true;
 
-    public virtual void Update(AppTime gameTime)
+    public virtual void Update(AppTime appTime)
     {
 
     }
@@ -20,7 +20,7 @@ public abstract class EntityProcessor<T>: IEntityProcessor where T: class, IEnti
 
     }
 
-    public virtual void Draw(AppTime gameTime)
+    public virtual void Draw(AppTime appTime)
     {
         
     }

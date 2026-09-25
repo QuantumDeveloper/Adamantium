@@ -1,6 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
-using Adamantium.Game;
+using Adamantium.Multiverse;
 using Adamantium.Graphics;
 using Adamantium.Graphics.Core;
 using Adamantium.Mathematics;
@@ -183,7 +183,7 @@ public class VirtualWindow : ContentControl, IVirtualWindow, IAdornerHost, IPopu
         get => GetValue<WindowState>(StateProperty);
         set => SetValue(StateProperty, value);
     }
-    // A virtual (in-game/designer) window has no OS frame, so custom chrome is moot here.
+    // A virtual (in-universe/designer) window has no OS frame, so custom chrome is moot here.
     public bool UseCustomChrome => false;
     public WindowResizeMode ResizeMode => WindowResizeMode.NoResize;
 

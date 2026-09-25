@@ -38,7 +38,7 @@ public class AdornerRenderProcessor : EntityProcessor<WindowRenderService>
     /// scope behind per stage per window - and every app-wide event walks them all.</summary>
     protected override void OnDetached() => RenderDirtyRouter.Forget(_scope);
 
-    public override void Update(AppTime gameTime) { }   // building moved to PreRender (after the fence wait) - see below
+    public override void Update(AppTime appTime) { }   // building moved to PreRender (after the fence wait) - see below
 
     // Build the overlay HERE, inside the beforeRenderPass hook, AFTER BeginDraw's fence wait - the GPU is done with this
     // frame slot, so (re)allocating this stage's GPU buffers can't race an in-flight submit. Building it in Update (BEFORE
@@ -159,7 +159,7 @@ public class AdornerRenderProcessor : EntityProcessor<WindowRenderService>
     /// was silently dropped. Measured: the ring was built, themed, sized and positioned correctly every frame and put
     /// not one pixel on the screen. The designer and the offscreen tests always passed a device, which is why the stage
     /// looked healthy everywhere except in a running application.</para></summary>
-    public override void Draw(AppTime gameTime)
+    public override void Draw(AppTime appTime)
     {
         if (_cache == null)
             return;

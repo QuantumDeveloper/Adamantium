@@ -37,7 +37,7 @@ public class PopupRenderProcessor : EntityProcessor<WindowRenderService>
     /// scope behind per stage per window - and every app-wide event walks them all.</summary>
     protected override void OnDetached() => RenderDirtyRouter.Forget(_scope);
 
-    public override void Update(AppTime gameTime) { }   // building moved to PreRender (after the fence wait) - see below
+    public override void Update(AppTime appTime) { }   // building moved to PreRender (after the fence wait) - see below
 
     // Build + prepare the overlay HERE, inside the beforeRenderPass hook, AFTER BeginDraw's fence wait - the GPU is done
     // with this frame slot, so (re)allocating this stage's GPU buffers + text render targets can't race an in-flight
@@ -90,7 +90,7 @@ public class PopupRenderProcessor : EntityProcessor<WindowRenderService>
     // now drawn as an SDF-batched pen instead of a separate ring), per-unit ClipToBounds scissor, and the off-clip cull.
     // The old device-less Render() skipped ALL of that, so a batchable popup rect fell to the fill-only per-unit path and
     // its border vanished (and flickered as it batched in some frames but not others).
-    public override void Draw(AppTime gameTime)
+    public override void Draw(AppTime appTime)
     {
         if (_cache == null) return;
         var window = AssociatedService.Window;

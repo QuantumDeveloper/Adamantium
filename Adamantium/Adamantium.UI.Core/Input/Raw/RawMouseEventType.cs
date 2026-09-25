@@ -32,7 +32,7 @@ public enum RawMouseEventType : uint
 
    MouseWheel,
 
-   /// <summary>Relative motion for a game's mouse-look: an unbounded delta instead of a position, produced while the
+   /// <summary>Relative motion for a universe's mouse-look: an unbounded delta instead of a position, produced while the
    /// cursor is hidden and held centred (see <c>IWindowWorkerService.SetRelativeMouseMode</c>).</summary>
    RawMouseMove,
    RawLeftButtonDown,

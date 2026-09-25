@@ -1,15 +1,15 @@
 ﻿using System;
 using System.Collections.Generic;
 using Adamantium.Core.Events;
-using Adamantium.Game;
-using Adamantium.Game.Input;
+using Adamantium.Multiverse;
+using Adamantium.Multiverse.Input;
 using Adamantium.Graphics.Core;
 using Adamantium.Imaging;
 using Adamantium.Mathematics;
 using Adamantium.UI.Controls;
 using Adamantium.UI.Core;
 using Adamantium.UI.Core.Input;
-using GameMouseButtons = Adamantium.Game.Input.MouseButton;
+using UniverseMouseButton = Adamantium.Multiverse.Input.MouseButton;
 
 
 namespace Adamantium.UI.Universes
@@ -21,7 +21,7 @@ namespace Adamantium.UI.Universes
         
         public override UniverseOutputDescription Description { get; protected set; }
 
-        /// <summary>The component the game's surface IS - a window, or the panel it is hosted in. Public because a
+        /// <summary>The component the universe's surface IS - a window, or the panel it is hosted in. Public because a
         /// cursor position only means something relative to it.</summary>
         public IInputComponent InputComponent { get; protected set; }
 
@@ -50,7 +50,7 @@ namespace Adamantium.UI.Universes
         }
 
         // The same relative mode the surface's own mouse-look engages: it enters and leaves on the window's own thread
-        // (the worker posts itself a message), which is what makes it safe to ask for from the game loop.
+        // (the worker posts itself a message), which is what makes it safe to ask for from the universe loop.
         public override void HoldPointer(bool hold, Vector2F origin)
         {
             if (InputComponent?.RootVisual is not WindowBase root) return;
@@ -63,7 +63,7 @@ namespace Adamantium.UI.Universes
         private PixelPoint heldFrom;
 
         protected static readonly Dictionary<Key, Keys> TranslationKeys;
-        protected static readonly Dictionary<MouseButtons, GameMouseButtons> MouseTranslationKeys;
+        protected static readonly Dictionary<MouseButtons, UniverseMouseButton> MouseTranslationKeys;
 
         static UIUniverseOutput()
         {

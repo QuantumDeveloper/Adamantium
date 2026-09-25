@@ -373,7 +373,7 @@ public class ImageRenderComponent : UIRenderComponent
         base.Render();
     }
 
-    // A live shared surface (game->panel) is imported per generation and sampled by THIS component alone, so the
+    // A live shared surface (universe->panel) is imported per generation and sampled by THIS component alone, so the
     // component owns its GPU lifetime and frees it here. This is fence-gated: the component reaches Dispose only through
     // the render device's deferred-dispose queue - either a rebuild onto the producer's NEXT surface defers the old
     // component, or a detach removes the unit - i.e. after the frame that sampled it has retired, so the render thread

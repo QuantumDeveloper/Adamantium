@@ -1,7 +1,7 @@
 using System.Reflection;
 using System.Text.RegularExpressions;
 using Adamantium.Core;
-using Adamantium.Game;
+using Adamantium.Multiverse;
 using Adamantium.Graphics.Core;
 using Adamantium.Mathematics;
 using Adamantium.UI.Controls.Adorners;
@@ -30,7 +30,7 @@ public sealed class DesignerSession : IDisposable
     private readonly DesignerApplication _app;
     private readonly IGraphicsDevice _device;
     private readonly IGraphicsDeviceService _deviceService;
-    private readonly IUniverseService _gameService;
+    private readonly IUniverseService _universeService;
 
     // One render service for the whole designer session: ONE device (the shared _device) + one renderer/presenter,
     // re-pointed/resized per previewed window (WindowRenderService.RenderHeadlessFrame). It drives the content
@@ -73,7 +73,7 @@ public sealed class DesignerSession : IDisposable
 
     public DesignerSession()
     {
-        // Tell design-unsafe code (game-hosting behaviors etc.) it is running in the previewer, so it stays dormant.
+        // Tell design-unsafe code (universe-hosting behaviors etc.) it is running in the previewer, so it stays dormant.
         Design.IsDesignMode = true;
 
         // Every engine assembly of the host's own closure, not every dll in its folder: a leftover of an older build
@@ -91,11 +91,11 @@ public sealed class DesignerSession : IDisposable
 
         _app = new DesignerApplication();
 
-        // The engine's game services are normally registered by GameApplication.RegisterServices, which only runs
-        // via Run()/Initialize() - which the headless designer skips. Register the game service explicitly so a
-        // design-aware behavior can resolve IUniverseService and host a game in the preview (see DriveDesignTimeGames).
-        _gameService = new UniverseService();
-        _app.Container.RegisterInstance<IUniverseService>(_gameService);
+        // The engine's universe services are normally registered by MultiverseApplication.RegisterServices, which only runs
+        // via Run()/Initialize() - which the headless designer skips. Register the universe service explicitly so a
+        // design-aware behavior can resolve IUniverseService and host a universe in the preview (see DriveDesignTimeUniverses).
+        _universeService = new UniverseService();
+        _app.Container.RegisterInstance<IUniverseService>(_universeService);
         _app.Container.RegisterSingleton<IOutputFactory, UIOutputFactory>();
         _app.Container.RegisterSingleton<IWindowingPlatform, UIWindowingPlatform>();
 
@@ -258,15 +258,15 @@ public sealed class DesignerSession : IDisposable
         return (designWidth, designHeight);
     }
 
-    // The shared rendering tail: drives any design-time game, picks the render scale/target, renders the current frame
+    // The shared rendering tail: drives any design-time universe, picks the render scale/target, renders the current frame
     // and remembers the live session so the streaming "frame" op can advance it. Used by both the full build and the
     // hot-reload reconcile path.
     private RenderResult RenderTail(IWindow window, double designWidth, double designHeight, double scale, string outPath, bool live, List<string> diagnostics, bool resetCache)
     {
-        // Design-time game preview: a design-aware behavior (e.g. GameHostBehavior) created+bound a game to its
-        // RenderTargetPanel while the tree was built. Drive a short snapshot so the game loads content and publishes a
-        // frame to the panel; the content render path composites that below. No-op when no game is hosted.
-        DriveDesignTimeGames();
+        // Design-time universe preview: a design-aware behavior (e.g. DemoUniverseBehavior) created+bound a universe to
+        // its RenderTargetPanel while the tree was built. Drive a short snapshot so the universe loads content and
+        // publishes a frame to the panel; the content render path composites that below. No-op when none is hosted.
+        DriveDesignTimeUniverses();
 
         if (scale <= 0) scale = 1.0;
         var maxScale = Math.Max(1.0, Math.Min(_maxRenderDimension / designWidth, _maxRenderDimension / designHeight));
@@ -538,36 +538,36 @@ public sealed class DesignerSession : IDisposable
         return fallback;
     }
 
-    // Wall-clock budget for the design-time game snapshot: enough for the game to parse+load its model content
+    // Wall-clock budget for the design-time universe snapshot: enough for the universe to parse+load its model content
     // (async) and publish a stable frame. A one-shot preview, so a few seconds is acceptable.
-    private const double GameSnapshotSeconds = 15.0;
+    private const double UniverseSnapshotSeconds = 15.0;
 
     /// <summary>
-    /// Drives every game hosted in the markup (a design-aware behavior created it bound to a RenderTargetPanel) for a
-    /// short snapshot: each iteration runs one game frame and waits the device idle, with a tiny sleep so the game's
+    /// Drives every universe hosted in the markup (a design-aware behavior created it bound to a RenderTargetPanel) for
+    /// a short snapshot: each iteration runs one frame of it and waits the device idle, with a tiny sleep so its
     /// async content load completes. RunOnce publishes the frame to the panel (CopyOutput), so the panel samples it
-    /// when the content render path composites below. No-op when the markup hosts no game.
+    /// when the content render path composites below. No-op when the markup hosts no universe.
     /// </summary>
-    private void DriveDesignTimeGames()
+    private void DriveDesignTimeUniverses()
     {
-        var games = _gameService.Universes;
-        if (games.Count == 0) return;
+        var universes = _universeService.Universes;
+        if (universes.Count == 0) return;
 
         var total = TimeSpan.Zero;
         const double dt = 1.0 / 60.0;
-        var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(GameSnapshotSeconds);
+        var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(UniverseSnapshotSeconds);
         ulong frame = 0;
         while (DateTime.UtcNow < deadline)
         {
             total += TimeSpan.FromSeconds(dt);
             var time = new AppTime { FramesCount = ++frame, FrameTime = dt, TotalTime = total };
-            foreach (var game in games)
+            foreach (var universe in universes)
             {
-                game.RunOnce(time);
-                game.Submit();
+                universe.RunOnce(time);
+                universe.Submit();
             }
             _device.DeviceWaitIdle();
-            // The app's EndScene does this; without it the games' per-frame buffer pools never reset and fill the BAR.
+            // The app's EndScene does this; without it the universes' per-frame buffer pools never reset and fill the BAR.
             _deviceService.RaiseFrameFinished();
             Thread.Sleep(8);   // let the async content-load tasks make progress between frames
         }

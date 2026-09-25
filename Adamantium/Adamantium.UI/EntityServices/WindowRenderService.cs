@@ -109,10 +109,10 @@ public class WindowRenderService : UiRenderService
     public override bool IsUpdateService => true;
     public override EntityServiceType ServiceType => EntityServiceType.Update | EntityServiceType.Render;
 
-    public override void Update(AppTime gameTime)
+    public override void Update(AppTime appTime)
     {
-        Window.Update(_themeManager, gameTime);
-        base.Update(gameTime);
+        Window.Update(_themeManager, appTime);
+        base.Update(appTime);
     }
 
     private bool _recordedAtLoopLevel;
@@ -184,16 +184,16 @@ public class WindowRenderService : UiRenderService
         }
     }
 
-    public override void Draw(AppTime gameTime)
+    public override void Draw(AppTime appTime)
     {
         if (Window.State == WindowState.Minimized)
         {
             pauseEvent.WaitOne();
         }
 
-        windowRenderer?.Render(gameTime);
+        windowRenderer?.Render(appTime);
         var t0 = Stopwatch.GetTimestamp();
-        DrawProcessors(gameTime);
+        DrawProcessors(appTime);
         RuntimeStats.LastProcessorsMs = Stopwatch.GetElapsedTime(t0).TotalMilliseconds;
     }
 

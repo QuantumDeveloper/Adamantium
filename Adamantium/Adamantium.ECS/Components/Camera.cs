@@ -232,11 +232,11 @@ namespace Adamantium.ECS.Components
             SetFreeCamera();
         }
 
-        private void ContiniousRotation(AppTime gameTime)
+        private void ContiniousRotation(AppTime appTime)
         {
             if (!rotationDone)
             {
-                rotationDuration += gameTime.FrameTime * 1000;
+                rotationDuration += appTime.FrameTime * 1000;
                 var weight = (float) rotationDuration / rotationTime;
                 Rotation = QuaternionF.Lerp(startingRotation, rotationToSync, weight);
                 if (rotationDuration >= rotationTime)
@@ -273,11 +273,11 @@ namespace Adamantium.ECS.Components
             Type = CameraType.Free;
         }
 
-        private void MoveToPoint(AppTime gameTime)
+        private void MoveToPoint(AppTime appTime)
         {
             if (!moveToObjectDone)
             {
-                moveToDuration += gameTime.FrameTime * 1000;
+                moveToDuration += appTime.FrameTime * 1000;
                 var weight = (float)moveToDuration / moveTime;
                 Owner.Transform.Position = Vector3.Lerp(startingOffset, endingPosition, weight);
                 if (moveToDuration >= moveTime)
@@ -290,7 +290,7 @@ namespace Adamantium.ECS.Components
             }
         }
 
-        public override void Update(AppTime gameTime)
+        public override void Update(AppTime appTime)
         {
             // Rotation is a STRUCT behind a property: Rotation.Normalize() normalised a copy and dropped it, so the
             // quaternion drifted from unit length as mouse-look multiplied into it - and a non-unit quaternion scales
@@ -299,11 +299,11 @@ namespace Adamantium.ECS.Components
             rotation.Normalize();
             Rotation = rotation;
 
-            MoveToPoint(gameTime);
+            MoveToPoint(appTime);
 
             // Whatever the camera type is. It used to tick only inside the Special branch, so the orientation gizmo
             // armed a turn the free camera never performed - the click registered and nothing moved.
-            ContiniousRotation(gameTime);
+            ContiniousRotation(appTime);
             if (Type == CameraType.Free)
             {
                 ViewMatrix = Matrix4x4F.RotationQuaternion(Rotation);

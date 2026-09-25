@@ -6,7 +6,7 @@ using Adamantium.ECS.Components;
 using Adamantium.ECS.Components.Extensions;
 using Adamantium.Engine.EntityServices;
 using Adamantium.Engine.Templates.Tools;
-using Adamantium.Game.Input;
+using Adamantium.Multiverse.Input;
 using Adamantium.Mathematics;
 
 namespace Adamantium.Engine.Tools;
@@ -50,7 +50,7 @@ public class OrientationCube : EditorProcessor
         stepDown = cube.Get("StepDownManipulator");
     }
 
-    public override void Update(AppTime gameTime)
+    public override void Update(AppTime appTime)
     {
         var observatory = Tools.Observatory;
         var cameras = observatory.CurrentCameras;

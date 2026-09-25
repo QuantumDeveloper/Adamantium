@@ -85,7 +85,7 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Adamantium.Engine", "Adaman
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Adamantium.XInput", "Adamantium.XInput\Adamantium.XInput.csproj", "{26227314-3116-4270-BB44-960001B8983B}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Adamantium.Game", "Adamantium.Game\Adamantium.Game.csproj", "{85FBD26B-982D-4ABA-A4FC-3E5C5CBAA703}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Adamantium.Multiverse", "Adamantium.Multiverse\Adamantium.Multiverse.csproj", "{85FBD26B-982D-4ABA-A4FC-3E5C5CBAA703}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

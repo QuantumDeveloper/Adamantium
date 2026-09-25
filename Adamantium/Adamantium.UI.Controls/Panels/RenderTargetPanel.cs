@@ -24,9 +24,9 @@ public class RenderTargetPanel : Grid
    {
       UseLayoutRoundingProperty.OverrideMetadata(typeof(RenderTargetPanel),
          new PropertyMetadata(true, PropertyMetadataOptions.AffectsMeasure));
-      // Unlike a plain panel, this one IS an interactive surface: the hosted game is activated and fed input ONLY while
+      // Unlike a plain panel, this one IS an interactive surface: the hosted universe is activated and fed input ONLY while
       // the panel holds focus (RenderTargetUniverseOutput keys IsActive/Got|LostFocus off it). So opt back IN to focus,
-      // since Panel's default is now false. A click on the panel then focuses it and the game starts receiving input.
+      // since Panel's default is now false. A click on the panel then focuses it and the universe starts receiving input.
       FocusableProperty.OverrideMetadata(typeof(RenderTargetPanel), new PropertyMetadata(true));
    }
 
@@ -36,7 +36,7 @@ public class RenderTargetPanel : Grid
    public static readonly AdamantiumProperty MouseLookModeProperty = AdamantiumProperty.Register(nameof(MouseLookMode),
       typeof(MouseLookMode), typeof(RenderTargetPanel), new PropertyMetadata(MouseLookMode.None));
 
-   /// <summary>How the panel feeds the hosted game a relative mouse delta for mouse-look (see <see cref="MouseLookMode"/>).
+   /// <summary>How the panel feeds the hosted universe a relative mouse delta for mouse-look (see <see cref="MouseLookMode"/>).
    /// Default <see cref="MouseLookMode.None"/> - the cursor stays a normal pointer.</summary>
    public MouseLookMode MouseLookMode
    {
@@ -49,7 +49,7 @@ public class RenderTargetPanel : Grid
       new PropertyMetadata(true, OnIsMouseLookEnabledChanged));
 
    /// <summary>Gates mouse-look ON/OFF without changing the <see cref="MouseLookMode"/>. Bind it to app state (e.g. an
-   /// open in-game menu) so a click on the panel does NOT hide the cursor while the menu is up; setting it false while
+   /// open overlay menu) so a click on the panel does NOT hide the cursor while the menu is up; setting it false while
    /// looking immediately restores the cursor. Default <c>true</c>.</summary>
    public bool IsMouseLookEnabled
    {
@@ -103,10 +103,10 @@ public class RenderTargetPanel : Grid
 
    /// <summary>
    /// Marks the panel for re-record after a source swap, DEFERRED to the START of the next loop frame. The producer (the
-   /// game loop) binds the surface during the loop's DRAW phase - AFTER this frame's UI record - so an INLINE
+   /// universe loop) binds the surface during the loop's DRAW phase - AFTER this frame's UI record - so an INLINE
    /// <see cref="UIComponent.InvalidateRender"/> marks geometry too late: the frame's <c>RenderDirty.Clear</c> wipes the
    /// mark before any record snapshots it, and the surface is bound ONCE (no per-frame retry), so the panel would stay on
-   /// its placeholder and never draw the game. Neither dispatcher facade fits: <c>Dispatcher.Post</c> runs INLINE when
+   /// its placeholder and never draw the universe. Neither dispatcher facade fits: <c>Dispatcher.Post</c> runs INLINE when
    /// already on the loop thread (same bad timing), and <c>Dispatcher.Invoke</c> runs on the message-pump thread, which
    /// races the loop's record→clear and loses the mark. <see cref="LoopSignal.Post"/> ALWAYS queues onto the loop thread's
    /// pre-record drain (<c>DrainPending</c>, start of Update), so the mark is set before that frame's record and cannot be

@@ -1007,7 +1007,7 @@ public class ImageRenderUnit : RenderUnit<ImagePayload>
     }
 
     // BitmapSource (not just BitmapImage) so SharedSurfaceImage / RenderTargetImage also render. A live shared
-    // surface (game→panel) is sampled directly and synchronised via its Produce/Consume timeline (see
+    // surface (universe→panel) is sampled directly and synchronised via its Produce/Consume timeline (see
     // ImageRenderComponent.SharedSource/PreRender); a regular bitmap is sampled directly.
     private ImageRenderComponent CreateImageRenderer(Adamantium.Graphics.Core.Models.Mesh mesh, BitmapSource image)
     {
@@ -1029,7 +1029,7 @@ public class ImageRenderUnit : RenderUnit<ImagePayload>
             Sampler = GraphicsDevice.SamplerStates.LinearClampToEdge,
             FrameLayer = layer
         };
-        // A live shared surface (game→panel): sample it directly, and drive the producer/consumer timeline so the
+        // A live shared surface (universe→panel): sample it directly, and drive the producer/consumer timeline so the
         // sample never races the producer's write (see ImageRenderComponent.PreRender). Composited with the default
         // AlphaBlend so the panel's Opacity controls translucency; the producer now publishes an opaque frame
         // (alpha=1, see RenderingService.BeginDraw) so at Opacity=1 it is fully solid.

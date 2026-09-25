@@ -1,7 +1,7 @@
 ﻿using System;
 using Adamantium.Core.Events;
-using Adamantium.Game;
-using Adamantium.Game.Payloads;
+using Adamantium.Multiverse;
+using Adamantium.Multiverse.Payloads;
 using Adamantium.Graphics;
 using Adamantium.Graphics.Core.Presentation;
 using Adamantium.Mathematics;
@@ -21,18 +21,18 @@ namespace Adamantium.UI.Universes
             Initialize(new OutputContext(window));
         }
 
-        public WindowUniverseOutput(IEventAggregator eventAggregator, OutputContext gameContext) : base(eventAggregator)
+        public WindowUniverseOutput(IEventAggregator eventAggregator, OutputContext context) : base(eventAggregator)
         {
-            Initialize(gameContext);
+            Initialize(context);
         }
 
         public override bool IsKeyboardFocused => window.IsActive;
 
         public override bool IsPointerOver => InputComponent.IsMouseOver;
 
-        protected override bool CanHandle(OutputContext gameContext)
+        protected override bool CanHandle(OutputContext context)
         {
-            return gameContext.Context is IWindow && window != null;
+            return context.Context is IWindow && window != null;
         }
 
         protected override void InitializeInternal(OutputContext context)

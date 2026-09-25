@@ -3,7 +3,7 @@ using Adamantium.Core;
 using Adamantium.ECS;
 using Adamantium.ECS.Components.Extensions;
 using Adamantium.Engine.EntityServices;
-using Adamantium.Game.Input;
+using Adamantium.Multiverse.Input;
 
 namespace Adamantium.Engine.Tools;
 
@@ -29,7 +29,7 @@ public abstract class ToolProcessor : EditorProcessor
     /// <summary>How close to a line of a handle the pointer has to be to take it, in points: pixels at 100% scale.</summary>
     public float PickAperture { get; set; } = 6;
 
-    public override void Update(AppTime gameTime)
+    public override void Update(AppTime appTime)
     {
         var target = Tools.Selection.Current;
         CollectActive(target);

@@ -36,22 +36,22 @@ public class ForwardRenderingProcessor : RenderingProcessor
     private BasicEffect BasicEffect { get; set; }
     private MeshGeometryCache _geometryCache;
 
-    public override void Draw(AppTime gameTime)
+    public override void Draw(AppTime appTime)
     {
         ActiveCamera = Window.Camera;
         if (ActiveCamera == null) return;
 
         foreach (var entity in Entities)
         {
-            OnDraw(entity, gameTime);
+            OnDraw(entity, appTime);
         }
     }
 
-    private void OnDraw(Entity entity, AppTime gameTime)
+    private void OnDraw(Entity entity, AppTime appTime)
     {
         try
         {
-            entity.TraverseInDepth(current => DrawEntity(current, gameTime));
+            entity.TraverseInDepth(current => DrawEntity(current, appTime));
         }
         catch (Exception exception)
         {
@@ -59,7 +59,7 @@ public class ForwardRenderingProcessor : RenderingProcessor
         }
     }
 
-    private void DrawEntity(Entity entity, AppTime gameTime)
+    private void DrawEntity(Entity entity, AppTime appTime)
     {
         if (!entity.Visible)
         {

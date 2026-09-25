@@ -1,6 +1,6 @@
 using System;
 using Adamantium.Core.Events;
-using Adamantium.Game;
+using Adamantium.Multiverse;
 using Adamantium.Graphics;
 using Adamantium.Graphics.Core;
 using Adamantium.Graphics.Core.Presentation;
@@ -167,9 +167,9 @@ public class RenderTargetUniverseOutput : UIUniverseOutput
     /// </summary>
     public override object NativeWindow => nativeWindow;
 
-    protected override bool CanHandle(OutputContext gameContext)
+    protected override bool CanHandle(OutputContext context)
     {
-        return gameContext.Context is RenderTargetPanel && nativeWindow != null;
+        return context.Context is RenderTargetPanel && nativeWindow != null;
     }
 
     protected override void SwitchContext(OutputContext context)

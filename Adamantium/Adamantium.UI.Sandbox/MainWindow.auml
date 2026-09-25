@@ -24,7 +24,7 @@
          is just the window CONTENT - hosted below the caption by the template's ContentPresenter. -->
     <Grid>
         <!-- The control gallery: data-driven tabs, one View + view-model per tab (see GalleryView / GalleryViewModel).
-             The old inline demos (shapes, images, the game panel) now live in their respective tabs. -->
+             The old inline demos (shapes, images, the universe panel) now live in their respective tabs. -->
         <views:GalleryView/>
 
         <!-- Shows which title-bar command last ran, so the caption commands visibly do distinct things. -->

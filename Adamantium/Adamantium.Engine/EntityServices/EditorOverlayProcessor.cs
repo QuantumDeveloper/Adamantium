@@ -69,7 +69,7 @@ public class EditorOverlayProcessor : RenderingProcessor
         base.OnDetached();
     }
 
-    public override void Draw(AppTime gameTime)
+    public override void Draw(AppTime appTime)
     {
         ActiveCamera = Window.Camera;
         if (ActiveCamera == null)

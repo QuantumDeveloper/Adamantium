@@ -19,7 +19,7 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Adamantium.Core", "Adamanti
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Adamantium.Graphics", "Adamantium.Graphics\Adamantium.Graphics.csproj", "{FC037CF8-2D12-4B69-9AE7-082FFA4EFF92}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Adamantium.Game", "Adamantium.Game\Adamantium.Game.csproj", "{A02907D8-8A1C-4D77-A397-C57CB4323021}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Adamantium.Multiverse", "Adamantium.Multiverse\Adamantium.Multiverse.csproj", "{A02907D8-8A1C-4D77-A397-C57CB4323021}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Adamantium.Engine", "Adamantium.Engine\Adamantium.Engine.csproj", "{2703C5BE-1D98-4111-A195-C465BF176357}"
 EndProject

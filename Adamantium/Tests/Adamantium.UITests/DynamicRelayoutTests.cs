@@ -39,7 +39,7 @@ public class DynamicRelayoutTests
         try
         {
             var root = new TestWindowRoot { Name = "root", Width = 1280, Height = 720, ClientWidth = 1280, ClientHeight = 720 };
-            var panel = new Grid { Name = "panel" };                       // the "render target panel" / game host
+            var panel = new Grid { Name = "panel" };                       // the "render target panel" / universe host
             var image = new Border { Name = "image", Width = 200, Height = 200, HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Top };
             var button = new Border { Name = "button", Width = 150, Height = 150, HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Bottom };
             panel.Children.Add(image);
@@ -65,7 +65,7 @@ public class DynamicRelayoutTests
             Assert.Multiple(() =>
             {
                 Assert.That(image.Bounds, Is.EqualTo(imageBounds1), "image moved/resized when the unrelated sibling button was resized");
-                Assert.That(panel.Bounds, Is.EqualTo(panelBounds1), "panel (game host) moved/resized when its child button was resized");
+                Assert.That(panel.Bounds, Is.EqualTo(panelBounds1), "panel (universe host) moved/resized when its child button was resized");
             });
         }
         finally

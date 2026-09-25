@@ -134,16 +134,16 @@ namespace Adamantium.ECS
             }
         }
 
-        public void Update(AppTime gameTime)
+        public void Update(AppTime appTime)
         {
             foreach (var handler in _snapshot)
             {
-                handler.Update(gameTime);
+                handler.Update(appTime);
             }
         }
 
         /// <summary>Draws every rendering service that agrees to draw this frame. True when at least one did.</summary>
-        public bool Draw(AppTime gameTime)
+        public bool Draw(AppTime appTime)
         {
             var drew = false;
             foreach (var service in _snapshot)
@@ -153,10 +153,10 @@ namespace Adamantium.ECS
                 if (!service.BeginDraw()) continue;
 
                 drew = true;
-                OnDrawStarted?.Invoke(service, gameTime);
-                service.Draw(gameTime);
+                OnDrawStarted?.Invoke(service, appTime);
+                service.Draw(appTime);
                 service.EndDraw();
-                OnDrawFinished?.Invoke(service, gameTime);
+                OnDrawFinished?.Invoke(service, appTime);
                 service.Submit();
             }
 

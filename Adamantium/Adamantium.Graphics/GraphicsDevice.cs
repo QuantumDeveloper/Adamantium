@@ -190,7 +190,7 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
         // wrapper (they share one VkDevice). Just reference it — no per-device allocation.
         DescriptorHeapManager = mainDevice.DescriptorHeapManager;
 
-        // The per-frame constant-buffer arena stays per render device: devices render concurrently (parallel games)
+        // The per-frame constant-buffer arena stays per render device: devices render concurrently (parallel universes)
         // and cycle frames independently, so this can't be shared.
         _dynamicBufferPools = new EffectPass.DynamicBufferPool[MaxFramesInFlight];
         for (int i = 0; i < MaxFramesInFlight; i++)

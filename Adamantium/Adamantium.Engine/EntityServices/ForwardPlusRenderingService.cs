@@ -1,7 +1,7 @@
 ﻿using Adamantium.Core;
 using Adamantium.ECS;
 using Adamantium.ECS.Components;
-using Adamantium.Game;
+using Adamantium.Multiverse;
 
 //using Texture2D = Adamantium.Graphics.Texture2D;
 
@@ -179,9 +179,9 @@ public class ForwardPlusRenderingService : RenderingService
 //            base.EndDraw();
     }
 
-    public override void Draw(AppTime gameTime)
+    public override void Draw(AppTime appTime)
     {
-        base.Draw(gameTime);
+        base.Draw(appTime);
         if (ActiveCamera == null)
         {
             return;
@@ -242,7 +242,7 @@ public class ForwardPlusRenderingService : RenderingService
 //            DrawCameraIcons();
 //            DrawAdditionalStuff();
 //
-//            Text = "FPS: " + gameTime.FpsCount + "\n";
+//            Text = "FPS: " + appTime.FpsCount + "\n";
     }
 
     private bool _showDebug = true;
@@ -362,7 +362,7 @@ public class ForwardPlusRenderingService : RenderingService
 //                //_lighting.Parameters["InvLightRadiusSqr"].SetValue(light.Radius);
 //
 //                _lighting.CurrentTechnique.Passes[0].Apply();
-//                LightService.DrawPointLightMesh(GraphicsDevice, GameTime);
+//                LightService.DrawPointLightMesh(GraphicsDevice, AppTime);
 //            }
 //
 //            _lighting.CurrentTechnique = _lighting.Techniques[2];
@@ -417,7 +417,7 @@ public class ForwardPlusRenderingService : RenderingService
 //                _lighting.Parameters["InvLightRadiusSqr"].SetValue(light.Range);
 //
 //                _lighting.CurrentTechnique.Passes[0].Apply();
-//                LightService.DrawSpotLightMesh(GraphicsDevice, GameTime);
+//                LightService.DrawSpotLightMesh(GraphicsDevice, AppTime);
 //            }
     }
 
@@ -446,7 +446,7 @@ public class ForwardPlusRenderingService : RenderingService
 //                        _mainEffect.Parameters["NormalMap"].SetResource(_normalMap);
 //                        _mainEffect.Parameters["NormalMapSampler"].SetResource(GraphicsDevice.SamplersStates.LinearWrap);
 //                        _mainEffect.CurrentTechnique.Passes[0].Apply();
-//                        meshRenderer.Draw(GraphicsDevice, GameTime);
+//                        meshRenderer.Draw(GraphicsDevice, AppTime);
 //                    });
 //            }
     }
@@ -494,7 +494,7 @@ public class ForwardPlusRenderingService : RenderingService
 //                        _mainEffect.Parameters["LightMapSampler"].SetResource(GraphicsDevice.SamplersStates.PointClamp);
 //
 //                        _mainEffect.CurrentTechnique.Passes[0].Apply();
-//                        meshRenderer.Draw(GraphicsDevice, GameTime);
+//                        meshRenderer.Draw(GraphicsDevice, AppTime);
 //                    });
 //            }
     }

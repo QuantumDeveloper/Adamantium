@@ -29,7 +29,7 @@
 
 	<ItemGroup>
 		<ProjectReference Include="..\Adamantium.Engine\Adamantium.Engine.csproj" />
-		<ProjectReference Include="..\Adamantium.Game\Adamantium.Game.csproj" />
+		<ProjectReference Include="..\Adamantium.Multiverse\Adamantium.Multiverse.csproj" />
 		<ProjectReference Include="..\Adamantium.MVVM\Adamantium.MVVM.csproj" />
 		<ProjectReference Include="..\Adamantium.UI\Adamantium.UI.csproj" />
 		<ProjectReference Include="..\Adamantium.UI.Themes\Adamantium.UI.Themes.csproj" />

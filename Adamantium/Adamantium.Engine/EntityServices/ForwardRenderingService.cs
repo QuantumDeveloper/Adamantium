@@ -6,8 +6,8 @@ using Adamantium.Core;
 using Adamantium.Engine.NoiseGenerator;
 using Adamantium.ECS;
 using Adamantium.ECS.Components;
-using Adamantium.Game;
-using Adamantium.Game.Input;
+using Adamantium.Multiverse;
+using Adamantium.Multiverse.Input;
 using Adamantium.Mathematics;
 using Serilog;
 using Adamantium.Vulkan.Core;
@@ -73,7 +73,7 @@ public class ForwardRenderingService : RenderingService
     {
     }
 
-    public override void Draw(AppTime gameTime)
+    public override void Draw(AppTime appTime)
     {
         if (ActiveCamera == null)
         {
@@ -242,14 +242,14 @@ public class ForwardRenderingService : RenderingService
                                     if (component is SkinnedMeshRenderer)
                                     {
                                         BasicEffect.Techniques["MeshVertex"].Passes["Skinned"].Apply();
-                                        component.Draw(DeferredDevice, gameTime);
+                                        component.Draw(DeferredDevice, appTime);
                                         BasicEffect.Techniques["MeshVertex"].Passes["Skinned"].UnApply(true);
                                     }
 
                                     if (component is MeshRenderer)
                                     {
                                         BasicEffect.Techniques["MeshVertex"].Passes["DirectionalLight"].Apply();
-                                        component.Draw(DeferredDevice, gameTime);
+                                        component.Draw(DeferredDevice, appTime);
                                         BasicEffect.Techniques["MeshVertex"].Passes["DirectionalLight"].UnApply(true);
                                     }
 
@@ -271,7 +271,7 @@ public class ForwardRenderingService : RenderingService
                                     solidWIreframeEffect.Parameters["LineWidth"].SetValue(wireframeWidthValue);
 
                                     solidWIreframeEffect.Techniques[0].Passes["SolidWirePattern"].Apply();
-                                    component.Draw(DeferredDevice, gameTime);
+                                    component.Draw(DeferredDevice, appTime);
                                     solidWIreframeEffect.Techniques[0].Passes["SolidWirePattern"].UnApply(true);
 
                                 }
@@ -472,7 +472,7 @@ public class ForwardRenderingService : RenderingService
 //            int spriteSceneRadiusHeight = backBuffer.Height / 2 - textureHalfSize;
 //
 //            // Time used to animate the balls
-//            var time = (float)gameTime.TotalTime.TotalSeconds;
+//            var time = (float)appTime.TotalTime.TotalSeconds;
 //
 //            // Draw sprites on the screen
 //            var random = new Random(0);
@@ -519,7 +519,7 @@ public class ForwardRenderingService : RenderingService
        spriteBatch.DrawString(cambriaTrueType, "Hello world\nNew Line", new Vector2F(300, 300), Color.DarkGreen, 0, Vector2F.Zero, Vector2F.One, SpriteEffects.FlipVertically, 0);
        spriteBatch.DrawString(cambriaTrueType, "Hello world\nNew Line", new Vector2F(300, 400), Color.DarkGreen, 0, Vector2F.Zero, Vector2F.One, SpriteEffects.FlipBoth, 0);
 
-           rotation += 1 * (float)GameTime.FrameTime;
+           rotation += 1 * (float)AppTime.FrameTime;
         //spriteBatch.Draw(pointer, mouseState.Position - pointerCenterBlack, Color.Red, pointerScaleBlack);
         spriteBatch.Draw(nullTexture6, new RectangleF(0, 0, 300, 300), null, Color.RosyBrown);
         spriteBatch.Draw(nullTexture5, new RectangleF(1050, 100, 300, 300), null, Color.White, rotation, new Vector2F(300, 300), SpriteEffects.None, 0.1f);
@@ -544,7 +544,7 @@ public class ForwardRenderingService : RenderingService
         Text += "Right thumb: " + state.RightThumb + "\n";
         Text += "Left trigger: " + state.LeftTrigger + "\n";
         Text += "Right trigger: " + state.RightTrigger + "\n";
-        base.Draw(gameTime);
+        base.Draw(appTime);
         */
     }
 }

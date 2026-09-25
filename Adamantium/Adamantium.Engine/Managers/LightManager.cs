@@ -18,7 +18,7 @@ public class LightManager
 
     private List<Light> lights;
     //private Effect depthWriter;
-    //private Game game;
+    //private Universe universe;
 
     private object _syncObj = new object();
 
@@ -40,7 +40,7 @@ public class LightManager
     public LightManager(EntityWorld entityWorld)
     {
         this.entityWorld = entityWorld;
-        //depthWriter = game.Content.Load<Effect>("Effects/DeferredShading/DepthWriter");
+        //depthWriter = universe.Content.Load<Effect>("Effects/DeferredShading/DepthWriter");
         lights = new List<Light>();
         _lights = new ReadOnlyCollection<Light>(lights);
         _lightsGroup = new EntityGroup("Lights");
@@ -130,12 +130,12 @@ public class LightManager
         return _lightsGroup.Contains(light);
     }
 
-    public void DrawPointLightMesh(GraphicsDevice device, MeshGeometryCache geometryCache, AppTime gameTime)
+    public void DrawPointLightMesh(GraphicsDevice device, MeshGeometryCache geometryCache, AppTime appTime)
     {
         geometryCache.DrawMesh(device, pointLightRenderer);
     }
 
-    public void DrawSpotLightMesh(GraphicsDevice device, MeshGeometryCache geometryCache, AppTime gameTime)
+    public void DrawSpotLightMesh(GraphicsDevice device, MeshGeometryCache geometryCache, AppTime appTime)
     {
         geometryCache.DrawMesh(device, spotLightRenderer);
     }

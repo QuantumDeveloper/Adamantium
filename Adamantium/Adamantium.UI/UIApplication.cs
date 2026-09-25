@@ -11,7 +11,7 @@ using Adamantium.Core.Collections;
 using Adamantium.Core.DependencyInjection;
 using Adamantium.Core.Events;
 using Adamantium.ECS;
-using Adamantium.Game;
+using Adamantium.Multiverse;
 using Adamantium.Graphics;
 using Adamantium.Graphics.Core;
 using Adamantium.UI.Core.Diagnostics;
@@ -787,7 +787,7 @@ public abstract class UIApplication : FundamentalUIComponent, IAdamantiumApplica
     }
 
     /// <summary>
-    /// Updates game time for each frame
+    /// Updates the time for each frame
     /// </summary>
     /// <param name="elapsed">elapsed time from the last frame</param>
     protected void UpdateAppTime(double elapsed)

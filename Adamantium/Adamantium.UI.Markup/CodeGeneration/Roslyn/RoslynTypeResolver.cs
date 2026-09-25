@@ -155,7 +155,7 @@ public class RoslynTypeResolver : ITypeResolver
         }
         
         // The compiled assembly itself is not in ReferencedAssemblySymbols, so resolve local types (e.g. a
-        // GameHostBehavior declared in the same project and referenced via clr-namespace) against it explicitly.
+        // DemoUniverseBehavior declared in the same project and referenced via clr-namespace) against it explicitly.
         var assemblySymbol = _compilation.Assembly.Name == assemblyName
             ? _compilation.Assembly
             : _compilation.SourceModule.ReferencedAssemblySymbols.FirstOrDefault(q => q.Name == assemblyName);

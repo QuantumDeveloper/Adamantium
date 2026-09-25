@@ -227,7 +227,7 @@ namespace Adamantium.ECS.Components
             }
         }
 
-        public abstract void Update(AppTime gameTime);
+        public abstract void Update(AppTime appTime);
 
         ///<summary>
         ///Rotate camera absolutely around base X, Y and Z axis.

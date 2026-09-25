@@ -7,7 +7,7 @@ namespace Adamantium.Engine.EntityServices;
 
 /// <summary>
 /// Runs the editor's processors once per frame: what sits over the scene first, then the one tool in use. Only an editor
-/// creates it; a game has no tools.
+/// creates it; a universe without the editor has no tools.
 /// </summary>
 public class ToolsService : EntityService
 {
@@ -68,7 +68,7 @@ public class ToolsService : EntityService
         Selection = EntityWorld.Satellites.Get<Selection>();
     }
 
-    public override void Update(AppTime gameTime)
+    public override void Update(AppTime appTime)
     {
         var next = requested;
         if (next != tool)
@@ -80,6 +80,6 @@ public class ToolsService : EntityService
 
         IsPointerTaken = false;
         Hovered = null;
-        base.Update(gameTime);
+        base.Update(appTime);
     }
 }

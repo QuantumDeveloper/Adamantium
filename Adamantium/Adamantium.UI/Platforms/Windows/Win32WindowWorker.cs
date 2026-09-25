@@ -24,7 +24,7 @@ internal class Win32WindowWorker : AdamantiumComponent, IWindowWorkerService
     private bool osMouseCaptured;
     private Win32NativeWindowWrapper source;
 
-    // RELATIVE mouse mode (game mouse-look). SetRelativeMouseMode posts RelativeModeMessage (enable in wParam, the restore
+    // RELATIVE mouse mode (mouse-look). SetRelativeMouseMode posts RelativeModeMessage (enable in wParam, the restore
     // screen point packed in lParam) so the cursor hide/show + capture - HWND-thread-affine - run on the PUMP thread. While
     // active, HandleMouseMove reads the physical cursor, feeds a RawMouseMove delta and re-centres to _recenterScreen so the
     // delta never runs out at the window edge. The cursor's SAVED position is NOT held here - the panel owns it (in its own
@@ -1066,8 +1066,8 @@ internal class Win32WindowWorker : AdamantiumComponent, IWindowWorkerService
 
     private IntPtr HandleMouseMove(WindowMessages windowMessage, IntPtr wParam, IntPtr lParam, out bool handled)
     {
-        // RELATIVE mouse mode (game mouse-look): synthesize a RawMouseMove delta from the physical move and re-centre the
-        // cursor, so the game gets unbounded relative motion (the cursor never reaches the window edge). The normal
+        // RELATIVE mouse mode (mouse-look): synthesize a RawMouseMove delta from the physical move and re-centre the
+        // cursor, so the universe gets unbounded relative motion (the cursor never reaches the window edge). The normal
         // MouseMove is suppressed while looking - the cursor is hidden and pinned to the centre.
         if (_relativeActive)
         {

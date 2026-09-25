@@ -12,7 +12,7 @@ public class DescriptorHeapManager : DisposableObject, IDescriptorHeapManager
     private ulong currentResourceOffset = 0;
     private ulong currentSamplerOffset = 0;
     // The heap is shared by all render devices of one logical device, which may render concurrently (different
-    // games run in parallel). Serialize the offset allocators and heap writes so the heap path stays correct.
+    // universes run in parallel). Serialize the offset allocators and heap writes so the heap path stays correct.
     private readonly object _heapSync = new object();
 
     public IBuffer ResourceHeapBuffer { get; private set; }

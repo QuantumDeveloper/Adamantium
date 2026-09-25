@@ -34,7 +34,7 @@ public class EntityIcons : EditorProcessor
 
     public bool ShowsCameras { get; set; } = true;
 
-    public override void Update(AppTime gameTime)
+    public override void Update(AppTime appTime)
     {
         seen.Clear();
         var roots = Tools.EntityWorld.RootEntities;

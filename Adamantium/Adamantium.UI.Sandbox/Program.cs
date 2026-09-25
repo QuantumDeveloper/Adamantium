@@ -34,7 +34,7 @@ public class Program
             }
         }
 
-        var gameApp = new AdamantiumGameApplication();
+        var sandboxApp = new SandboxApplication();
 
         // ADAM_START_TAB=<header>: open ON that tab instead of the first one. A measurement of a particular tab starts
         // by getting to it, and getting to it by hand is a click, a build and a settle that are part of neither the
@@ -1702,7 +1702,7 @@ public class Program
                     var tabs = win?.Content is Adamantium.UI.Core.IUIComponent c ? Find<Adamantium.UI.Controls.TabControl>(c) : null;
                     var visited = new System.Text.StringBuilder();
 
-                    // Focus the game panel first: its input path reads the pointer in the PANEL's own coordinates, and
+                    // Focus the universe panel first: its input path reads the pointer in the PANEL's own coordinates, and
                     // that path only runs once the panel has been focused. A sweep that never focuses it never enters
                     // the path, so it cannot tell whether leaving the tab still breaks it.
                     var panel = win?.Content is Adamantium.UI.Core.IUIComponent gc
@@ -1712,7 +1712,7 @@ public class Program
                     {
                         Adamantium.UI.Threading.Dispatcher.CurrentDispatcher?.Post(() => panel.Focus());
                         System.Threading.Thread.Sleep(1000);
-                        visited.Append("game-panel-focused ");
+                        visited.Append("universe-panel-focused ");
                     }
 
                     if (tabs != null)
@@ -1726,7 +1726,7 @@ public class Program
                                    .Append(Adamantium.UI.Core.Diagnostics.RuntimeStats.PresentedFrames);
                             // Found again each time, not once before the loop: leaving a tab can drop its content for
                             // good, and a reference kept from the start would then report on a dead object for the
-                            // rest of the sweep - including on the game's own tab, where the answer matters most.
+                            // rest of the sweep - including on the Scene tab, where the answer matters most.
                             // Visibility says nothing about being on screen, and that is what this shows: off its own
                             // tab the panel still reads Visible while it is no longer in the tree at all.
                             var live = win?.Content is Adamantium.UI.Core.IUIComponent lc
@@ -1973,8 +1973,8 @@ public class Program
             }) { IsBackground = true };
             t.Start();
         }
-        gameApp.IsFixedTimeStep = false;
-        SetUp(gameApp);
+        sandboxApp.IsFixedTimeStep = false;
+        SetUp(sandboxApp);
     }
 
     private static int _panned;   // TEMP: pans that actually moved the strip - a harness that pans nothing measures nothing
@@ -2149,7 +2149,7 @@ public class Program
     {
         var service = Adamantium.UI.UIApplication.Current?.Container
             ?.Resolve<Adamantium.Graphics.Core.IGraphicsDeviceService>();
-        var main = (service as Adamantium.Game.GraphicsDeviceService)?.MainGraphicsDevice;
+        var main = (service as Adamantium.Multiverse.GraphicsDeviceService)?.MainGraphicsDevice;
         if (main == null) return "no device";
 
         return $"swapchainMaintenance {main.SupportsSwapchainMaintenance} | presentWait {main.SupportsPresentWait}"
@@ -2203,11 +2203,11 @@ public class Program
         return -1;
     }
 
-    private static void SetUp(AdamantiumGameApplication gameApp)
+    private static void SetUp(SandboxApplication sandboxApp)
     {
-        gameApp.EnableGraphicsDebug = Environment.GetEnvironmentVariable("ADAM_VK_DEBUG") == "1";
-        gameApp.DesiredFPS = 300;
-        gameApp.StartupType = typeof(MainWindow);
-        gameApp.Run();
+        sandboxApp.EnableGraphicsDebug = Environment.GetEnvironmentVariable("ADAM_VK_DEBUG") == "1";
+        sandboxApp.DesiredFPS = 300;
+        sandboxApp.StartupType = typeof(MainWindow);
+        sandboxApp.Run();
     }
 }

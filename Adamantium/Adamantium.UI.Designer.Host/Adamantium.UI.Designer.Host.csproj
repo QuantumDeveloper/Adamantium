@@ -21,7 +21,7 @@
 
     <ItemGroup>
         <ProjectReference Include="..\Adamantium.UI\Adamantium.UI.csproj" />
-        <ProjectReference Include="..\Adamantium.Game\Adamantium.Game.csproj" />
+        <ProjectReference Include="..\Adamantium.Multiverse\Adamantium.Multiverse.csproj" />
         <ProjectReference Include="..\Adamantium.UI.Themes\Adamantium.UI.Themes.csproj" />
     </ItemGroup>
 

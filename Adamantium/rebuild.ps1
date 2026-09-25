@@ -1,4 +1,4 @@
-# One-shot rebuild of the run targets (game Sandbox + AUML designer host) with the standard engine
+# One-shot rebuild of the run targets (Sandbox + AUML designer host) with the standard engine
 # build flags. Run this instead of building a single project by hand.
 #
 # Why both: the designer host builds into its OWN folder (artifacts/designer-host) so that a running
@@ -14,7 +14,7 @@ param([string]$Config = 'Debug')
 $ErrorActionPreference = 'Stop'
 $root = $PSScriptRoot
 
-# Kill the long-running processes that file-lock build outputs (host + language server + the game itself
+# Kill the long-running processes that file-lock build outputs (host + language server + the Sandbox itself
 # + the Roslyn build server, which can also cache a stale source generator).
 Get-Process -Name 'Adamantium.UI.Designer.Host','Adamantium.UI.LanguageServer','Adamantium.UI.Sandbox','VBCSCompiler' -ErrorAction SilentlyContinue |
     ForEach-Object { Write-Host "Killing $($_.Name) ($($_.Id))"; $_ | Stop-Process -Force }

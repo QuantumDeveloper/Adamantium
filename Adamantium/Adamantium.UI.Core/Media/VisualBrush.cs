@@ -53,7 +53,7 @@ public sealed class VisualBrush : TileBrush
     internal bool NeedsBake { get; set; } = true;
 
     /// <summary>Take a fresh picture of the source at the next opportunity. Called for you when the source announces a
-    /// change; public because a source can also change in ways it does not announce (a game surface, a video frame).</summary>
+    /// change; public because a source can also change in ways it does not announce (a universe's surface, a video frame).</summary>
     public void Refresh()
     {
         var origin = Origin;

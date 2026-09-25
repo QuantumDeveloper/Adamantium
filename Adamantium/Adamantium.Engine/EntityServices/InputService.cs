@@ -5,8 +5,8 @@ using Adamantium.Engine.Services;
 using Adamantium.ECS;
 using Adamantium.ECS.Components;
 using Adamantium.ECS.Components.Extensions;
-using Adamantium.Game;
-using Adamantium.Game.Input;
+using Adamantium.Multiverse;
+using Adamantium.Multiverse.Input;
 using Adamantium.Graphics.Core;
 using Adamantium.Imaging;
 using Adamantium.Mathematics;
@@ -54,36 +54,36 @@ public class InputService : EntityService
     /// The mouse turns and zooms the camera of the output under the pointer, the keys and gamepad drive the camera of
     /// the output taking the keyboard - which may be another output, or none. Every visible camera is updated either way.
     /// </summary>
-    public override void Update(AppTime gameTime)
+    public override void Update(AppTime appTime)
     {
         userControlledEntity = selection.Current ?? UserControlledEntity;
 
         if (observatory.PointerOutput is { Camera: { } pointerCamera } pointerOutput)
         {
-            HandlePointer(pointerOutput.Input, pointerCamera, gameTime);
+            HandlePointer(pointerOutput.Input, pointerCamera, appTime);
         }
 
         if (observatory.KeyboardOutput is { Camera: { } keyboardCamera } keyboardOutput)
         {
-            HandleKeyboard(keyboardOutput, keyboardCamera, gameTime);
+            HandleKeyboard(keyboardOutput, keyboardCamera, appTime);
         }
 
         var cameras = observatory.CurrentCameras;
         for (int i = 0; i < cameras.Count; i++)
         {
-            cameras[i].Update(gameTime);
+            cameras[i].Update(appTime);
         }
     }
 
-    private void HandlePointer(InputWormhole inputManager, Camera currentCamera, AppTime gameTime)
+    private void HandlePointer(InputWormhole inputManager, Camera currentCamera, AppTime appTime)
     {
         if (inputManager.IsMouseButtonDown(MouseButton.Right))
         {
             currentCamera.RotateRelativeXY(
                 (inputManager.RawMouseDelta.Y * currentCamera.MouseSensitivity) *
-                (float)gameTime.FrameTime,
+                (float)appTime.FrameTime,
                 (-inputManager.RawMouseDelta.X * currentCamera.MouseSensitivity) *
-                (float)gameTime.FrameTime);
+                (float)appTime.FrameTime);
         }
 
         if (inputManager.MouseWheelDelta != 0)
@@ -92,12 +92,12 @@ public class InputService : EntityService
         }
     }
 
-    private void HandleKeyboard(UniverseOutput output, Camera currentCamera, AppTime gameTime)
+    private void HandleKeyboard(UniverseOutput output, Camera currentCamera, AppTime appTime)
     {
         var inputManager = output.Input;
         var gamepadState = inputManager.GetGamepadState(0);
-        Double cameraMovementSpeed = currentCamera.Velocity * gameTime.FrameTime;
-        float rotationAngle = currentCamera.RotationSpeed * (float)gameTime.FrameTime;
+        Double cameraMovementSpeed = currentCamera.Velocity * appTime.FrameTime;
+        float rotationAngle = currentCamera.RotationSpeed * (float)appTime.FrameTime;
 
         if (inputManager.IsKeyPressed(Keys.Divide))
         {

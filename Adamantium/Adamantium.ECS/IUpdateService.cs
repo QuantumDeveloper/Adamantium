@@ -8,8 +8,8 @@ public interface IUpdateService : IContentable
     /// <summary>
     /// This method is called when this application component is updated.
     /// </summary>
-    /// <param name="gameTime">The current timing.</param>
-    void Update(AppTime gameTime);
+    /// <param name="appTime">The current timing.</param>
+    void Update(AppTime appTime);
 
     /// <summary>
     /// Gets a value indicating whether the application component's Update method should be called by <see cref="SystemManager.Update"/>.

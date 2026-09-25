@@ -4,7 +4,7 @@ using Adamantium.Engine.Templates.CameraTemplates;
 using Adamantium.ECS;
 using Adamantium.ECS.Components;
 using Adamantium.ECS.Components.Extensions;
-using Adamantium.Game;
+using Adamantium.Multiverse;
 using Adamantium.Graphics;
 using Adamantium.Graphics.Core.EffectsFramework;
 using Adamantium.Mathematics;
@@ -13,7 +13,7 @@ namespace Adamantium.Engine.Managers;
 
 /// <summary>
 /// Cameras as objects in the scene, for the editor: a new one set in front of the current one, and a frustum showing
-/// where the selected one looks. A game has no use for any of it.
+/// where the selected one looks. A universe without the editor has no use for any of it.
 /// </summary>
 public class CameraGizmo
 {
@@ -78,7 +78,7 @@ public class CameraGizmo
     }
 
 
-    public void DrawDebugCamera(Effect effect, Camera camera, GraphicsDevice drawingContext, MeshGeometryCache geometryCache, AppTime gametime)
+    public void DrawDebugCamera(Effect effect, Camera camera, GraphicsDevice drawingContext, MeshGeometryCache geometryCache, AppTime appTime)
     {
         if (SelectedCamera == null || !SelectedCamera.IsEnabled)
         {

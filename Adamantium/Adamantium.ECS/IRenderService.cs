@@ -18,8 +18,8 @@ public interface IRenderService : IContentable, IDisplayContent
     /// <summary>
     /// Draws this instance.
     /// </summary>
-    /// <param name="gameTime">The current timing.</param>
-    void Draw(AppTime gameTime);
+    /// <param name="appTime">The current timing.</param>
+    void Draw(AppTime appTime);
 
     /// <summary>
     /// Ends the drawing of a frame. This method is preceded by calls to BeginScene and Draw.

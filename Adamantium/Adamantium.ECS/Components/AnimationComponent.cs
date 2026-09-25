@@ -50,13 +50,13 @@ namespace Adamantium.ECS.Components
 
         public Dictionary<string, Matrix4x4F> InterpolatedMatrices { get; private set; }
 
-        public void Update(AppTime gameTime)
+        public void Update(AppTime appTime)
         {
             if (!IsPaused)
             {
                 try
                 {
-                    var currentTime = gameTime.TotalTime;
+                    var currentTime = appTime.TotalTime;
                     InterpolatedMatrices.Clear();
 
 

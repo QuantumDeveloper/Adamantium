@@ -2,12 +2,12 @@ using System;
 using Adamantium.Core;
 using Adamantium.ECS;
 using Adamantium.ECS.Components;
-using Adamantium.Game;
-using Adamantium.Game.Input;
-using Adamantium.Game.Payloads;
+using Adamantium.Multiverse;
+using Adamantium.Multiverse.Input;
+using Adamantium.Multiverse.Payloads;
 using Adamantium.Graphics.Core;
 using Adamantium.Graphics.Core.Content;
-using Keys = Adamantium.Game.Input.Keys;
+using Keys = Adamantium.Multiverse.Input.Keys;
 
 namespace Adamantium.Engine.EntityServices;
 
@@ -120,9 +120,9 @@ public class RenderingService : EntityService
         return true;
     }
 
-    public override void Draw(AppTime gameTime)
+    public override void Draw(AppTime appTime)
     {
-        AppTime = gameTime;
+        AppTime = appTime;
 
         if (InputManager.IsKeyPressed(Keys.P))
         {
@@ -131,7 +131,7 @@ public class RenderingService : EntityService
 
         ActiveCamera = Window.Camera;
 
-        DrawProcessors(gameTime);
+        DrawProcessors(appTime);
     }
 
     protected virtual void Debug() { }

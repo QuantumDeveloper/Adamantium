@@ -835,7 +835,7 @@ public abstract class WindowBase : ContentControl, IWindow, IWindowInternals, IA
     /// <see cref="Activate"/>, which would cost the drag its mouse capture.</summary>
     public void BringToFront() => WindowWorkerService?.RaiseWithoutActivation();
 
-    /// <summary>Enter/leave RELATIVE mouse mode (hidden, centred cursor + synthesized raw delta) for a hosted game's
+    /// <summary>Enter/leave RELATIVE mouse mode (hidden, centred cursor + synthesized raw delta) for a hosted universe's
     /// mouse-look. Driven by a <see cref="Panels.RenderTargetPanel"/> per its <c>MouseLookMode</c>; delegates to the
     /// platform worker.</summary>
     public void SetRelativeMouseMode(bool enabled, PixelPoint restoreScreen) =>

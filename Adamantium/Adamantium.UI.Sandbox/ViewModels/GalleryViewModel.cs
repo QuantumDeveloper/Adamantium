@@ -47,7 +47,7 @@ public partial class GalleryViewModel
         new TilesViewModel(),
         new InstancingViewModel(),
         new TransformsViewModel(),
-        new GameViewModel(),
+        new SceneViewModel(),
     };
 
     [Bindable] private TabPageViewModel _selectedTab;

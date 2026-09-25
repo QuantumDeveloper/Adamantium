@@ -32,7 +32,7 @@ namespace Adamantium.ECS.Components
 
       public Dictionary<String, Matrix4x4F> FinalMatrices { get; }
 
-      public void Update(AppTime gameTime)
+      public void Update(AppTime appTime)
       {
          var animation = GetComponentInParents<AnimationComponent>();
          if (animation != null && animation.IsAnimationStarted && IsEnabled)

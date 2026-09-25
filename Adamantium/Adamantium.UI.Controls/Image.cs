@@ -655,7 +655,7 @@ public class Image : InputUIComponent, IDesignTimeAnimatedMedia
       // cannot carry, and nothing else:
       //  - a DRAWING replays its own shapes;
       //  - an ANIMATION draws one layer of a frame-array texture, chosen per frame;
-      //  - a LIVE SURFACE (a game rendering into a panel) is imported and owned per component.
+      //  - a LIVE SURFACE (a universe rendering into a panel) is imported and owned per component.
       if (Brushed(image))
       {
          context.ForControl(this).DrawRectangle(Tiling(image), new Rect(0, 0, Bounds.Width, Bounds.Height),
