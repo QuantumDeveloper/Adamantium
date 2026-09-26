@@ -3,7 +3,7 @@
     <PropertyGroup>
         <TargetFramework>netstandard2.0</TargetFramework>
         <Configurations>Debug;Release</Configurations>
-        <Platforms>x64</Platforms>
+        <Platforms>AnyCPU</Platforms>
         <LangVersion>latest</LangVersion>
         <Nullable>disable</Nullable>
         <IsRoslynComponent>false</IsRoslynComponent>
@@ -39,9 +39,9 @@
 	<ItemGroup>
          <!--Generator dependencies-->
 		
-		<PackageReference Include="Adamantium.Vulkan.Spirv" Version="1.0.11" GeneratePathProperty="true" PrivateAssets="all" />
-		<PackageReference Include="Adamantium.Vulkan.Slang" Version="1.0.9" GeneratePathProperty="true" PrivateAssets="all" />
-        <PackageReference Include="QuantumBinding.Utils" Version="3.0.0" GeneratePathProperty="true" PrivateAssets="all" />
+		<PackageReference Include="Adamantium.Vulkan.Spirv" Version="1.0.12" GeneratePathProperty="true" PrivateAssets="all" />
+		<PackageReference Include="Adamantium.Vulkan.Slang" Version="1.0.10" GeneratePathProperty="true" PrivateAssets="all" />
+        <PackageReference Include="QuantumBinding.Utils" Version="3.0.1" GeneratePathProperty="true" PrivateAssets="all" />
         <PackageReference Include="MessagePack" Version="3.1.7" GeneratePathProperty="true" PrivateAssets="all" />
         <PackageReference Include="MessagePack.Annotations" Version="3.1.7" GeneratePathProperty="true" PrivateAssets="all" />
 		<PackageReference Include="System.Runtime.CompilerServices.Unsafe" Version="6.1.2" GeneratePathProperty="true" PrivateAssets="all" />
@@ -63,12 +63,12 @@
         <GetTargetPathDependsOn>$(GetTargetPathDependsOn);GetDependencyTargetPaths</GetTargetPathDependsOn>
     </PropertyGroup>
     
-    <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|x64' ">
+    <PropertyGroup Condition=" '$(Configuration)' == 'Debug' ">
       <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
       <NoWarn>1701;1702;RS1035</NoWarn>
     </PropertyGroup>
     
-    <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|x64' ">
+    <PropertyGroup Condition=" '$(Configuration)' == 'Release' ">
       <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
       <NoWarn>1701;1702;RS1035</NoWarn>
     </PropertyGroup>

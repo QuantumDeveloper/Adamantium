@@ -130,19 +130,19 @@ namespace Adamantium.ProceduralGeometry.Shapes
                 double width,
                 double length)
             {
-                var startPositionX = width / 2;
-                var startPositionY = length / 2;
+                var sizeX = width / 2;
+                var sizeZ = length / 2;
 
                 var vertices = new List<Vector3>();
-                vertices.Add(new Vector3(-startPositionX, -startPositionY, 0));
-                vertices.Add(new Vector3(startPositionX, -startPositionY, 0));
-                vertices.Add(new Vector3(startPositionX, startPositionY, 0));
-                vertices.Add(new Vector3(-startPositionX, startPositionY, 0));
+                vertices.Add(new Vector3(-sizeX, 0, -sizeZ));
+                vertices.Add(new Vector3(sizeX, 0, -sizeZ));
+                vertices.Add(new Vector3(sizeX, 0, sizeZ));
+                vertices.Add(new Vector3(-sizeX, 0, sizeZ));
 
                 var mesh = new Mesh();
                 mesh.SetTopology(PrimitiveType.LineStrip).
                     SetPoints(vertices).
-                    GenerateBasicIndices();
+                    SetIndices([0, 1, 2, 3, 0]);
                 
                 return mesh;
             }

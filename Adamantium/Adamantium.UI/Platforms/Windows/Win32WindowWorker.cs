@@ -1027,7 +1027,8 @@ internal class Win32WindowWorker : AdamantiumComponent, IWindowWorkerService
         return new KeyPressInfo
         {
             PreviousState = parameters.PreviousState == Adamantium.Win32.KeyStates.Down ? KeyState.Down : KeyState.Up,
-            RepeatCount = parameters.RepeatCount
+            RepeatCount = parameters.RepeatCount,
+            PhysicalKey = Win32ScanCodes.ToHidUsage(parameters.ScanCode, parameters.IsExtendedKey)
         };
     }
 

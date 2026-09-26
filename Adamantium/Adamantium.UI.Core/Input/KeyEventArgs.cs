@@ -2,10 +2,12 @@
 
 public class KeyEventArgs:InputEventArgs
 {
-   public KeyEventArgs(KeyboardDevice device, Key key, InputModifiers modifiers, uint timestamp) : base(modifiers, timestamp)
+   public KeyEventArgs(KeyboardDevice device, Key key, InputModifiers modifiers, uint timestamp, uint physicalKey = 0)
+      : base(modifiers, timestamp)
    {
       Device = device;
       Key = key;
+      PhysicalKey = physicalKey;
       IsDown = Keyboard.IsKeyDown(key);
       IsUp = !IsDown;
       IsToggled = Keyboard.IsKeyToggled(key);
@@ -15,6 +17,9 @@ public class KeyEventArgs:InputEventArgs
    public KeyboardDevice Device { get; }
 
    public Key Key { get; }
+
+   /// <summary>Where the key is on the keyboard, as <see cref="KeyPressInfo.PhysicalKey"/>; 0 when not known.</summary>
+   public uint PhysicalKey { get; }
 
    public bool IsDown { get;}
 

@@ -208,7 +208,7 @@ ItemsControl (: Control)
 ## Проверка (end-to-end)
 
 - Headless `Tests/Adamantium.UITests` (сьюта headless): пофазные тесты выше
-  (`dotnet test … -p:Platform=x64`). Проверяем число реализованных визуальных детей, контент,
+  (`dotnet test …`). Проверяем число реализованных визуальных детей, контент,
   `{Binding}`, метрики скролла (1D и 2D).
 - Вручную: `<ItemsControl>` в `Adamantium.UI.Sandbox`, привязанный к
   `ObservableCollection`, запуск приложения; headless-рендер вьюхи в дизайнере.

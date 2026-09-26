@@ -4,6 +4,7 @@ using Adamantium.Engine.Managers;
 using Adamantium.ECS;
 using Adamantium.ECS.Components;
 using Adamantium.Multiverse;
+using Adamantium.Multiverse.Input;
 
 namespace Adamantium.Engine;
 
@@ -11,7 +12,7 @@ namespace Adamantium.Engine;
 /// The editor's view of the universe: its outputs, the ones taking keyboard and pointer, and the cameras seen through
 /// them. An immutable snapshot taken once per frame after the outputs settle, readable from any thread.
 /// </summary>
-public class Observatory
+public class Observatory : IInputRouting
 {
     private static readonly int StateCount = Enum.GetValues<OutputState>().Length;
 
@@ -32,6 +33,7 @@ public class Observatory
         CameraGizmo = new CameraGizmo(entityWorld);
         TakeSnapshot();
         universe.OutputsSettled += OnOutputsSettled;
+        universe.Satellites.Add<IInputRouting>(this);
     }
 
     public CameraGizmo CameraGizmo { get; }
@@ -48,6 +50,10 @@ public class Observatory
     /// <see cref="KeyboardOutput"/>.
     /// </summary>
     public UniverseOutput PointerOutput => snapshot.PointerOutput;
+
+    public InputWormhole KeyboardInput => KeyboardOutput?.Input;
+
+    public InputWormhole PointerInput => PointerOutput?.Input;
 
     public IReadOnlyList<UniverseOutput> VisibleOutputs => GetOutputs(OutputState.Shown);
 

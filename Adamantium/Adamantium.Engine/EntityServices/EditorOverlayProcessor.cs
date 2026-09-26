@@ -96,7 +96,16 @@ public class EditorOverlayProcessor : RenderingProcessor
     public void DrawInScene(Entity root)
     {
         Collect(root);
+        effect.View.SetValue(ActiveCamera.ViewMatrix);
         DrawParts(ActiveCamera.ViewProjectionMatrix, true, Look.Shaded);
+    }
+
+    /// <summary>Draws an entity and what is under it in the scene in its flat colors, in front of everything the scene
+    /// drew: for pictograms, which have no form to shade.</summary>
+    public void DrawFlatInScene(Entity root)
+    {
+        Collect(root);
+        DrawParts(ActiveCamera.ViewProjectionMatrix, true, Look.Flat);
     }
 
     /// <summary>
@@ -155,6 +164,7 @@ public class EditorOverlayProcessor : RenderingProcessor
     public void DrawOnScreen(Entity root)
     {
         Collect(root);
+        effect.View.SetValue(Matrix4x4F.Identity);
         DrawParts(ActiveCamera.UiProjection, false, Look.Shaded);
     }
 
@@ -253,6 +263,12 @@ public class EditorOverlayProcessor : RenderingProcessor
 
         Array.Clear(drawn, 0, parts.Count);
 
+        var blend = GraphicsDevice.ColorBlendEquation;
+        if (look is Look.Shaded or Look.Flat)
+        {
+            GraphicsDevice.ColorBlendEquation = ColorBlendEquations.AlphaBlend;
+        }
+
         for (var i = 0; i < parts.Count; ++i)
         {
             if (drawn[i])
@@ -281,7 +297,7 @@ public class EditorOverlayProcessor : RenderingProcessor
             effect.InstanceColor.SetValue(instanceColors);
             var instances = (uint)(count * directions);
 
-            if (head.Line && look == Look.Shaded)
+            if (head.Line && look is Look.Shaded or Look.Flat)
             {
                 DrawRibbon(head.Data, inFront, (uint)count);
                 continue;
@@ -299,6 +315,8 @@ public class EditorOverlayProcessor : RenderingProcessor
                 geometry.DrawMesh(GraphicsDevice, head.Data, instances);
             }
         }
+
+        GraphicsDevice.ColorBlendEquation = blend;
     }
 
     private void DrawRibbon(MeshData data, bool inFront, uint instances)
@@ -333,7 +351,7 @@ public class EditorOverlayProcessor : RenderingProcessor
         return look switch
         {
             Look.Outline => effect.BasicOutlineInstancedPass,
-            Look.Mask => effect.BasicFlatInstancedPass,
+            Look.Mask or Look.Flat => effect.BasicFlatInstancedPass,
             _ => flat ? effect.BasicFlatInstancedPass : effect.BasicLitInstancedPass
         };
     }
@@ -341,6 +359,7 @@ public class EditorOverlayProcessor : RenderingProcessor
     private enum Look
     {
         Shaded,
+        Flat,
         Mask,
         Outline
     }

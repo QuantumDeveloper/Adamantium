@@ -85,7 +85,7 @@ Retained-рендер сейчас на каждом кадре **ре-чита�
 
 ## Фазы (каждая отдельно тестируема, по возрастанию риска)
 
-**Билд/запуск/проверка для каждой:** `dotnet build -p:Platform=x64`, запуск `artifacts/bin/net10.0`,
+**Билд/запуск/проверка для каждой:** `dotnet build`, запуск `artifacts/bin/net10.0`,
 вкладка Layout (60k стресс — `LayoutViewModel`), FPS через `CalculateFps` (`UIApplication.cs:544`) +
 тайминги `RuntimeStats`; проверять непрерывный скролл, drag вкладок, смену темы (стрелки Up/Down), resize.
 

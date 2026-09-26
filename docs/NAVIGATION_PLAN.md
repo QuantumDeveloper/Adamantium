@@ -207,7 +207,7 @@ Guarded-дефолты в `UIApplication.RegisterServices` (`UIApplication.cs:38
 
 ## Проверка (end-to-end)
 
-- Сборка x64: `dotnet build Adamantium.sln -p:Platform=x64`. `Adamantium.Navigation` компилится только против `Adamantium.Core`;
+- Сборка: `dotnet build Adamantium.sln`. `Adamantium.Navigation` компилится только против `Adamantium.Core`;
   `IUIApplication.Navigation` доступен; Sandbox линкуется.
 - Таб **Navigation**: `HomePageView` в регионе со своим DataContext; **Details** — `SlideLeft` + `id=42`; **Back/Forward** и
   доступность; вето `IConfirmNavigation` блокирует смену.

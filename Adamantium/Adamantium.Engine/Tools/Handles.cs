@@ -14,7 +14,8 @@ namespace Adamantium.Engine.Tools;
 public abstract class Handles
 {
     private const float FacingEye = 0.97f;
-    private const float SquareEdgeOn = 0.05f;
+
+    private static readonly float SquareEdgeOn = MathF.Sqrt(1 - FacingEye * FacingEye);
 
     protected Handles(Entity shape)
     {

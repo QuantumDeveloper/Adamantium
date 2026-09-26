@@ -1,4 +1,3 @@
-using System;
 using Adamantium.Core.DependencyInjection;
 using Adamantium.Multiverse.Input;
 using Adamantium.Graphics;
@@ -18,9 +17,9 @@ public static class UniverseBuilder
             container.RegisterSingleton<IGraphicsDeviceFactory, GraphicsDeviceFactory>();
         }
 
-        if (OperatingSystem.IsWindows() && !container.IsRegistered<IGamepadFactory>())
+        if (!container.IsRegistered<IGamepadBackend>())
         {
-            container.RegisterSingleton<IGamepadFactory, XBoxGamepadFactory>();
+            container.RegisterSingleton<IGamepadBackend, NoGamepadBackend>();
         }
     }
 }

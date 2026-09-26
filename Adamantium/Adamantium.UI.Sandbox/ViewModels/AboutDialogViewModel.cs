@@ -16,7 +16,7 @@ public partial class AboutDialogViewModel : AdamantiumViewModel, IDialogAware
         var name = assembly.GetName();
 
         Product = assembly.GetCustomAttribute<AssemblyProductAttribute>()?.Product ?? name.Name;
-        Manufacturer = assembly.GetCustomAttribute<AssemblyCompanyAttribute>()?.Company ?? "Adamantium";
+        Manufacturer = assembly.GetCustomAttribute<AssemblyCompanyAttribute>()?.Company ?? "Adamantium Studio";
         Copyright = assembly.GetCustomAttribute<AssemblyCopyrightAttribute>()?.Copyright ?? string.Empty;
 
         var informational = assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion;

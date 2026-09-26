@@ -57,7 +57,7 @@ public class EntityIcons : EditorProcessor
 
     public override void DrawOverlay(EditorOverlayProcessor overlay)
     {
-        overlay.DrawInScene(root);
+        overlay.DrawFlatInScene(root);
     }
 
     public override PickHit PickEntity(in PickRay ray)

@@ -18,5 +18,9 @@ public struct KeyPressInfo
     /// <summary>How many repeats the OS coalesced into this one event.</summary>
     public int RepeatCount { get; set; }
 
+    /// <summary>The key's place on the keyboard as a USB HID usage (usage page shifted left 16, then the usage id),
+    /// whatever the layout makes it type; 0 when the platform did not say, as for input a program synthesized.</summary>
+    public uint PhysicalKey { get; set; }
+
     public bool IsRepeated => PreviousState == KeyState.Down && CurrentState == KeyState.Down;
 }

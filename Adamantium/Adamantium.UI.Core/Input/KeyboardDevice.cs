@@ -161,7 +161,7 @@ public class KeyboardDevice
                   var parameters = e.Press;
                   parameters.PressTime = e.Timestamp;
                   KeyEventArgs args = new KeyEventArgs(this, e.ChangedKey, e.InputModifiers,
-                     e.Timestamp);
+                     e.Timestamp, parameters.PhysicalKey);
                   if (e.EventType == RawKeyboardEventType.KeyDown)
                   {
                      parameters.CurrentState = KeyState.Down;

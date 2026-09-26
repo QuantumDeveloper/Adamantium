@@ -7,6 +7,7 @@ using Adamantium.Engine.Compiler.Models;
 using Adamantium.ECS;
 using Adamantium.ECS.Components;
 using Adamantium.Multiverse.Events;
+using Adamantium.Multiverse.Input;
 using Adamantium.Graphics;
 using Adamantium.Graphics.Core;
 using Adamantium.Graphics.Core.Content;
@@ -104,6 +105,7 @@ public class Universe : PropertyChangedBase, IUniverse
         Satellites.Add<IContentManager>(Content);
         Satellites.Add(ModelConverter);
         Satellites.Add<IGraphicsDeviceService>(GraphicsDeviceService);
+        Satellites.Add(InputActions);
 
         Stopped += ResetWorld;
         loopThread = new Thread(RunLoop);
@@ -119,6 +121,12 @@ public class Universe : PropertyChangedBase, IUniverse
     public Satellites Satellites { get; }
 
     public IGraphicsDeviceService GraphicsDeviceService { get; set; }
+
+    /// <summary>
+    /// The actions of this universe, read each frame right after the input, through the <see cref="IInputRouting"/> in
+    /// <see cref="Satellites"/>; without one they stay idle.
+    /// </summary>
+    public InputActions InputActions { get; } = new();
 
     public bool IsInitialized { get; private set; }
     public bool IsPaused { get; private set; }
@@ -620,6 +628,11 @@ public class Universe : PropertyChangedBase, IUniverse
     protected virtual void Update(AppTime time)
     {
         platform.UpdateInput(time);
+        if (Satellites.TryGet<IInputRouting>(out var routing))
+        {
+            InputActions.Update(routing.KeyboardInput, routing.PointerInput);
+        }
+
         EntityWorld.ServiceManager.Update(time);
     }
 

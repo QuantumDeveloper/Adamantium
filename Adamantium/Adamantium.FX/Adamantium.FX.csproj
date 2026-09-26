@@ -3,7 +3,7 @@
     <PropertyGroup>
         <TargetFramework>net10.0</TargetFramework>
         <ImplicitUsings>enable</ImplicitUsings>
-        <Platforms>x64</Platforms>
+        <Platforms>AnyCPU</Platforms>
         <Nullable>disable</Nullable>
         <EmitCompilerGeneratedFiles>true</EmitCompilerGeneratedFiles>
         <CompilerGeneratedFilesOutputPath>$(BaseIntermediateOutputPath)Generated</CompilerGeneratedFilesOutputPath>
@@ -14,7 +14,7 @@
     <!-- The Slang runtime rides in this package, so the shader compiler does not need the Vulkan SDK installed. Named
          here only to learn where NuGet put it; the generator is handed the path. -->
     <ItemGroup>
-        <PackageReference Include="Adamantium.Vulkan.Slang" Version="1.0.9" GeneratePathProperty="true" PrivateAssets="all" />
+        <PackageReference Include="Adamantium.Vulkan.Slang" Version="1.0.10" GeneratePathProperty="true" PrivateAssets="all" />
     </ItemGroup>
 
     <PropertyGroup>

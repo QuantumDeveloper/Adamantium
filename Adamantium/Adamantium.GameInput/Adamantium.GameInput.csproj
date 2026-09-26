@@ -1,0 +1,34 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Platforms>AnyCPU</Platforms>
+    <Configurations>Debug;Release</Configurations>
+    <LangVersion>latest</LangVersion>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Adamantium.Multiverse\Adamantium.Multiverse.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Adamantium.EngineTests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Remove="native\build\**" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="gameinput-c-shared.dll" Condition="Exists('gameinput-c-shared.dll')">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="QuantumBinding.Utils" Version="3.0.1" />
+  </ItemGroup>
+
+</Project>

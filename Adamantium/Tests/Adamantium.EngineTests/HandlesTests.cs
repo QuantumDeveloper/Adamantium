@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using Adamantium.ECS;
 using Adamantium.ECS.Components;
 using Adamantium.Engine.Tools;
@@ -56,7 +57,7 @@ public class HandlesTests
     }
 
     [Test]
-    public void Move_Squares_SitOnTheSideTheCameraLooksFrom()
+    public void Move_Squares_SitBetweenTheirArrows_FromEverySide()
     {
         var scene = new ToolScene();
         var at = new Vector3(4, 4, 10);
@@ -64,9 +65,68 @@ public class HandlesTests
 
         handles.Place(ToolScene.Target(at), scene.Camera);
 
-        Assert.That(SideOf(CenterOf(handles, "RightUpManipulator", scene) - at), Is.EqualTo(new[] { -1, -1, 0 }));
-        Assert.That(SideOf(CenterOf(handles, "RightForwardManipulator", scene) - at), Is.EqualTo(new[] { -1, 0, -1 }));
-        Assert.That(SideOf(CenterOf(handles, "UpForwardManipulator", scene) - at), Is.EqualTo(new[] { 0, -1, -1 }));
+        Assert.That(SideOf(CenterOf(handles, "RightUpManipulator", scene) - at), Is.EqualTo(new[] { 1, 1, 0 }));
+        Assert.That(SideOf(CenterOf(handles, "RightForwardManipulator", scene) - at), Is.EqualTo(new[] { 1, 0, 1 }));
+        Assert.That(SideOf(CenterOf(handles, "UpForwardManipulator", scene) - at), Is.EqualTo(new[] { 0, 1, 1 }));
+    }
+
+    [Test]
+    public void Move_ASquareAtAGrazingAngle_IsHidden_AsAnArmNearTheEyeIs()
+    {
+        var scene = new ToolScene();
+        var handles = new MoveHandles();
+
+        handles.Place(ToolScene.Target(new Vector3(0, 1.5, 10)), scene.Camera);
+        Assert.That(IsShown(handles, "RightForwardManipulator", scene), Is.False, "8.5 degrees off edge-on");
+
+        handles.Place(ToolScene.Target(new Vector3(0, 3.64, 10)), scene.Camera);
+        Assert.That(IsShown(handles, "RightForwardManipulator", scene), Is.True, "20 degrees off edge-on");
+    }
+
+    [Test]
+    public void Move_AcrossAPlane_ByItsOutline_StaysInThatPlane()
+    {
+        var scene = new ToolScene();
+        scene.LookFrom(At + new Vector3(-6, -5, -8), At);
+        var target = ToolScene.Target(At);
+        var handles = new MoveHandles();
+
+        Drag(scene, handles, target, "RightForwardOutline", At + new Vector3(0.3, 0, 0.3), At + new Vector3(1.3, 0, 0.8));
+
+        AssertNear(target.Transform.Position, At + new Vector3(1, 0, 0.5));
+    }
+
+    [Test]
+    public void Move_PointingAtASquaresOutline_LightsUpTheWholeSquare()
+    {
+        var handles = new MoveHandles();
+
+        handles.Highlight(handles.Shape.Get("RightForwardOutline"));
+
+        Assert.That(handles.Shape.Get("RightForwardManipulator").IsSelected, Is.True);
+        Assert.That(handles.Shape.Get("RightForwardOutline").IsSelected, Is.True);
+    }
+
+    [Test]
+    public void Move_Squares_StartWhereTheArrowsStart()
+    {
+        var handles = new MoveHandles();
+        var fill = handles.Shape.Get("RightUpManipulator").GetComponent<MeshData>().Mesh.Points;
+        var arrowStart = handles.Shape.Get("RightAxis").GetComponent<MeshData>().Mesh.Points.Min(p => p.X);
+
+        Assert.That(fill.Min(p => p.X), Is.EqualTo(arrowStart).Within(1e-9));
+        Assert.That(fill.Min(p => p.Y), Is.EqualTo(arrowStart).Within(1e-9));
+    }
+
+    [Test]
+    public void Move_SquareOutline_ClosesRoundItsFill()
+    {
+        var handles = new MoveHandles();
+        var fill = handles.Shape.Get("RightUpManipulator").GetComponent<MeshData>().Mesh;
+        var outline = handles.Shape.Get("RightUpOutline").GetComponent<MeshData>().Mesh;
+
+        Assert.That(outline.Indices, Is.EqualTo(new[] { 0, 1, 2, 3, 0 }));
+        Assert.That(outline.Points, Is.EquivalentTo(fill.Points));
     }
 
     [Test]

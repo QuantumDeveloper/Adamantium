@@ -1,0 +1,154 @@
+namespace Adamantium.UI.Platforms.Windows;
+
+internal static class Win32ScanCodes
+{
+    private const uint KeyboardPage = 0x0007_0000;
+    private const uint ConsumerPage = 0x000C_0000;
+    private const uint GenericDesktopPage = 0x0001_0000;
+
+    public static uint ToHidUsage(int scanCode, bool extended)
+    {
+        return extended ? Extended(scanCode) : Plain(scanCode);
+    }
+
+    private static uint Plain(int scanCode)
+    {
+        return scanCode switch
+        {
+            0x01 => Key(0x29),
+            >= 0x02 and <= 0x0B => Key(0x1E + (uint)(scanCode - 0x02)),
+            0x0C => Key(0x2D),
+            0x0D => Key(0x2E),
+            0x0E => Key(0x2A),
+            0x0F => Key(0x2B),
+            0x10 => Key(0x14),
+            0x11 => Key(0x1A),
+            0x12 => Key(0x08),
+            0x13 => Key(0x15),
+            0x14 => Key(0x17),
+            0x15 => Key(0x1C),
+            0x16 => Key(0x18),
+            0x17 => Key(0x0C),
+            0x18 => Key(0x12),
+            0x19 => Key(0x13),
+            0x1A => Key(0x2F),
+            0x1B => Key(0x30),
+            0x1C => Key(0x28),
+            0x1D => Key(0xE0),
+            0x1E => Key(0x04),
+            0x1F => Key(0x16),
+            0x20 => Key(0x07),
+            0x21 => Key(0x09),
+            0x22 => Key(0x0A),
+            0x23 => Key(0x0B),
+            0x24 => Key(0x0D),
+            0x25 => Key(0x0E),
+            0x26 => Key(0x0F),
+            0x27 => Key(0x33),
+            0x28 => Key(0x34),
+            0x29 => Key(0x35),
+            0x2A => Key(0xE1),
+            0x2B => Key(0x31),
+            0x2C => Key(0x1D),
+            0x2D => Key(0x1B),
+            0x2E => Key(0x06),
+            0x2F => Key(0x19),
+            0x30 => Key(0x05),
+            0x31 => Key(0x11),
+            0x32 => Key(0x10),
+            0x33 => Key(0x36),
+            0x34 => Key(0x37),
+            0x35 => Key(0x38),
+            0x36 => Key(0xE5),
+            0x37 => Key(0x55),
+            0x38 => Key(0xE2),
+            0x39 => Key(0x2C),
+            0x3A => Key(0x39),
+            >= 0x3B and <= 0x44 => Key(0x3A + (uint)(scanCode - 0x3B)),
+            0x45 => Key(0x48),
+            0x46 => Key(0x47),
+            0x47 => Key(0x5F),
+            0x48 => Key(0x60),
+            0x49 => Key(0x61),
+            0x4A => Key(0x56),
+            0x4B => Key(0x5C),
+            0x4C => Key(0x5D),
+            0x4D => Key(0x5E),
+            0x4E => Key(0x57),
+            0x4F => Key(0x59),
+            0x50 => Key(0x5A),
+            0x51 => Key(0x5B),
+            0x52 => Key(0x62),
+            0x53 => Key(0x63),
+            0x54 => Key(0x46),
+            0x56 => Key(0x64),
+            0x57 => Key(0x44),
+            0x58 => Key(0x45),
+            0x59 => Key(0x67),
+            >= 0x64 and <= 0x6E => Key(0x68 + (uint)(scanCode - 0x64)),
+            0x70 => Key(0x88),
+            0x76 => Key(0x73),
+            0x79 => Key(0x8A),
+            0x7B => Key(0x8B),
+            0x7E => Key(0x85),
+            _ => 0
+        };
+    }
+
+    private static uint Extended(int scanCode)
+    {
+        return scanCode switch
+        {
+            0x10 => Consumer(0xB6),
+            0x19 => Consumer(0xB5),
+            0x1C => Key(0x58),
+            0x1D => Key(0xE4),
+            0x20 => Consumer(0xE2),
+            0x21 => Consumer(0x192),
+            0x22 => Consumer(0xCD),
+            0x24 => Consumer(0xB7),
+            0x2E => Consumer(0xEA),
+            0x30 => Consumer(0xE9),
+            0x32 => Consumer(0x223),
+            0x35 => Key(0x54),
+            0x37 => Key(0x46),
+            0x38 => Key(0xE6),
+            0x45 => Key(0x53),
+            0x46 => Key(0x48),
+            0x47 => Key(0x4A),
+            0x48 => Key(0x52),
+            0x49 => Key(0x4B),
+            0x4B => Key(0x50),
+            0x4D => Key(0x4F),
+            0x4F => Key(0x4D),
+            0x50 => Key(0x51),
+            0x51 => Key(0x4E),
+            0x52 => Key(0x49),
+            0x53 => Key(0x4C),
+            0x5B => Key(0xE3),
+            0x5C => Key(0xE7),
+            0x5D => Key(0x65),
+            0x5F => GenericDesktopPage | 0x82,
+            0x65 => Consumer(0x221),
+            0x66 => Consumer(0x22A),
+            0x67 => Consumer(0x227),
+            0x68 => Consumer(0x226),
+            0x69 => Consumer(0x225),
+            0x6A => Consumer(0x224),
+            0x6B => Consumer(0x194),
+            0x6C => Consumer(0x18A),
+            0x6D => Consumer(0x183),
+            _ => 0
+        };
+    }
+
+    private static uint Key(uint id)
+    {
+        return KeyboardPage | id;
+    }
+
+    private static uint Consumer(uint id)
+    {
+        return ConsumerPage | id;
+    }
+}

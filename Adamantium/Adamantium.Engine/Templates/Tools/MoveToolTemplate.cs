@@ -8,6 +8,8 @@ namespace Adamantium.Engine.Templates.Tools;
 
 public class MoveToolTemplate : BaseToolTemplate
 {
+   private const float SquareFill = 0.3f;
+
    private double axisLength;
    private int tesselation;
 
@@ -49,37 +51,34 @@ public class MoveToolTemplate : BaseToolTemplate
       var forwardAxis = BuildSubEntity(root, "ForwardAxis", zAxisMesh, Colors.Blue);
       BuildSubEntity(forwardAxis, "ForwardAxisManipulator", coneMeshZ, Colors.Blue, BoundingVolume.OrientedBox);
 
-      var xzPlane = Shapes.Plane.GenerateGeometry(
-         GeometryType.Solid,
+      var squareCenter = quarterPart * 1.5;
+      BuildSquare(root, "RightForward", quarterPart, Matrix4x4.Translation(squareCenter, 0, squareCenter), Colors.Green);
+      BuildSquare(
+         root,
+         "RightUp",
          quarterPart,
-         quarterPart,
-         1,
-         Matrix4x4.Translation(quarterPart, 0, quarterPart));
-
-      BuildSubEntity(root, "RightForwardManipulator", xzPlane, Colors.Orange, BoundingVolume.OrientedBox);
-
-      var xyPlane = Shapes.Plane.GenerateGeometry(
-         GeometryType.Solid,
-         quarterPart,
-         quarterPart,
-         1,
-         Matrix4x4.RotationX(MathHelper.DegreesToRadians(90)) * Matrix4x4.Translation(quarterPart, quarterPart, 0));
-
-      BuildSubEntity(root, "RightUpManipulator", xyPlane, Colors.DarkOrchid, BoundingVolume.OrientedBox);
+         Matrix4x4.RotationX(MathHelper.DegreesToRadians(90)) * Matrix4x4.Translation(squareCenter, squareCenter, 0),
+         Colors.Blue);
 
       var rot = QuaternionF.RotationYawPitchRoll(MathHelper.DegreesToRadians(90), MathHelper.DegreesToRadians(90), 0);
-      var zyPlane = Shapes.Plane.GenerateGeometry(
-         GeometryType.Solid,
+      BuildSquare(
+         root,
+         "UpForward",
          quarterPart,
-         quarterPart,
-         1,
-         Matrix4x4.RotationQuaternion(rot) * Matrix4x4.Translation(0, quarterPart, quarterPart));
-
-      BuildSubEntity(root, "UpForwardManipulator", zyPlane, Colors.CornflowerBlue, BoundingVolume.OrientedBox);
+         Matrix4x4.RotationQuaternion(rot) * Matrix4x4.Translation(0, squareCenter, squareCenter),
+         Colors.Red);
 
       var centralCube = Shapes.Cube.GenerateGeometry(GeometryType.Outlined, quarterPart, 1);
       BuildSubEntity(root, "CentralManipulator", centralCube, Colors.Turquoise, BoundingVolume.OrientedBox);
 
       return root;
+   }
+
+   private void BuildSquare(Entity root, string name, double size, Matrix4x4 transform, Color color)
+   {
+      var fill = Shapes.Plane.GenerateGeometry(GeometryType.Solid, size, size, 1, transform).ClearNormals();
+      var square = BuildSubEntity(root, name + "Manipulator", fill, color, BoundingVolume.OrientedBox, SquareFill);
+      var outline = Shapes.Plane.GenerateGeometry(GeometryType.Outlined, size, size, 1, transform);
+      BuildSubEntity(square, name + "Outline", outline, color);
    }
 }

@@ -1,20 +1,8 @@
-﻿namespace Adamantium.Multiverse.Input
+namespace Adamantium.Multiverse.Input;
+
+public record struct KeyboardInput
 {
-    public struct KeyboardInput : IEquatable<KeyboardInput>
-    {
-        public Keys Key;
+    public Keys Key;
 
-        public InputType InputType;
-
-        public bool Equals(KeyboardInput other)
-        {
-            return Key == other.Key && InputType == other.InputType;
-        }
-
-        public override bool Equals(object obj)
-        {
-            if (ReferenceEquals(null, obj)) return false;
-            return obj is ButtonState && Equals((ButtonState)obj);
-        }
-    }
+    public InputType InputType;
 }

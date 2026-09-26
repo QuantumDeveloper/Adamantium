@@ -36,7 +36,7 @@ Start-Sleep -Milliseconds 500
 # 2) Build the host + ALL deps into the isolated folder. Key bits:
 #      -p:OutputPath=<isolated>            -> deps build here, NOT into the shared artifacts\bin (no lock).
 #      -p:AppendTargetFrameworkToOutputPath=false -> exe + deps land in ONE folder (no extra \net10.0).
-& dotnet build $proj -c $Configuration -p:Platform=x64 -nodeReuse:false `
+& dotnet build $proj -c $Configuration -nodeReuse:false `
     -p:OutputPath="$outDir\" -p:AppendTargetFrameworkToOutputPath=false
 if ($LASTEXITCODE -ne 0) { Write-Error "Build failed (exit $LASTEXITCODE)."; exit 1 }
 if (-not (Test-Path $exe)) { Write-Error "Build succeeded but $exe is missing."; exit 1 }

@@ -447,6 +447,15 @@ public class Mesh
         return this;
     }
 
+    public Mesh ClearNormals()
+    {
+        Normals = [];
+        Semantic &= ~VertexSemantic.Normal;
+        IsModified = true;
+
+        return this;
+    }
+
     public Mesh ClearContours()
     {
         Contours?.Clear();

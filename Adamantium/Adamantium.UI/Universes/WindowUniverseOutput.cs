@@ -37,6 +37,7 @@ namespace Adamantium.UI.Universes
 
         protected override void InitializeInternal(OutputContext context)
         {
+            StopWatchingWindow();
             OutputContext = context;
             window = OutputContext.Context as IWindow ?? throw new ArgumentException($"{nameof(context.Context)} should be of type {nameof(IWindow)}");
             InputComponent = window as IInputComponent;
@@ -89,8 +90,20 @@ namespace Adamantium.UI.Universes
 
         protected override void Dispose(bool disposeManagedResources)
         {
+            StopWatchingWindow();
             base.Dispose(disposeManagedResources);
             Close();
+        }
+
+        private void StopWatchingWindow()
+        {
+            if (window == null)
+            {
+                return;
+            }
+
+            window.ClientSizeChanged -= WindowOnClientSizeChanged;
+            window.StateChanged -= WindowOnStateChanged;
         }
     }
 }

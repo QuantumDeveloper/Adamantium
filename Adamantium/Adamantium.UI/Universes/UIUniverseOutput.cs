@@ -18,7 +18,8 @@ namespace Adamantium.UI.Universes
     {
         private OutputCursor cursor;
         private IWindow scaleSource;
-        
+        private IInputComponent listenedInput;
+
         public override UniverseOutputDescription Description { get; protected set; }
 
         /// <summary>The component the universe's surface IS - a window, or the panel it is hosted in. Public because a
@@ -62,8 +63,10 @@ namespace Adamantium.UI.Universes
 
         private PixelPoint heldFrom;
 
-        protected static readonly Dictionary<Key, Keys> TranslationKeys;
-        protected static readonly Dictionary<MouseButtons, UniverseMouseButton> MouseTranslationKeys;
+        private static readonly HashSet<Keys> KnownKeys = [.. Enum.GetValues<Keys>()];
+
+        protected internal static readonly Dictionary<Key, Keys> TranslationKeys;
+        protected internal static readonly Dictionary<MouseButtons, UniverseMouseButton> MouseTranslationKeys;
 
         static UIUniverseOutput()
         {
@@ -89,7 +92,6 @@ namespace Adamantium.UI.Universes
             TranslationKeys[Key.RightArrow] = Keys.RightArrow;
             TranslationKeys[Key.DownArrow] = Keys.DownArrow;
             TranslationKeys[Key.Select] = Keys.Select;
-            TranslationKeys[Key.Print] = Keys.Print;
             TranslationKeys[Key.Execute] = Keys.Execute;
             TranslationKeys[Key.PrintScreen] = Keys.PrintScreen;
             TranslationKeys[Key.Insert] = Keys.Insert;
@@ -212,16 +214,9 @@ namespace Adamantium.UI.Universes
             TranslationKeys[Key.OemPipe] = Keys.OemPipe;
             TranslationKeys[Key.OemCloseBrackets] = Keys.OemCloseBrackets;
             TranslationKeys[Key.OemQuotes] = Keys.OemQuotes;
-            TranslationKeys[Key.Oem8] = Keys.Oem8;
             TranslationKeys[Key.OemBackSlash] = Keys.OemBackslash;
-            TranslationKeys[Key.ProcessKey] = Keys.ProcessKey;
-            TranslationKeys[Key.Attn] = Keys.Attn;
             TranslationKeys[Key.CrSel] = Keys.Crsel;
             TranslationKeys[Key.ExSel] = Keys.Exsel;
-            TranslationKeys[Key.EraseEof] = Keys.EraseEof;
-            TranslationKeys[Key.Play] = Keys.Play;
-            TranslationKeys[Key.Zoom] = Keys.Zoom;
-            TranslationKeys[Key.PA1] = Keys.Pa1;
             TranslationKeys[Key.OemClear] = Keys.OemClear;
             TranslationKeys[Key.Shift] = Keys.Shift;
             TranslationKeys[Key.Ctrl] = Keys.Control;
@@ -273,12 +268,44 @@ namespace Adamantium.UI.Universes
                 scaleSource.DpiChanged += HostDpiChanged;
             }
 
-            InputComponent.KeyDown += WindowOnKeyDown;
-            InputComponent.KeyUp += WindowOnKeyUp;
-            InputComponent.MouseDown += OnMouseDown;
-            InputComponent.MouseUp += OnMouseUp;
-            InputComponent.MouseWheel += OnMouseWheel;
-            InputComponent.RawMouseMove += OnMouseMove;
+            StopListening();
+            listenedInput = InputComponent;
+            listenedInput.KeyDown += WindowOnKeyDown;
+            listenedInput.KeyUp += WindowOnKeyUp;
+            listenedInput.TextInput += WindowOnTextInput;
+            listenedInput.MouseDown += OnMouseDown;
+            listenedInput.MouseUp += OnMouseUp;
+            listenedInput.MouseWheel += OnMouseWheel;
+            listenedInput.RawMouseMove += OnMouseMove;
+        }
+
+        protected override void Dispose(bool disposeManagedResources)
+        {
+            StopListening();
+            if (scaleSource != null)
+            {
+                scaleSource.DpiChanged -= HostDpiChanged;
+                scaleSource = null;
+            }
+
+            base.Dispose(disposeManagedResources);
+        }
+
+        private void StopListening()
+        {
+            if (listenedInput == null)
+            {
+                return;
+            }
+
+            listenedInput.KeyDown -= WindowOnKeyDown;
+            listenedInput.KeyUp -= WindowOnKeyUp;
+            listenedInput.TextInput -= WindowOnTextInput;
+            listenedInput.MouseDown -= OnMouseDown;
+            listenedInput.MouseUp -= OnMouseUp;
+            listenedInput.MouseWheel -= OnMouseWheel;
+            listenedInput.RawMouseMove -= OnMouseMove;
+            listenedInput = null;
         }
 
         public override object NativeWindow => OutputContext.Context;
@@ -396,37 +423,58 @@ namespace Adamantium.UI.Universes
 
         private void OnMouseUp(object sender, MouseButtonEventArgs e)
         {
-            var mouseInput = new MouseInput();
-            mouseInput.InputType = InputType.Up;
-            mouseInput.Button = MouseTranslationKeys[e.ChangedButton];
-            OnMouseInput(mouseInput);
+            if (!MouseTranslationKeys.TryGetValue(e.ChangedButton, out var button))
+            {
+                return;
+            }
+
+            OnMouseInput(new MouseInput { InputType = InputType.Up, Button = button });
         }
 
         private void OnMouseDown(object sender, MouseButtonEventArgs e)
         {
-            var mouseInput = new MouseInput();
-            mouseInput.InputType = InputType.Down;
-            mouseInput.Button = MouseTranslationKeys[e.ChangedButton];
-            mouseInput.ClickCount = e.ClickCount;
-            OnMouseInput(mouseInput);
+            if (!MouseTranslationKeys.TryGetValue(e.ChangedButton, out var button))
+            {
+                return;
+            }
+
+            OnMouseInput(new MouseInput { InputType = InputType.Down, Button = button, ClickCount = e.ClickCount });
+        }
+
+        internal static bool TryTranslate(Key key, uint physicalKey, out Keys result)
+        {
+            if (physicalKey != 0 && KnownKeys.Contains((Keys)physicalKey))
+            {
+                result = (Keys)physicalKey;
+                return true;
+            }
+
+            return TranslationKeys.TryGetValue(key, out result);
         }
 
         private void WindowOnKeyUp(object sender, KeyEventArgs e)
         {
-            var keyboardInput = new KeyboardInput();
-            keyboardInput.Key = TranslationKeys[e.Key];
-            keyboardInput.InputType = InputType.Up;
-            
-            OnKeyInput(keyboardInput);
+            if (!TryTranslate(e.Key, e.PhysicalKey, out var key))
+            {
+                return;
+            }
+
+            OnKeyInput(new KeyboardInput { Key = key, InputType = InputType.Up });
+        }
+
+        private void WindowOnTextInput(object sender, TextInputEventArgs e)
+        {
+            OnTextInput(e.Text);
         }
 
         private void WindowOnKeyDown(object sender, KeyEventArgs e)
         {
-            var keyboardInput = new KeyboardInput();
-            keyboardInput.Key = TranslationKeys[e.Key];
-            keyboardInput.InputType = InputType.Down;
-            
-            OnKeyInput(keyboardInput);
+            if (!TryTranslate(e.Key, e.PhysicalKey, out var key))
+            {
+                return;
+            }
+
+            OnKeyInput(new KeyboardInput { Key = key, InputType = InputType.Down });
         }
     }
 }

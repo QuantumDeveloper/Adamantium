@@ -8,7 +8,7 @@
 1. **Build the server:**
 
    ```
-   dotnet build ..\..\Adamantium.UI.LanguageServer\Adamantium.UI.LanguageServer.csproj -c Debug -p:Platform=x64
+   dotnet build ..\..\Adamantium.UI.LanguageServer\Adamantium.UI.LanguageServer.csproj -c Debug
    ```
 
    Produces:

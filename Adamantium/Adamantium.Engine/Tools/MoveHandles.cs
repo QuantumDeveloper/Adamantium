@@ -8,7 +8,7 @@ namespace Adamantium.Engine.Tools;
 
 /// <summary>
 /// Arrows that move a target along an axis, squares that move it across a plane, and a center that moves it across the
-/// view. The world's axes. The squares sit by the center, on the side the camera looks from.
+/// view. The world's axes. Each square sits between its two arrows.
 /// </summary>
 public class MoveHandles : Handles
 {
@@ -20,6 +20,7 @@ public class MoveHandles : Handles
     private readonly Entity rightUp;
     private readonly Entity rightForward;
     private readonly Entity upForward;
+    private readonly Entity[] parts;
     private Vector3 anchor;
     private Vector3 startPosition;
     private Vector3F direction;
@@ -36,6 +37,7 @@ public class MoveHandles : Handles
         rightUp = Shape.Get("RightUpManipulator");
         rightForward = Shape.Get("RightForwardManipulator");
         upForward = Shape.Get("UpForwardManipulator");
+        parts = [right, up, forward, rightUp, rightForward, upForward];
     }
 
     public override void Place(Entity target, Camera camera)
@@ -44,7 +46,6 @@ public class MoveHandles : Handles
         PlaceShape(camera, at, QuaternionF.Identity, Pixels * UnitsPerPoint(camera, at) / Length);
         HideArmsFacingEye(right, up, forward, QuaternionF.Identity, at, camera);
         HideSquaresEdgeOn(rightUp, rightForward, upForward, QuaternionF.Identity, at, camera);
-        TurnSquaresToEye(QuaternionF.Identity, at, camera);
     }
 
     public override void BeginDrag(Entity target, Entity handle, in PickRay ray)
@@ -61,9 +62,9 @@ public class MoveHandles : Handles
             return;
         }
 
-        direction = handle == rightUp ? Vector3F.UnitZ
-            : handle == rightForward ? Vector3F.UnitY
-            : handle == upForward ? Vector3F.UnitX
+        direction = IsPartOf(handle, rightUp) ? Vector3F.UnitZ
+            : IsPartOf(handle, rightForward) ? Vector3F.UnitY
+            : IsPartOf(handle, upForward) ? Vector3F.UnitX
             : Vector3F.Normalize((Vector3F)ray.Camera.Forward);
         OnPlane(ray.Ray, origin, direction, out var hit);
         startOffset = hit - origin;
@@ -97,38 +98,19 @@ public class MoveHandles : Handles
 
     public override void Highlight(Entity handle)
     {
-        base.Highlight(AxisOf(handle) ?? handle);
+        base.Highlight(PartOf(handle) ?? handle);
     }
 
-    private static void Mirror(Entity part, Vector3F signs, Camera camera)
+    private Entity PartOf(Entity handle)
     {
-        var metadata = part.Transform.GetMetadata(camera);
-        metadata.WorldMatrixF = Matrix4x4F.Scaling(signs) * metadata.WorldMatrixF;
-    }
-
-    private void TurnSquaresToEye(QuaternionF axes, Vector3 at, Camera camera)
-    {
-        var toEye = -InRender(at, camera);
-        var x = Vector3F.Dot(Axis(axes, Vector3F.UnitX), toEye) < 0 ? -1f : 1f;
-        var y = Vector3F.Dot(Axis(axes, Vector3F.UnitY), toEye) < 0 ? -1f : 1f;
-        var z = Vector3F.Dot(Axis(axes, Vector3F.UnitZ), toEye) < 0 ? -1f : 1f;
-        Mirror(rightUp, new Vector3F(x, y, 1), camera);
-        Mirror(rightForward, new Vector3F(x, 1, z), camera);
-        Mirror(upForward, new Vector3F(1, y, z), camera);
-    }
-
-    private Entity AxisOf(Entity handle)
-    {
-        if (IsPartOf(handle, right))
+        foreach (var part in parts)
         {
-            return right;
+            if (IsPartOf(handle, part))
+            {
+                return part;
+            }
         }
 
-        if (IsPartOf(handle, up))
-        {
-            return up;
-        }
-
-        return IsPartOf(handle, forward) ? forward : null;
+        return null;
     }
 }

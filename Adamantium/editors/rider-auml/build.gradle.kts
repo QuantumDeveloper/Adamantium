@@ -65,7 +65,7 @@ val publishServer by tasks.registering(Exec::class) {
     commandLine(
         "dotnet", "publish", serverCsproj.absolutePath,
         "--disable-build-servers",
-        "-c", serverConfiguration, "-p:Platform=x64",
+        "-c", serverConfiguration,
         "-o", serverPublishDir.get().asFile.absolutePath
     )
 }

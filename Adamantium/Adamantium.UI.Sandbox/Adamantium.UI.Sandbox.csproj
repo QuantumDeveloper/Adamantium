@@ -3,15 +3,13 @@
 	<PropertyGroup>
 		<OutputType>WinExe</OutputType>
 		<TargetFramework>net10.0</TargetFramework>
-		<Platforms>x64</Platforms>
+		<Platforms>AnyCPU</Platforms>
 		<Configurations>Debug;Release</Configurations>
 		<LangVersion>latest</LangVersion>
 		<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
 		<!-- Product metadata surfaced by the About dialog (read from assembly attributes at runtime). -->
 		<Product>Adamantium Engine Sandbox</Product>
-		<Company>Adamantium</Company>
 		<Version>0.1.0</Version>
-		<Copyright>Copyright © 2026 Adamantium</Copyright>
 		<!-- MEASUREMENT (not yet a decision): a 4K tile grid takes the managed heap from 130MB to 936MB, and the workstation
 		     collector then stops every thread for 240-460ms of each second - a quarter to a half of the frame budget, spent
 		     where no profiler of ours was looking. Server GC collects per-core and in parallel, which is the shape this

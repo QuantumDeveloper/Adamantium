@@ -30,6 +30,11 @@ public class RenderTargetPanel : Grid
       FocusableProperty.OverrideMetadata(typeof(RenderTargetPanel), new PropertyMetadata(true));
    }
 
+   public RenderTargetPanel()
+   {
+      LostMouseCapture += OnLostMouseCapture;
+   }
+
    /// <summary>The descriptor of the currently bound source, or <c>null</c> when nothing is bound.</summary>
    public SharedSurfaceDescriptor Source { get; private set; }
 
@@ -66,6 +71,7 @@ public class RenderTargetPanel : Grid
    private bool _looking;    // relative mode currently engaged by THIS panel
    private bool _leftDown;   // Drag mode: left button held on the panel
    private bool _rightDown;  // Drag mode: right button held on the panel
+   private bool _middleDown;
    private Vector2 _engagePoint;   // panel-relative cursor position at engage; restored (as screen) on release
 
    // Esc is the always-available escape hatch out of mouse-look (frees the hidden cursor), the safety net for
@@ -158,7 +164,11 @@ public class RenderTargetPanel : Grid
 
    protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
    {
+      _leftDown = false;
+      _rightDown = false;
+      _middleDown = false;
       Disengage();   // a tab switch / tree teardown while looking must restore the cursor
+      LetGoOfPointer();
       ReleaseSource();
       base.OnDetachedFromVisualTree(e);
    }
@@ -188,7 +198,28 @@ public class RenderTargetPanel : Grid
       if (!_looking) return;
       _looking = false;
       (RootVisual as WindowBase)?.SetRelativeMouseMode(false, this.PointToScreen(_engagePoint));
-      ReleaseMouseCapture();
+      LetGoOfPointer();
+   }
+
+   private void LetGoOfPointer()
+   {
+      if (!_looking && !_leftDown && !_rightDown && !_middleDown)
+      {
+         ReleaseMouseCapture();
+      }
+   }
+
+   private void OnLostMouseCapture(object sender, MouseEventArgs e)
+   {
+      if (IsMouseCaptured)
+      {
+         return;
+      }
+
+      _leftDown = false;
+      _rightDown = false;
+      _middleDown = false;
+      Disengage();
    }
 
    // Exact inverse of this.PointToScreen (screen -> panel-relative): the screen point in root-client coords minus the
@@ -206,6 +237,7 @@ public class RenderTargetPanel : Grid
    {
       base.OnMouseLeftButtonDown(sender, e);
       _leftDown = true;
+      CaptureMouse();
 
       // NO grab on the left button: looking around is the RIGHT one (that is the button the engine rotates the camera
       // with). Grabbing here hid and re-centred the cursor on a plain click, so every left-click pick measured from
@@ -218,13 +250,29 @@ public class RenderTargetPanel : Grid
    {
       base.OnMouseLeftButtonUp(sender, e);
       _leftDown = false;
+      LetGoOfPointer();
+   }
+
+   protected override void OnMouseMiddleButtonDown(object sender, MouseButtonEventArgs e)
+   {
+      base.OnMouseMiddleButtonDown(sender, e);
+      _middleDown = true;
+      CaptureMouse();
+   }
+
+   protected override void OnMouseMiddleButtonUp(object sender, MouseButtonEventArgs e)
+   {
+      base.OnMouseMiddleButtonUp(sender, e);
+      _middleDown = false;
+      LetGoOfPointer();
    }
 
    protected override void OnMouseRightButtonDown(object sender, MouseButtonEventArgs e)
    {
       base.OnMouseRightButtonDown(sender, e);
       _rightDown = true;
-      if (MouseLookMode == MouseLookMode.Drag) 
+      CaptureMouse();
+      if (MouseLookMode == MouseLookMode.Drag)
          Engage();
       else if (MouseLookMode == MouseLookMode.Continuous) 
          Focus();
@@ -235,6 +283,7 @@ public class RenderTargetPanel : Grid
       base.OnMouseRightButtonUp(sender, e);
       _rightDown = false;
       if (MouseLookMode == MouseLookMode.Drag) Disengage();
+      LetGoOfPointer();
    }
 
    protected override void OnGotFocus(RoutedEventArgs e)

@@ -15,9 +15,12 @@ public class InputWormhole
     private readonly ButtonState[] mouseButtons = new ButtonState[5];
     private readonly int[] clickCounts = new int[5];
 
+    private readonly List<string> textInputs = [];
+
     private readonly UniverseOutput output;
     private readonly GamepadHub gamepads;
 
+    private string text = string.Empty;
     private Vector2F absolutePosition;
     private bool isPointerHeld;
     private Vector2F rawMouseDelta;
@@ -31,9 +34,9 @@ public class InputWormhole
 
     internal void OnKeyboardInput(KeyboardInput e)
     {
-        lock (KeyboadInputs)
+        lock (KeyboardInputs)
         {
-            KeyboadInputs.Add(e);
+            KeyboardInputs.Add(e);
         }
     }
 
@@ -45,7 +48,15 @@ public class InputWormhole
         }
     }
 
-    internal List<KeyboardInput> KeyboadInputs { get; } = [];
+    internal void OnTextInput(string value)
+    {
+        lock (textInputs)
+        {
+            textInputs.Add(value);
+        }
+    }
+
+    internal List<KeyboardInput> KeyboardInputs { get; } = [];
 
     internal List<MouseInput> MouseInputs { get; } = [];
 
@@ -70,19 +81,25 @@ public class InputWormhole
 
     public Vector2F RawMouseDelta => IsMouseEnabled ? rawMouseDelta : Vector2F.Zero;
 
+    /// <summary>
+    /// The text typed into the output this frame, in the order it was typed - characters, not keys, so it follows the
+    /// keyboard layout and takes what an input method composed. Empty when nothing was typed or the keyboard is off.
+    /// </summary>
+    public string Text => IsKeyboardEnabled ? text : string.Empty;
+
     public bool IsKeyDown(Keys key)
     {
-        return IsKeyboardEnabled && downKeys.Contains(key);
+        return IsKeyboardEnabled && Holds(downKeys, key);
     }
 
     public bool IsKeyPressed(Keys key)
     {
-        return IsKeyboardEnabled && pressedKeys.Contains(key);
+        return IsKeyboardEnabled && Holds(pressedKeys, key);
     }
 
     public bool IsKeyReleased(Keys key)
     {
-        return IsKeyboardEnabled && releasedKeys.Contains(key);
+        return IsKeyboardEnabled && Holds(releasedKeys, key);
     }
 
     public bool IsMouseButtonDown(MouseButton button)
@@ -176,7 +193,22 @@ public class InputWormhole
     public void Update(AppTime time)
     {
         UpdateKeyboard();
+        UpdateText();
         UpdateMouse();
+    }
+
+    private void UpdateText()
+    {
+        lock (textInputs)
+        {
+            text = textInputs.Count switch
+            {
+                0 => string.Empty,
+                1 => textInputs[0],
+                _ => string.Concat(textInputs)
+            };
+            textInputs.Clear();
+        }
     }
 
     private void UpdateKeyboard()
@@ -184,30 +216,34 @@ public class InputWormhole
         pressedKeys.Clear();
         releasedKeys.Clear();
 
-        lock (KeyboadInputs)
+        lock (KeyboardInputs)
         {
-            foreach (var keyboardInput in KeyboadInputs)
+            foreach (var keyboardInput in KeyboardInputs)
             {
                 switch (keyboardInput.InputType)
                 {
                     case InputType.Up:
-                        if (IsKeyDown(keyboardInput.Key))
+                        if (downKeys.Remove(keyboardInput.Key))
                         {
                             releasedKeys.Add(keyboardInput.Key);
-                            downKeys.Remove(keyboardInput.Key);
                         }
                         break;
 
                     case InputType.Down:
-                        if (!IsKeyDown(keyboardInput.Key))
+                        if (downKeys.Add(keyboardInput.Key))
                         {
                             pressedKeys.Add(keyboardInput.Key);
-                            downKeys.Add(keyboardInput.Key);
                         }
                         break;
                 }
             }
-            KeyboadInputs.Clear();
+            KeyboardInputs.Clear();
+        }
+
+        if (!output.IsKeyboardFocused)
+        {
+            releasedKeys.UnionWith(downKeys);
+            downKeys.Clear();
         }
     }
 
@@ -227,18 +263,13 @@ public class InputWormhole
         {
             foreach (var mouseInput in MouseInputs)
             {
-                ButtonState state;
                 switch (mouseInput.InputType)
                 {
-                    case InputType.Up:
-                        state = mouseButtons[(int)mouseInput.Button];
-                        HandleButtonState(ref state, false);
-                        mouseButtons[(int)mouseInput.Button] = state;
+                    case InputType.Up when IsTracked(mouseInput.Button):
+                        Release(ref mouseButtons[(int)mouseInput.Button]);
                         break;
-                    case InputType.Down:
-                        state = mouseButtons[(int)mouseInput.Button];
-                        HandleButtonState(ref state, true);
-                        mouseButtons[(int)mouseInput.Button] = state;
+                    case InputType.Down when IsTracked(mouseInput.Button):
+                        Press(ref mouseButtons[(int)mouseInput.Button]);
                         clickCounts[(int)mouseInput.Button] = mouseInput.ClickCount;
                         break;
                     case InputType.Wheel:
@@ -251,24 +282,49 @@ public class InputWormhole
             }
             MouseInputs.Clear();
         }
+
+        if (!output.IsPointerOver && !isPointerHeld)
+        {
+            for (int i = 0; i < mouseButtons.Length; ++i)
+            {
+                if (mouseButtons[i].IsDown)
+                {
+                    Release(ref mouseButtons[i]);
+                }
+            }
+        }
     }
 
-    private void HandleButtonState(ref ButtonState state, bool isDown)
+    private static bool Holds(HashSet<Keys> keys, Keys key)
     {
-        if (isDown)
+        return key switch
         {
-            if (!state.IsDown)
-            {
-                state.IsPressed = true;
-            }
-            state.IsDown = true;
-            state.IsReleased = false;
-        }
-        else
+            Keys.Shift => keys.Contains(Keys.Shift) || keys.Contains(Keys.LeftShift) || keys.Contains(Keys.RightShift),
+            Keys.Control => keys.Contains(Keys.Control) || keys.Contains(Keys.LeftControl) ||
+                            keys.Contains(Keys.RightControl),
+            Keys.Alt => keys.Contains(Keys.Alt) || keys.Contains(Keys.LeftAlt) || keys.Contains(Keys.RightAlt),
+            _ => keys.Contains(key)
+        };
+    }
+
+    private bool IsTracked(MouseButton button)
+    {
+        return button >= 0 && (int)button < mouseButtons.Length;
+    }
+
+    private static void Press(ref ButtonState state)
+    {
+        if (!state.IsDown)
         {
-            state.IsReleased = true;
-            state.IsDown = false;
-            state.IsPressed = false;
+            state.IsPressed = true;
         }
+        state.IsDown = true;
+        state.IsReleased = false;
+    }
+
+    private static void Release(ref ButtonState state)
+    {
+        state.IsDown = false;
+        state.IsReleased = true;
     }
 }

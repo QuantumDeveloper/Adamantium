@@ -1,188 +1,163 @@
+using Adamantium.Core.Events;
 using Adamantium.Mathematics;
+using Adamantium.Multiverse.Events;
+using Adamantium.Multiverse.Payloads;
 
 namespace Adamantium.Multiverse.Input;
 
 /// <summary>
-/// Every connected gamepad, polled once per frame. A gamepad belongs to the machine, not to an output, so there is
-/// one of these per platform and each output's input reads from it.
+/// The gamepads, polled once per frame. A gamepad belongs to the machine, not to an output, so there is one of these
+/// per platform and each output's input reads from it. A gamepad keeps its slot while it is connected; the slot of one
+/// that left goes to the next to arrive.
 /// </summary>
 public class GamepadHub
 {
-    private const int MaxGamepadsCount = 8;
-    private const float LeftThumbDeadZone = 0.2f;
-    private const float RightThumbDeadZone = 0.2f;
+    public const int SlotCount = 8;
 
-    private readonly HashSet<GamepadButton>[] downGamepadButtons;
-    private readonly HashSet<GamepadButton>[] pressedGamepadButtons;
-    private readonly HashSet<GamepadButton>[] releasedGamepadButtons;
-    private readonly HashSet<GamepadButton>[] currentGamepadButtons;
+    private const float ThumbDeadZone = 0.2f;
 
-    private readonly HashSet<GamepadButton> supportedGamepadButtons =
-    [
-        GamepadButton.A,
-        GamepadButton.B,
-        GamepadButton.X,
-        GamepadButton.Y,
-        GamepadButton.Back,
-        GamepadButton.Start,
-        GamepadButton.LeftThumb,
-        GamepadButton.RightThumb,
-        GamepadButton.LeftShoulder,
-        GamepadButton.RightShoulder,
-        GamepadButton.DpadLeft,
-        GamepadButton.DpadRight,
-        GamepadButton.DpadUp,
-        GamepadButton.DpadDown
-    ];
+    private readonly IGamepadBackend backend;
+    private readonly IEventAggregator events;
+    private readonly Gamepad[] slots = new Gamepad[SlotCount];
+    private readonly GamepadState[] states = new GamepadState[SlotCount];
+    private readonly GamepadButton[] pressed = new GamepadButton[SlotCount];
+    private readonly GamepadButton[] released = new GamepadButton[SlotCount];
 
-    private Gamepad[] gamepads;
-    private GamepadState[] gamepadStates;
-
-    public GamepadHub(IGamepadFactory gamepadFactory)
+    public GamepadHub(IGamepadBackend backend, IEventAggregator events)
     {
-        downGamepadButtons = new HashSet<GamepadButton>[MaxGamepadsCount];
-        pressedGamepadButtons = new HashSet<GamepadButton>[MaxGamepadsCount];
-        releasedGamepadButtons = new HashSet<GamepadButton>[MaxGamepadsCount];
-        currentGamepadButtons = new HashSet<GamepadButton>[MaxGamepadsCount];
-
-        for (int i = 0; i < MaxGamepadsCount; i++)
-        {
-            downGamepadButtons[i] = [];
-            pressedGamepadButtons[i] = [];
-            releasedGamepadButtons[i] = [];
-            currentGamepadButtons[i] = [];
-        }
-
-        gamepads = gamepadFactory.GetConnectedGamepads();
-        gamepadStates = new GamepadState[MaxGamepadsCount];
+        this.backend = backend ?? throw new ArgumentNullException(nameof(backend));
+        this.events = events;
     }
 
-    public bool IsButtonDown(int gamepadIndex, GamepadButton button)
+    /// <summary>The gamepad in <paramref name="slot"/>, or null when the slot is free.</summary>
+    public Gamepad GetGamepad(int slot)
     {
-        return downGamepadButtons[gamepadIndex].Contains(button);
+        return IsSlot(slot) ? slots[slot] : null;
     }
 
-    public bool IsButtonPressed(int gamepadIndex, GamepadButton button)
+    public bool IsButtonDown(int slot, GamepadButton button)
     {
-        return pressedGamepadButtons[gamepadIndex].Contains(button);
+        return IsSlot(slot) && Holds(states[slot].Buttons, button);
     }
 
-    public bool IsButtonReleased(int gamepadIndex, GamepadButton button)
+    public bool IsButtonPressed(int slot, GamepadButton button)
     {
-        return releasedGamepadButtons[gamepadIndex].Contains(button);
+        return IsSlot(slot) && Holds(pressed[slot], button);
     }
 
-    public GamepadState GetState(int gamepadIndex)
+    public bool IsButtonReleased(int slot, GamepadButton button)
     {
-        return gamepadStates[gamepadIndex];
+        return IsSlot(slot) && Holds(released[slot], button);
+    }
+
+    public GamepadState GetState(int slot)
+    {
+        return IsSlot(slot) ? states[slot] : default;
     }
 
     public void Update()
     {
-        lock (gamepadStates)
+        Array.Clear(pressed);
+        Array.Clear(released);
+
+        backend.Update();
+        var connected = backend.Gamepads;
+        DropDeparted(connected);
+        SeatArrivals(connected);
+
+        for (var slot = 0; slot < SlotCount; slot++)
         {
-            for (int i = 0; i < MaxGamepadsCount; i++)
+            if (slots[slot] != null)
             {
-                pressedGamepadButtons[i].Clear();
-                releasedGamepadButtons[i].Clear();
-                currentGamepadButtons[i].Clear();
-                gamepadStates[i].IsConnected = false;
-            }
-
-            for (var i = 0; i < gamepads.Length; i++)
-            {
-                var gamepad = gamepads[i];
-                var state = gamepad.GetState();
-                ClampDeadZone(ref state);
-                gamepadStates[i] = state;
-            }
-
-            for (int i = 0; i < gamepadStates.Length; ++i)
-            {
-                foreach (var supportedGamepadButton in supportedGamepadButtons)
-                {
-                    if (!gamepadStates[i].IsConnected)
-                    {
-                        continue;
-                    }
-
-                    var state = gamepadStates[i];
-                    if (state.Buttons.HasFlag(supportedGamepadButton))
-                    {
-                        if (!downGamepadButtons[i].Contains(supportedGamepadButton))
-                        {
-                            downGamepadButtons[i].Add(supportedGamepadButton);
-                            pressedGamepadButtons[i].Add(supportedGamepadButton);
-                        }
-                        currentGamepadButtons[i].Add(supportedGamepadButton);
-                    }
-                }
-
-                foreach (var button in downGamepadButtons[i])
-                {
-                    if (!currentGamepadButtons[i].Contains(button))
-                    {
-                        releasedGamepadButtons[i].Add(button);
-                    }
-                }
-
-                foreach (var button in releasedGamepadButtons[i])
-                {
-                    downGamepadButtons[i].Remove(button);
-                }
+                Read(slot);
             }
         }
     }
 
-    private void ClampDeadZone(ref GamepadState state)
+    private void DropDeparted(IReadOnlyList<Gamepad> connected)
     {
-        var leftThumbNormalizedX = Math.Max(-1, state.LeftThumb.X / short.MaxValue);
-        var leftThumbNormalizedY = Math.Max(-1, state.LeftThumb.Y / short.MaxValue);
-
-        var absLeftThumbNormalizedX = Math.Abs(leftThumbNormalizedX);
-        var absLeftThumbNormalizedY = Math.Abs(leftThumbNormalizedY);
-
-        var leftThumbX = absLeftThumbNormalizedX < LeftThumbDeadZone
-            ? 0
-            : (absLeftThumbNormalizedX - LeftThumbDeadZone) * (leftThumbNormalizedX / absLeftThumbNormalizedX);
-
-        var leftThumbY = absLeftThumbNormalizedY < LeftThumbDeadZone
-            ? 0
-            : (absLeftThumbNormalizedY - LeftThumbDeadZone) * (leftThumbNormalizedY / absLeftThumbNormalizedY);
-
-        var rightThumbNormalizedX = Math.Max(-1, state.RightThumb.X / short.MaxValue);
-        var rightThumbNormalizedY = Math.Max(-1, state.RightThumb.Y / short.MaxValue);
-
-        var absRightThumbNormalizedX = Math.Abs(rightThumbNormalizedX);
-        var absRightThumbNormalizedY = Math.Abs(rightThumbNormalizedY);
-
-        var rightThumbX = absRightThumbNormalizedX < RightThumbDeadZone
-            ? 0
-            : (absRightThumbNormalizedX - RightThumbDeadZone) * (rightThumbNormalizedX / absRightThumbNormalizedX);
-
-        var rightThumbY = absRightThumbNormalizedY < RightThumbDeadZone
-            ? 0
-            : (absRightThumbNormalizedY - RightThumbDeadZone) * (rightThumbNormalizedY / absRightThumbNormalizedY);
-
-        if (LeftThumbDeadZone > 0)
+        for (var slot = 0; slot < SlotCount; slot++)
         {
-            leftThumbX *= 1 / (1 - LeftThumbDeadZone);
-            leftThumbY *= 1 / (1 - LeftThumbDeadZone);
+            var gamepad = slots[slot];
+            if (gamepad == null || Contains(connected, gamepad))
+            {
+                continue;
+            }
+
+            released[slot] = states[slot].Buttons;
+            states[slot] = default;
+            slots[slot] = null;
+            events?.GetEvent<GamepadDisconnectedEvent>().Publish(new GamepadPayload(slot, gamepad));
+        }
+    }
+
+    private void SeatArrivals(IReadOnlyList<Gamepad> connected)
+    {
+        for (var i = 0; i < connected.Count; i++)
+        {
+            var gamepad = connected[i];
+            if (Array.IndexOf(slots, gamepad) >= 0)
+            {
+                continue;
+            }
+
+            var slot = Array.IndexOf(slots, null);
+            if (slot < 0)
+            {
+                return;
+            }
+
+            slots[slot] = gamepad;
+            events?.GetEvent<GamepadConnectedEvent>().Publish(new GamepadPayload(slot, gamepad));
+        }
+    }
+
+    private void Read(int slot)
+    {
+        var previous = states[slot].Buttons;
+        var state = slots[slot].GetState();
+        state.IsConnected = true;
+        state.LeftThumb = new Vector2F(DeadZone(state.LeftThumb.X), DeadZone(state.LeftThumb.Y));
+        state.RightThumb = new Vector2F(DeadZone(state.RightThumb.X), DeadZone(state.RightThumb.Y));
+        state.LeftTrigger = Math.Clamp(state.LeftTrigger, 0f, 1f);
+        state.RightTrigger = Math.Clamp(state.RightTrigger, 0f, 1f);
+
+        pressed[slot] = state.Buttons & ~previous;
+        released[slot] |= previous & ~state.Buttons;
+        states[slot] = state;
+    }
+
+    private static float DeadZone(float value)
+    {
+        var magnitude = Math.Abs(value);
+        if (magnitude < ThumbDeadZone)
+        {
+            return 0;
         }
 
-        if (RightThumbDeadZone > 0)
+        return Math.Sign(value) * Math.Min(1f, (magnitude - ThumbDeadZone) / (1 - ThumbDeadZone));
+    }
+
+    private static bool Contains(IReadOnlyList<Gamepad> gamepads, Gamepad gamepad)
+    {
+        for (var i = 0; i < gamepads.Count; i++)
         {
-            rightThumbX *= 1 / (1 - RightThumbDeadZone);
-            rightThumbY *= 1 / (1 - RightThumbDeadZone);
+            if (ReferenceEquals(gamepads[i], gamepad))
+            {
+                return true;
+            }
         }
 
-        state.LeftThumb = new Vector2F(leftThumbX, leftThumbY);
-        state.RightThumb = new Vector2F(rightThumbX, rightThumbY);
+        return false;
+    }
 
-        var normalizedLeftTrigger = state.LeftTrigger / 255;
-        var normalizedRightTrigger = state.RightTrigger / 255;
+    private static bool Holds(GamepadButton buttons, GamepadButton button)
+    {
+        return button != GamepadButton.None && (buttons & button) == button;
+    }
 
-        state.LeftTrigger = normalizedLeftTrigger;
-        state.RightTrigger = normalizedRightTrigger;
+    private static bool IsSlot(int slot)
+    {
+        return slot >= 0 && slot < SlotCount;
     }
 }

@@ -19,7 +19,7 @@ $root = $PSScriptRoot
 Get-Process -Name 'Adamantium.UI.Designer.Host','Adamantium.UI.LanguageServer','Adamantium.UI.Sandbox','VBCSCompiler' -ErrorAction SilentlyContinue |
     ForEach-Object { Write-Host "Killing $($_.Name) ($($_.Id))"; $_ | Stop-Process -Force }
 
-$flags = @('-c', $Config, '-p:Platform=x64', '-p:UseSharedCompilation=false', '-nodeReuse:false', '-m:1')
+$flags = @('-c', $Config, '-p:UseSharedCompilation=false', '-nodeReuse:false', '-m:1')
 
 Write-Host "==> Building Sandbox ($Config)"
 dotnet build (Join-Path $root 'Adamantium.UI.Sandbox\Adamantium.UI.Sandbox.csproj') @flags

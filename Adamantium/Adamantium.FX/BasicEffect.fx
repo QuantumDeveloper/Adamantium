@@ -11,6 +11,8 @@ float transparency;
 float4x4 instanceWorld[64];
 float4 instanceColor[64];
 float4x4 viewProjection;
+// The view's rotation for the instanced normals: identity when the copies are placed on the screen.
+float4x4 view;
 // The selection outline's width as a clip-space offset per unit of w, along x and along y.
 float2 outlineStep;
 // A line's width in pixels, one per copy in x (and for a ring, 1 in y when only its front half shows); lines are spread
@@ -107,7 +109,8 @@ PS_OUTPUT_BASIC BasicLit_VS(MESH_VERTEX input)
 }
 
 // The instanced twin: the placement and the colour come from the tables above, everything else is identical. The
-// normal rides the copy's OWN matrix, so copies of one mesh may be turned any way and still light correctly.
+// normal rides the copy's OWN matrix, so copies of one mesh may be turned any way and still light correctly, then the
+// view's, since the light is fixed in the view.
 PS_OUTPUT_BASIC BasicLitInstanced_VS(MESH_VERTEX input, uint instanceId : SV_InstanceID)
 {
     PS_OUTPUT_BASIC output;
@@ -118,7 +121,7 @@ PS_OUTPUT_BASIC BasicLitInstanced_VS(MESH_VERTEX input, uint instanceId : SV_Ins
     output.position = mul(mul(input.position, placement), viewProjection);
     output.uv = input.uv0;
     output.color = instanceColor[instanceId];
-    output.normal = mul(input.normal, (float3x3)placement);
+    output.normal = mul(mul(input.normal, (float3x3)placement), (float3x3)view);
     return output;
 }
 

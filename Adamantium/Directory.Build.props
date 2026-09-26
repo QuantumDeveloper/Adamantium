@@ -15,4 +15,11 @@
     <PackageOutputPath>$(MSBuildThisFileDirectory)artifacts\packages\</PackageOutputPath>
   </PropertyGroup>
 
+  <!-- One identity for every assembly and package of the engine, the same as in QuantumBinding and AdamantiumVulkan. -->
+  <PropertyGroup>
+    <Authors>Adamantium Studio</Authors>
+    <Company>Adamantium Studio</Company>
+    <Copyright>Copyright © 2019-2026 Adamantium Studio</Copyright>
+  </PropertyGroup>
+
 </Project>

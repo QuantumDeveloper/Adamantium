@@ -68,7 +68,7 @@ namespace Adamantium.Multiverse
             _eventAggregator = universe.Satellites.Get<IUniverseEventAggregator>();
             outputFactory = universe.Container.Resolve<IOutputFactory>();
             windowingPlatform = universe.Container.Resolve<IWindowingPlatform>();
-            gamepads = new GamepadHub(universe.Container.Resolve<IGamepadFactory>());
+            gamepads = new GamepadHub(universe.Container.Resolve<IGamepadBackend>(), _eventAggregator);
             _eventAggregator.GetEvent<UniverseOutputChangesRequestedEvent>()
                 .Subscribe(OnUniverseOutputChangesRequested);
 

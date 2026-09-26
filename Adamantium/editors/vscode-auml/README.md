@@ -11,7 +11,7 @@ powered by `Adamantium.UI.LanguageServer` over LSP/stdio.
 - The language server built:
 
   ```
-  dotnet build ..\..\Adamantium.UI.LanguageServer\Adamantium.UI.LanguageServer.csproj -c Debug -p:Platform=x64
+  dotnet build ..\..\Adamantium.UI.LanguageServer\Adamantium.UI.LanguageServer.csproj -c Debug
   ```
 
   This produces the exe the extension launches:

@@ -262,6 +262,14 @@ namespace Adamantium.Multiverse
             Input?.OnKeyboardInput(args);
         }
 
+        protected void OnTextInput(string text)
+        {
+            if (!string.IsNullOrEmpty(text))
+            {
+                Input?.OnTextInput(text);
+            }
+        }
+
         protected void OnMouseInput(MouseInput args)
         {
             Input?.OnMouseInput(args);
