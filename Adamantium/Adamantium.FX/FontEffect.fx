@@ -36,7 +36,7 @@ struct PSInput
     float2 UV : TEXCOORD0;
     float4 Color : COLOR;
     // The rounded ancestor clip's SHAPE, fetched from the transform table in the VERTEX stage like every other family
-    // (see ClipMath.fxh). That fetch is a SECOND read of the table from this shader, which used to kill the shader
+    // (see ClipFromSlot). That fetch is a SECOND read of the table from this shader, which used to kill the shader
     // compiler outright until the effect lost its two dead passes.
     nointerpolation float4 ClipBox : TEXCOORD1;
     nointerpolation float4 ClipRadii : TEXCOORD2;
@@ -87,9 +87,41 @@ struct NodeSlot
     float4   Params;   // .x = alpha (1 = opaque); .yzw reserved
 };
 
-// The rounded clip, shared with the UI's effects (one physical file, linked in - see Adamantium.FX.csproj). It reads
-// NodeSlot and TransformsAddress, both declared just above, so it has to come AFTER them. NOTHING after the path.
-#include "Includes/ClipMath.fxh"
+// ---- Text clip: a rounded rectangle in device pixels, box.xy = origin, box.zw = size (0 = no clip), radii = TL, TR,
+// BR, BL. The text's own code, so the engine does not depend on the UI's shader headers.
+
+float TextClipDistance(float2 p, float2 halfSize, float4 radii)
+{
+    // SDF y is down, so a negative p.y is the top half.
+    float r = p.x < 0.0 ? (p.y < 0.0 ? radii.x : radii.w)
+                        : (p.y < 0.0 ? radii.y : radii.z);
+    float2 q = abs(p) - halfSize + r;
+    return min(max(q.x, q.y), 0.0) + length(max(q, float2(0.0, 0.0))) - r;
+}
+
+float ClipCoverage(float2 fragment, float4 box, float4 radii)
+{
+    if (box.z <= 0.0) return 1.0;
+    float2 halfSize = max(box.zw * 0.5, float2(1.0, 1.0));
+    float2 local = fragment - (box.xy + halfSize);
+    float lim = min(halfSize.x, halfSize.y);
+    float d = TextClipDistance(local, halfSize, min(radii, float4(lim, lim, lim, lim)));
+    float aa = fwidth(d) + 1e-4;
+    return 1.0 - smoothstep(-aa, aa, d);
+}
+
+// The batch reads its clip from the transform table: row 0 of the slot's matrix is the box, row 1 the radii, and
+// Params.x marks the slot as carrying one. A slot below 0 means no clip.
+void ClipFromSlot(float slotIndex, out float4 box, out float4 radii)
+{
+    box = float4(0.0, 0.0, 0.0, 0.0);
+    radii = float4(0.0, 0.0, 0.0, 0.0);
+    if (slotIndex < 0.0) return;
+    NodeSlot clip = ((NodeSlot*)TransformsAddress)[(uint)slotIndex];
+    if (clip.Params.x < 0.5) return;
+    box = clip.World[0];
+    radii = clip.World[1];
+}
 
 // Per-glyph quad expansion, now in the VERTEX stage (corner from SV_VertexID), so the geometry shader is gone:
 // plain instanced rendering (4-vertex triangle strip x N glyphs), portable to Metal/MoltenVK and free of the
@@ -259,8 +291,7 @@ PSInput FontBatchInstancedVS(uint vertexId : SV_VertexID, uint instanceId : SV_I
     // Together with the fade this shader now reads that table THREE times; it used to AV the compiler on the second,
     // and what made the difference is the two dead passes this effect no longer carries.
     o.Layer = g.Params.y;   // the atlas layer this glyph was packed into
-    o.ClipBox = ClipShapeBox(g.Clip.x);
-    o.ClipRadii = ClipShapeRadii(g.Clip.x);
+    ClipFromSlot(g.Clip.x, o.ClipBox, o.ClipRadii);
     return o;
 }
 

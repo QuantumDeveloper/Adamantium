@@ -20,9 +20,7 @@
 // value painted into its own colour channel and compared per pixel - they matched). The failure does not reproduce on
 // this design (4 starts of 4, no loss), so the cause is unknown and nothing in the framework is known to be broken.
 //
-// Its own header rather than a section of ShapeMath: the TEXT batch clips by the same shape through the same slot and is
-// compiled as a separate effect, so this is exactly the piece the two have to share - one field, not two that drift.
-// Both write #include "Includes/ClipMath.fxh"; Adamantium.FX links this very file in rather than keeping a copy.
+// The UI's effects include it; text in the engine's FontEffect clips by the same slot with its own code.
 //
 // It deliberately declares no globals of its own - it uses NodeSlot and TransformsAddress, which every effect that
 // includes it already declares, so it adds nothing to a parameter block that has been shown to be at its limit.
