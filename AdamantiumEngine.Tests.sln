@@ -9,10 +9,6 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Adamantium.Engine.GraphicsT
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Adamantium.Graphics.Core", "Adamantium.Graphics.Core\Adamantium.Graphics.Core.csproj", "{BC500346-78B5-4F95-B849-86719BC7F0E2}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Adamantium.Vulkan", "..\..\AdamantiumVulkan\Adamantium.Vulkan\Adamantium.Vulkan.csproj", "{9768E55B-EB25-40E4-BE19-336026DDC221}"
-EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "QuantumBinding.Utils", "..\..\QuantumBinding\QuantumBinding.Utils\QuantumBinding.Utils.csproj", "{D047F938-1728-4BDD-A083-CFF904C4D6BE}"
-EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Adamantium.EffectsCompiler", "Adamantium.EffectsCompiler\Adamantium.EffectsCompiler.csproj", "{54E5ADC1-D038-4708-BA9F-8F5FC084A93A}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Adamantium.Core", "Adamantium.Core\Adamantium.Core.csproj", "{7A335116-2943-4E13-9A2D-A9582AE15F35}"
@@ -46,8 +42,6 @@ EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Adamantium.MVVM.Generators", "Adamantium.MVVM.Generators\Adamantium.MVVM.Generators.csproj", "{6D0648C8-74A4-42B9-A33D-3A62815D1C35}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Adamantium.MacOS", "Adamantium.MacOS\Adamantium.MacOS.csproj", "{2283120B-9584-4BE1-AC7C-3D91A02DD9AD}"
-EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Adamantium.Vulkan.Loader", "..\..\AdamantiumVulkan\Adamantium.Vulkan.Loader\Adamantium.Vulkan.Loader.csproj", "{702856C6-71E3-4728-9755-C37A7E09A615}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Adamantium.MathTests", "Tests\Adamantium.MathTests\Adamantium.MathTests.csproj", "{E4D943DC-DC75-4314-84E5-54408E05682E}"
 EndProject
@@ -83,14 +77,6 @@ Global
 		{BC500346-78B5-4F95-B849-86719BC7F0E2}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{BC500346-78B5-4F95-B849-86719BC7F0E2}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{BC500346-78B5-4F95-B849-86719BC7F0E2}.Release|Any CPU.Build.0 = Release|Any CPU
-		{9768E55B-EB25-40E4-BE19-336026DDC221}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{9768E55B-EB25-40E4-BE19-336026DDC221}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{9768E55B-EB25-40E4-BE19-336026DDC221}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{9768E55B-EB25-40E4-BE19-336026DDC221}.Release|Any CPU.Build.0 = Release|Any CPU
-		{D047F938-1728-4BDD-A083-CFF904C4D6BE}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{D047F938-1728-4BDD-A083-CFF904C4D6BE}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{D047F938-1728-4BDD-A083-CFF904C4D6BE}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{D047F938-1728-4BDD-A083-CFF904C4D6BE}.Release|Any CPU.Build.0 = Release|Any CPU
 		{54E5ADC1-D038-4708-BA9F-8F5FC084A93A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{54E5ADC1-D038-4708-BA9F-8F5FC084A93A}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{54E5ADC1-D038-4708-BA9F-8F5FC084A93A}.Release|Any CPU.ActiveCfg = Release|Any CPU
@@ -159,10 +145,6 @@ Global
 		{2283120B-9584-4BE1-AC7C-3D91A02DD9AD}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{2283120B-9584-4BE1-AC7C-3D91A02DD9AD}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{2283120B-9584-4BE1-AC7C-3D91A02DD9AD}.Release|Any CPU.Build.0 = Release|Any CPU
-		{702856C6-71E3-4728-9755-C37A7E09A615}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{702856C6-71E3-4728-9755-C37A7E09A615}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{702856C6-71E3-4728-9755-C37A7E09A615}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{702856C6-71E3-4728-9755-C37A7E09A615}.Release|Any CPU.Build.0 = Release|Any CPU
 		{E4D943DC-DC75-4314-84E5-54408E05682E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{E4D943DC-DC75-4314-84E5-54408E05682E}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{E4D943DC-DC75-4314-84E5-54408E05682E}.Release|Any CPU.ActiveCfg = Release|Any CPU

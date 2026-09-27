@@ -17,7 +17,7 @@ work it started as, this file says it did not stay that way.
 
 ## FJCore — JPEG codec
 
-**Where:** `Adamantium/Adamantium.Imaging/Jpeg/` (22 files: decoder, encoder, DCT, colour models, filters)
+**Where:** `Adamantium.Imaging/Jpeg/` (22 files: decoder, encoder, DCT, colour models, filters)
 
 A pure C# JPEG codec, originally a Fluxcapacity Open Source project by Jeffrey Powers, later mirrored on GitHub after
 Google Code shut down. Upstream is no longer maintained — the last code change was in 2016 — which changes nothing about

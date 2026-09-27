@@ -1,6 +1,6 @@
 # Анализ производительности и архитектуры: игра + ECS
 
-_2026-07-17. Код под `C:\AdamantiumEngine\Adamantium\Adamantium`. Активная конфигурация Sandbox: сервисы `InputService`,
+_2026-07-17. Активная конфигурация Sandbox: сервисы `InputService`,
 `TransformService` (update) + `RenderingService`/`ForwardRenderingProcessor` (render). Сцена = один импортируемый F-15._
 _Дополняет [`PERF_ANALYSIS.md`](PERF_ANALYSIS.md) (2026-06-23, GPU-сериализация игры-в-панели): там — «почему 375→155»._
 _Секции A–D — что резать в кадре; **E** — архитектура ECS (как Entity держит позицию и т.д.); **F** — архитектура
@@ -89,23 +89,23 @@ Render-thread теперь всегда включён (6284b84) → при ре
 ## A. Архитектурный рычаг №1 — развязать частоту рендера игры от UI
 
 **Цепочка кадра:** `EntityServiceManager.Draw` → `OnDrawStarted` → `GameApplication.ServiceManagerOnDrawStarted`
-([GameApplication.cs:30](../Adamantium/Adamantium.Game/GameApplication.cs#L30)) → `GameService.RunGames` →
-`Parallel.ForEach → Game.RunOnce` ([GameService.cs:61-76](../Adamantium/Adamantium.Game/GameService.cs#L61)). `RunOnce`
-([Game.cs:255](../Adamantium/Adamantium.Game/Game.cs#L255)) делает **Update + полный Draw + FrameFinished без единой
+([GameApplication.cs:30](../Adamantium.Game/GameApplication.cs#L30)) → `GameService.RunGames` →
+`Parallel.ForEach → Game.RunOnce` ([GameService.cs:61-76](../Adamantium.Game/GameService.cs#L61)). `RunOnce`
+([Game.cs:255](../Adamantium.Game/Game.cs#L255)) делает **Update + полный Draw + FrameFinished без единой
 проверки «менялось ли что-то»**.
 
 **Почему `DesiredFPS` игры не работает:** цикл `Game.StartGameLoop` (читает `DesiredFPS`/`IsFixedTimeStep`,
-[Game.cs:448-489](../Adamantium/Adamantium.Game/Game.cs#L448)) стартует только из `Run()`
-([Game.cs:293](../Adamantium/Adamantium.Game/Game.cs#L293)). Хостовая игра создаётся через
-`GameService.CreateGame → InitializeBeforeRun` ([Game.cs:185-188](../Adamantium/Adamantium.Game/Game.cs#L185)) и **`Run()`
+[Game.cs:448-489](../Adamantium.Game/Game.cs#L448)) стартует только из `Run()`
+([Game.cs:293](../Adamantium.Game/Game.cs#L293)). Хостовая игра создаётся через
+`GameService.CreateGame → InitializeBeforeRun` ([Game.cs:185-188](../Adamantium.Game/Game.cs#L185)) и **`Run()`
 не зовётся** → `gameLoopThread` не запускается, игру тикает только внешний `RunOnce`. Значит `DesiredFPS=60`
-([Game.cs:66-67](../Adamantium/Adamantium.Game/Game.cs#L66)) сейчас **ни на что не влияет**.
+([Game.cs:66-67](../Adamantium.Game/Game.cs#L66)) сейчас **ни на что не влияет**.
 
 **Фикс:** rate-gate в `RunGames`. Аккумулятор на `GameKey`; пропускать `item.Game.RunOnce(time)`, пока
-`accum < item.Game.TimeStep` (`TimeStep = 1/DesiredFPS`, [Game.cs:170](../Adamantium/Adamantium.Game/Game.cs#L170)), иначе
+`accum < item.Game.TimeStep` (`TimeStep = 1/DesiredFPS`, [Game.cs:170](../Adamantium.Game/Game.cs#L170)), иначе
 `accum += FrameTime`. На пропущенном кадре — ничего: панель композитит последний shared-surface. Single-buffer безопасен —
 backpressure-гард `if (_sharedSurface.ConsumeValue < _lastProduced) return;`
-([RenderTargetGameOutput.cs:81](../Adamantium/Adamantium.Game.Core/RenderTargetGameOutput.cs#L81)) не даёт перезаписать
+([RenderTargetGameOutput.cs:81](../Adamantium.Game.Core/RenderTargetGameOutput.cs#L81)) не даёт перезаписать
 кадр во время сэмпла. Итог: UI ~375, игра ~60.
 
 > Rate-gate поднимает СРЕДНИЙ FPS, но не удешевляет один игровой кадр. За стоимость кадра отвечают B/C/D — они и определяют
@@ -116,39 +116,39 @@ backpressure-гард `if (_sharedSurface.ConsumeValue < _lastProduced) return;`
 ## B. ECS update — безусловный пересчёт (нет dirty-флагов)
 
 **Корень:** ни у `Transform`, ни у `TransformMetaData`
-([TransformMetaData.cs](../Adamantium/Adamantium.ECS/ComponentsBasics/TransformMetaData.cs)) нет dirty/version-флага,
+([TransformMetaData.cs](../Adamantium.ECS/ComponentsBasics/TransformMetaData.cs)) нет dirty/version-флага,
 поэтому всё ниже пересчитывается всегда.
 
 1. **[КРУПНО] `TransformService` пересчитывает мировую матрицу КАЖДОЙ сущности каждый кадр × активные камеры.**
-   [TransformService.cs:37-85](../Adamantium/Adamantium.Engine/EntityServices/TransformService.cs#L37) →
+   [TransformService.cs:37-85](../Adamantium.Engine/EntityServices/TransformService.cs#L37) →
    `Transform.CalculateFinalTransform`
-   ([Transform.cs:709-726](../Adamantium/Adamantium.ECS/ComponentsBasics/Transform.cs#L709)): полный
+   ([Transform.cs:709-726](../Adamantium.ECS/ComponentsBasics/Transform.cs#L709)): полный
    `Matrix4x4F.Transformation(...)` + лишний widening-каст `(Matrix4x4)matrix`
-   ([Transform.cs:721-722](../Adamantium/Adamantium.ECS/ComponentsBasics/Transform.cs#L721)) на каждый узел, даже если
+   ([Transform.cs:721-722](../Adamantium.ECS/ComponentsBasics/Transform.cs#L721)) на каждый узел, даже если
    ничего не двигалось. **Фикс:** `bool IsDirty` на `Transform`, ставить в существующих `SetProperty`-сеттерах
-   Position/Rotation/Scale/Pivot ([Transform.cs:75-133](../Adamantium/Adamantium.ECS/ComponentsBasics/Transform.cs#L75));
+   Position/Rotation/Scale/Pivot ([Transform.cs:75-133](../Adamantium.ECS/ComponentsBasics/Transform.cs#L75));
    т.к. `relativePosition` зависит от позиции камеры
-   ([Transform.cs:712](../Adamantium/Adamantium.ECS/ComponentsBasics/Transform.cs#L712)), хранить в метадате позицию камеры
+   ([Transform.cs:712](../Adamantium.ECS/ComponentsBasics/Transform.cs#L712)), хранить в метадате позицию камеры
    и пересчитывать узел только если `IsDirty` ИЛИ камера сдвинулась. O(all) → O(moved). Заодно убрать double-каст.
 
 2. **[ЛЁГКИЙ ВЫИГРЫШ] `LightManager.Update` пересобирает 3 списка LINQ'ом каждый кадр — хотя они ведутся инкрементально.**
-   [LightManager.cs:93-103](../Adamantium/Adamantium.Engine/Managers/LightManager.cs#L93):
+   [LightManager.cs:93-103](../Adamantium.Engine/Managers/LightManager.cs#L93):
    `DirectionalLights/SpotLights/PointLights = _lights.Where(...).ToList()` ×3, а `AddLight` уже кладёт свет в нужный список
-   ([LightManager.cs:160-168](../Adamantium/Adamantium.Engine/Managers/LightManager.cs#L160)). Зовётся из
-   [TransformService.cs:47](../Adamantium/Adamantium.Engine/EntityServices/TransformService.cs#L47). **Фикс:** удалить тело
+   ([LightManager.cs:160-168](../Adamantium.Engine/Managers/LightManager.cs#L160)). Зовётся из
+   [TransformService.cs:47](../Adamantium.Engine/EntityServices/TransformService.cs#L47). **Фикс:** удалить тело
    `Update()` или гейтить `_lightsDirty`. Минус 3 скана + 3 аллокации/кадр.
 
 3. **Коллайдеры: O(colliders²) + `ClearData` с реаллокацией на узел на камеру.**
-   [TransformService.cs:70-77](../Adamantium/Adamantium.Engine/EntityServices/TransformService.cs#L70): вложенный i/j-цикл,
+   [TransformService.cs:70-77](../Adamantium.Engine/EntityServices/TransformService.cs#L70): вложенный i/j-цикл,
    `ClearData()` стирает весь per-camera словарь
-   ([BoxCollider.cs:20-41](../Adamantium/Adamantium.ECS.Components/BoxCollider.cs#L20)), потом `UpdateForCamera` пере-добавляет
+   ([BoxCollider.cs:20-41](../Adamantium.ECS.Components/BoxCollider.cs#L20)), потом `UpdateForCamera` пере-добавляет
    только текущую камеру (при >1 камере переживает лишь последняя — латентный баг). **Фикс:** один цикл
    `foreach collider: collider.UpdateForCamera(camera)` (оно перезаписывает `ColliderData[camera]`, `ClearData` не нужен);
    гейтить dirty из B1.
 
 4. **Камера: `Update` безусловно каждый тик** (view-матрица, оси, `UpdateFrustum`, viewProj).
-   [InputService.cs:314](../Adamantium/Adamantium.Engine/EntityServices/InputService.cs#L314) →
-   [Camera.cs:269-336](../Adamantium/Adamantium.ECS.Components/Camera.cs#L269), без проверки «камера двигалась?». **Фикс:**
+   [InputService.cs:314](../Adamantium.Engine/EntityServices/InputService.cs#L314) →
+   [Camera.cs:269-336](../Adamantium.ECS.Components/Camera.cs#L269), без проверки «камера двигалась?». **Фикс:**
    звать `Camera.Update`, только когда input реально менял Rotation/Position/Type этот кадр.
 
 ---
@@ -156,75 +156,75 @@ backpressure-гард `if (_sharedSurface.ConsumeValue < _lastProduced) return;`
 ## C. Доступ к компонентам — аллокации + поэлементные локи (hot в update И рендере)
 
 1. **`GetComponents<T>()` = `new List<T>()` + `.ToArray()` на каждый вызов на узел каждый кадр.**
-   [EntityComponentCollection.cs:39-53](../Adamantium/Adamantium.ECS/EntityComponentCollection.cs#L39). Горячие вызовы:
+   [EntityComponentCollection.cs:39-53](../Adamantium.ECS/EntityComponentCollection.cs#L39). Горячие вызовы:
    `TransformService.cs:60` (Collider), `ForwardRenderingProcessor.cs:89` (MeshRendererBase). **Фикс:** у сущностей обычно
    один Collider/MeshRenderer — неаллоцирующий `Get<T>()` или `GetAll<T>(List<T> reuse)`; для коллайдеров закэшировать ссылку.
 
 2. **`Get<T>` = линейный скан с Monitor-локом НА КАЖДЫЙ элемент** (индексер `this[i]` перелочивает тот же `SyncRoot`).
-   [EntityComponentCollection.cs:19-32](../Adamantium/Adamantium.ECS/EntityComponentCollection.cs#L19) +
-   [AdamantiumCollection.cs:492-500](../Adamantium/Adamantium.Core/Collections/AdamantiumCollection.cs#L492). Плюс
+   [EntityComponentCollection.cs:19-32](../Adamantium.ECS/EntityComponentCollection.cs#L19) +
+   [AdamantiumCollection.cs:492-500](../Adamantium.Core/Collections/AdamantiumCollection.cs#L492). Плюс
    `Entity.GetComponent` обёрнут в try/catch + `Console.WriteLine`
-   ([Entity.cs:241-252](../Adamantium/Adamantium.ECS/Entity.cs#L241)). **Фикс:** взять лок один раз и идти по сырому
+   ([Entity.cs:241-252](../Adamantium.ECS/Entity.cs#L241)). **Фикс:** взять лок один раз и идти по сырому
    backing-массиву (или вести `Dictionary<Type,IComponent>` → O(1)); убрать try/catch+Console.
 
 3. **`GetEnumerator` боксит struct-энумератор + лочится; `TraverseInDepth` аллоцирует `Stack` на вызов.**
-   [AdamantiumCollection.cs:92-98](../Adamantium/Adamantium.Core/Collections/AdamantiumCollection.cs#L92) (боксинг),
-   [Entity.cs:315-330](../Adamantium/Adamantium.ECS/Entity.cs#L315) (`new Stack<Entity>()`). **Фикс:** возвращать struct-энумератор,
+   [AdamantiumCollection.cs:92-98](../Adamantium.Core/Collections/AdamantiumCollection.cs#L92) (боксинг),
+   [Entity.cs:315-330](../Adamantium.ECS/Entity.cs#L315) (`new Stack<Entity>()`). **Фикс:** возвращать struct-энумератор,
    обходить `Dependencies` по индексу, переиспользовать пулled `Stack` (обход однопоточный).
 
 4. **`GetComponent<Material>()` внутри цикла рендереров** — материал per-entity, а лукап per-renderer.
-   [ForwardRenderingProcessor.cs:101](../Adamantium/Adamantium.Engine/EntityServices/ForwardRenderingProcessor.cs#L101). **Фикс:** вынести из цикла.
+   [ForwardRenderingProcessor.cs:101](../Adamantium.Engine/EntityServices/ForwardRenderingProcessor.cs#L101). **Фикс:** вынести из цикла.
 
 5. **`CameraManager.GetActive(Window)` (lock + dict) на каждый узел** в обходе рисования.
-   [ForwardRenderingProcessor.cs:50](../Adamantium/Adamantium.Engine/EntityServices/ForwardRenderingProcessor.cs#L50), хотя
-   камера уже добыта в [RenderingService.cs:157](../Adamantium/Adamantium.Engine/EntityServices/RenderingService.cs#L157). **Фикс:** читать из поля процессора.
+   [ForwardRenderingProcessor.cs:50](../Adamantium.Engine/EntityServices/ForwardRenderingProcessor.cs#L50), хотя
+   камера уже добыта в [RenderingService.cs:157](../Adamantium.Engine/EntityServices/RenderingService.cs#L157). **Фикс:** читать из поля процессора.
 
 ---
 
 ## D. Per-draw GPU-сабмишн — избыточное состояние на каждый меш
 
 1. **[КРУПНО] Шейдер ребайндится КАЖДЫЙ draw, даже когда pass не менялся.** `EffectPass.ApplyHeap`
-   ([EffectPass.cs:190-198](../Adamantium/Adamantium.Graphics/Effects/EffectPass.cs#L190)) — `foreach stage → BindShader`
+   ([EffectPass.cs:190-198](../Adamantium.Graphics/Effects/EffectPass.cs#L190)) — `foreach stage → BindShader`
    (+ `BindShader(GeometryBit, null)`) = **3 `vkCmdBindShadersEXT` на каждый `Apply`**, а `Apply` — раз на меш. Все меши
    F-15 идут через ОДИН pass → все ребайнды кроме первого избыточны. **Фикс:** `_lastAppliedPass` в `GraphicsDevice`,
    пропускать блок BindShader, если `CurrentEffectPass == this` уже выставлен на этом cmd-буфере (инвалидировать в
-   `BeginDraw` рядом с `_stateInitialized=false`, [GraphicsDevice.cs:912](../Adamantium/Adamantium.Graphics/GraphicsDevice.cs#L912)).
+   `BeginDraw` рядом с `_stateInitialized=false`, [GraphicsDevice.cs:912](../Adamantium.Graphics/GraphicsDevice.cs#L912)).
 
 2. **VB и IB биндятся ДВАЖДЫ на draw.** `MeshRendererBase.Draw`
-   ([MeshRendererBase.cs:68](../Adamantium/Adamantium.ECS.Components/MeshRendererBase.cs#L68),
-   [:76](../Adamantium/Adamantium.ECS.Components/MeshRendererBase.cs#L76)) биндит VB/IB, затем `DrawIndexed` биндит снова
-   ([GraphicsDevice.cs:1401-1403](../Adamantium/Adamantium.Graphics/GraphicsDevice.cs#L1401)). **Фикс:** убрать один из двух.
+   ([MeshRendererBase.cs:68](../Adamantium.ECS.Components/MeshRendererBase.cs#L68),
+   [:76](../Adamantium.ECS.Components/MeshRendererBase.cs#L76)) биндит VB/IB, затем `DrawIndexed` биндит снова
+   ([GraphicsDevice.cs:1401-1403](../Adamantium.Graphics/GraphicsDevice.cs#L1401)). **Фикс:** убрать один из двух.
 
 3. **`vkGetBufferDeviceAddress` на каждый CB на каждый draw.**
-   [EffectPass.cs:173](../Adamantium/Adamantium.Graphics/Effects/EffectPass.cs#L173) → `Buffer.GetDeviceAddress`
-   ([Buffer.cs:390-395](../Adamantium/Adamantium.Graphics/Buffer.cs#L390)) зовёт драйвер каждый раз, хотя адрес страницы
+   [EffectPass.cs:173](../Adamantium.Graphics/Effects/EffectPass.cs#L173) → `Buffer.GetDeviceAddress`
+   ([Buffer.cs:390-395](../Adamantium.Graphics/Buffer.cs#L390)) зовёт драйвер каждый раз, хотя адрес страницы
    пула стабилен. **Фикс:** кэшировать device-address на `Buffer`/странице пула.
 
 4. **WVP = 2 матричных умножения на меш; `View*Proj` не кэшируется.**
-   [ForwardRenderingProcessor.cs:102](../Adamantium/Adamantium.Engine/EntityServices/ForwardRenderingProcessor.cs#L102).
+   [ForwardRenderingProcessor.cs:102](../Adamantium.Engine/EntityServices/ForwardRenderingProcessor.cs#L102).
    **Фикс:** `viewProj = View*Proj` раз на кадр, в цикле `World * viewProj`.
 
 5. **`GraphicsDevice.Submit` аллоцирует 5×`List` + 3×`ToArray` + `SubmitInfo` на сабмит** (×~2 сервиса × ~155/с).
-   [GraphicsDevice.cs:1115-1169](../Adamantium/Adamantium.Graphics/GraphicsDevice.cs#L1115). **Фикс:** переиспользуемые
-   поля-массивы (как `commandBuffersArray`, [GraphicsDevice.cs:95-97](../Adamantium/Adamantium.Graphics/GraphicsDevice.cs#L95)).
+   [GraphicsDevice.cs:1115-1169](../Adamantium.Graphics/GraphicsDevice.cs#L1115). **Фикс:** переиспользуемые
+   поля-массивы (как `commandBuffersArray`, [GraphicsDevice.cs:95-97](../Adamantium.Graphics/GraphicsDevice.cs#L95)).
 
-6. **Transition-барьеры аллоцируют `List`/`ToArray`/`new[]` на кадр** ([GraphicsDevice.cs:629](../Adamantium/Adamantium.Graphics/GraphicsDevice.cs#L629),
-   [:666](../Adamantium/Adamantium.Graphics/GraphicsDevice.cs#L666), [:728](../Adamantium/Adamantium.Graphics/GraphicsDevice.cs#L728)).
-   Мелко. (`BufferBarrier` `new[]{barrier}` [:1471](../Adamantium/Adamantium.Graphics/GraphicsDevice.cs#L1471) — это
+6. **Transition-барьеры аллоцируют `List`/`ToArray`/`new[]` на кадр** ([GraphicsDevice.cs:629](../Adamantium.Graphics/GraphicsDevice.cs#L629),
+   [:666](../Adamantium.Graphics/GraphicsDevice.cs#L666), [:728](../Adamantium.Graphics/GraphicsDevice.cs#L728)).
+   Мелко. (`BufferBarrier` `new[]{barrier}` [:1471](../Adamantium.Graphics/GraphicsDevice.cs#L1471) — это
    compute-путь UI-обводки, НЕ игровой hot-path.)
 
 7. **Нет сортировки/батчинга/инстансинга** — наивная per-object подача. `ClearColor` зря выставляется в per-mesh цикле
-   ([ForwardRenderingProcessor.cs:134](../Adamantium/Adamantium.Engine/EntityServices/ForwardRenderingProcessor.cs#L134)).
+   ([ForwardRenderingProcessor.cs:134](../Adamantium.Engine/EntityServices/ForwardRenderingProcessor.cs#L134)).
 
 **Уже эффективно (не гоняться):** кэш динамич. состояния `SetDrawingState`
-([GraphicsDevice.cs:1302-1377](../Adamantium/Adamantium.Graphics/GraphicsDevice.cs#L1302), re-emit только при изменении);
-персистентно-замапленные CB ([Buffer.cs:133-140](../Adamantium/Adamantium.Graphics/Buffer.cs#L133), аплоад = один
+([GraphicsDevice.cs:1302-1377](../Adamantium.Graphics/GraphicsDevice.cs#L1302), re-emit только при изменении);
+персистентно-замапленные CB ([Buffer.cs:133-140](../Adamantium.Graphics/Buffer.cs#L133), аплоад = один
 `MemoryCopy`); **frustum culling ЕСТЬ**
-([ForwardRenderingProcessor.cs:59-63](../Adamantium/Adamantium.Engine/EntityServices/ForwardRenderingProcessor.cs#L59); оговорка:
-узел БЕЗ Collider не рисуется вообще, [:77](../Adamantium/Adamantium.Engine/EntityServices/ForwardRenderingProcessor.cs#L77) —
+([ForwardRenderingProcessor.cs:59-63](../Adamantium.Engine/EntityServices/ForwardRenderingProcessor.cs#L59); оговорка:
+узел БЕЗ Collider не рисуется вообще, [:77](../Adamantium.Engine/EntityServices/ForwardRenderingProcessor.cs#L77) —
 возможный источник «пропавших» мешей); Deferred/ForwardPlus — мёртвые заглушки, активен только `ForwardRenderingProcessor`
-([AdamantiumGame.cs:37](../Adamantium/Adamantium.UI.Sandbox/AdamantiumGame.cs#L37)); lock-free снапшот сервисов
-([EntityServiceManager.cs:146-168](../Adamantium/Adamantium.ECS/EntityServiceManager.cs#L146)); шина shared-surface ≈0.
+([AdamantiumGame.cs:37](../Adamantium.UI.Sandbox/AdamantiumGame.cs#L37)); lock-free снапшот сервисов
+([EntityServiceManager.cs:146-168](../Adamantium.ECS/EntityServiceManager.cs#L146)); шина shared-surface ≈0.
 
 ---
 
@@ -234,7 +234,7 @@ backpressure-гард `if (_sharedSurface.ConsumeValue < _lastProduced) return;`
 
 Adamantium «ECS» — это **объектно-ориентированный сцен-граф**, а не data-oriented ECS. `Entity` — объект
 (`PropertyChangedBase`) с `Transform` + per-entity коллекцией компонентов-**объектов** (`EntityComponentCollection`,
-[Entity.cs:40-43](../Adamantium/Adamantium.ECS/Entity.cs#L40)). «Системы» = сервисы (`EntityService`/`EntityProcessor`),
+[Entity.cs:40-43](../Adamantium.ECS/Entity.cs#L40)). «Системы» = сервисы (`EntityService`/`EntityProcessor`),
 обходящие дерево сущностей. **Нет архетипов, нет SoA, нет плотных массивов компонентов, нет кэшированных запросов.** Ближе
 всего к Unity legacy GameObject/Component (+ Transform), но даже более OOP: компоненты — наблюдаемые INPC-объекты в
 залоченной коллекции.
@@ -251,16 +251,16 @@ Adamantium «ECS» — это **объектно-ориентированный 
 
 **Факт (подтверждён в коде):**
 - `Transform.Position` — **абсолютная позиция В МИРЕ**
-  ([Transform.cs:99-103](../Adamantium/Adamantium.ECS/ComponentsBasics/Transform.cs#L99)). Локального пространства и
+  ([Transform.cs:99-103](../Adamantium.ECS/ComponentsBasics/Transform.cs#L99)). Локального пространства и
   parent-relative координат нет.
 - Мировая матрица строится **только из собственных** Position/Rotation/Scale узла:
   `relativePosition = Position - camera.Owner.Transform.Position`
-  ([Transform.cs:712](../Adamantium/Adamantium.ECS/ComponentsBasics/Transform.cs#L712)) →
-  `Matrix4x4F.Transformation(...)` ([Transform.cs:716](../Adamantium/Adamantium.ECS/ComponentsBasics/Transform.cs#L716)).
+  ([Transform.cs:712](../Adamantium.ECS/ComponentsBasics/Transform.cs#L712)) →
+  `Matrix4x4F.Transformation(...)` ([Transform.cs:716](../Adamantium.ECS/ComponentsBasics/Transform.cs#L716)).
   **Матрица родителя НЕ умножается.**
 - «Иерархия» (`Entity.Owner`/`Dependencies`, `TraverseInDepth`) — дерево **владения/обхода**, не трансформа. При обходе
   всем узлам передаётся один общий pivot корня (`generalCenter = root.GetLocalCenter()`,
-  [TransformService.cs:57-58](../Adamantium/Adamantium.Engine/EntityServices/TransformService.cs#L57)), но каждый узел
+  [TransformService.cs:57-58](../Adamantium.Engine/EntityServices/TransformService.cs#L57)), но каждый узел
   использует свою абсолютную `Position`.
 
 **Следствия (слабости):**
@@ -271,8 +271,8 @@ Adamantium «ECS» — это **объектно-ориентированный 
 - **Нет локального пространства** → редактирование в родительских координатах невозможно; `Position` ребёнка бессмысленна
   без знания, что она мировая.
 - **Мировая матрица кэшируется ПО КАМЕРЕ** (`Dictionary<CameraBase, TransformMetaData>`,
-  [Transform.cs:28](../Adamantium/Adamantium.ECS/ComponentsBasics/Transform.cs#L28),
-  [43-54](../Adamantium/Adamantium.ECS/ComponentsBasics/Transform.cs#L43)) и пересчитывается каждый кадр. Это связывает
+  [Transform.cs:28](../Adamantium.ECS/ComponentsBasics/Transform.cs#L28),
+  [43-54](../Adamantium.ECS/ComponentsBasics/Transform.cs#L43)) и пересчитывается каждый кадр. Это связывает
   трансформ с камерой и множит работу на число камер; мировой трансформ должен быть camera-independent.
 - Нет dirty-распространения → полный пересчёт каждый кадр (см. B1).
 
@@ -339,10 +339,10 @@ data-oriented хранение**, ограничивающее масштаб. �
 ### F.0 Что под капотом
 
 Фундамент — **современный Vulkan**, и это сильно:
-- **Shader objects** (`vkCmdBindShadersEXT`, [EffectPass.cs:190-198](../Adamantium/Adamantium.Graphics/Effects/EffectPass.cs#L190))
+- **Shader objects** (`vkCmdBindShadersEXT`, [EffectPass.cs:190-198](../Adamantium.Graphics/Effects/EffectPass.cs#L190))
   вместо монолитных PSO — нет комбинаторного взрыва пайплайнов.
 - **Dynamic rendering** (переходы + begin rendering в BeginDraw,
-  [GraphicsDevice.cs:629](../Adamantium/Adamantium.Graphics/GraphicsDevice.cs#L629)/[:666](../Adamantium/Adamantium.Graphics/GraphicsDevice.cs#L666)/[:728](../Adamantium/Adamantium.Graphics/GraphicsDevice.cs#L728))
+  [GraphicsDevice.cs:629](../Adamantium.Graphics/GraphicsDevice.cs#L629)/[:666](../Adamantium.Graphics/GraphicsDevice.cs#L666)/[:728](../Adamantium.Graphics/GraphicsDevice.cs#L728))
   — нет объектов `VkRenderPass`/`Framebuffer`.
 - **Descriptor heap + BDA** (buffer device address) — «bindless»-фундамент: ресурсы адресуются, а не биндятся по слотам.
 - **Slang** как компилятор шейдеров.
@@ -351,20 +351,20 @@ data-oriented хранение**, ограничивающее масштаб. �
 
 ### F.1 Как устроен кадр рендера
 
-`RenderingService` ([RenderingService.cs](../Adamantium/Adamantium.Engine/EntityServices/RenderingService.cs)) —
+`RenderingService` ([RenderingService.cs](../Adamantium.Engine/EntityServices/RenderingService.cs)) —
 **фиксированный конвейер**: `BeginDraw` (ставит RT/depth/MSAA/blend, стартует ОДИН dynamic-rendering проход,
-[RenderingService.cs:105-141](../Adamantium/Adamantium.Engine/EntityServices/RenderingService.cs#L105)) → `Draw` →
+[RenderingService.cs:105-141](../Adamantium.Engine/EntityServices/RenderingService.cs#L105)) → `Draw` →
 `DrawProcessors` (один `ForwardRenderingProcessor`) → `EndDraw` (`Window.CopyOutput`,
-[RenderingProcessor.cs:89-92](../Adamantium/Adamantium.Engine/EntityServices/RenderingProcessor.cs#L89)) → `Submit` →
+[RenderingProcessor.cs:89-92](../Adamantium.Engine/EntityServices/RenderingProcessor.cs#L89)) → `Submit` →
 `Present` (Mailbox) → `FrameEnded`. Командный буфер — **только Primary**
-([GraphicsDevice.cs:549](../Adamantium/Adamantium.Graphics/GraphicsDevice.cs#L549)), **пересобирается с нуля каждый кадр**.
-Одна графическая очередь; `computeQueue` объявлена ([GraphicsDevice.cs:32](../Adamantium/Adamantium.Graphics/GraphicsDevice.cs#L32)),
+([GraphicsDevice.cs:549](../Adamantium.Graphics/GraphicsDevice.cs#L549)), **пересобирается с нуля каждый кадр**.
+Одна графическая очередь; `computeQueue` объявлена ([GraphicsDevice.cs:32](../Adamantium.Graphics/GraphicsDevice.cs#L32)),
 но не используется.
 
 ### F.2 Слабые стороны (архитектура, не микро-перф)
 
 1. **Нет render graph (frame graph).** Барьеры/переходы ресурсов расставлены ВРУЧНУЮ в BeginDraw
-   ([629](../Adamantium/Adamantium.Graphics/GraphicsDevice.cs#L629)/[666](../Adamantium/Adamantium.Graphics/GraphicsDevice.cs#L666)/[728](../Adamantium/Adamantium.Graphics/GraphicsDevice.cs#L728)),
+   ([629](../Adamantium.Graphics/GraphicsDevice.cs#L629)/[666](../Adamantium.Graphics/GraphicsDevice.cs#L666)/[728](../Adamantium.Graphics/GraphicsDevice.cs#L728)),
    нет авто-планирования проходов, барьеров и переиспользования памяти RT. Добавить тени/пост/depth-prepass чисто некуда:
    каждый новый проход = ручная возня с барьерами и RT. **Главный архитектурный пробел.**
 2. **Только один проход — forward.** Нет shadow map, depth pre-pass, пост-обработки (bloom/SSAO/tonemap);
@@ -430,7 +430,7 @@ render graph.
 3. **[доступ к компонентам] C1–C3** (неаллоцирующий `Get<T>`, одинарный лок, убрать try/catch; **C4/C5** вынести Material/GetActive).
 4. **[per-draw] D1** guard ребайнда pass + **D2** двойной bind VB/IB + **D3** кэш device-address + **D4** кэш viewProj.
 5. **[GC] D5/D6** аллокации Submit/барьеров, `Stack` в `TraverseInDepth`, мёртвый `FinalMatrices.Values.ToArray()`
-   ([ForwardRenderingProcessor.cs:85](../Adamantium/Adamantium.Engine/EntityServices/ForwardRenderingProcessor.cs#L85)).
+   ([ForwardRenderingProcessor.cs:85](../Adamantium.Engine/EntityServices/ForwardRenderingProcessor.cs#L85)).
 
 _Замеренные числа (375/155/3.3 мс) — из `PERF_ANALYSIS.md`; перед оптимизацией по ним стоит перемерить на текущем коде
 (render-thread теперь всегда включён)._
