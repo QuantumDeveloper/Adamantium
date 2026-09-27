@@ -505,7 +505,7 @@ namespace Adamantium.Imaging
                     size = (ulong)stream.Length;
                     memoryPtr = Utilities.AllocateMemory((uint)size);
                     Span<byte> bytes = new Span<byte>(memoryPtr.ToPointer(), (int)size);
-                    stream.Read(bytes);
+                    stream.ReadExactly(bytes);
                 }
             }
             catch (Exception)

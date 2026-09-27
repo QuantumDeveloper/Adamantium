@@ -19,7 +19,6 @@ namespace Adamantium.Engine.Compiler.Converter.Containers
          Materials = new List<material>();
          Cameras = new List<camera>();
          Effects = new List<effect>();
-         Axis = new UpAxis();
       }
 
 
@@ -40,8 +39,6 @@ namespace Adamantium.Engine.Compiler.Converter.Containers
       public List<camera> Cameras { get; set; }
 
       public List<effect> Effects { get; set; }
-
-      public UpAxis Axis { get; set; }
 
       //The file's own unit against the common coordinate system
       public SceneData.Unit Units { get; set; }

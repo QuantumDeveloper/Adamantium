@@ -32,7 +32,7 @@ namespace Adamantium.Imaging.Jpeg.IO
 
         public ushort ReadShort()
         {
-            _stream.Read(_buffer, 0, 2);
+            _stream.ReadExactly(_buffer, 0, 2);
             return (ushort)(_buffer[0] << 8 | _buffer[1] & 0xff);
         }
 

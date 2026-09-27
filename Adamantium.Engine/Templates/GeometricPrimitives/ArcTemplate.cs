@@ -28,7 +28,7 @@ public class ArcTemplate : PrimitiveTemplate
     {
         this.diameter = diameter;
         this.thickness = thickness;
-        this.stopAngle = startAngle;
+        this.startAngle = startAngle;
         this.stopAngle = stopAngle;
         this.isClockwise = isClockwise;
     }

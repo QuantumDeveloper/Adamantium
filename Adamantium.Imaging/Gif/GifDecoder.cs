@@ -44,7 +44,7 @@ namespace Adamantium.Imaging.Gif
             if ((screenDescriptor.Fields & 0x80) != 0)
             {
                 var colorTable = new byte[3 * gctSize];
-                stream.Read(colorTable, 0, colorTable.Length);
+                stream.ReadExactly(colorTable, 0, colorTable.Length);
                 int offset = 0;
                 for (int i = 0; i < gctSize; i++)
                 {
@@ -167,7 +167,7 @@ namespace Adamantium.Imaging.Gif
                 var size = 1 << ((descriptor.Fields & 0x07) + 1);
                 //Read local color table
                 var colorTable = new byte[3 * size];
-                stream.Read(colorTable, 0, colorTable.Length);
+                stream.ReadExactly(colorTable, 0, colorTable.Length);
                 int offset = 0;
                 frame.ColorTable = new ColorRGB[size];
                 for (int i = 0; i < size; i++)

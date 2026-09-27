@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
 
 namespace Adamantium.Mathematics
 {
@@ -1010,7 +1009,7 @@ namespace Adamantium.Mathematics
         
         public static OrientedBoundingBox Merge(ref OrientedBoundingBox obb1, Vector3[] corners)
         {
-            var corners1 = obb1.GetCorners().Cast<Vector3>().ToArray();
+            var corners1 = Array.ConvertAll(obb1.GetCorners(), corner => (Vector3)corner);
             var points = new Vector3[16];
             Array.Copy(corners1, points, 8);
             Array.Copy(corners, 0, points, 8, 8);

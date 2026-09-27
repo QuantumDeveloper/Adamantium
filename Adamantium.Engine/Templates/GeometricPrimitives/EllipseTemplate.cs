@@ -29,7 +29,7 @@ public class EllipseTemplate : PrimitiveTemplate
     {
         this.diameter = diameter;
         this.ellipseType = ellipseType;
-        this.stopAngle = startAngle;
+        this.startAngle = startAngle;
         this.stopAngle = stopAngle;
         this.isClockwise = isClockwise;
     }
@@ -53,10 +53,10 @@ public class EllipseTemplate : PrimitiveTemplate
         var geometry = Shapes.Ellipse.GenerateGeometry(
             GeometryType, 
             ellipseType, 
-            diameter, 
-            startAngle, 
-            stopAngle, 
-            isClockwise, 
+            diameter,
+            startAngle,
+            stopAngle - startAngle,
+            isClockwise,
             Tessellation, 
             Transform);
         return Task.FromResult(BuildEntityFromPrimitive(owner, geometry));

@@ -122,7 +122,17 @@ namespace Adamantium.Core
 
             var buffer = new byte[size];
 
-            stream.Read(buffer, 0, (int)size);
+            var read = 0;
+            while (read < size)
+            {
+                var count = stream.Read(buffer, read, (int)size - read);
+                if (count == 0)
+                {
+                    throw new EndOfStreamException();
+                }
+
+                read += count;
+            }
 
             return buffer;
         }

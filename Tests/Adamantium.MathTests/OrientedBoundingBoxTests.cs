@@ -9,6 +9,19 @@ namespace Adamantium.MathTests;
 public class OrientedBoundingBoxTests
 {
     [Test]
+    public void Merge_WithDoubleCorners_TakesInBothBoxes()
+    {
+        var first = new OrientedBoundingBox(Vector3F.Zero, Vector3F.One, QuaternionF.Identity);
+        var second = new OrientedBoundingBox(new Vector3F(4, 0, 0), Vector3F.One, QuaternionF.Identity);
+        var corners = Array.ConvertAll(second.GetCorners(), corner => (Vector3)corner);
+
+        var merged = OrientedBoundingBox.Merge(ref first, corners);
+
+        Assert.That(merged.Contains(ref first), Is.EqualTo(ContainmentType.Contains));
+        Assert.That(merged.Contains(ref second), Is.EqualTo(ContainmentType.Contains));
+    }
+
+    [Test]
     public void BoxesTurnedAlike_ThatOverlap_Intersect()
     {
         var first = new OrientedBoundingBox(Vector3F.Zero, Vector3F.One, QuaternionF.Identity);
