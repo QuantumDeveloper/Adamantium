@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
-using System.Threading;
 using Adamantium.Core;
 using Adamantium.Graphics.Core.Extensions;
 using Adamantium.Vulkan.Core;
@@ -22,7 +21,6 @@ namespace Adamantium.Graphics.Core
         private readonly List<IGraphicsDevice> graphicsDevices;
 
         private readonly Dictionary<Guid, IGraphicsDevice> deviceMap;
-        private Mutex _submissionSync;
 
         public uint BuffersCount { get; }
 
@@ -526,32 +524,6 @@ namespace Adamantium.Graphics.Core
             }
 
             return queue;
-        }
-
-        public void Submit(Queue queue, params SubmitInfo[] submitInfos)
-        {
-            _submissionSync.WaitOne();
-
-            var renderFence = InFlightFences[CurrentFrame];
-
-            var result = LogicalDevice.ResetFences(1, renderFence);
-
-            if (result != Result.Success)
-            {
-                throw new Exception($"failed to reset fences. Result: {result}");
-            }
-
-            result = queue.QueueSubmit((uint)submitInfos.Length, submitInfos, renderFence);
-            LogicalDevice.WaitForFences(1, renderFence, true, ulong.MaxValue);
-
-            if (result != Result.Success)
-            {
-                throw new Exception($"failed to submit draw command buffer! Result was {result}");
-            }
-
-            CurrentFrame = (CurrentFrame + 1) % BuffersCount;
-
-            _submissionSync.ReleaseMutex();
         }
 
         public static implicit operator PhysicalDevice(MainGraphicsDevice device)

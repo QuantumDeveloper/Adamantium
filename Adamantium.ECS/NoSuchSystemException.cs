@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Runtime.Serialization;
 
 namespace Adamantium.ECS
 {
@@ -14,10 +13,6 @@ namespace Adamantium.ECS
       }
 
       public NoSuchSystemException(string message, Exception innerException) : base(message, innerException)
-      {
-      }
-
-      protected NoSuchSystemException(SerializationInfo info, StreamingContext context) : base(info, context)
       {
       }
    }

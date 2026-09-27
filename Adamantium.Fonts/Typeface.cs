@@ -141,7 +141,6 @@ namespace Adamantium.Fonts
                     break;
                 default:
                     return null;
-                    break;
             }
 
             parser.ReadFontName();

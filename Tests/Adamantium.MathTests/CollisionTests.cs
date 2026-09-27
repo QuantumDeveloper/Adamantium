@@ -63,7 +63,6 @@ namespace Adamantium.MathTests
             LineSegment2D segment2 = new LineSegment2D(start2, end2);
 
             LineSegment2D segment3 = new LineSegment2D(start, point);
-            Vector2 interPoint;
             //var inter = Collision2D.SegmentSegmentIntersection(ref segment2, ref segment3, out interPoint);
 
             var refs1 = Collision2D.IsPointOnSegment(ref segment1, ref point);

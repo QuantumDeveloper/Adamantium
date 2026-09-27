@@ -43,10 +43,6 @@ namespace Adamantium.Graphics.Fonts
         }
 
         private bool _warnedLayersExhausted;
-        
-        private SamplerState assignedSamplerState;
-        private Color foregroundColor;
-        private TextRenderingParameters renderingParameters;
 
         protected FontAtlasData AtlasData { get; }
 

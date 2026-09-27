@@ -29,7 +29,6 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
 
     private CommandBuffer[] commandBuffers;
     private Queue resourceQueue;
-    private Queue computeQueue;
         
     private readonly SubmitInfo[] submitInfos = new SubmitInfo[1];
     private uint frame;

@@ -17,7 +17,6 @@ namespace Adamantium.ECS.Components
         private bool rotationDone = true;
         private double rotationDuration;
         private QuaternionF startingRotation;
-        private Vector3 lookAtRotationPoint;
         private int moveTime;
         private bool moveToObjectDone = true;
         private double moveToDuration = 0;

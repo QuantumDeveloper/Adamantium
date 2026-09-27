@@ -13,8 +13,6 @@ namespace Adamantium.ECS.Components
         private Single fov;
         private Single fovY;
         private Single tanFov;
-        private Vector3F up;
-        private Vector3? lookAt;
         private Double radius;
         private bool isDepthInversed;
         private CameraType cameraType;

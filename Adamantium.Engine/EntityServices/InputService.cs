@@ -17,7 +17,6 @@ public class InputService : EntityService
     private const double ZoomNotchesPerMeter = 8;
 
     private Entity userControlledEntity;
-    private Entity selectedEntity;
     //private AudioManager audioManager;
     private Selection selection;
     private Observatory observatory;

@@ -13,14 +13,12 @@ public class OrientationToolTemplate: BaseToolTemplate
 {
    private double size;
    private Quaternion rotation;
-   private int tesselation;
 
    public OrientationToolTemplate(float size, Vector3F baseScale, QuaternionF rotation)
    {
       this.size = size;
       this.baseScale = baseScale;
       this.rotation = rotation;
-      tesselation = 4;
    }
 
    public override Entity BuildEntity(Entity owner, string name)

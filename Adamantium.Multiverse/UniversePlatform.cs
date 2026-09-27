@@ -39,8 +39,7 @@ namespace Adamantium.Multiverse
         {
             get
             {
-                var assemblyUri = new Uri(Universe.GetType().Assembly.CodeBase);
-                return Path.GetDirectoryName(assemblyUri.LocalPath);
+                return Path.GetDirectoryName(Universe.GetType().Assembly.Location);
             }
         }
 

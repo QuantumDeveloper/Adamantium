@@ -498,7 +498,6 @@ namespace Adamantium.Imaging.Jpeg.Decoder
 
                         var components = frame.Scan.Components;
                         int totalSteps = components.Count * 3; // Three steps per loop
-                        int stepsFinished = 0;
 
                         // ONE COMPONENT PER THREAD. Luma and the two chroma planes share nothing at this point: each
                         // dequantizes, transforms and writes into its OWN plane of the raster, so the three passes that

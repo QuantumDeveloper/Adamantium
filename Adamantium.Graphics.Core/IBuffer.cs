@@ -155,11 +155,6 @@ public interface IBuffer: IDisposable
 
     UInt64 GetDeviceAddress();
 
-    /// <summary>
-    /// Releases unmanaged and - optionally - managed resources
-    /// </summary>
-    void Dispose();
-
     Buffer GetBuffer();
 
     /// <summary>

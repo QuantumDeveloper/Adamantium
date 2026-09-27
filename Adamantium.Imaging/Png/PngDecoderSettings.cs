@@ -20,26 +20,5 @@
         public bool ColorConvert { get; set; }
 
         public bool ReadTextChunks { get; set; }
-
-        public static bool operator ==(PngDecoderSettings left, PngDecoderSettings right)
-        {
-            if (left.IgnoreAdler32 == right.IgnoreAdler32 && left.IgnoreCrc == right.IgnoreCrc
-                && left.IgnoreCritical == right.IgnoreCritical && left.ColorConvert == right.ColorConvert)
-            {
-                return true;
-            }
-
-            return false;
-        }
-
-        public static bool operator !=(PngDecoderSettings left, PngDecoderSettings right)
-        {
-            if (left == right)
-            {
-                return false;
-            }
-
-            return true;
-        }
     }
 }

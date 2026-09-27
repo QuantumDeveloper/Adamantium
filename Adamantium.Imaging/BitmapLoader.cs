@@ -139,7 +139,7 @@ public static class BitmapLoader
                 var img = loader.Loader?.Invoke(dataPointer, dataSize);
                 return img;
             }
-            catch (Exception e)
+            catch (Exception)
             {
                 // ignore
             }

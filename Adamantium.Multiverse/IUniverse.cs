@@ -53,8 +53,6 @@ namespace Adamantium.Multiverse
         /// </summary>
         String Title { get; set; }
 
-        void Run(object context);
-        
         public event EventHandler Initialized;
 
         public event EventHandler FrameFinished;

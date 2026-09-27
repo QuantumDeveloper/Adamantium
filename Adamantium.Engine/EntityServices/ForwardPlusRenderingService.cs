@@ -245,8 +245,6 @@ public class ForwardPlusRenderingService : RenderingService
 //            Text = "FPS: " + appTime.FpsCount + "\n";
     }
 
-    private bool _showDebug = true;
-
     protected override void Debug()
     {
         //output our final composition into the backbuffer. We could output it into a

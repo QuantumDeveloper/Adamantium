@@ -4,8 +4,6 @@ namespace Adamantium.ECS.Components;
 
 public class TransformMetaData
 {
-    private bool enabled;
-
     public TransformMetaData()
     {
         Enabled = true;

@@ -86,13 +86,13 @@ namespace Adamantium.Core.DependencyInjection
             return this;
         }
 
-        IContainerRegistry IContainerRegistry.RegisterInstance<TService>(object instance, string name = "")
+        IContainerRegistry IContainerRegistry.RegisterInstance<TService>(object instance, string name)
         {
             ((IContainerRegistry)this).RegisterInstance(typeof(TService), instance, name);
             return this;
         }
 
-        IContainerRegistry IContainerRegistry.RegisterInstance(Type source, object instance, string name = "")
+        IContainerRegistry IContainerRegistry.RegisterInstance(Type source, object instance, string name)
         {
             Register(LifeTimeVariant.Singleton, source, instance.GetType(), instance, name);
             return this;

@@ -14,9 +14,7 @@ namespace Adamantium.Fonts.Tables.CFF
         private List<Glyph> glyphs;
 
         private Dictionary<UInt32, Glyph> indexToGlyph;
-        private Dictionary<UInt32, Glyph> unicodeToGlyph;
-        private Dictionary<string, Glyph> nameToGlyph;
-        
+
         public string Name { get; set; }
         
         public IReadOnlyCollection<Glyph> Glyphs => glyphs.AsReadOnly();
@@ -59,16 +57,6 @@ namespace Adamantium.Fonts.Tables.CFF
             CffVersion = cffVersion;
         }
         
-        public Glyph GetGlyphByName(string name)
-        {
-            return nameToGlyph.TryGetValue(name, out var glyph) ? glyph : glyphs.FirstOrDefault();
-        }
-
-        public Glyph GetGlyphByUnicode(uint unicode)
-        {
-            return unicodeToGlyph.TryGetValue(unicode, out var glyph) ? glyph : glyphs.FirstOrDefault();
-        }
-
         public Glyph GetGlyphByIndex(uint index)
         {
             return indexToGlyph.TryGetValue(index, out var glyph) ? glyph : glyphs.FirstOrDefault();

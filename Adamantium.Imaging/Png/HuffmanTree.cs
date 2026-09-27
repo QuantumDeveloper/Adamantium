@@ -172,7 +172,6 @@ namespace Adamantium.Imaging.Png
         {
             uint[] blCount = new uint[tree.MaxBitLen + 1];
             uint[] nextCode = new uint[tree.MaxBitLen + 1];
-            uint error = 0;
             uint bits, n;
 
             //tree.Tree1D = new uint[tree.Numcodes * Marshal.SizeOf<uint>()];

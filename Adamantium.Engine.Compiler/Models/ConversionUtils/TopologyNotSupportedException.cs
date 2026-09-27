@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Runtime.Serialization;
 
 namespace Adamantium.Engine.Compiler.Models.ConversionUtils
 {
@@ -14,10 +13,6 @@ namespace Adamantium.Engine.Compiler.Models.ConversionUtils
       }
 
       public TopologyNotSupportedException(string message, Exception innerException) : base(message, innerException)
-      {
-      }
-
-      protected TopologyNotSupportedException(SerializationInfo info, StreamingContext context) : base(info, context)
       {
       }
    }

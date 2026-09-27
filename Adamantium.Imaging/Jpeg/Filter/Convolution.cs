@@ -58,7 +58,6 @@ namespace Adamantium.Imaging.Jpeg.Filter
             public int end;
             public GrayImage data;
             public GrayImage result;
-            public int dataPtr;
             public int destPtr;
         }
 
@@ -227,7 +226,7 @@ namespace Adamantium.Imaging.Jpeg.Filter
             {
                 int rowStart = y * data.Width;
 
-                int ptr = fj.dataPtr + rowStart;
+                int ptr = rowStart;
 
                 // Left checked region
                 for (int x = 0; x < pad; x++)

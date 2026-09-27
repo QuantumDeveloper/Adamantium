@@ -73,8 +73,6 @@ namespace Adamantium.Imaging.Png
         private uint DecodeGeneric(PngState state, out PngImage pngImage)
         {
             bool IEND = false;
-            /*the data from idat chunks*/
-            long predict = 0;
 
             // initialize out parameters in case of errors
             pngImage = new PngImage();

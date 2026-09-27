@@ -19,26 +19,5 @@
         public PngInfo InfoPng { get; set; }
 
         public uint Error { get; set; }
-
-        public static bool operator ==(PngState left, PngState right)
-        {
-            if (left.DecoderSettings == right.DecoderSettings && left.ColorModeRaw == right.ColorModeRaw
-                && left.InfoPng == right.InfoPng && left.Error == right.Error)
-            {
-                return true;
-            }
-
-            return false;
-        }
-
-        public static bool operator !=(PngState left, PngState right)
-        {
-            if (left == right)
-            {
-                return false;
-            }
-
-            return true;
-        }
     }
 }

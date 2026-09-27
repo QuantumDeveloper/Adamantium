@@ -188,27 +188,6 @@ namespace Adamantium.Imaging.Png
         public byte[] UnknownChunksData;
 
         /*size in bytes of the unknown chunks, given for protection*/
-        public ulong[] UnknownChunksSize; 
-
-        public static bool operator ==(PngInfo left, PngInfo right)
-        {
-            if (left.CompressionMethod == right.CompressionMethod && left.FilterMethod == right.FilterMethod
-                && left.InterlaceMethod == right.InterlaceMethod && left.ColorMode == right.ColorMode)
-            {
-                return true;
-            }
-
-            return false;
-        }
-
-        public static bool operator !=(PngInfo left, PngInfo right)
-        {
-            if (left == right)
-            {
-                return false;
-            }
-
-            return true;
-        }
+        public ulong[] UnknownChunksSize;
     }
 }

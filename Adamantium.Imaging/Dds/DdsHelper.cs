@@ -781,9 +781,9 @@ namespace Adamantium.Imaging.Dds
                                 {
                                     byte t = *(sPtr++);
 
-                                    var t1 = (short) (((t & 0xe0) << 8) | ((t & 0xc0) << 5));
-                                    var t2 = (short) (((t & 0x1c) << 6) | ((t & 0x1c) << 3));
-                                    var t3 = (short) (((t & 0x03) << 3) | ((t & 0x03) << 1) | ((t & 0x02) >> 1));
+                                    var t1 = ((t & 0xe0) << 8) | ((t & 0xc0) << 5);
+                                    var t2 = ((t & 0x1c) << 6) | ((t & 0x1c) << 3);
+                                    var t3 = ((t & 0x03) << 3) | ((t & 0x03) << 1) | ((t & 0x02) >> 1);
 
                                     *(dPtr++) = (short) (t1 | t2 | t3);
                                 }
@@ -810,7 +810,7 @@ namespace Adamantium.Imaging.Dds
                             int t3 = ((t & 0x0003) << 22) | ((t & 0x0003) << 20) | ((t & 0x0003) << 18) | ((t & 0x0003) << 16);
                             uint ta = ((flags & ImageHelper.ScanlineFlags.SetAlpha) != 0 ? 0xff000000 : (uint) ((t & 0xff00) << 16));
 
-                            *(dPtr++) = (int) (t1 | t2 | t3 | ta);
+                            *(dPtr++) = (int) ((uint) (t1 | t2 | t3) | ta);
                         }
                     }
                     return true;
@@ -849,7 +849,7 @@ namespace Adamantium.Imaging.Dds
                             int t1 = pal8[t & 0xff];
                             uint ta = ((flags & ImageHelper.ScanlineFlags.SetAlpha) != 0 ? 0xff000000 : (uint) ((t & 0xff00) << 16));
 
-                            *(dPtr++) = (int) (t1 | ta);
+                            *(dPtr++) = (int) ((uint) t1 | ta);
                         }
                     }
                     return true;
@@ -867,7 +867,7 @@ namespace Adamantium.Imaging.Dds
                         {
                             byte t = *(sPtr++);
 
-                            short t1 = (short)(t & 0x0f);
+                            int t1 = t & 0x0f;
                             ushort ta = (flags & ImageHelper.ScanlineFlags.SetAlpha ) != 0 ?  (ushort)0xf000 : (ushort)((t & 0xf0) << 8);
 
                             *(dPtr++) = (short)(t1 | (t1 << 4) | (t1 << 8) | ta);
@@ -889,7 +889,7 @@ namespace Adamantium.Imaging.Dds
                                     int t1 = ((t & 0x0f) << 4) | (t & 0x0f);
                                     uint ta = ((flags & ImageHelper.ScanlineFlags.SetAlpha) != 0 ? 0xff000000 : (uint) (((t & 0xf0) << 24) | ((t & 0xf0) << 20)));
 
-                                    *(dPtr++) = (int) (t1 | (t1 << 8) | (t1 << 16) | ta);
+                                    *(dPtr++) = (int) ((uint) (t1 | (t1 << 8) | (t1 << 16)) | ta);
                                 }
                             }
                             return true;
@@ -913,7 +913,7 @@ namespace Adamantium.Imaging.Dds
                             int t3 = ((t & 0x000f) << 20) | ((t & 0x000f) << 16);
                             uint ta = ((flags & ImageHelper.ScanlineFlags.SetAlpha) != 0 ? 0xff000000 : (uint) (((t & 0xf000) << 16) | ((t & 0xf000) << 12)));
 
-                            *(dPtr++) = (int) (t1 | t2 | t3 | ta);
+                            *(dPtr++) = (int) ((uint) (t1 | t2 | t3) | ta);
                         }
                     }
                     return true;

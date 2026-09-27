@@ -264,8 +264,6 @@ namespace Adamantium.ProceduralGeometry.Shapes
                         uvs.Add(texcoord);
                     }
 
-                    const float XMVectorSplatEpsilon = 1.192092896e-7f;
-
                     // There are a couple of fixes to do. One is a texture coordinate wraparound fixup. At some point, there will be
                     // a set of triangles somewhere in the mesh with texture coordinates such that the wraparound across 0.0/1.0
                     // occurs across that triangle. Eg. when the left hand side of the triangle has a U coordinate of 0.98 and the

@@ -12,16 +12,6 @@ using Adamantium.Mathematics;
 
 namespace Adamantium.Engine.Compiler.Converter.Parsers
 {
-    enum ParsedStep
-    {
-        None,
-        Position,
-        UV,
-        Normal,
-        Faces,
-        Material
-    }
-
     public class ObjFileParser : ModelFileParser
     {
         private List<string> fileContent;
@@ -36,8 +26,6 @@ namespace Adamantium.Engine.Compiler.Converter.Parsers
         private const string NORMAL = "vn ";
         private const string UV = "vt ";
         private const string FACES = "f ";
-
-        private ParsedStep _lastParsedStep;
 
         private readonly ObjDataContainer dataContainer;
         public ObjFileParser(String filePath) : base(filePath)
@@ -128,7 +116,6 @@ namespace Adamantium.Engine.Compiler.Converter.Parsers
                     String values = line.Substring(POSITION.Length).Trim(' ');
                     var v = ParseNumericString(values);
                     positions.Add(new Vector3(v));
-                    _lastParsedStep = ParsedStep.Position;
                 }
 
                 else if (line.StartsWith(NORMAL))
@@ -141,7 +128,6 @@ namespace Adamantium.Engine.Compiler.Converter.Parsers
                     String values = line.Substring(NORMAL.Length);
                     var n = ParseNumericStringFloat(values);
                     normals.Add(new Vector3F(n));
-                    _lastParsedStep = ParsedStep.Normal;
                 }
 
                 else if (line.StartsWith(UV))
@@ -154,7 +140,6 @@ namespace Adamantium.Engine.Compiler.Converter.Parsers
                     String values = line.Substring(UV.Length);
                     var uv = ParseNumericStringFloat(values);
                     uvs.Add(new Vector2F(uv[0], uv[1]));
-                    _lastParsedStep = ParsedStep.UV;
                 }
 
                 else if (line.StartsWith(USEMTL))
@@ -169,7 +154,6 @@ namespace Adamantium.Engine.Compiler.Converter.Parsers
                     {
                         geometryData?.GeometrySemantic.Add(semanticData);
                     }
-                    _lastParsedStep = ParsedStep.Material;
                 }
 
                 else if (line.StartsWith(FACES))
@@ -203,8 +187,6 @@ namespace Adamantium.Engine.Compiler.Converter.Parsers
                         offset = new Offset();
                         offsetIndex = 0;
                     }
-
-                    _lastParsedStep = ParsedStep.Faces;
                 }
             }
 

@@ -2,7 +2,7 @@
 
 namespace Adamantium.Imaging.Png
 {
-    internal class PngColorMode
+    internal class PngColorMode : IEquatable<PngColorMode>
     {
         public PngColorMode()
         {
@@ -74,26 +74,32 @@ namespace Adamantium.Imaging.Png
         /*blue component of color key*/
         public uint KeyB;
 
+        public bool Equals(PngColorMode other)
+        {
+            return other is not null
+                   && ColorType == other.ColorType && BitDepth == other.BitDepth
+                   && PaletteSize == other.PaletteSize && IsKeyDefined == other.IsKeyDefined
+                   && KeyR == other.KeyR && KeyG == other.KeyG && KeyB == other.KeyB;
+        }
+
+        public override bool Equals(object obj)
+        {
+            return Equals(obj as PngColorMode);
+        }
+
+        public override int GetHashCode()
+        {
+            return HashCode.Combine(ColorType, BitDepth, PaletteSize, IsKeyDefined, KeyR, KeyG, KeyB);
+        }
+
         public static bool operator ==(PngColorMode left, PngColorMode right)
         {
-            if (left.ColorType == right.ColorType && left.BitDepth == right.BitDepth
-                && left.PaletteSize == right.PaletteSize && left.IsKeyDefined == right.IsKeyDefined
-                && left.KeyR == right.KeyR && left.KeyG == right.KeyG && left.KeyB == right.KeyB)
-            {
-                return true;
-            }
-
-            return false;
+            return left is null ? right is null : left.Equals(right);
         }
 
         public static bool operator !=(PngColorMode left, PngColorMode right)
         {
-            if (left == right)
-            {
-                return false;
-            }
-
-            return true;
+            return !(left == right);
         }
     }
 }

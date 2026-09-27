@@ -129,7 +129,6 @@ namespace Adamantium.Fonts.TextureGeneration
         // edge is a list of connected segments which have no sharp corners within them
         private static void ColorEdges(List<MsdfGlyphSegment> segments)
         {
-            var segmentLengthThreshold = 10;
             var contours = SplitToEdgedContours(segments);
 
             segments.Clear();
