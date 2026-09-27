@@ -1,7 +1,6 @@
 ﻿using Adamantium.Core;
 using Adamantium.ECS;
-using Adamantium.Game;
-using Adamantium.Game.Core;
+using Adamantium.Multiverse;
 
 //using Texture2D = Adamantium.Graphics.Texture2D;
 
@@ -44,7 +43,7 @@ public class DeferredRenderingService : RenderingService
 //        private RenderTarget2D _albedoBufferRT;
 //        private RenderTarget2D _normalsBufferRT;
 
-    public DeferredRenderingService(EntityWorld world, GameOutput window) : base(world, window)
+    public DeferredRenderingService(EntityWorld world, UniverseOutput window) : base(world, window)
     {
     }
 
@@ -252,8 +251,8 @@ public class DeferredRenderingService : RenderingService
 //                    GraphicsDevice.RasterizerState = DeferredDevice.RasterizerStates.CullBackClipDisabled;
 //                //GraphicsDevice.RasterizerState = DeferredDevice.RasterizerStates.CullNoneClipDisabled;
 //                spotLight.CurrentTechnique.Passes[0].Apply();
-//                LightService.DrawSpotLightMesh(DeferredDevice, GameTime);
-//                //LightService.DrawPointLightMesh(DeferredDevice, GameTime);
+//                LightService.DrawSpotLightMesh(DeferredDevice, AppTime);
+//                //LightService.DrawPointLightMesh(DeferredDevice, AppTime);
 //
 //                Text += $"AngleCos = {lightAngleCos}"+"\n";
 //            }
@@ -303,7 +302,7 @@ public class DeferredRenderingService : RenderingService
 //                //GraphicsDevice.RasterizerState = DeferredDevice.RasterizerStates.CullNoneClipDisabled;
 //                pointLight.CurrentTechnique.Passes[0].Apply();
 //
-//                LightService.DrawPointLightMesh(DeferredDevice, GameTime);
+//                LightService.DrawPointLightMesh(DeferredDevice, AppTime);
 //            }
 //
 //            DeferredDevice.SetTargets(null);
@@ -392,7 +391,7 @@ public class DeferredRenderingService : RenderingService
 //                GBuffer.CurrentTechnique.Passes[0].Apply();
 //            }
 //
-//            meshRenderer.Draw(GraphicsDevice, GameTime);
+//            meshRenderer.Draw(GraphicsDevice, AppTime);
     }
 
     private void ClearGBuffer()
@@ -408,15 +407,15 @@ public class DeferredRenderingService : RenderingService
 //            DeferredDevice.Quad.DrawRaw();
     }
 
-    public override void Draw(AppTime gameTime)
+    public override void Draw(AppTime appTime)
     {
-//            base.Draw(gameTime);
+//            base.Draw(appTime);
 //            if (ActiveCamera == null)
 //            {
 //                return;
 //            }
 //
-//            Text = "FPS: " + GameTime.FpsCount + "\n";
+//            Text = "FPS: " + AppTime.FpsCount + "\n";
 //            Text += "Camera view direction = " + ActiveCamera.Forward + "\n";
 //            Text += "Offset: " + ActiveCamera.Owner.Transform.Position + "\n";
 //            Text += "Camera type: " + ActiveCamera.Type + "\n";

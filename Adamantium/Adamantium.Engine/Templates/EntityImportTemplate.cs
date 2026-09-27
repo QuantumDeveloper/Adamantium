@@ -4,6 +4,7 @@ using System.IO;
 using System.Threading.Tasks;
 using Adamantium.ECS;
 using Adamantium.ECS.Components;
+using Adamantium.ECS.Components.Extensions;
 using Adamantium.ECS.Templates;
 using Adamantium.Graphics;
 using Adamantium.Graphics.Core.Content;
@@ -28,6 +29,7 @@ public class EntityImportTemplate : IEntityTemplate
         //this.camera = camera;
     }
         
+    /// <param name="initialPosition">Where the model's center is placed; the model turns and scales about it.</param>
     public EntityImportTemplate(SceneData sceneData, IContentManager manager, Vector3 initialPosition)
     {
         this.sceneData = sceneData;
@@ -86,14 +88,13 @@ public class EntityImportTemplate : IEntityTemplate
                         var entityPart = new Entity(entity, $"{currentMesh.Name} ({count})");
                         count++;
                         WriteMeshData(entityPart, mesh);
-
-                        SetTransformation(entityPart, (Vector3)currentMesh.Position,
-                            currentMesh.Scale * new Vector3F(sceneData.Units.Value), currentMesh.Rotation);
                     }
                 }
 
-                SetTransformation(entity, (Vector3)currentMesh.Position, currentMesh.Scale * new Vector3F(sceneData.Units.Value),
-                    currentMesh.Rotation);
+                var scale = currentMesh.Parent == null
+                    ? currentMesh.Scale * new Vector3F(sceneData.Units.Value)
+                    : currentMesh.Scale;
+                SetTransformation(entity, (Vector3)currentMesh.Position, scale, currentMesh.Rotation);
 
                 if (sceneData.Controllers.ContainsKey(currentMesh.ID))
                 {
@@ -122,9 +123,13 @@ public class EntityImportTemplate : IEntityTemplate
             }
 
             CalculateBoundBoxes(owner);
-            var collider = owner.GetComponent<Collider>();
-            //owner.Transform.SetPosition(owner.GetPositionForNewObject(camera, Vector3F.Max(collider.Bounds.Size)));
-            owner.Transform.Position = initialPosition;
+
+            owner.TraverseInDepth(entity =>
+            {
+                var transform = entity.Transform;
+                transform.Pivot = (Vector3)Vector3F.TransformCoordinate(entity.GetLocalCenter(), transform.GetLocalMatrixF());
+            });
+            owner.Transform.Position += initialPosition - owner.Transform.Pivot;
             return Task.FromResult(owner);
         }
         catch (Exception exception)
@@ -161,10 +166,16 @@ public class EntityImportTemplate : IEntityTemplate
 
         for (var i = roots.Count - 1; i >= 0; --i)
         {
-            var rootCollider = roots[i].GetOrCreateComponent<BoxCollider>();
+            BoxCollider rootCollider = null;
             foreach (var entity in roots[i].Dependencies)
             {
                 var collider = entity.GetComponent<Collider>();
+                if (collider == null)
+                {
+                    continue;
+                }
+
+                rootCollider ??= roots[i].GetOrCreateComponent<BoxCollider>();
                 rootCollider.Merge(collider);
             }
         }
@@ -172,11 +183,9 @@ public class EntityImportTemplate : IEntityTemplate
 
     private static void SetTransformation(Entity entity, Vector3 pos, Vector3F scale, QuaternionF rot)
     {
-        var transform = new Transform();
-        transform.Position = pos;
-        transform.Rotation = rot;
-        transform.BaseScale = scale;
-        entity.AddComponent(transform);
+        entity.Transform.Position = pos;
+        entity.Transform.Rotation = rot;
+        entity.Transform.BaseScale = scale;
     }
 
     private void WriteMeshData(Entity entity, Mesh mesh)
@@ -204,7 +213,7 @@ public class EntityImportTemplate : IEntityTemplate
                 var material = new Material();
                 material.AmbientColor = materialData.AmbientColor;
                 material.DiffuseColor = materialData.DiffuseColor;
-                materialData.SpecularColor = materialData.SpecularColor;
+                material.SpecularColor = materialData.SpecularColor;
                 material.Emission = materialData.Emission;
                 material.Reflective = materialData.Reflective;
                 material.Reflectivity = materialData.Reflectivity;

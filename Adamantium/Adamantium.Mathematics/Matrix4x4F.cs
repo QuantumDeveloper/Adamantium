@@ -2424,14 +2424,12 @@ namespace Adamantium.Mathematics
             return result;
         }
 
+        /// <summary>A left-handed perspective whose <paramref name="fov"/>, in degrees, spans the width.</summary>
         public static Matrix4x4F PerspectiveFovX(float fov, float aspect, float zNear, float zFar)
         {
-            float e = 1.0f / (float)Math.Tan(MathHelper.DegreesToRadians(fov / 2.0f));
-            float aspectInv = 1.0f / aspect;
-            float fovX = 2.0f * (float)Math.Atan(aspectInv / e);
-            float xScale = 1.0f / (float)Math.Tan(0.5f * fovX);
-            float yScale = xScale / aspectInv;
-            var result = Identity;
+            float xScale = 1.0f / (float)Math.Tan(MathHelper.DegreesToRadians(fov / 2.0f));
+            float yScale = xScale * aspect;
+            var result = new Matrix4x4F();
             result.M11 = xScale;
             result.M22 = yScale;
             result.M33 = zFar / (zFar - zNear);
@@ -2455,7 +2453,7 @@ namespace Adamantium.Mathematics
             float yScale = (float)(1.0f / Math.Tan(fov * 0.5f));
             float q = zFar / (zFar - zNear);
 
-            result = Identity;
+            result = new Matrix4x4F();
             result.M11 = yScale / aspect;
             result.M22 = yScale;
             result.M33 = q;

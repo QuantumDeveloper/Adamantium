@@ -4,13 +4,13 @@ namespace Adamantium.ECS;
 
 public interface IEntityProcessor
 {
-    public void Update(AppTime gameTime);
+    public void Update(AppTime appTime);
 
     // Out-of-render-pass work (e.g. a GPU compute dispatch) recorded in the renderer's beforeRenderPass hook, before
     // the render pass begins and before Draw. No-op for processors that don't need it.
     public void PreRender();
 
-    public void Draw(AppTime gameTime);
+    public void Draw(AppTime appTime);
 
     public void EndDraw();
 

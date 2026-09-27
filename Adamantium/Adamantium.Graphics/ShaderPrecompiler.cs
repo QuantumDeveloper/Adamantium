@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.Threading.Tasks;
 using Adamantium.Graphics.Core;
 using Adamantium.Graphics.Core.EffectsFramework;
 using Serilog;
@@ -40,8 +41,29 @@ public static class ShaderPrecompiler
     private const int MaxAttemptsWithoutProgress = 3;   // no longer flake - something is permanently wrong
     private static readonly TimeSpan AttemptTimeout = TimeSpan.FromMinutes(2);
 
-    /// <summary>True in the child: this process must compile the shaders and exit, not run an application.</summary>
-    public static bool IsCompilePass => Environment.GetCommandLineArgs().Contains(PassArgument);
+    private static readonly object BackgroundGate = new();
+    private static readonly HashSet<string> BackgroundTried = new(StringComparer.Ordinal);
+
+    private static string _inFlightPath;
+    private static string _inFlightEffect;
+
+    /// <summary>True in the child: this process must compile the shaders and exit, not run an application. Read once -
+    /// the command line cannot change, and this is asked per shader.</summary>
+    public static bool IsCompilePass { get; } = Environment.GetCommandLineArgs().Contains(PassArgument);
+
+    // The one effect this child was asked for, or null for all of them. A named run ignores the standing verdict -
+    // something decided to ask again.
+    private static string RequestedEffect
+    {
+        get
+        {
+            var args = Environment.GetCommandLineArgs();
+            var at = Array.IndexOf(args, PassArgument);
+            return at >= 0 && at + 1 < args.Length && !args[at + 1].StartsWith("--", StringComparison.Ordinal)
+                ? args[at + 1]
+                : null;
+        }
+    }
 
     /// <summary>Called once the graphics device exists and BEFORE anything is shown. In the child this compiles and
     /// terminates the process; in a normal launch it returns as soon as the cache is known complete.</summary>
@@ -69,6 +91,16 @@ public static class ShaderPrecompiler
             {
                 Log.Logger.Information($"Shaders precompiled in {attempt} attempt(s): {CachedCount(folder)} shaders");
                 return;
+            }
+
+            // The child left behind the name of what it was building when it died. Writing that down is progress of
+            // its own kind - the next attempt starts past it - and without this one effect the driver will not
+            // compile holds the whole cache cold, for every launch, forever.
+            if (TakePoisoned(device) is { } poisoned)
+            {
+                Log.Logger.Warning($"Shader precompile: {poisoned} took the process down - skipping it from now on");
+                withoutProgress = 0;
+                continue;
             }
 
             // A dead child still made progress if it persisted something new; only a run that adds NOTHING counts
@@ -101,15 +133,43 @@ public static class ShaderPrecompiler
         // extra render device costs nothing.
         var target = device.MainDevice.CreateRenderDevice();
 
+        var inFlightPath = InFlightFile(device);
+        var stats = ShaderCompileStats.Load(device);
+        var clock = new Stopwatch();
+        var only = RequestedEffect;
+
         foreach (var type in EffectTypes())
         {
+            var name = type.FullName ?? type.Name;
+
+            if (only != null)
+            {
+                if (name != only) continue;
+            }
+            else if (stats.ShouldSkip(name))
+            {
+                skipped++;
+                continue;
+            }
+
+            // Written BEFORE the constructor, deleted after it: if the process does not come back, the parent reads
+            // this and knows which effect took it down - and, once the device starts reporting, which shader of it.
+            _inFlightPath = inFlightPath;
+            _inFlightEffect = name;
+            TryWrite(inFlightPath, name);
+            stats.RecordAttempt(name);
+            // Saved before each build, not at the end: a pass that dies leaves the attempt counted anyway.
+            stats.Save();
+
             try
             {
                 // Generated effects all take (IGraphicsDevice, EffectPool = null) and compile their shaders in the ctor.
                 // A pool EACH: one pool refuses to hold two effects sharing a global shader name, and which effects
                 // collide is none of this pass's business.
+                clock.Restart();
                 (Activator.CreateInstance(type, target, EffectPool.New(target)) as IDisposable)?.Dispose();
                 created++;
+                stats.RecordSuccess(name, (int)clock.ElapsedMilliseconds);
             }
             catch (Exception e)
             {
@@ -119,11 +179,18 @@ public static class ShaderPrecompiler
                 skipped++;
                 // Reflection wraps whatever the ctor threw; the wrapper's message says nothing about the real fault.
                 var cause = (e as TargetInvocationException)?.InnerException ?? e;
+                stats.RecordSkipped(name, cause.GetType().Name);
                 Log.Logger.Warning($"Shader precompile skipped {type.Name}: {cause.GetType().Name}: {cause.Message}");
             }
+
+            TryDelete(inFlightPath);
         }
 
-        // Reaching here at all means the process survived the whole list - that is what "precompiled" means.
+        stats.Save();
+
+        // No stamp for a named run: one effect proves nothing about the rest.
+        if (only != null) Environment.Exit(created > 0 ? 0 : 1);
+
         var stamped = false;
         if (created > 0)
         {
@@ -143,7 +210,43 @@ public static class ShaderPrecompiler
         Environment.Exit(stamped ? 0 : 1);
     }
 
-    private static bool RunChild()
+    /// <summary>Builds ONE effect in a child process while the application keeps running - the fault being recovered
+    /// from kills whatever process attempts it, so the attempt cannot be made here. Once per effect per run.</summary>
+    public static void TryCompileInBackground(GraphicsDevice device, string shaderName)
+    {
+        if (IsCompilePass || device == null || !Enabled || !ShaderBinaryCache.Enabled) return;
+
+        var effect = ShaderCompileStats.ForDevice(device).EffectOfShader(shaderName);
+        if (effect == null || !ShaderCompileStats.ForDevice(device).CanRetry(effect)) return;
+
+        lock (BackgroundTried)
+        {
+            if (!BackgroundTried.Add(effect)) return;
+        }
+
+        Task.Run(() =>
+        {
+            // One at a time: each child holds a Vulkan device of its own, and several at once is pressure for nothing.
+            lock (BackgroundGate)
+            {
+                Log.Logger.Information($"Shader precompile: trying {effect} again in the background");
+
+                if (RunChild(effect))
+                {
+                    ShaderCompileStats.Refresh(device);
+                    Log.Logger.Information($"Shader precompile: {effect} built - it will be used from the next draw");
+                    return;
+                }
+
+                // Writing the death down is what stops this being tried forever.
+                TakePoisoned(device);
+                ShaderCompileStats.Refresh(device);
+                Log.Logger.Warning($"Shader precompile: {effect} took the child down again");
+            }
+        });
+    }
+
+    private static bool RunChild(string onlyEffect = null)
     {
         try
         {
@@ -160,6 +263,7 @@ public static class ShaderPrecompiler
                 info.ArgumentList.Add(entry);
             }
             info.ArgumentList.Add(PassArgument);
+            if (!string.IsNullOrEmpty(onlyEffect)) info.ArgumentList.Add(onlyEffect);
 
             using var child = Process.Start(info);
             if (child == null) return false;
@@ -201,8 +305,9 @@ public static class ShaderPrecompiler
 
             foreach (var type in types)
             {
-                if (type.IsAbstract || !typeof(Effect).IsAssignableFrom(type)) continue;
-                if (type.Namespace?.EndsWith(".Effects.Generated", StringComparison.Ordinal) != true) continue;
+                // Type only, NO namespace test: one for ".Effects.Generated" went stale when the generator moved its
+                // output, and the pass then found no effects at all - silently, every launch.
+                if (type.IsAbstract || type == typeof(Effect) || !typeof(Effect).IsAssignableFrom(type)) continue;
                 yield return type;
             }
         }
@@ -238,15 +343,81 @@ public static class ShaderPrecompiler
         }
     }
 
-    private static string StampFile(GraphicsDevice device)
+    private static string StampFile(GraphicsDevice device) => SideFile(device, "precompiled.stamp");
+
+    // What the child is building right now. It survives the process that wrote it, which is the point: a fault leaves
+    // no exception to catch, so this is the only thing that says what was being built.
+    private static string InFlightFile(GraphicsDevice device) => SideFile(device, "compiling.txt");
+
+    /// <summary>Called by the device just before the driver is handed a shader. Writes only inside the compile pass -
+    /// a file per shader would be pure cost in an application that has nothing to recover from.</summary>
+    internal static void NoteShaderInFlight(string shaderName)
+    {
+        if (_inFlightPath == null || _inFlightEffect == null) return;
+        TryWrite(_inFlightPath, _inFlightEffect + Environment.NewLine + shaderName);
+    }
+
+    private static string SideFile(GraphicsDevice device, string name)
     {
         try
         {
-            return Path.Combine(ShaderBinaryCache.DirectoryFor(device), "precompiled.stamp");
+            return Path.Combine(ShaderBinaryCache.DirectoryFor(device), name);
         }
         catch
         {
             return null;
+        }
+    }
+
+    /// <summary>Writes whatever the dead child was building into the statistics as a death, and returns it. Null when
+    /// the child died somewhere other than a constructor - there is nothing to blame then.</summary>
+    private static string TakePoisoned(GraphicsDevice device)
+    {
+        var inFlight = InFlightFile(device);
+        if (inFlight == null || !File.Exists(inFlight)) return null;
+
+        try
+        {
+            // The effect, then the shader the driver held - a child that died before any shader leaves just the first.
+            var lines = File.ReadAllLines(inFlight);
+            File.Delete(inFlight);
+
+            var name = lines.Length > 0 ? lines[0].Trim() : "";
+            if (name.Length == 0) return null;
+
+            var stats = ShaderCompileStats.Load(device);
+            stats.RecordDeath(name, lines.Length > 1 ? lines[1].Trim() : null);
+            stats.Save();
+            return name;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private static void TryWrite(string path, string text)
+    {
+        try
+        {
+            if (path == null) return;
+            Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+            File.WriteAllText(path, text);
+        }
+        catch
+        {
+            // Housekeeping. A pass that cannot leave notes still compiles shaders.
+        }
+    }
+
+    private static void TryDelete(string path)
+    {
+        try
+        {
+            if (path != null && File.Exists(path)) File.Delete(path);
+        }
+        catch
+        {
         }
     }
 

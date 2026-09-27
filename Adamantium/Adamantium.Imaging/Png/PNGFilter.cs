@@ -1,5 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Numerics;
+using System.Runtime.CompilerServices;
 
 namespace Adamantium.Imaging.Png
 {
@@ -52,16 +54,16 @@ namespace Adamantium.Imaging.Png
             return error;
         }
 
+        // Optimized from the first call: an image is decoded once, and tiering would leave most of it unoptimized.
+        [MethodImpl(MethodImplOptions.AggressiveOptimization)]
         private static unsafe uint UnfilterScanline(byte* recon, byte* scanline, byte* precon, int bytewidth, byte filterType, int length)
         {
             int i = 0;
             switch (filterType)
             {
                 case 0:
-                    for (i = 0; i != length; ++i)
-                    {
-                        recon[i] = scanline[i];
-                    }
+                    // CopyTo, not a byte loop: in and out may be the same buffer, and it moves overlapping data correctly.
+                    new Span<byte>(scanline, length).CopyTo(new Span<byte>(recon, length));
                     break;
                 case 1:
                     for (i = 0; i != bytewidth; ++i) recon[i] = scanline[i];
@@ -70,11 +72,22 @@ namespace Adamantium.Imaging.Png
                 case 2:
                     if (precon != null)
                     {
-                        for (i = 0; i != length; ++i) recon[i] = (byte)(scanline[i] + precon[i]);
+                        // Each chunk is loaded before it is stored, so an in-place line, which trails its input, stays right.
+                        var step = Vector<byte>.Count;
+                        if (Vector.IsHardwareAccelerated)
+                        {
+                            for (; i + step <= length; i += step)
+                            {
+                                var sum = Unsafe.ReadUnaligned<Vector<byte>>(scanline + i) + Unsafe.ReadUnaligned<Vector<byte>>(precon + i);
+                                Unsafe.WriteUnaligned(recon + i, sum);
+                            }
+                        }
+
+                        for (; i < length; ++i) recon[i] = (byte)(scanline[i] + precon[i]);
                     }
                     else
                     {
-                        for (i = 0; i != length; ++i) recon[i] = scanline[i];
+                        new Span<byte>(scanline, length).CopyTo(new Span<byte>(recon, length));
                     }
                     break;
                 case 3:
@@ -96,10 +109,7 @@ namespace Adamantium.Imaging.Png
                         {
                             recon[i] = (byte)(scanline[i] + precon[i]); /*paethPredictor(0, precon[i], 0) is always precon[i]*/
                         }
-                        for (i = bytewidth; i < length; ++i)
-                        {
-                            recon[i] = (byte)(scanline[i] + PaethPredictor(recon[i - bytewidth], precon[i], precon[i - bytewidth]));
-                        }
+                        UnfilterPaeth(recon, scanline, precon, bytewidth, length);
                     }
                     else
                     {
@@ -117,6 +127,82 @@ namespace Adamantium.Imaging.Png
                 default: return 36; /*error: unexisting filter type given*/
             }
             return 0;
+        }
+
+        // The channels of a pixel run side by side, so the CPU overlaps their dependency chains; the neighbors stay in
+        // locals instead of being read back.
+        [MethodImpl(MethodImplOptions.AggressiveOptimization)]
+        private static unsafe void UnfilterPaeth(byte* recon, byte* scanline, byte* precon, int bytewidth, int length)
+        {
+            if (bytewidth == 3)
+            {
+                int a0 = recon[0], a1 = recon[1], a2 = recon[2];
+                int c0 = precon[0], c1 = precon[1], c2 = precon[2];
+                for (var i = 3; i + 2 < length; i += 3)
+                {
+                    int b0 = precon[i], b1 = precon[i + 1], b2 = precon[i + 2];
+                    a0 = (scanline[i] + Paeth(a0, b0, c0)) & 0xFF;
+                    a1 = (scanline[i + 1] + Paeth(a1, b1, c1)) & 0xFF;
+                    a2 = (scanline[i + 2] + Paeth(a2, b2, c2)) & 0xFF;
+                    recon[i] = (byte)a0;
+                    recon[i + 1] = (byte)a1;
+                    recon[i + 2] = (byte)a2;
+                    c0 = b0;
+                    c1 = b1;
+                    c2 = b2;
+                }
+
+                return;
+            }
+
+            if (bytewidth == 4)
+            {
+                int a0 = recon[0], a1 = recon[1], a2 = recon[2], a3 = recon[3];
+                int c0 = precon[0], c1 = precon[1], c2 = precon[2], c3 = precon[3];
+                for (var i = 4; i + 3 < length; i += 4)
+                {
+                    int b0 = precon[i], b1 = precon[i + 1], b2 = precon[i + 2], b3 = precon[i + 3];
+                    a0 = (scanline[i] + Paeth(a0, b0, c0)) & 0xFF;
+                    a1 = (scanline[i + 1] + Paeth(a1, b1, c1)) & 0xFF;
+                    a2 = (scanline[i + 2] + Paeth(a2, b2, c2)) & 0xFF;
+                    a3 = (scanline[i + 3] + Paeth(a3, b3, c3)) & 0xFF;
+                    recon[i] = (byte)a0;
+                    recon[i + 1] = (byte)a1;
+                    recon[i + 2] = (byte)a2;
+                    recon[i + 3] = (byte)a3;
+                    c0 = b0;
+                    c1 = b1;
+                    c2 = b2;
+                    c3 = b3;
+                }
+
+                return;
+            }
+
+            for (var i = bytewidth; i < length; ++i)
+            {
+                recon[i] = (byte)(scanline[i] + Paeth(recon[i - bytewidth], precon[i], precon[i - bytewidth]));
+            }
+        }
+
+        // Branchless: the choice is data-dependent, and as branches it mispredicted on every other byte.
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static int Paeth(int a, int b, int c)
+        {
+            int pa = b - c, pb = a - c;
+            var pc = pa + pb;
+            var sign = pa >> 31;
+            pa = (pa ^ sign) - sign;
+            sign = pb >> 31;
+            pb = (pb ^ sign) - sign;
+            sign = pc >> 31;
+            pc = (pc ^ sign) - sign;
+
+            var pickC = (pc - pb) >> 31;
+            var nearest = pb ^ ((pb ^ pc) & pickC);
+            var other = b ^ ((b ^ c) & pickC);
+            var pickOther = (nearest - pa) >> 31;
+            return a ^ ((a ^ other) & pickOther);
         }
 
         internal static unsafe uint Filter(byte* outData, byte* inData, uint width, uint height,

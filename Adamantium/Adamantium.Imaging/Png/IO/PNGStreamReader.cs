@@ -404,7 +404,7 @@ namespace Adamantium.Imaging.Png.IO
                 }
 
                 info.IsBackgroundDefined = true;
-                bkgd.BackgroundR = bkgd.BackgroundB = bkgd.BackgroundB = (uint)colorByte;
+                bkgd.BackgroundR = bkgd.BackgroundG = bkgd.BackgroundB = (uint)colorByte;
                 info.BackgroundR = info.BackgroundG = info.BackgroundB = (uint)colorByte;
             }
             else if (info.ColorMode.ColorType == PngColorType.Grey || info.ColorMode.ColorType == PngColorType.GreyAlpha)
@@ -418,7 +418,7 @@ namespace Adamantium.Imaging.Png.IO
                 /*the values are truncated to bitdepth in the PNG file*/
                 info.IsBackgroundDefined = true;
                 var color = ReadUInt16();
-                bkgd.BackgroundR = bkgd.BackgroundB = bkgd.BackgroundB = color;
+                bkgd.BackgroundR = bkgd.BackgroundG = bkgd.BackgroundB = color;
                 info.BackgroundR = info.BackgroundG = info.BackgroundB = color;
             }
             else if (info.ColorMode.ColorType == PngColorType.RGB || info.ColorMode.ColorType == PngColorType.RGBA)
@@ -437,7 +437,7 @@ namespace Adamantium.Imaging.Png.IO
                 var blueColor = ReadUInt16();
                 info.IsBackgroundDefined = true;
                 bkgd.BackgroundR = redColor;
-                bkgd.BackgroundB = greenColor;
+                bkgd.BackgroundG = greenColor;
                 bkgd.BackgroundB = blueColor;
                 info.BackgroundR = bkgd.BackgroundR;
                 info.BackgroundG = bkgd.BackgroundG;

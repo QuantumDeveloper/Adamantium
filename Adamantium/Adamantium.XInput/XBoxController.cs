@@ -21,11 +21,14 @@ namespace Adamantium.XInput
 
         static XBoxController()
         {
-            if (LoadLibrary("xinput1_4.dll") != IntPtr.Zero)
+            if (NativeLibrary.TryLoad("xinput1_4.dll", out _))
             {
                 _xinput = new XInput14();
             }
         }
+
+        /// <summary>Whether XInput 1.4 is on this machine.</summary>
+        public static bool IsSupported => _xinput != null;
 
         public UserIndex UserIndex => _userIndex;
 
@@ -90,8 +93,5 @@ namespace Adamantium.XInput
         {
             return (Result)_xinput.XInputGetKeystroke((int) _userIndex, (int)DeviceQueryType.Any, out keystroke);
         }
-
-        [DllImport("kernel32", CharSet = CharSet.Unicode, EntryPoint = "LoadLibrary", SetLastError = true)]
-        private static extern IntPtr LoadLibrary(string lpFileName);
     }
 }

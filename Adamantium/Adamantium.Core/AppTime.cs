@@ -3,12 +3,12 @@
 namespace Adamantium.Core;
 
 /// <summary>
-/// Contains game frame time, total time and FPS
+/// Contains frame time, total time and FPS
 /// </summary>
 public struct AppTime
 {
     /// <summary>
-    /// Number of frames passed since game start
+    /// Number of frames passed since start
     /// </summary>
     public ulong FramesCount { get; set; }
 

@@ -11,7 +11,7 @@
       void LoadContent();
 
       /// <summary>
-      /// Called when graphics resources need to be unloaded. Override this method to unload any game-specific graphics resources.
+      /// Called when graphics resources need to be unloaded. Override this method to unload any application-specific graphics resources.
       /// </summary>
       void UnloadContent();
    }

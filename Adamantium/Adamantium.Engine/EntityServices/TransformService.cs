@@ -1,9 +1,9 @@
 ﻿using System;
+using System.Collections.Generic;
 using Adamantium.Core;
-using Adamantium.Engine.Managers;
 using Adamantium.ECS;
 using Adamantium.ECS.Components;
-using Adamantium.ECS.Components.Extensions;
+using Adamantium.Multiverse;
 using Adamantium.Mathematics;
 using Serilog;
 
@@ -11,9 +11,8 @@ namespace Adamantium.Engine.EntityServices;
 
 public class TransformService : EntityService
 {
-    private ToolsManager tools;
-    private LightManager lightManager;
-    private CameraManager cameraManager;
+    private IUniverse universe;
+    private readonly List<Camera> cameras = [];
 
     public Boolean IsPaused { get; set; }
 
@@ -29,22 +28,19 @@ public class TransformService : EntityService
 
     public override void Initialize()
     {
-        tools = EntityWorld.DependencyResolver.Resolve<ToolsManager>();
-        lightManager = EntityWorld.DependencyResolver.Resolve<LightManager>();
-        cameraManager = EntityWorld.DependencyResolver.Resolve<CameraManager>();
+        universe = EntityWorld.Satellites.Get<IUniverse>();
     }
 
-    public override void Update(AppTime gameTime)
+    public override void Update(AppTime appTime)
     {
         var entities = Entities;
         try
         {
+            universe.CollectCurrentCameras(cameras);
             foreach (var entity in entities)
             {
-                Transform(entity, gameTime);
+                Transform(entity, appTime);
             }
-            tools.Update(entities, cameraManager, lightManager);
-            lightManager.Update();
         }
         catch (Exception ex)
         {
@@ -52,16 +48,15 @@ public class TransformService : EntityService
         }
     }
         
-    private void Transform(Entity entity, AppTime gameTime)
+    private void Transform(Entity entity, AppTime appTime)
     {
-        var generalCenter = entity.GetLocalCenter();
         entity.TraverseInDepth(current =>
         {
             var transform = current.Transform;
             var dirty = transform.IsWorldDirty;
             Collider[] colliders = null;
 
-            foreach (var camera in cameraManager.ActiveCameras)
+            foreach (var camera in cameras)
             {
                 if (camera.Owner == current)
                 {
@@ -69,14 +64,10 @@ public class TransformService : EntityService
                 }
 
                 var metadata = transform.GetMetadata(camera);
-                // Recompute this (node, camera) ONLY when an input to its world matrix changed: the node's own transform
-                // (dirty - also set below when its PARENT moved), the CAMERA position (the world is camera-relative; note a
-                // rotating camera does NOT move, so mouse-look costs nothing), the shared pivot, or a first-ever compute.
-                // A static scene therefore skips the whole matrix + collider pass instead of rebuilding it every frame.
-                // WORLD position: a parented camera's local offset barely changes while its subject flies.
+                // Only when an input to the world matrix changed - the node or its parent, the camera position -
+                // so a static scene skips the pass. World position: a parented camera's local offset barely changes.
                 if (!dirty && metadata.Computed
-                    && metadata.LastCameraPosition == camera.WorldPosition
-                    && metadata.LastPivotCorrection == generalCenter)
+                    && metadata.LastCameraPosition == camera.WorldPosition)
                 {
                     continue;
                 }
@@ -85,7 +76,7 @@ public class TransformService : EntityService
                 var parentWorld = current.Owner?.Transform != null
                     ? current.Owner.Transform.GetMetadata(camera).AbsoluteWorld
                     : Matrix4x4F.Identity;
-                transform.CalculateFinalTransform(camera, generalCenter, parentWorld);
+                transform.CalculateFinalTransform(camera, parentWorld);
 
                 // Collider bounds ride the same world matrix, so refresh them exactly when it was recomputed (fetch the
                 // list lazily so a fully-static node allocates nothing).
@@ -111,8 +102,8 @@ public class TransformService : EntityService
                 }
             }
 
-            current.GetComponent<AnimationComponent>()?.Update(gameTime);
-            current.GetComponent<AnimationController>()?.Update(gameTime);
+            current.GetComponent<AnimationComponent>()?.Update(appTime);
+            current.GetComponent<AnimationController>()?.Update(appTime);
         });
     }
 }

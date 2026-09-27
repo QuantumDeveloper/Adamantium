@@ -35,23 +35,7 @@ namespace Adamantium.ECS.Components
         /// <summary>Where this entity is IN THE WORLD: its own position composed through its parents. <see cref="Position"/>
         /// is relative to the parent, so for anything below a root the two differ. Camera-independent, unlike
         /// <see cref="TransformMetaData.AbsoluteWorld"/>, which the render pass records per camera.</summary>
-        public Vector3 WorldPosition
-        {
-            get
-            {
-                var world = Matrix4x4F.Translation((Vector3F)Position);
-
-                for (var at = Owner?.Owner; at != null; at = at.Owner)
-                {
-                    var t = at.Transform;
-                    world *= Matrix4x4F.Scaling(t.Scale)
-                             * Matrix4x4F.RotationQuaternion(t.Rotation)
-                             * Matrix4x4F.Translation((Vector3F)t.Position);
-                }
-
-                return (Vector3)world.TranslationVector;
-            }
-        }
+        public Vector3 WorldPosition => (Vector3)GetWorldMatrixF().TranslationVector;
 
         public void RemoveMetadata(CameraBase camera)
         {
@@ -93,17 +77,31 @@ namespace Adamantium.ECS.Components
             GetMetadata(camera).Enabled = enabled;
         }
 
+        /// <summary>The point this entity turns and scales about, in its parent's space. Moving it leaves the entity in place.</summary>
         public Vector3 Pivot
         {
             get => pivot + Position;
             set
             {
-                if (SetProperty(ref pivot, value))
-                {
-                    pivot = value - Position;
-                    IsWorldDirty = true;
-                }
+                var shift = (Vector3F)(value - Pivot);
+                var local = GetLocalMatrixF();
+                Matrix4x4F.Invert(ref local, out var inverse);
+                ShiftPivot(inverse == Matrix4x4F.Zero ? shift : Vector3F.TransformNormal(shift, inverse));
             }
+        }
+
+        private void ShiftPivot(Vector3F offset)
+        {
+            if (offset == Vector3F.Zero)
+            {
+                return;
+            }
+
+            var drift = Vector3F.TransformNormal(offset, GetLocalMatrixF()) - offset;
+            pivot += (Vector3)offset;
+            Position += (Vector3)drift;
+            IsWorldDirty = true;
+            RaisePropertyChanged(nameof(Pivot));
         }
 
         public QuaternionF PivotRotation
@@ -346,7 +344,7 @@ namespace Adamantium.ECS.Components
         {
             if (IsEnabled)
             {
-                Pivot = Position;
+                ShiftPivot(-(Vector3F)pivot);
             }
         }
 
@@ -503,16 +501,32 @@ namespace Adamantium.ECS.Components
             }
         }
 
-        public Matrix4x4F CalculateFinalTransform(CameraBase camera, Vector3F pivotCorrection, Matrix4x4F parentWorld)
+        /// <summary>Where this entity stands in its parent: scaled and turned about its pivot, then moved to its position.</summary>
+        public Matrix4x4F GetLocalMatrixF()
         {
             var scaling = Scale;
-            // LOCAL position (relative to the parent), NOT camera-relative: the camera shift is applied once, at the end,
-            // to the composed world - otherwise it would be subtracted once per level of the hierarchy.
             var localPosition = (Vector3F)Position;
-            var finalPivot = (Vector3F)pivot + pivotCorrection;
-            var scalingCenter = finalPivot;
+            var scalingCenter = (Vector3F)pivot;
+            var rotationCenter = scalingCenter;
+            Matrix4x4F.Transformation(ref scalingCenter, ref pivotRotation, ref scaling, ref rotationCenter, ref rotation, ref localPosition, out var localMatrix);
+            return localMatrix;
+        }
 
-            Matrix4x4F.Transformation(ref scalingCenter, ref pivotRotation, ref scaling, ref finalPivot, ref rotation, ref localPosition, out var localMatrix);
+        /// <summary>Where this entity stands in the world, through its parents; the same matrix it is drawn with.</summary>
+        public Matrix4x4F GetWorldMatrixF()
+        {
+            var world = GetLocalMatrixF();
+            for (var at = Owner?.Owner; at != null; at = at.Owner)
+            {
+                world *= at.Transform.GetLocalMatrixF();
+            }
+
+            return world;
+        }
+
+        public Matrix4x4F CalculateFinalTransform(CameraBase camera, Matrix4x4F parentWorld)
+        {
+            var localMatrix = GetLocalMatrixF();
 
             // THE hierarchical fix: compose through the parent (row-vector convention -> local * parent). The parent's
             // absolute world was computed earlier this frame (TransformService walks the tree top-down), so a parent
@@ -528,14 +542,13 @@ namespace Adamantium.ECS.Components
             var metadata = GetMetadata(camera);
             metadata.AbsoluteWorld = absoluteWorld;
             metadata.RelativePosition = GetRelativePosition(cameraWorld);
-            metadata.Pivot = finalPivot;
+            metadata.Pivot = (Vector3F)pivot;
             metadata.WorldMatrixF = renderWorld;
             metadata.WorldMatrix = (Matrix4x4)renderWorld;
             metadata.Rotation = Rotation;
             metadata.Scale = Scale;
             // Record the inputs so TransformService can skip this (camera, node) next frame if none of them changed.
             metadata.LastCameraPosition = cameraWorld;
-            metadata.LastPivotCorrection = pivotCorrection;
             metadata.Computed = true;
             return renderWorld;
         }
@@ -549,7 +562,8 @@ namespace Adamantium.ECS.Components
                 transform.ScaleFactor = ScaleFactor;
                 transform.InitialPosition = InitialPosition;
                 transform.Position = Position;
-                transform.Pivot = pivot;
+                transform.pivot = pivot;
+                transform.IsWorldDirty = true;
                 transform.PivotRotation = PivotRotation;
             }
         }

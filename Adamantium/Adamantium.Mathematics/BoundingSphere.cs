@@ -9,7 +9,7 @@ namespace Adamantium.Mathematics
    /// Represents a bounding sphere in three dimensional space.
    /// </summary>
    [StructLayout(LayoutKind.Sequential, Pack = 4)]
-   public struct BoundingSphere : IEquatable<BoundingSphere>, IFormattable
+   public struct BoundingSphere : IEquatable<BoundingSphere>, IFormattable, IConvexShape
    {
       /// <summary>
       /// The center of the sphere in three dimensional space.
@@ -24,7 +24,7 @@ namespace Adamantium.Mathematics
       /// <summary>
       /// The diameter of the sphere.
       /// </summary>
-      public float Diameter => Radius * Radius;
+      public float Diameter => Radius * 2;
 
       /// <summary>
       /// Initializes a new instance of the <see cref="BoundingBox"/> struct.
@@ -71,6 +71,12 @@ namespace Adamantium.Mathematics
          if (up > scale) scale = up;
          if (forward > scale) scale = forward;
          return new BoundingSphere(center, Radius * scale);
+      }
+
+      public Vector3F Support(Vector3F direction)
+      {
+         var length = direction.Length();
+         return length > 0 ? Center + direction * (Radius / length) : Center + new Vector3F(Radius, 0, 0);
       }
 
       /// <summary>
@@ -190,6 +196,18 @@ namespace Adamantium.Mathematics
          return Intersects(ref sphere);
       }
 
+      /// <summary>Whether the sphere and a capsule share a point.</summary>
+      public bool Intersects(ref BoundingCapsule capsule)
+      {
+         return Collision.CapsuleIntersectsSphere(ref capsule, ref this);
+      }
+
+      /// <summary>Whether the sphere and a convex hull share a point.</summary>
+      public bool Intersects(ConvexHull hull)
+      {
+         return Gjk.Intersects(this, hull);
+      }
+
       /// <summary>
       /// Determines whether the current objects contains a point.
       /// </summary>
@@ -229,8 +247,7 @@ namespace Adamantium.Mathematics
       /// <returns>The type of containment the two objects have.</returns>
       public ContainmentType Contains(ref OrientedBoundingBox obb)
       {
-         BoundingBox box = obb.GetBoundingBox();
-         return Collision.SphereContainsBox(ref this, ref box);
+         return OrientedBoundingBox.Contains(ref this, ref obb);
       }
 
       /// <summary>

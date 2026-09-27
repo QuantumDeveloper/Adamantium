@@ -4,7 +4,7 @@
 
         <IsPackable>false</IsPackable>
 
-        <Platforms>x64</Platforms>
+        <Platforms>AnyCPU</Platforms>
 
         <Configurations>Debug;Release</Configurations>
 
@@ -13,11 +13,11 @@
         <TargetFramework>net10.0</TargetFramework>
     </PropertyGroup>
 
-    <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|x64' ">
+    <PropertyGroup Condition=" '$(Configuration)' == 'Debug' ">
       <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     </PropertyGroup>
 
-    <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|x64' ">
+    <PropertyGroup Condition=" '$(Configuration)' == 'Release' ">
       <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     </PropertyGroup>
 

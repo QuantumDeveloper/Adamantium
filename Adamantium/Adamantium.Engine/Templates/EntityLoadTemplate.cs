@@ -31,7 +31,6 @@ public class EntityLoadTemplate:IEntityTemplate
    private Task<Entity> LoadEntityFromFile(Entity owner)
    {
       var input = File.ReadAllBytes(pathToFile);
-      GameContainer container = null;
       /*
       try
       {
@@ -105,6 +104,6 @@ public class EntityLoadTemplate:IEntityTemplate
 
          }
       }*/
-      return Task.FromResult(container?.EntityTree);
+      return Task.FromResult<Entity>(null);
    }
 }

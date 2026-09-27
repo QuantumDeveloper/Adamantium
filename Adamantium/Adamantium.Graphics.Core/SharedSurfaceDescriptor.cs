@@ -4,7 +4,7 @@ using Adamantium.Imaging;
 namespace Adamantium.Graphics.Core;
 
 /// <summary>
-/// How the shared memory/semaphore handles were produced. The producer (a game engine, possibly on another
+/// How the shared memory/semaphore handles were produced. The producer (a renderer, possibly on another
 /// API) picks this; the importing side maps it to the matching Vulkan external-handle type.
 /// </summary>
 public enum SharedHandleType

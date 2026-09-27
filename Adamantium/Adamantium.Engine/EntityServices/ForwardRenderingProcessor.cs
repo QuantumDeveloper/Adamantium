@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using System.Linq;
 using Adamantium.Core;
 using Adamantium.ECS;
@@ -20,11 +19,12 @@ public class ForwardRenderingProcessor : RenderingProcessor
     {
     }
 
-    protected override void LoadContent()
+    protected override void CreateDeviceResources()
     {
+        _geometryCache?.Dispose();
         BasicEffect = new BasicEffect(GraphicsDevice);
         _geometryCache = new MeshGeometryCache(GraphicsDevice);
-        base.LoadContent();
+        base.CreateDeviceResources();
     }
 
     protected override void OnDetached()
@@ -35,29 +35,23 @@ public class ForwardRenderingProcessor : RenderingProcessor
 
     private BasicEffect BasicEffect { get; set; }
     private MeshGeometryCache _geometryCache;
-    
-    public override void Draw(AppTime gameTime)
+
+    public override void Draw(AppTime appTime)
     {
-        // Resolve the active camera ONCE per frame, not once per entity in the traversal below - it is invariant for the
-        // whole draw and GetActive takes a lock + dictionary lookup.
-        ActiveCamera = CameraManager.GetActive(Window);
+        ActiveCamera = Window.Camera;
         if (ActiveCamera == null) return;
 
         foreach (var entity in Entities)
         {
-            OnDraw(entity, gameTime);
+            OnDraw(entity, appTime);
         }
-
-        // Over the scene, in screen space: the orientation gizmo. Its logic has run every frame all along - only the
-        // draw was missing, and it lived in a service nothing creates.
-        DrawHUD();
     }
-    
-    private void OnDraw(Entity entity, AppTime gameTime)
+
+    private void OnDraw(Entity entity, AppTime appTime)
     {
         try
         {
-            entity.TraverseInDepth(current => DrawEntity(current, gameTime));
+            entity.TraverseInDepth(current => DrawEntity(current, appTime));
         }
         catch (Exception exception)
         {
@@ -65,13 +59,13 @@ public class ForwardRenderingProcessor : RenderingProcessor
         }
     }
 
-    private void DrawEntity(Entity entity, AppTime gameTime)
+    private void DrawEntity(Entity entity, AppTime appTime)
     {
         if (!entity.Visible)
         {
             return;
         }
-        
+
         var collider = entity.GetComponent<Collider>();
         if (collider != null)
         {
@@ -105,8 +99,7 @@ public class ForwardRenderingProcessor : RenderingProcessor
         var controller = entity.GetComponent<AnimationController>();
         if (controller != null && controller.FinalMatrices.Count > 0)
         {
-            // Skinning is WIP; upload the bones here once the pass is wired (do NOT materialise the array every frame
-            // until it is actually consumed).
+            // Skinning is WIP: the bones are uploaded here once the pass consumes them.
             //BasicEffect.Parameters["Bones"].SetValue(controller.FinalMatrices.Values.ToArray());
         }
 
@@ -132,8 +125,7 @@ public class ForwardRenderingProcessor : RenderingProcessor
             BasicEffect.ShaderTexture.SetResource(material.Texture);
         }
 
-        // The render PATH is the mesh data's explicit choice, not a property of the mesh - it selects the shader pass
-        // here and (inside DrawMesh) the vertex format the GPU buffers are built for.
+        // The mesh data's choice, not the mesh's: it picks the pass here and the vertex format inside DrawMesh.
         if (meshData.RenderMode == MeshRenderMode.Skinned)
         {
             BasicEffect.Techniques["Basic"].Passes["Skinned"].Apply();
@@ -152,229 +144,5 @@ public class ForwardRenderingProcessor : RenderingProcessor
         }
 
         _geometryCache.DrawMesh(GraphicsDevice, meshData);
-    }
-
-    protected void DrawTools(Camera activeCamera)
-    {
-        var tools = EntityWorld.EntityManager.GetGroup("Tools");
-        foreach (var tool in tools)
-        {
-            try
-            {
-                tool.TraverseInDepth(ProcessTool);
-            }
-            catch (Exception exception)
-            {
-                Log.Logger.Error(exception, "Draw failed for tool {Tool}", tool.Name);
-            }
-        }
-//            BasicEffect.Techniques["MeshVertex"].Passes["NoLight"].UnApply(true);
-    }
-
-
-    protected void DrawLights(Camera activeCamera)
-    {
-        if (CameraManager.UserControlledCamera == ActiveCamera)
-        {
-//                LightService.DrawDebugLight(ToolsService.SelectedEntity, BasicEffect, CameraService, ActiveCamera, DeferredDevice, GameTime);
-        }
-    }
-
-    protected void DrawCommonTools(Camera activeCamera)
-    {
-        var tools = EntityWorld.EntityManager.GetGroup("Common");
-//            DeferredDevice.RasterizerState = DeferredDevice.RasterizerStates.CullNoneClipEnabled;
-//            DeferredDevice.BlendState = DeferredDevice.BlendStates.NonPremultiplied;
-//            DeferredDevice.DepthStencilState = DeferredDevice.DepthStencilStates.DepthEnableGreaterEqual;
-
-        foreach (var tool in tools)
-        {
-            try
-            {
-                tool.TraverseInDepth(ProcessTool);
-            }
-            catch (Exception exception)
-            {
-                Log.Logger.Error(exception, "Draw failed for tool {Tool}", tool.Name);
-            }
-        }
-//            BasicEffect.Techniques["MeshVertex"].Passes["NoLight"].UnApply(true);
-    }
-
-    protected void DrawHUD()
-    {
-        var tools = EntityWorld.EntityManager.GetGroup("HUD");
-
-        foreach (var tool in tools)
-        {
-            try
-            {
-                _hudParts.Clear();
-                tool.TraverseInDepth(CollectHUD);
-                DrawHudParts();
-            }
-            catch (Exception exception)
-            {
-                Log.Logger.Error(exception, "HUD draw failed for tool {Tool}", tool.Name);
-            }
-        }
-    }
-
-
-    private void ProcessTool(Entity current)
-    {
-        var transformation = current.Transform.GetMetadata(ActiveCamera);
-        if (!transformation.Enabled || !current.Visible)
-        {
-            return;
-        }
-
-        var material = current.GetComponent<Material>();
-        var geometries = current.GetComponents<MeshData>();
-        foreach (var component in geometries)
-        {
-            var world = transformation.WorldMatrixF;
-            var wvp = world * ActiveCamera.ViewMatrix * ActiveCamera.ProjectionMatrix;
-            Matrix4x4F inverseViewProjection =
-                Matrix4x4F.Invert(ActiveCamera.ViewMatrix * ActiveCamera.ProjectionMatrix);
-//                BasicEffect.Parameters["wvp"].SetValue(wvp);
-//                BasicEffect.Parameters["sphereCenter"].SetValue(transformation.RelativePosition); 
-//                BasicEffect.Parameters["InverseViewProjection"].SetValue(inverseViewProjection);
-//                BasicEffect.Parameters["ViewDir"].SetValue(ActiveCamera.Backward);
-
-            if (material != null)
-            {
-                if (current.IsSelected)
-                {
-//                        BasicEffect.Parameters["meshColor"].SetValue(material.HighlightColor);
-                }
-                else
-                {
-//                        BasicEffect.Parameters["meshColor"].SetValue(material.MeshColor);
-                }
-
-//                    BasicEffect.Parameters["transparency"].SetValue(material.Transparency);
-            }
-
-            if (!current.Name.Contains("Orbit"))
-            {
-//                    BasicEffect.Techniques["MeshVertex"].Passes["NoLight"].Apply();
-            }
-            else
-            {
-//                    BasicEffect.Techniques["MeshVertex"].Passes["RotationOrbits"].Apply();
-            }
-
-//                component.Draw(DeferredDevice, GameTime);
-        }
-    }
-
-    // What one drawable part of a HUD tool amounts to: a mesh, where it stands, and what colour it is.
-    private readonly record struct HudPart(MeshData Data, Matrix4x4F World, Vector4F Color);
-
-    private readonly List<HudPart> _hudParts = [];
-    private readonly Matrix4x4F[] _instanceWorld = new Matrix4x4F[InstanceCapacity];
-    private readonly Vector4F[] _instanceColors = new Vector4F[InstanceCapacity];
-
-    // Matches the table length declared in BasicEffect.fx.
-    private const int InstanceCapacity = 64;
-
-    private void CollectHUD(Entity current)
-    {
-        var transformation = current.Transform.GetMetadata(ActiveCamera);
-        if (!transformation.Enabled || !current.Visible)
-        {
-            return;
-        }
-
-        var material = current.GetComponent<Material>();
-
-        var color = material == null
-            ? Colors.White.ToVector4()
-            : transformation.IsSelected
-                ? material.HighlightColor
-                : new Vector4F(material.MeshColor, material.Transparency);
-
-        foreach (var component in current.GetComponents<MeshData>())
-        {
-            if (component?.Mesh == null || !component.IsEnabled) continue;
-
-            _hudParts.Add(new HudPart(component, transformation.WorldMatrixF, color));
-        }
-    }
-
-    // Parts that SHARE a mesh go out as ONE instanced draw: the orientation gizmo is seven balls, three arms and four
-    // arrows - three meshes, three draws. Only the placement and the colour differ per copy.
-    private void DrawHudParts()
-    {
-        if (_hudParts.Count == 0) return;
-
-        // UI projection, not the scene's: a tool places itself in screen pixels.
-        BasicEffect.ViewProjection.SetValue(ActiveCamera.UiProjection);
-
-        var drawn = new bool[_hudParts.Count];
-
-        for (var i = 0; i < _hudParts.Count; ++i)
-        {
-            if (drawn[i]) continue;
-
-            var head = _hudParts[i];
-            var count = 0;
-
-            for (var j = i; j < _hudParts.Count && count < InstanceCapacity; ++j)
-            {
-                if (drawn[j] || !ReferenceEquals(_hudParts[j].Data.Mesh, head.Data.Mesh)) continue;
-
-                _instanceWorld[count] = _hudParts[j].World;
-                _instanceColors[count] = _hudParts[j].Color;
-                drawn[j] = true;
-                ++count;
-            }
-
-            BasicEffect.InstanceWorld.SetValue(_instanceWorld);
-            BasicEffect.InstanceColor.SetValue(_instanceColors);
-            BasicEffect.BasicLitInstancedPass.Apply();
-
-            _geometryCache.DrawMesh(GraphicsDevice, head.Data, (uint)count);
-        }
-    }
-
-    protected void DrawAdditionalStuff()
-    {
-        DrawCommonTools(ActiveCamera);
-
-//            GraphicsDevice.ClearTargets(Colors.Gray, ClearOptions.DepthBuffer);
-//            DeferredDevice.RasterizerState = DeferredDevice.RasterizerStates.CullNoneClipEnabled;
-//            DeferredDevice.BlendState = DeferredDevice.BlendStates.NonPremultiplied;
-//            DeferredDevice.DepthStencilState = DeferredDevice.DepthStencilStates.DepthEnableGreater;
-
-        if (ActiveCamera == CameraManager.UserControlledCamera)
-        {
-            DrawTools(ActiveCamera);
-        }
-
-        DrawLights(ActiveCamera);
-
-        if (ShowDebugOutput)
-        {
-            //Debug();
-        }
-
-        DrawHUD();
-    }
-
-    protected void DrawLightIcons()
-    {
-//            LightService.DrawIcons(BasicEffect, ActiveCamera, DeferredDevice, GameTime);
-    }
-
-    protected void DrawCameraIcons()
-    {
-//            CameraService.DrawCameraIcons(BasicEffect, ActiveCamera, DeferredDevice, GameTime);
-//            if (CameraService.Contains(ToolsService.SelectedEntity))
-//            {
-//                CameraService.SetSelected(ToolsService.SelectedEntity);
-//                CameraService.DrawDebugCamera(BasicEffect, ActiveCamera, DeferredDevice, GameTime);
-//            }
     }
 }

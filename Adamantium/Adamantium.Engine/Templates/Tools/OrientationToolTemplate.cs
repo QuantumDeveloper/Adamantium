@@ -60,8 +60,8 @@ public class OrientationToolTemplate: BaseToolTemplate
 
       TileDirections = directions.ToArray();
 
-      var hub = BuildSubEntity(root, HomeName, sphere, Colors.Gainsboro, BoundingVolume.Sphere);
-      hub.Transform.ScaleFactor = new Vector3F(0.8f);
+      var hub = BuildSubEntity(root, HomeName, sphere, new Color(104, 106, 108), BoundingVolume.Sphere);
+      hub.Transform.ScaleFactor = new Vector3F(1.5f);
 
       BuildStepArrows(root, size * 0.85);
 

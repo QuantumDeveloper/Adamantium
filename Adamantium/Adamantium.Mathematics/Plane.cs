@@ -271,6 +271,24 @@ namespace Adamantium.Mathematics
          return Collision.PlaneIntersectsSphere(ref this, ref sphere);
       }
 
+      /// <summary>On which side of the plane an oriented box lies, or whether the plane cuts it.</summary>
+      public PlaneIntersectionType Intersects(ref OrientedBoundingBox box)
+      {
+         return box.Intersects(ref this);
+      }
+
+      /// <summary>On which side of the plane a capsule lies, or whether the plane cuts it.</summary>
+      public PlaneIntersectionType Intersects(ref BoundingCapsule capsule)
+      {
+         return capsule.Intersects(ref this);
+      }
+
+      /// <summary>On which side of the plane a convex hull lies, or whether the plane cuts it.</summary>
+      public PlaneIntersectionType Intersects(ConvexHull hull)
+      {
+         return hull.Intersects(ref this);
+      }
+
       /// <summary>
       /// Builds a matrix that can be used to reflect vectors about a plane.
       /// </summary>

@@ -56,7 +56,7 @@ public class PivotToolTemplate: BaseToolTemplate
             0,
             360,
             true,
-            tesselation);
+            tesselation).ContoursToLines();
 
         var upOrbit = forwardOrbit.Clone(Matrix4x4.RotationX(MathHelper.DegreesToRadians(90)));
         var rightOrbit = upOrbit.Clone(Matrix4x4.RotationZ(MathHelper.DegreesToRadians(90)));
@@ -65,7 +65,7 @@ public class PivotToolTemplate: BaseToolTemplate
         BuildSubEntity(root, "RightOrbit", rightOrbit, Colors.Red);
         BuildSubEntity(root, "UpOrbit", upOrbit, Colors.Green);
 
-        var centralRectangle = Shapes.Rectangle.GenerateGeometry(GeometryType.Outlined, axisLength / 5, axisLength / 5, new CornerRadius(0), 0);
+        var centralRectangle = Shapes.Rectangle.GenerateGeometry(GeometryType.Outlined, axisLength / 5, axisLength / 5, new CornerRadius(0), 0).ContoursToLines();
         BuildSubEntity(root, "CentralManipulator", centralRectangle, Colors.Turquoise, BoundingVolume.OrientedBox);
 
         return root;

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using Adamantium.Core;
@@ -12,13 +12,13 @@ namespace Adamantium.Graphics.Fonts;
 public class TextLayout : DisposableObject
 {
     public Guid Guid { get; }
-    
+
     private const uint MaxItemsCount = 4096;
-    
+
     private readonly GlyphLayoutContainer layoutContainer;
     public Typeface Typeface { get; }
     public IFont Font { get; }
-    
+
     public uint ElementsCount { get; private set; }
 
     private Glyph spaceGlyph;
@@ -27,9 +27,8 @@ public class TextLayout : DisposableObject
     public Size CalculatedLayoutSize { get; private set; }
 
     /// <summary>
-    /// When true, a newline (<c>\n</c>) is materialised as a zero-width glyph at the end of its line so a text editor
-    /// can address a caret position for it (carrying the true post-wrap line index). It is skipped by rendering. Off by
-    /// default so ordinary text blocks are completely unaffected.
+    /// Emits a zero-width glyph for each newline, so a text editor can place the caret there. Skipped by rendering; off
+    /// by default.
     /// </summary>
     public bool EmitNewlineCarets { get; set; }
 
@@ -39,8 +38,8 @@ public class TextLayout : DisposableObject
     private FontItem[] fontItems;
 
     public TextRenderingParameters RenderingParameters { get; private set; }
-    public Buffer<FontItem> VertexBuffer { get; private set; } 
-    
+    public Buffer<FontItem> VertexBuffer { get; private set; }
+
     public FontAtlas FontAtlas { get; private set; }
 
     public string Text { get; private set; }
@@ -48,10 +47,8 @@ public class TextLayout : DisposableObject
     public float FontSize { get; private set; }
 
     /// <summary>
-    /// How far (screen px) a glyph's effect (outline/glow/shadow) can reach beyond its body = the atlas
-    /// margin scaled to the current font size (same ratio the glyph quad is expanded by, constant across
-    /// glyphs). The text render target and composite quad are padded by this so effects on the edge glyphs
-    /// of the block aren't clipped at the text boundary. 0 when the atlas isn't built yet. 
+    /// How far (screen px) a glyph's effect (outline/glow/shadow) reaches beyond its body: the atlas margin at the
+    /// current font size. 0 before the atlas is built.
     /// </summary>
     public int EffectPadding => FontAtlas == null
         ? 0
@@ -61,8 +58,7 @@ public class TextLayout : DisposableObject
 
     private bool _textUpdated;
 
-    // Which atlas VERSION this block's glyph quads were built against. Behind the atlas = some of its glyphs have
-    // arrived since, and the quads have to be built again.
+    // Behind the atlas version: glyphs have arrived since, and the quads must be built again.
     private int _atlasVersion = -1;
     private bool _vertexBufferDirty;
 
@@ -75,11 +71,7 @@ public class TextLayout : DisposableObject
         dotGlyph = font.GetGlyphByCharacter('.');
 
         layoutContainer = new GlyphLayoutContainer(typeface, font);
-        // GROWN to fit, NOT preallocated at the cap. There is one TextLayout per TextBlock, and a 4096-slot FontItem
-        // array is 256KB - so a five-character label reserved a quarter of a megabyte for glyphs it will never have.
-        // Measured on a tab build: 288KB per TextLayout x 289 built a second = two thirds of everything the whole layout
-        // pass allocated, and about 40% of what the tab switch allocated in total. Only ElementsCount is ever read back
-        // (the vertex upload and SnapshotGlyphs both take it), so the rest was never anything but reserved emptiness.
+        // Grown to fit: preallocating the 4096 cap cost 256KB per TextBlock.
         fontItems = Array.Empty<FontItem>();
     }
 
@@ -107,18 +99,18 @@ public class TextLayout : DisposableObject
         RealTextDimensions = new Size(maxX - minX, maxY - minY);
     }
 
-    private bool CompareInputParameters(string text, 
-        double fontSize, 
+    private bool CompareInputParameters(string text,
+        double fontSize,
         TextRenderingParameters renderingParameters)
     {
         return Text == text && MathHelper.IsZero(FontSize - fontSize) &&
                _previousRenderingParameters == renderingParameters;
     }
 
-    public Size ProcessText(string text, 
-        double fontSize, 
+    public Size ProcessText(string text,
+        double fontSize,
         Size textArea,
-        TextWrapping textWrapping, 
+        TextWrapping textWrapping,
         TextTrimming textTrimming,
         HorizontalTextAlignment horizontalTextAlignment,
         VerticalTextAlignment verticalTextAlignment,
@@ -133,7 +125,7 @@ public class TextLayout : DisposableObject
             textArea.Height = Int32.MaxValue;
         }
         var @params = new TextRenderingParameters()
-            { 
+            {
                 HorizontalTextAlignment = horizontalTextAlignment,
                 VerticalTextAlignment = verticalTextAlignment,
                 JustifyLastLine = justifyLastLine,
@@ -141,21 +133,19 @@ public class TextLayout : DisposableObject
                 TextTrimming = textTrimming,
                 TextArea = new Rectangle(Vector2F.Zero, textArea)
             };
-        
+
         if (CompareInputParameters(text, fontSize, @params))
             return CalculatedLayoutSize;
-        
+
         Text = text;
         FontSize = (float)fontSize;
         _previousRenderingParameters = @params;
-        
+
         _textUpdated = true;
         return ProcessText(text, fontSize, @params);
     }
 
-    /// <summary>What laying out one string ALLOCATES, by stage. A text measure costs ~117KB and text is two thirds of
-    /// everything the layout pass allocates on a tab build; the shared-glyph list that looked like the cause turned out
-    /// to be a separate defect, so this is measured rather than reasoned about. Cumulative.</summary>
+    /// <summary>What laying out one string allocates, by stage. Cumulative.</summary>
     public static long TranslateBytes;
     public static long FeatureBytes;
     public static long WordLoopBytes;
@@ -164,10 +154,7 @@ public class TextLayout : DisposableObject
 
     public Size ProcessText(string text, double fontSize, TextRenderingParameters renderingParameters)
     {
-        // NOTHING is not "no work to do". Returning zero here left the last text's shaped words and glyph quads in
-        // place, and whoever drew this layout next drew THOSE: a block whose text was cleared went on saying what it
-        // used to. In a table that is a recycled row wearing the name, owner and region of the row its container had
-        // been - the record was blank, the screen was not.
+        // Empty text clears the previous glyphs, or a recycled row keeps drawing its old text.
         if (string.IsNullOrEmpty(text))
         {
             _wordData?.Clear();
@@ -188,7 +175,6 @@ public class TextLayout : DisposableObject
         layoutContainer.SetText(text);
         var _b1 = System.GC.GetAllocatedBytesForCurrentThread();
 
-        // try to apply GPOS kern
         var kernApplied = Font.FeatureService.ApplyFeature(Features.kern, layoutContainer, 0, (uint)glyphs.Count);
         // var subApp = font.FeatureService.ApplyFeature(Features.aalt, layoutContainer, 0, (uint)glyphs.Length);
 
@@ -197,10 +183,8 @@ public class TextLayout : DisposableObject
 
         var scale = fontSize / Font.UnitsPerEm;
 
-        // Kerning (screen px) to add to the pen after the glyph at this global index = the kern between it
-        // and the next glyph; applying it to the cursor propagates it to every following glyph. With GPOS the
-        // feature stored the pair adjustment on the first glyph's advance (GetAdvance(pos)); without GPOS we
-        // fall back to the legacy TTF 'kern' table. Bounds-guarded against the displayed-glyph count.
+        // Kern between this glyph and the next: GPOS stores it on the first glyph's advance, otherwise the legacy
+        // 'kern' table. Added to the pen, so it carries to every following glyph.
         double KernAdvance(int pos)
         {
             if (pos < 0 || pos >= (int)layoutContainer.Count) return 0;
@@ -244,36 +228,24 @@ public class TextLayout : DisposableObject
 
             if (wordIndex < words.Length - 1)
             {
-                // Sub-pixel like the glyphs (no Ceiling) so the space doesn't inflate the line bounds.
+                // Sub-pixel like the glyphs, so the space doesn't inflate the line bounds.
                 var rect = new RectangleF((float)cursorPosition,
                     (float)(height + baseLine),
                     (float)spaceWidth,
-                    0f); 
-                // add space after word
+                    0f);
                 glyphsData.Add(new GlyphWordData(spaceGlyph, ' ',
                     rect,
                     -1,
                     lineIndex));
                 cursorPosition += spaceWidth + KernAdvance(positionInString);
-                positionInString++; // the space is one glyph in the displayed-glyph stream
+                positionInString++;
             }
         }
 
-        // NOT published yet. The alignment passes below still SHIFT every glyph in this list, and the render thread reads
-        // _wordData whenever it bakes glyphs - publishing here handed it a list whose glyphs had been laid out but not yet
-        // aligned, so a frame that landed in that window drew the text at the wrong place (or off its own block, which
-        // reads as text vanishing for one frame). The list becomes _wordData once it is FINISHED, in one assignment.
-        // The block's height is a FONT metric - the last line's baseline - NOT the ink extremes. Ink differs per
-        // string (descenders, round overshoot), so measuring it made "Output" measure taller than "Errors" at the
-        // same size, and same-size text changed height as its content changed. Descenders hang below the box, which
-        // is exactly how ArrangeText centres the block (an ascent-to-baseline reference, no descent reserve).
+        // Not published yet: the render thread reads _wordData, and the alignment below still moves every glyph.
+        // The height is a font metric (last baseline plus descent), not the ink, so same-size strings measure alike and
+        // a turned label keeps its descenders.
         var lastBaseline = height + baseLine;
-        // ...plus the DESCENT below it. Still a font metric, so it is the same for every string of this size and the
-        // stability above is untouched - "Output" and "Errors" still measure alike. What changes is that the box now
-        // CONTAINS the glyphs instead of ending at their baseline. A box that stops at the baseline works only while
-        // something else happens to leave room below it: turn the text ninety degrees, as a pane folded against a side
-        // does with its tab labels, and the overhang becomes SIDEWAYS - into a strip sized to exactly this box, which
-        // clips it. The tails were cut off every turned label in both themes.
         height = lastBaseline + System.Math.Abs(Font.Descender) * scale;
 
         var _b3 = System.GC.GetAllocatedBytesForCurrentThread();
@@ -287,20 +259,19 @@ public class TextLayout : DisposableObject
         {
             finalRect.Width = renderingParameters.TextArea.Width;
         }
-        
+
         if (renderingParameters.TextArea.Height != Int32.MaxValue)
         {
             finalRect.Height = renderingParameters.TextArea.Height;
         }
-        
+
         ArrangeText();
 
-        // Finished: hand the whole list over in one reference write. A reader either sees the previous layout or this
-        // one, never a half-aligned mixture.
         var _b4 = System.GC.GetAllocatedBytesForCurrentThread();
 
         TranslateBytes += _b1 - _b0; FeatureBytes += _b2 - _b1; WordLoopBytes += _b3 - _b2; TailBytes += _b4 - _b3; ProcessCount++;
 
+        // One reference write: a reader sees the previous layout or this one, never a half-aligned mixture.
         _wordData = glyphsData;
 
         CalculatedLayoutSize = finalRect;
@@ -311,13 +282,8 @@ public class TextLayout : DisposableObject
         {
             var wordWidth = GetWordWidth(scale, word);
 
-            // WrapByWords decides at the WORD boundary, BEFORE laying any glyph: if the whole word won't fit in
-            // what's left of the current line (and the line already has content), advance to a fresh line and place
-            // the word there in one pass. A word wider than the entire line only wraps when the line is non-empty; as
-            // the first word on a line it simply overflows, because an unbreakable word can't be split. Deciding
-            // up-front removes both the old per-glyph re-check (which re-fired on every glyph of an over-wide word and
-            // exploded the block vertically) and the post-hoc RearrangeData shuffle (whose walk-back mis-handled a
-            // leading over-wide word and left everything on one overflowing line).
+            // Wrapped at the word boundary, before any glyph is laid: a word that does not fit starts a new line, and
+            // a word wider than the line only overflows as the first on its line.
             if (renderingParameters.TextWrapping == TextWrapping.WrapByWords
                 && wordIndex > 0
                 && cursorPosition > 0
@@ -337,9 +303,6 @@ public class TextLayout : DisposableObject
                 switch (symbol)
                 {
                     case '\n':
-                        // With caret sentinels on (text editor), emit a zero-width glyph at the end of the current
-                        // line so the newline has a caret-addressable position carrying the true (post-wrap) line
-                        // index. Rendering skips it (Symbol == '\n', like a space). Then advance to the next line.
                         if (EmitNewlineCarets)
                         {
                             var caretRect = new RectangleF((float)cursorPosition, (float)(height + baseLine), 0f, 0f);
@@ -359,9 +322,6 @@ public class TextLayout : DisposableObject
                             glyphBase,
                             scale);
 
-                        // Advance the pen by this glyph's advance plus its GPOS kern with the next glyph
-                        // (GetAdvance is stored on the first glyph of the pair); adding it to the cursor
-                        // propagates the kern to every following glyph.
                         cursorPosition += glyph.AdvanceWidth * scale + KernAdvance(positionInString);
 
                         glyphsData.Add(new GlyphWordData(glyph, symbol, glyphRect, positionInString, lineIndex));
@@ -384,7 +344,6 @@ public class TextLayout : DisposableObject
                                     if (cursorPosition > textArea.Width)
                                     {
                                         var glyphsDataCopy = glyphsData.ToArray();
-                                        // We have more vertical space for text
                                         if (height + lineHeight < textArea.Height)
                                         {
                                             lineIndex++;
@@ -400,13 +359,11 @@ public class TextLayout : DisposableObject
                                     }
                                 }
                                 break;
-                            // WrapByWords is handled at the word boundary in ProcessWord (see above), not per glyph.
                         }
                         break;
                     }
                 }
-                // One displayed glyph consumed (letter, space or newline) - keep the global index in lockstep
-                // with layoutContainer's glyph stream so GPOS GetAdvance(pos) lines up.
+                // In lockstep with layoutContainer's glyph stream, so GetAdvance(pos) lines up.
                 positionInString++;
             }
             return true;
@@ -427,9 +384,7 @@ public class TextLayout : DisposableObject
                         var glyphsForLine = glyphsData.Where(x => x.LineIndex == i).ToArray();
                         if (glyphsForLine.Length == 0) break;
 
-                        // Centre by the INK extent (ignore leading/trailing spaces) so they don't pull the
-                        // line off-centre - matching how Right alignment measures. diff places the ink left at
-                        // exactly (areaWidth - inkWidth)/2.
+                        // By the ink, so leading/trailing spaces don't pull the line off-center.
                         var ink = glyphsForLine.Where(x => x.Symbol != ' ').ToArray();
                         if (ink.Length == 0) continue;
                         minX = ink.Min(x => x.Rect.Left);
@@ -452,8 +407,7 @@ public class TextLayout : DisposableObject
                     {
                         var glyphsForLine = glyphsData.Where(x => x.LineIndex == i).ToArray();
                         if (glyphsForLine.Length == 0) break;
-                        
-                        // get max right point ignoring spaces in the end of the line
+
                         maxX = glyphsForLine.Where(x=>x.Symbol != ' ').Max(x => x.Rect.Right);
                         var diff = (finalRect.Width - maxX);
                         foreach (var glyphWordData in glyphsForLine)
@@ -470,15 +424,10 @@ public class TextLayout : DisposableObject
                     var maxLines = glyphsData.Max(x => x.LineIndex);
                     for (int i = 0; i <= maxLines; ++i)
                     {
-                        // The last line of a justified block stays ragged (left-aligned), per typography
-                        // convention - so a single line is never stretched either. Opt out via
-                        // JustifyLastLine (text-align-last) to stretch the last/only line as well.
+                        // The last line stays ragged unless JustifyLastLine asks otherwise.
                         if (i == maxLines && !renderingParameters.JustifyLastLine) break;
 
-                        // Word-spacing justification: widen the gaps BETWEEN words to fill the line, leaving
-                        // each word's internal layout (letter spacing + kerning) untouched. We only SHIFT
-                        // glyphs - never re-lay them - so sub-pixel positions and side bearings stay correct
-                        // (the old code re-laid every glyph: int-truncated the pen and dropped the first LSB).
+                        // Only the gaps between words widen; glyphs are shifted, never re-laid, so kerning and bearings stay.
                         var lineGlyphs = glyphsData.Where(x => x.LineIndex == i).OrderBy(x => x.Rect.X).ToArray();
                         if (lineGlyphs.Length == 0) continue;
 
@@ -489,16 +438,15 @@ public class TextLayout : DisposableObject
                             if (firstInk < 0) firstInk = k;
                             lastInk = k;
                         }
-                        if (firstInk < 0) continue; // line has no ink to justify
+                        if (firstInk < 0) continue;
 
-                        // expandable gaps = spaces strictly between the first and last ink glyph
                         var spaceCount = 0;
                         for (int k = firstInk + 1; k < lastInk; k++)
                             if (lineGlyphs[k].Symbol == ' ') spaceCount++;
-                        if (spaceCount == 0) continue; // single word - nothing to stretch
+                        if (spaceCount == 0) continue;
 
                         var extra = finalRect.Width - lineGlyphs[lastInk].Rect.Right;
-                        if (extra <= 0) continue; // already fills / overflows the line
+                        if (extra <= 0) continue;
 
                         var perSpace = extra / spaceCount;
                         double shift = 0;
@@ -514,22 +462,17 @@ public class TextLayout : DisposableObject
                 }
                 break;
             }
-            
+
             switch (renderingParameters.VerticalTextAlignment)
             {
                 case VerticalTextAlignment.Center:
                 {
-                    // Centre by a GLYPH-INDEPENDENT reference box (the ascent above the baseline per line), NOT this
-                    // string's ink bounding box. Ink extents differ between strings (ascenders/descenders/round
-                    // overshoot), so ink-centring shifted the baseline a pixel or two per string and same-size text
-                    // wobbled as content changed (visible scrolling a DropDown). We deliberately measure ascent-to-
-                    // baseline only (NO descent reserve below): almost all UI labels have no descender, and reserving
-                    // descent space would push the optical centre a couple pixels high. Descenders simply hang below,
-                    // as they should - the caps/x-height stay put regardless of the exact characters.
+                    // Centred by ascent above the baseline, not the ink: ink differs per string and made same-size
+                    // text wobble. No descent reserve, so descenders hang below.
                     var lineCount = glyphsData.Max(x => x.LineIndex) + 1;
                     var ascent = Font.Ascender * scale;
                     var blockHeight = (lineCount - 1) * lineHeight + ascent;
-                    var blockTop = baseLine - ascent;                      // line 0's ascent top in the current coords
+                    var blockTop = baseLine - ascent;
                     var diff = (finalRect.Height - blockHeight) / 2 - blockTop;
                     foreach (var glyphWordData in glyphsData)
                     {
@@ -541,10 +484,7 @@ public class TextLayout : DisposableObject
                 break;
                 case VerticalTextAlignment.Bottom:
                 {
-                    // Sit the last line's BASELINE on the area's bottom edge - a glyph-independent reference, like
-                    // Center uses. Dropping the lowest INK pixel there instead made a string with a descender ride
-                    // higher than one without at the same size (visible between inline Runs). (Top is the default
-                    // no-op layout.)
+                    // The last baseline on the bottom edge, not the lowest ink, for the same reason.
                     var diff = finalRect.Height - lastBaseline;
                     foreach (var glyphWordData in glyphsData)
                     {
@@ -566,14 +506,14 @@ public class TextLayout : DisposableObject
                 cursorPosition -= data.Glyph.AdvanceWidth * scale;
                 var wordsLeft = glyphsDataCopy.Take(k).Count(x => x.Symbol == ' ') + 1;
                 rearrangeList.Add(data);
-                if (wordIndex > 0 && 
-                    cursorPosition <= textArea.Width && 
-                    renderingParameters.TextWrapping == TextWrapping.WrapByWords && 
+                if (wordIndex > 0 &&
+                    cursorPosition <= textArea.Width &&
+                    renderingParameters.TextWrapping == TextWrapping.WrapByWords &&
                     data.Symbol == ' ')
                 {
                     break;
                 }
-                else if (cursorPosition <= textArea.Width && 
+                else if (cursorPosition <= textArea.Width &&
                          renderingParameters.TextWrapping == TextWrapping.WrapBySymbols)
                 {
                     break;
@@ -593,7 +533,7 @@ public class TextLayout : DisposableObject
             {
                 var glyphData = rearrangeList[index];
                 if (index == 0 && glyphData.Glyph == spaceGlyph) continue;
-                
+
                 var glyphRect = CalculateGlyphPosition(glyphData.Glyph,
                     cursorPosition,
                     glyphBase,
@@ -601,8 +541,6 @@ public class TextLayout : DisposableObject
 
                 glyphData.Rect = glyphRect;
                 glyphData.LineIndex = lineIndex;
-                // Same GPOS kern as the first-pass layout, so wrapped lines stay kerned. Spaces carry
-                // PositionInString = -1, for which KernAdvance returns 0.
                 cursorPosition += glyphData.Glyph.AdvanceWidth * scale + KernAdvance(glyphData.PositionInString);
             }
         }
@@ -647,7 +585,6 @@ public class TextLayout : DisposableObject
             width = cursorPosition;
         }
 
-        // Adds ... to the end of the string
         void TrimText(int position, double glyphBase)
         {
             for (int j = 0; j < 3; j++)
@@ -663,13 +600,8 @@ public class TextLayout : DisposableObject
         }
     }
 
-    /// <summary>This block's atlas (created on first use). Public so a CALLER that is about to build many text blocks at once
-    /// can warm them all in ONE batch - see <see cref="FontAtlas.Warm"/>: rasterizing a glyph is MSDF work (~23 ms in Debug),
-    /// and the generator parallelises across glyphs, but the per-block path can only ever hand it the handful of characters
-    /// that ONE block introduced. Fifty new blocks in a frame then rasterize ~fifty glyphs one after another, on one core.</summary>
-    /// <summary>Glyphs have landed in the atlas since this block built its quads, so what it holds is missing letters it
-    /// could draw now. The render side asks this to decide what to rebuild after an asynchronous fill.</summary>
-    public bool NeedsGlyphRefresh => FontAtlas != null && FontAtlas.Version != _atlasVersion;
+    /// <summary>Glyphs have landed in the atlas since this block built its quads; the render side rebuilds on this.</summary>
+    public bool NeedsGlyphRefresh => FontAtlas != null && (FontAtlas.IsDisposed || FontAtlas.Version != _atlasVersion);
 
     /// <summary>Re-run the quad build against the atlas as it stands now (see <see cref="NeedsGlyphRefresh"/>).</summary>
     public void RefreshGlyphs(IGraphicsDevice graphicsDevice)
@@ -678,54 +610,44 @@ public class TextLayout : DisposableObject
         Update(graphicsDevice);
     }
 
-    public FontAtlas EnsureAtlas(IGraphicsDevice graphicsDevice) =>
-        FontAtlas ??= FontAtlasStore.GetOrCreateFrom(graphicsDevice, Typeface,
-            FontParameters.Default(sortingVariant: GlyphSortingVariant.ByIndex));
+    /// <summary>This block's atlas, created on first use and again when its device is gone.</summary>
+    public FontAtlas EnsureAtlas(IGraphicsDevice graphicsDevice)
+    {
+        if (FontAtlas == null || FontAtlas.IsDisposed)
+        {
+            FontAtlas = FontAtlasStore.GetOrCreateFrom(graphicsDevice, Typeface,
+                FontParameters.Default(sortingVariant: GlyphSortingVariant.ByIndex));
+        }
+
+        return FontAtlas;
+    }
 
     public void Update(IGraphicsDevice graphicsDevice)
     {
-        // Nothing to upload until ProcessText has shaped the text into _wordData. A render unit can be built for a text
-        // component in the SAME frame its text changed but BEFORE it was measured/shaped (a popup added + built before
-        // its layout pass ran), so _textUpdated is set but _wordData is still null - guard it, and retry next frame
-        // (_textUpdated stays set) once ProcessText has run.
+        // Built before its first measure (a popup built ahead of its layout pass): retried next frame.
         if (!_textUpdated || _wordData == null) return;
 
-        // ASK for the glyphs, do not WAIT for them. Rasterizing one is MSDF arithmetic (~8 ms apiece even with every core
-        // busy), and a tab full of new text used to pay all of it before its first frame could go out - measured at 88%
-        // of the whole apply phase. The work is the same either way; what changes is that the frame no longer stands
-        // still for it. Glyphs land over the next frames, each landing bumping the atlas VERSION, and a block whose
-        // version is behind rebuilds its quads (see NeedsGlyphRefresh) - so text fills in instead of holding up the tab.
+        // Asked for, not waited for: glyphs land over the next frames and bump the atlas version (NeedsGlyphRefresh).
         var atlas = EnsureAtlas(graphicsDevice);
         atlas.RequestAsync(Text + ".");
         _atlasVersion = atlas.Version;
         ElementsCount = 0;
-        // NOTE: the per-block GPU VertexBuffer is NOT created here. It's only needed by the DIRECT draw path
-        // (rotated/sheared text); the common batched path bakes fontItems into the shared aggregate buffer via
-        // TryBakeWorldGlyphs and never touches it. Creating it here allocated a fixed 4096-glyph buffer (~300 KB) in the
-        // tiny 214 MB BAR heap for EVERY text block - batched or not - which exhausted that heap (OOM). EnsureVertexBuffer
-        // now creates + uploads it lazily, only when a block is actually drawn direct.
+        // No vertex buffer here: only the direct draw path needs one (EnsureVertexBuffer), and one per block ran the BAR
+        // heap out of memory.
 
         for (int i = 0; i < _wordData.Count; ++i)
         {
             var word = _wordData[i];
             if (word.Glyph == spaceGlyph || word.Symbol == '\n') continue;
 
-            // Render the glyph quad as the FULL cell (body + margin), not just the body, so effects that
-            // reach outside the contour (outline/glow/shadow) have geometry and field to draw into. The body
-            // keeps its exact screen position/size - we only add the margin ring around it, scaled from atlas
-            // texels to screen pixels by the glyph's own body scale. For plain text the margin samples
-            // median < 0.5 -> opacity 0 -> fully transparent, so this is visually identical.
+            // The full cell (body plus margin), so outline/glow/shadow have room to draw.
             var gd = FontAtlas.GetGlyphData(word.Glyph.Index);
             FontItem item;
             if (gd != null && gd.BoundingRect.Width > 0 && gd.BoundingRect.Height > 0)
             {
                 var rect = word.Rect;
-                // Per-axis margin: this maps the body EXACTLY onto [rect.X/Y .. +Width/Height], i.e. onto the
-                // integer, baseline-flat glyph rect produced by CalculateGlyphPosition. A uniform margin would
-                // instead map the body to its un-rounded sub-pixel position (via the cell proportions) and the
-                // baseline would wobble again. For a sub-pixel-thin glyph the rounded side can be 0, which
-                // would zero that axis' margin and collapse the quad (the glyph vanishes); fall back to the
-                // uniform font-scale margin there - a 0-px side has no integer baseline row to preserve anyway.
+                // Per-axis margin maps the body exactly onto the pixel-snapped rect; a zero-size side falls back to the
+                // uniform margin, or the quad collapses.
                 var uniform = gd.Margin * (double)FontSize / FontAtlas.MSDFTextureSize;
                 var mx = rect.Width > 0 ? gd.Margin * (double)rect.Width / gd.BoundingRect.Width : uniform;
                 var my = rect.Height > 0 ? gd.Margin * (double)rect.Height / gd.BoundingRect.Height : uniform;
@@ -750,25 +672,22 @@ public class TextLayout : DisposableObject
             }
             else
             {
-                // Not rasterized YET (it was asked for above and is on its way): emit no quad at all. Emitting one with
-                // whatever the atlas would answer for an unknown glyph draws a piece of a NEIGHBOUR - a smear where a
-                // letter should be - which is worse than the letter arriving a frame later.
+                // Not rasterized yet: no quad, or it draws a piece of a neighbour.
                 continue;
             }
-            if (ElementsCount >= MaxItemsCount) break;   // the cap the vertex buffer is sized for
+            if (ElementsCount >= MaxItemsCount) break;
             EnsureItemCapacity((int)ElementsCount + 1);
             fontItems[ElementsCount] = item;
             ElementsCount++;
         }
 
-        _vertexBufferDirty = true;   // the direct path re-uploads on next draw (EnsureVertexBuffer); batched path ignores it
+        _vertexBufferDirty = true;
 
         _textUpdated = true;
     }
 
     /// <summary>
-    /// Lazily create + upload the per-block GPU vertex buffer, used ONLY by the direct draw path (rotated/sheared text).
-    /// Batched text never calls this, so batched blocks allocate ZERO GPU (BAR) memory - see Update's note.
+    /// Creates and uploads the per-block vertex buffer on demand; only the direct draw path (rotated/sheared text) uses it.
     /// </summary>
     public void EnsureVertexBuffer(IGraphicsDevice graphicsDevice)
     {
@@ -781,20 +700,15 @@ public class TextLayout : DisposableObject
         }
     }
 
-    // CPU pre-transform text batch (docs/TEXT_GLYPH_BATCH_PLAN.md §9 Stage 2): copy this block's glyphs into a shared
-    // aggregate buffer with their positions baked to WORLD space and the block's foreground written per glyph, so many
-    // blocks render in ONE instanced draw (the batch VS then applies only a static Projection). A glyph's local quad
-    // g -> (g + textAreaOffset) * world. Only translation + axis-aligned scale can be folded into the axis-aligned
-    // FontItem rect; a rotated/sheared world (non-zero off-diagonal) would need 4 baked corners - returns false so the
-    // caller renders that block via the per-block direct draw instead (Stage 1). Also false (no state change) if it
-    // would overflow dest, so the caller can flush the current batch and retry. Row-vector convention (see FontEffect.fx).
+    /// <summary>Copies this block's glyphs into a shared batch, baked to world space with its color, so many blocks draw
+    /// in one call. False for a rotated/sheared world (direct path instead) or when <paramref name="dest"/> is full.</summary>
     public bool TryBakeWorldGlyphs(FontItem[] dest, ref int count, Matrix4x4F world, Vector2F textAreaOffset, Vector4F color)
     {
-        if (ElementsCount == 0) return true;   // nothing to contribute
+        if (ElementsCount == 0) return true;
 
         const float eps = 1e-4f;
-        if (Math.Abs(world.M12) > eps || Math.Abs(world.M21) > eps) return false;   // rotation/shear -> direct path
-        if (count + (int)ElementsCount > dest.Length) return false;                 // caller flushes + retries
+        if (Math.Abs(world.M12) > eps || Math.Abs(world.M21) > eps) return false;
+        if (count + (int)ElementsCount > dest.Length) return false;
 
         var sx = world.M11;
         var sy = world.M22;
@@ -804,7 +718,7 @@ public class TextLayout : DisposableObject
         for (int i = 0; i < ElementsCount; i++)
         {
             var item = fontItems[i];
-            var d = item.ArrangeRect;   // local x, y, w, h
+            var d = item.ArrangeRect;
             item.ArrangeRect = new Vector4F(
                 (d.X + textAreaOffset.X) * sx + tx,
                 (d.Y + textAreaOffset.Y) * sy + ty,
@@ -816,9 +730,8 @@ public class TextLayout : DisposableObject
         return true;
     }
 
-    /// <summary>An immutable snapshot of the currently-shaped glyphs (call AFTER <see cref="Update"/>), so the render
-    /// thread bakes text from a frozen copy instead of reading this layout while it is reshaped in place. The atlas is
-    /// shared by reference (its tiles are append-only and stable). See <see cref="FrozenGlyphRun"/>.</summary>
+    /// <summary>A frozen copy of the shaped glyphs (call after <see cref="Update"/>), so the render thread never reads
+    /// this layout while it is reshaped.</summary>
     public FrozenGlyphRun SnapshotGlyphs()
     {
         var n = (int)ElementsCount;
@@ -850,36 +763,22 @@ public class TextLayout : DisposableObject
         double glyphBase,
         double scale)
     {
-        // Kerning is applied to the pen in ProcessWord (GPOS GetAdvance, propagated), not here.
         var verticalShift = -glyph.BoundingRectangle.Y * scale;
         var horizontalShift = glyph.LeftSideBearing * scale;
 
         var glyphWidth = glyph.BoundingRectangle.Width * scale;
         var glyphHeight = glyph.BoundingRectangle.Height * scale;
         var glyphTop = (glyphBase - glyphHeight) + verticalShift;
-        // Apply the left side bearing for EVERY glyph. Previously the first glyph skipped it, so its ink was
-        // shifted left while the pen still advanced by the full width - the gap after the first letter came
-        // out inflated by that bearing. Now the line just starts at the natural LSB indent.
         glyphLeft += horizontalShift;
 
-        // Anchor every glyph to SHARED reference lines - the baseline for the bottom, the ascender line for the top - so
-        // same-height glyphs share exact pixel rows. Rounding a glyph's OWN ink extremes independently rounds its overshoot
-        // per glyph, so a round-bottomed letter (о е с а) lands a pixel below a flat one (к и в) AND a round-topped cap/digit
-        // (0 8 9) lands a pixel above a flat one (1 4 7) at small sizes - the line visibly wobbles. Instead round each shared
-        // reference ONCE, then round the ink's distance FROM it: sub-pixel overshoot is absorbed both ways, real descenders
-        // (р у) and true ascenders are preserved, and every baseline-sitting glyph bottoms - and every cap tops - on one row.
+        // Y snaps to shared baseline/ascender rows, rounded once, so round and flat letters sit on the same pixel row.
         var baseR = (int)System.Math.Round(glyphBase);
         var ascLine = glyphBase - Font.Ascender * scale;
         var ascR = (int)System.Math.Round(ascLine);
         var top = ascR + (int)System.Math.Round(glyphTop - ascLine);
         var bottom = baseR - (int)System.Math.Round(glyphBase - (glyphTop + glyphHeight));
 
-        // X axis stays SUB-PIXEL: keep the glyph at its exact fractional position/width (do NOT round). The
-        // pen advances are fractional, so snapping X to whole pixels makes equal metric gaps render 1px apart
-        // (the pixel-snap wobble, e.g. "Проверка"). At sub-pixel X the gaps match the metrics exactly and the
-        // MSDF anti-aliasing renders the fractional vertical edges cleanly. Y stays snapped (baseR above) so
-        // horizontal strokes and the baseline remain crisp - we only give up snapping on the axis where even
-        // spacing matters more than pixel-aligned stems.
+        // X stays sub-pixel: snapping fractional advances made equal gaps render a pixel apart.
         return new RectangleF((float)glyphLeft, top, (float)glyphWidth, bottom - top);
     }
 }

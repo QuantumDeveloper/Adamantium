@@ -1,7 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <Platforms>x64</Platforms>
+    <Platforms>AnyCPU</Platforms>
     <Configurations>Debug;Release</Configurations>
     <LangVersion>latest</LangVersion>
     <TargetFrameworks>netstandard2.0;net10.0</TargetFrameworks>
@@ -10,16 +10,14 @@
 	<PropertyGroup>
 		<PackageId>Adamantium.Core</PackageId>
 		<Version>1.0.0</Version>
-		<Authors>Adamantium studio</Authors>
-		<Company>Adamantium studio</Company>
 		<GeneratePackageOnBuild>true</GeneratePackageOnBuild>
 	</PropertyGroup>
 
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+  <PropertyGroup Condition="'$(Configuration)'=='Debug'">
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
 
-  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|x64' ">
+  <PropertyGroup Condition=" '$(Configuration)' == 'Release' ">
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
 

@@ -307,7 +307,7 @@ namespace Adamantium.Mathematics
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static bool IsZero(float a)
         {
-            return NearEqual(a, ZeroToleranceF);
+            return Math.Abs(a) < ZeroToleranceF;
         }
 
         /// <summary>
@@ -318,7 +318,7 @@ namespace Adamantium.Mathematics
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static bool IsZero(double a)
         {
-            return NearEqual(a, ZeroToleranceD);
+            return Math.Abs(a) < ZeroToleranceD;
         }
 
         /// <summary>

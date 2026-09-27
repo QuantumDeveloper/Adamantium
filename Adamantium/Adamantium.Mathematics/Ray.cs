@@ -236,6 +236,24 @@ namespace Adamantium.Mathematics
             return Collision.RayIntersectsSphere(ref this, ref sphere, out point);
         }
 
+        /// <summary>Where the ray first meets an oriented box; a ray starting inside meets it at 0.</summary>
+        public bool Intersects(ref OrientedBoundingBox box, out float distance)
+        {
+            return box.Intersects(ref this, out distance);
+        }
+
+        /// <summary>Where the ray, with a unit direction, first meets a capsule; a ray starting inside meets it at 0.</summary>
+        public bool Intersects(ref BoundingCapsule capsule, out float distance)
+        {
+            return Collision.RayIntersectsCapsule(ref this, ref capsule, out distance);
+        }
+
+        /// <summary>Where the ray first meets a convex hull; a ray starting inside meets it at 0.</summary>
+        public bool Intersects(ConvexHull hull, out float distance)
+        {
+            return hull.Intersects(ref this, out distance);
+        }
+
         /// <summary>
         /// Calculates a world space <see cref="Ray"/> from 2d screen coordinates.
         /// </summary>

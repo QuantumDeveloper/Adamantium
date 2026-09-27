@@ -354,3 +354,7 @@ logs/
 /Adamantium/Adamantium.UI.Sandbox/Content/
 **/Content/**/*.aemf
 **/obj/Content/
+
+# CMake build tree and fetched SDK packages of the native shims (the built .dll is staged next to the project and
+# committed separately).
+**/native/build/

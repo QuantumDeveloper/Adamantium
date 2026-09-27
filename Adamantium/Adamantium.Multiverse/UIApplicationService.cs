@@ -1,0 +1,14 @@
+using Adamantium.ECS;
+
+namespace Adamantium.Multiverse;
+
+public class UIApplicationService : EntityService
+{
+    public UIApplicationService(EntityWorld world) : base(world)
+    {
+    }
+
+    public override bool IsUpdateService => true;
+    public override bool IsRenderingService => true;
+    public override EntityServiceType ServiceType => EntityServiceType.Update | EntityServiceType.Render;
+}

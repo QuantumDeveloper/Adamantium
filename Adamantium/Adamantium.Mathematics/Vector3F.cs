@@ -1062,7 +1062,7 @@ namespace Adamantium.Mathematics
             Vector3F v = new Vector3F();
             TransformCoordinate(ref vector, ref worldViewProjection, out v);
 
-            result = new Vector3F(((1.0f + v.X) * 0.5f * width) + x, ((1.0f - v.Y) * 0.5f * height) + y, (v.Z * (maxZ - minZ)) + minZ);
+            result = new Vector3F(((1.0f + v.X) * 0.5f * width) + x, ((1.0f + v.Y) * 0.5f * height) + y, (v.Z * (maxZ - minZ)) + minZ);
         }
 
         /// <summary>

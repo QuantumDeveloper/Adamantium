@@ -14,11 +14,9 @@ namespace Adamantium.ECS
     {
         private bool enabled;
         private ExecutionType updateExecutionType;
-        private int updatePriority;
-        private int previousDrawPriority;
-        private int previousUpdatePriority;
-        
-        private int drawPriority;
+        private int priority;
+        private int previousPriority;
+
         private ExecutionType drawExecutionType;
         private bool isVisible;
 
@@ -68,17 +66,17 @@ namespace Adamantium.ECS
             set => SetProperty(ref enabled, value);
         }
 
-        public int UpdatePriority
+        public int Priority
         {
-            get => updatePriority;
+            get => priority;
             set
             {
-                if (updatePriority != value)
+                if (priority != value)
                 {
-                    previousUpdatePriority = updatePriority;
+                    previousPriority = priority;
                 }
 
-                SetProperty(ref updatePriority, value);
+                SetProperty(ref priority, value);
             }
         }
 
@@ -90,20 +88,6 @@ namespace Adamantium.ECS
         { 
             get => isVisible; 
             set => SetProperty(ref isVisible, value); 
-        }
-
-        public int DrawPriority
-        {
-            get => drawPriority;
-            set
-            {
-                if (drawPriority != value)
-                {
-                    previousDrawPriority = updatePriority;
-                }
-
-                SetProperty(ref drawPriority, value);
-            }
         }
 
         public ExecutionType UpdateExecutionType
@@ -145,12 +129,12 @@ namespace Adamantium.ECS
             processor.Detach();
         }
 
-        public virtual void Update(AppTime gameTime)
+        public virtual void Update(AppTime appTime)
         {
             foreach (var processor in processors)
             {
                 if (!processor.IsEnabled) continue;
-                try { processor.Update(gameTime); }
+                try { processor.Update(appTime); }
                 catch (Exception ex) { Log.Logger.Error(ex, "Processor Update failed: {Processor}", processor.GetType().Name); }
             }
         }
@@ -160,9 +144,9 @@ namespace Adamantium.ECS
             return IsVisible;
         }
 
-        public virtual void Draw(AppTime gameTime)
+        public virtual void Draw(AppTime appTime)
         {
-            DrawProcessors(gameTime);
+            DrawProcessors(appTime);
         }
 
         public virtual void EndDraw()
@@ -172,12 +156,12 @@ namespace Adamantium.ECS
 
         // Runs processors' Update explicitly (e.g. a synchronous one-shot render that doesn't go through the
         // service's own Update loop). Guarded so one processor can't take down the rest.
-        protected void UpdateProcessors(AppTime gameTime)
+        protected void UpdateProcessors(AppTime appTime)
         {
             foreach (var processor in processors)
             {
                 if (!processor.IsEnabled) continue;
-                try { processor.Update(gameTime); }
+                try { processor.Update(appTime); }
                 catch (Exception ex) { Log.Logger.Error(ex, "Processor Update failed: {Processor}", processor.GetType().Name); }
             }
         }
@@ -197,12 +181,12 @@ namespace Adamantium.ECS
         // Guarded, ordered iteration shared with rendering services that own the frame and call these
         // between their own BeginDraw/EndDraw. A throwing processor is logged and skipped so it cannot
         // take down the rest of the frame.
-        protected void DrawProcessors(AppTime gameTime)
+        protected void DrawProcessors(AppTime appTime)
         {
             foreach (var processor in processors)
             {
                 if (!processor.IsEnabled) continue;
-                try { processor.Draw(gameTime); }
+                try { processor.Draw(appTime); }
                 catch (Exception ex) { Log.Logger.Error(ex, "Processor Draw failed: {Processor}", processor.GetType().Name); }
             }
         }
@@ -253,11 +237,9 @@ namespace Adamantium.ECS
                 case nameof(Enabled):
                     EventAggregator.GetEvent<ProcessorEnabledChangedEvent>().Publish(new ProcessorStatePayload(this, Enabled));
                     break;
-                case nameof(UpdatePriority):
-                    EventAggregator.GetEvent<ProcessorPriorityChangedEvent>().Publish(new ProcessorPriorityPayload(this, ProcessorType.Update, previousUpdatePriority, UpdatePriority));
-                    break;
-                case nameof(DrawPriority):
-                    EventAggregator.GetEvent<ProcessorPriorityChangedEvent>().Publish(new ProcessorPriorityPayload(this, ProcessorType.Draw, previousDrawPriority, DrawPriority));
+                case nameof(Priority):
+                    EntityWorld.ServiceManager.OnServicePriorityChanged();
+                    EventAggregator.GetEvent<ProcessorPriorityChangedEvent>().Publish(new ProcessorPriorityPayload(this, previousPriority, Priority));
                     break;
                 case nameof(UpdateExecutionType):
                     {

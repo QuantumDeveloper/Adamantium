@@ -9,7 +9,7 @@ namespace Adamantium.Mathematics
    /// Represents an axis-aligned bounding box in three dimensional space.
    /// </summary>
    [StructLayout(LayoutKind.Sequential, Pack = 4)]
-   public struct BoundingBox : IEquatable<BoundingBox>, IFormattable
+   public struct BoundingBox : IEquatable<BoundingBox>, IFormattable, IConvexShape
    {
       /// <summary>
       /// The minimum point of the box.
@@ -57,6 +57,14 @@ namespace Adamantium.Mathematics
          corners[5] = new Vector3F(Maximum.X, Maximum.Y, Minimum.Z);
          corners[6] = new Vector3F(Maximum.X, Minimum.Y, Minimum.Z);
          corners[7] = new Vector3F(Minimum.X, Minimum.Y, Minimum.Z);
+      }
+
+      public Vector3F Support(Vector3F direction)
+      {
+         return new Vector3F(
+            direction.X >= 0 ? Maximum.X : Minimum.X,
+            direction.Y >= 0 ? Maximum.Y : Minimum.Y,
+            direction.Z >= 0 ? Maximum.Z : Minimum.Z);
       }
 
       /// <summary>
@@ -156,6 +164,24 @@ namespace Adamantium.Mathematics
       public bool Intersects(BoundingSphere sphere)
       {
          return Intersects(ref sphere);
+      }
+
+      /// <summary>Whether the box and an oriented box share a point.</summary>
+      public bool Intersects(ref OrientedBoundingBox box)
+      {
+         return box.Intersects(ref this);
+      }
+
+      /// <summary>Whether the box and a capsule share a point.</summary>
+      public bool Intersects(ref BoundingCapsule capsule)
+      {
+         return Gjk.Intersects(this, capsule);
+      }
+
+      /// <summary>Whether the box and a convex hull share a point.</summary>
+      public bool Intersects(ConvexHull hull)
+      {
+         return Gjk.Intersects(this, hull);
       }
 
       /// <summary>

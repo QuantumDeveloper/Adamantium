@@ -189,7 +189,7 @@ namespace Adamantium.Imaging.Png
             {
                 if (rIn >= modeIn.PaletteSize) return 82;
                 r = (uint)(modeIn.Palette[rIn * 4 + 0] * 257);
-                b = (uint)(modeIn.Palette[rIn * 4 + 1] * 257);
+                g = (uint)(modeIn.Palette[rIn * 4 + 1] * 257);
                 b = (uint)(modeIn.Palette[rIn * 4 + 2] * 257);
             }
             else return 31;
@@ -537,6 +537,32 @@ namespace Adamantium.Imaging.Png
         to RGBA or RGB with 8 bit per cannel. buffer must be RGBA or RGB output with
         enough memory, if has_alpha is true the output is RGBA. mode has the color mode
         of the input buffer.*/
+        // No color key, so nothing to test per pixel.
+        [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.AggressiveOptimization)]
+        private static unsafe void CopyRgb8(byte[] buffer, int numPixels, bool hasAlpha, byte[] inBuffer)
+        {
+            fixed (byte* output = buffer, input = inBuffer)
+            {
+                if (!hasAlpha)
+                {
+                    Buffer.MemoryCopy(input, output, buffer.Length, numPixels * 3L);
+                    return;
+                }
+
+                var source = input;
+                var target = output;
+                for (var i = 0; i < numPixels; ++i)
+                {
+                    target[0] = source[0];
+                    target[1] = source[1];
+                    target[2] = source[2];
+                    target[3] = 255;
+                    source += 3;
+                    target += 4;
+                }
+            }
+        }
+
         private static void GetPixelColorsRGBA8(byte[] buffer, int numPixels, bool hasAlpha, byte[] inBuffer, PngColorMode mode)
         {
             int numChannels = hasAlpha ? 4 : 3;
@@ -573,7 +599,9 @@ namespace Adamantium.Imaging.Png
                     for (int i = 0; i != numPixels; ++i)
                     {
                         int bufIndex = numChannels * i;
-                        var value = BitHelper.ReadBitsFromReversedStream(ref i, inBuffer, (int)mode.BitDepth);
+                        // A bit pointer of its own: passing the loop counter moved it twice per pixel.
+                        var bit = i * (int)mode.BitDepth;
+                        var value = BitHelper.ReadBitsFromReversedStream(ref bit, inBuffer, (int)mode.BitDepth);
                         buffer[bufIndex] = buffer[bufIndex + 1] = buffer[bufIndex + 2] = (byte)((value * 255) / highest);
                         if (hasAlpha)
                         {
@@ -584,7 +612,11 @@ namespace Adamantium.Imaging.Png
             }
             else if (mode.ColorType == PngColorType.RGB)
             {
-                if (mode.BitDepth == 8)
+                if (mode.BitDepth == 8 && !mode.IsKeyDefined)
+                {
+                    CopyRgb8(buffer, numPixels, hasAlpha, inBuffer);
+                }
+                else if (mode.BitDepth == 8)
                 {
                     for (int i = 0; i != numPixels; ++i)
                     {
@@ -631,7 +663,8 @@ namespace Adamantium.Imaging.Png
                     }
                     else
                     {
-                        index = (int)BitHelper.ReadBitsFromReversedStream(ref i, inBuffer, (int)mode.BitDepth);
+                        var bit = i * (int)mode.BitDepth;
+                        index = (int)BitHelper.ReadBitsFromReversedStream(ref bit, inBuffer, (int)mode.BitDepth);
                     }
 
                     if (index >= mode.PaletteSize)

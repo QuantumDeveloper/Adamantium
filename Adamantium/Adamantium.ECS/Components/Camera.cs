@@ -192,7 +192,7 @@ namespace Adamantium.ECS.Components
 
         private void BuildPerspectiveFovY(float zNear, float zFar)
         {
-            PerspectiveProjection = Matrix4x4F.PerspectiveFovY(Fov, (float)Width / Height, zNear, zFar);
+            PerspectiveProjection = Matrix4x4F.PerspectiveFovY(MathHelper.DegreesToRadians(Fov), (float)Width / Height, zNear, zFar);
         }
 
         private void GetAxisFromViewMatrix()
@@ -232,11 +232,11 @@ namespace Adamantium.ECS.Components
             SetFreeCamera();
         }
 
-        private void ContiniousRotation(AppTime gameTime)
+        private void ContiniousRotation(AppTime appTime)
         {
             if (!rotationDone)
             {
-                rotationDuration += gameTime.FrameTime * 1000;
+                rotationDuration += appTime.FrameTime * 1000;
                 var weight = (float) rotationDuration / rotationTime;
                 Rotation = QuaternionF.Lerp(startingRotation, rotationToSync, weight);
                 if (rotationDuration >= rotationTime)
@@ -273,11 +273,11 @@ namespace Adamantium.ECS.Components
             Type = CameraType.Free;
         }
 
-        private void MoveToPoint(AppTime gameTime)
+        private void MoveToPoint(AppTime appTime)
         {
             if (!moveToObjectDone)
             {
-                moveToDuration += gameTime.FrameTime * 1000;
+                moveToDuration += appTime.FrameTime * 1000;
                 var weight = (float)moveToDuration / moveTime;
                 Owner.Transform.Position = Vector3.Lerp(startingOffset, endingPosition, weight);
                 if (moveToDuration >= moveTime)
@@ -290,7 +290,7 @@ namespace Adamantium.ECS.Components
             }
         }
 
-        public override void Update(AppTime gameTime)
+        public override void Update(AppTime appTime)
         {
             // Rotation is a STRUCT behind a property: Rotation.Normalize() normalised a copy and dropped it, so the
             // quaternion drifted from unit length as mouse-look multiplied into it - and a non-unit quaternion scales
@@ -299,11 +299,11 @@ namespace Adamantium.ECS.Components
             rotation.Normalize();
             Rotation = rotation;
 
-            MoveToPoint(gameTime);
+            MoveToPoint(appTime);
 
             // Whatever the camera type is. It used to tick only inside the Special branch, so the orientation gizmo
             // armed a turn the free camera never performed - the click registered and nothing moved.
-            ContiniousRotation(gameTime);
+            ContiniousRotation(appTime);
             if (Type == CameraType.Free)
             {
                 ViewMatrix = Matrix4x4F.RotationQuaternion(Rotation);
@@ -416,6 +416,23 @@ namespace Adamantium.ECS.Components
             else
             {
                 Radius -= relativeZ;
+            }
+        }
+
+        /// <summary>
+        /// Wheel notches, forward positive: a camera orbiting a subject comes closer by <see cref="CameraBase.ZoomStep"/>
+        /// a notch, never nearer than twice its near plane; a free camera moves along its view by
+        /// <see cref="CameraBase.WheelVelocity"/> seconds of travel a notch.
+        /// </summary>
+        public void Zoom(double notches)
+        {
+            if (Type == CameraType.Free)
+            {
+                TranslateForward(notches * Velocity * WheelVelocity);
+            }
+            else if (Type.IsThirdPerson())
+            {
+                Radius = Math.Max(Radius * Math.Pow(ZoomStep, -notches), ZNear * 2);
             }
         }
 
@@ -692,11 +709,18 @@ namespace Adamantium.ECS.Components
         /// <inheritdoc />
         public override void DeleteThirdPersonConfig()
         {
-            Type = CameraType.Free;
+            if (Type.IsThirdPerson())
+            {
+                ViewMatrix.Decompose(out _, out var looking, out _);
+                Rotation = looking;
+            }
 
-            // Fold the offset back into world: it only meant something relative to the subject.
-            if (Owner?.Owner is { } was) Owner.Transform.Position = was.GetCenterAbsolute() + Owner.Transform.Position;
-            if (Owner != null) Owner.Owner = null;
+            Type = CameraType.Free;
+            if (Owner?.Owner != null)
+            {
+                Owner.Transform.Position = Owner.Transform.WorldPosition;
+                Owner.Owner = null;
+            }
         }
     }
 }

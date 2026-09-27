@@ -12,7 +12,6 @@ namespace Adamantium.ECS.Components
         private LightType _type;
         private float _range;
         private bool _isWithShadows;
-        private Vector3F _direction;
         private float _outerSpotAngle;
         private float _innerSpotAngle;
         private float _innerAngleDelta;
@@ -29,7 +28,6 @@ namespace Adamantium.ECS.Components
             OuterSpotAngle = (float)Math.Atan(Range);
             Intensity = 1.0f;
             Color = Colors.White.ToVector3();
-            Direction = Vector3F.Down;
         }
 
         public Vector3F Color
@@ -66,10 +64,18 @@ namespace Adamantium.ECS.Components
 
         public Single DepthBias => 1.0f / (20 * Range);
 
+        /// <summary>Where the light shines: its entity's own -Y axis, turned as the entity stands in the world.</summary>
         public Vector3F Direction
         {
-            get => _direction;
-            set => SetProperty(ref _direction, value);
+            get
+            {
+                if (Owner == null)
+                {
+                    return Vector3F.Down;
+                }
+
+                return Vector3F.Normalize(Vector3F.TransformNormal(Vector3F.Down, Owner.Transform.GetWorldMatrixF()));
+            }
         }
 
         public float OuterSpotAngle

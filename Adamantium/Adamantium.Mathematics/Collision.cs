@@ -1,5 +1,4 @@
 ﻿using System;
-using Adamantium.Mathematics.Triangulation;
 
 namespace Adamantium.Mathematics
 {
@@ -8,79 +7,50 @@ namespace Adamantium.Mathematics
    /// </summary>
    public static class Collision
    {
+      /// <summary>
+      /// The shortest distance between a ray and a line segment.
+      /// </summary>
+      /// <param name="coordinates">The point of the segment closest to the ray.</param>
       public static float RayIntersectsLineSegment(ref Ray ray, Vector3F lineStart, Vector3F lineEnd, out Vector3F coordinates)
       {
-         Vector3F u = ray.Direction;
-         Vector3F v = lineEnd - lineStart;
-         Vector3F w = ray.Position - lineStart;
-         float a = Vector3F.Dot(u, u); // always >= 0
-         float b = Vector3F.Dot(u, v);
-         float c = Vector3F.Dot(v, v); // always >= 0
-         float d = Vector3F.Dot(u, w);
-         float e = Vector3F.Dot(v, w);
-         float D = a * c - b * b; // always >= 0
-         float sc, sN, sD = D; // sc = sN / sD, default sD = D >= 0
-         float tc, tN, tD = D; // tc = tN / tD, default tD = D >= 0
+         //Source: Real-Time Collision Detection by Christer Ericson
+         //Reference: Page 149
 
-         // compute the line parameters of the two closest points
-         if (D < Polygon.Epsilon)
+         var u = ray.Direction;
+         var v = lineEnd - lineStart;
+         var w = ray.Position - lineStart;
+         var a = Vector3F.Dot(u, u);
+         var b = Vector3F.Dot(u, v);
+         var c = Vector3F.Dot(v, v);
+         var d = Vector3F.Dot(u, w);
+         var e = Vector3F.Dot(v, w);
+         float s;
+         float t;
+
+         if (c <= float.Epsilon)
          {
-            // the lines are almost parallel
-            sN = 0.0f; // force using point P0 on segment S1
-            sD = 1.0f; // to prevent possible division by 0.0 later
-            tN = e;
-            tD = c;
+            t = 0;
+            s = Math.Max(-d / a, 0);
          }
          else
          {
-            // get the closest points on the infinite lines
-            sN = (b * e - c * d);
-            tN = (a * e - b * d);
-            if (sN < 0.0)
+            var denominator = a * c - b * b;
+            s = denominator > 1e-7f * a * c ? Math.Max((b * e - c * d) / denominator, 0) : 0;
+            t = (b * s + e) / c;
+            if (t < 0)
             {
-               // sc < 0 => the s=0 edge is visible
-               sN = 0.0f;
-               tN = e;
-               tD = c;
+               t = 0;
+               s = Math.Max(-d / a, 0);
+            }
+            else if (t > 1)
+            {
+               t = 1;
+               s = Math.Max((b - d) / a, 0);
             }
          }
 
-         if (tN < 0.0)
-         {
-            // tc < 0 => the t=0 edge is visible
-            tN = 0.0f;
-            // recompute sc for this edge
-            if (-d < 0.0)
-
-               sN = 0.0f;
-            else
-            {
-               sN = -d;
-               sD = a;
-            }
-         }
-         else if (tN > tD)
-         {
-            // tc > 1 => the t=1 edge is visible
-            tN = tD;
-            // recompute sc for this edge
-            if ((-d + b) < 0.0)
-               sN = 0;
-            else
-            {
-               sN = (-d + b);
-               sD = a;
-            }
-         }
-         // finally do the division to get sc and tc
-         sc = Math.Abs(sN) < Polygon.Epsilon ? 0.0f : sN / sD;
-         tc = Math.Abs(tN) < Polygon.Epsilon ? 0.0f : tN / tD;
-
-         // get the difference of the two closest points
-         Vector3F dP = w + (sc * u) - (tc * v); // = S1(sc) - S2(tc)
-         //calculate intersection coordinates
-         coordinates = (lineEnd - lineStart) * tc + lineStart;
-         return dP.Length(); // return the closest distance
+         coordinates = lineStart + v * t;
+         return (ray.Position + u * s - coordinates).Length();
       }
 
 
@@ -177,7 +147,7 @@ namespace Adamantium.Mathematics
 
          float dot;
          Vector3F.Dot(ref plane.Normal, ref point, out dot);
-         float t = dot - plane.D;
+         float t = dot + plane.D;
 
          result = point - (t * plane.Normal);
       }
@@ -264,7 +234,7 @@ namespace Adamantium.Mathematics
 
          float dot;
          Vector3F.Dot(ref plane.Normal, ref point, out dot);
-         return dot - plane.D;
+         return dot + plane.D;
       }
 
       /// <summary>
@@ -440,60 +410,41 @@ namespace Adamantium.Mathematics
          //Reference: Page 780
 
          Vector3F.Cross(ref ray1.Direction, ref ray2.Direction, out var cross);
-         float denominator = cross.Length();
+         var denominator = cross.LengthSquared();
+         var offset = ray2.Position - ray1.Position;
 
-         //Lines are parallel.
-         if (MathHelper.IsZero(denominator))
+         if (denominator <= 1e-12f * ray1.Direction.LengthSquared() * ray2.Direction.LengthSquared())
          {
-            //Lines are parallel and on top of each other.
-            if (MathHelper.NearEqual(ray2.Position.X, ray1.Position.X) &&
-                MathHelper.NearEqual(ray2.Position.Y, ray1.Position.Y) &&
-                MathHelper.NearEqual(ray2.Position.Z, ray1.Position.Z))
+            var apart = Vector3F.Cross(offset, ray1.Direction).LengthSquared();
+            if (apart > 1e-12f * offset.LengthSquared() * ray1.Direction.LengthSquared())
             {
                point = Vector3F.Zero;
+               return false;
+            }
+
+            if (Vector3F.Dot(offset, ray1.Direction) >= 0)
+            {
+               point = ray2.Position;
                return true;
             }
+
+            if (Vector3F.Dot(-offset, ray2.Direction) >= 0)
+            {
+               point = ray1.Position;
+               return true;
+            }
+
+            point = Vector3F.Zero;
+            return false;
          }
 
-         denominator = denominator * denominator;
-
-         //3x3 matrix for the first ray.
-         float m11 = ray2.Position.X - ray1.Position.X;
-         float m12 = ray2.Position.Y - ray1.Position.Y;
-         float m13 = ray2.Position.Z - ray1.Position.Z;
-         float m21 = ray2.Direction.X;
-         float m22 = ray2.Direction.Y;
-         float m23 = ray2.Direction.Z;
-         float m31 = cross.X;
-         float m32 = cross.Y;
-         float m33 = cross.Z;
-
-         //Determinant of first matrix.
-         float dets =
-             m11 * m22 * m33 +
-             m12 * m23 * m31 +
-             m13 * m21 * m32 -
-             m11 * m23 * m32 -
-             m12 * m21 * m33 -
-             m13 * m22 * m31;
-
-         //3x3 matrix for the second ray.
-         m21 = ray1.Direction.X;
-         m22 = ray1.Direction.Y;
-         m23 = ray1.Direction.Z;
-
-         //Determinant of the second matrix.
-         float dett =
-             m11 * m22 * m33 +
-             m12 * m23 * m31 +
-             m13 * m21 * m32 -
-             m11 * m23 * m32 -
-             m12 * m21 * m33 -
-             m13 * m22 * m31;
-
-         //t values of the point of intersection.
-         float s = dets / denominator;
-         float t = dett / denominator;
+         float s = Vector3F.Dot(Vector3F.Cross(offset, ray2.Direction), cross) / denominator;
+         float t = Vector3F.Dot(Vector3F.Cross(offset, ray1.Direction), cross) / denominator;
+         if (s < 0 || t < 0)
+         {
+            point = Vector3F.Zero;
+            return false;
+         }
 
          //The points of intersection.
          Vector3F point1 = ray1.Position + (s * ray1.Direction);
@@ -620,7 +571,8 @@ namespace Adamantium.Mathematics
          //If the ray is parallel to the triangle plane, there is no collision.
          //This also means that we are not culling, the ray may hit both the
          //back and the front of the triangle.
-         if (MathHelper.IsZero(determinant))
+         float scale = edge1.LengthSquared() * edge2.LengthSquared() * ray.Direction.LengthSquared();
+         if (determinant * determinant <= 1e-14f * scale)
          {
             distance = 0f;
             return false;
@@ -961,13 +913,10 @@ namespace Adamantium.Mathematics
          Vector3F.Cross(ref plane1.Normal, ref plane2.Normal, out direction);
 
          //If direction is the zero vector, the planes are parallel and possibly
-         //coincident. It is not an intersection. The dot product will tell us.
+         //coincident. It is not an intersection.
          float denominator;
          Vector3F.Dot(ref direction, ref direction, out denominator);
 
-         //We assume the planes are normalized, therefore the denominator
-         //only serves as a parallel and coincident check. Otherwise we need
-         //to divide the point by the denominator.
          if (MathHelper.IsZero(denominator))
          {
             line = new Ray();
@@ -975,8 +924,9 @@ namespace Adamantium.Mathematics
          }
 
          Vector3F point;
-         Vector3F temp = plane1.D * plane2.Normal - plane2.D * plane1.Normal;
+         Vector3F temp = plane2.D * plane1.Normal - plane1.D * plane2.Normal;
          Vector3F.Cross(ref temp, ref direction, out point);
+         point /= denominator;
 
          line.Position = point;
          line.Direction = direction;
@@ -1143,9 +1093,11 @@ namespace Adamantium.Mathematics
          //Source: Real-Time Collision Detection by Christer Ericson
          //Reference: Page 166
 
-         Vector3F vector;
-         Vector3F.Clamp(ref sphere.Center, ref box.Minimum, ref box.Maximum, out vector);
-         float distance = Vector3F.DistanceSquared(sphere.Center, vector);
+         var local = Vector3F.Transform(sphere.Center - box.Center, QuaternionF.Conjugate(box.Orientation));
+         var halfExtent = box.HalfExtent;
+         var minimum = -halfExtent;
+         Vector3F.Clamp(ref local, ref minimum, ref halfExtent, out var vector);
+         float distance = Vector3F.DistanceSquared(local, vector);
 
          return distance <= sphere.Radius * sphere.Radius;
       }
@@ -1410,6 +1362,155 @@ namespace Adamantium.Mathematics
             return ContainmentType.Intersects;
 
          return ContainmentType.Contains;
+      }
+
+      /// <summary>
+      /// The point of a line segment closest to a point.
+      /// </summary>
+      public static Vector3F ClosestPointSegmentPoint(Vector3F start, Vector3F end, Vector3F point)
+      {
+         var segment = end - start;
+         var length = Vector3F.Dot(segment, segment);
+         if (length <= float.Epsilon)
+         {
+            return start;
+         }
+
+         return start + segment * Clamp01(Vector3F.Dot(point - start, segment) / length);
+      }
+
+      /// <summary>
+      /// The squared distance between two line segments.
+      /// </summary>
+      public static float DistanceSquaredSegmentSegment(Vector3F start1, Vector3F end1, Vector3F start2, Vector3F end2)
+      {
+         //Source: Real-Time Collision Detection by Christer Ericson
+         //Reference: Page 149
+
+         var d1 = end1 - start1;
+         var d2 = end2 - start2;
+         var r = start1 - start2;
+         var a = Vector3F.Dot(d1, d1);
+         var e = Vector3F.Dot(d2, d2);
+         var f = Vector3F.Dot(d2, r);
+         float s;
+         float t;
+
+         if (a <= float.Epsilon && e <= float.Epsilon)
+         {
+            return Vector3F.Dot(r, r);
+         }
+
+         if (a <= float.Epsilon)
+         {
+            s = 0;
+            t = Clamp01(f / e);
+         }
+         else
+         {
+            var c = Vector3F.Dot(d1, r);
+            if (e <= float.Epsilon)
+            {
+               t = 0;
+               s = Clamp01(-c / a);
+            }
+            else
+            {
+               var b = Vector3F.Dot(d1, d2);
+               var denominator = a * e - b * b;
+               s = denominator > 1e-7f * a * e ? Clamp01((b * f - c * e) / denominator) : 0;
+               t = (b * s + f) / e;
+               if (t < 0)
+               {
+                  t = 0;
+                  s = Clamp01(-c / a);
+               }
+               else if (t > 1)
+               {
+                  t = 1;
+                  s = Clamp01((b - c) / a);
+               }
+            }
+         }
+
+         var between = start1 + d1 * s - (start2 + d2 * t);
+         return Vector3F.Dot(between, between);
+      }
+
+      /// <summary>
+      /// Where a ray with a unit direction first meets a capsule; a ray starting inside meets it at 0.
+      /// </summary>
+      public static bool RayIntersectsCapsule(ref Ray ray, ref BoundingCapsule capsule, out float distance)
+      {
+         if (capsule.Contains(ref ray.Position) != ContainmentType.Disjoint)
+         {
+            distance = 0;
+            return true;
+         }
+
+         var found = false;
+         distance = float.MaxValue;
+         var axis = capsule.End - capsule.Start;
+         var axisLength = Vector3F.Dot(axis, axis);
+         if (axisLength > float.Epsilon)
+         {
+            var offset = ray.Position - capsule.Start;
+            var alongDirection = Vector3F.Dot(axis, ray.Direction);
+            var alongOffset = Vector3F.Dot(axis, offset);
+            var a = axisLength * Vector3F.Dot(ray.Direction, ray.Direction) - alongDirection * alongDirection;
+            var b = axisLength * Vector3F.Dot(ray.Direction, offset) - alongOffset * alongDirection;
+            var c = axisLength * Vector3F.Dot(offset, offset) - alongOffset * alongOffset - capsule.Radius * capsule.Radius * axisLength;
+            var h = b * b - a * c;
+            if (a > 1e-7f * axisLength && h >= 0)
+            {
+               var t = (-b - (float)Math.Sqrt(h)) / a;
+               var along = alongOffset + t * alongDirection;
+               if (t >= 0 && along >= 0 && along <= axisLength)
+               {
+                  distance = t;
+                  found = true;
+               }
+            }
+         }
+
+         var start = new BoundingSphere(capsule.Start, capsule.Radius);
+         if (RayIntersectsSphere(ref ray, ref start, out float toStart) && toStart < distance)
+         {
+            distance = toStart;
+            found = true;
+         }
+
+         var end = new BoundingSphere(capsule.End, capsule.Radius);
+         if (RayIntersectsSphere(ref ray, ref end, out float toEnd) && toEnd < distance)
+         {
+            distance = toEnd;
+            found = true;
+         }
+
+         if (!found)
+         {
+            distance = 0;
+         }
+
+         return found;
+      }
+
+      public static bool CapsuleIntersectsSphere(ref BoundingCapsule capsule, ref BoundingSphere sphere)
+      {
+         var closest = ClosestPointSegmentPoint(capsule.Start, capsule.End, sphere.Center);
+         var reach = capsule.Radius + sphere.Radius;
+         return Vector3F.DistanceSquared(closest, sphere.Center) <= reach * reach;
+      }
+
+      public static bool CapsuleIntersectsCapsule(ref BoundingCapsule capsule1, ref BoundingCapsule capsule2)
+      {
+         var reach = capsule1.Radius + capsule2.Radius;
+         return DistanceSquaredSegmentSegment(capsule1.Start, capsule1.End, capsule2.Start, capsule2.End) <= reach * reach;
+      }
+
+      private static float Clamp01(float value)
+      {
+         return value < 0 ? 0 : value > 1 ? 1 : value;
       }
    }
 }

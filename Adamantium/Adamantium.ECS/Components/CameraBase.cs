@@ -52,7 +52,11 @@ namespace Adamantium.ECS.Components
 
         public Double CurrentVelocity { get; set; }
 
+        /// <summary>How far one wheel notch moves a free camera, in seconds of travel at its <see cref="Velocity"/>.</summary>
         public Double WheelVelocity { get; set; }
+
+        /// <summary>How much one wheel notch closes the distance to the subject a camera orbits: it is divided by this.</summary>
+        public Double ZoomStep { get; set; } = 1.15;
 
         public Single RotationSpeed { get; set; }
 
@@ -120,6 +124,12 @@ namespace Adamantium.ECS.Components
             get => height;
             set => SetProperty(ref height, value);
         }
+
+        /// <summary>
+        /// Pixels per point on the output the camera draws into, as its host's scale gives it: <see cref="Width"/> and
+        /// <see cref="Height"/> are pixels, sizes meant to look the same at any scale are points.
+        /// </summary>
+        public float PixelsPerPoint { get; set; } = 1;
 
         public float TanFov
         {
@@ -217,7 +227,7 @@ namespace Adamantium.ECS.Components
             }
         }
 
-        public abstract void Update(AppTime gameTime);
+        public abstract void Update(AppTime appTime);
 
         ///<summary>
         ///Rotate camera absolutely around base X, Y and Z axis.
@@ -289,7 +299,7 @@ namespace Adamantium.ECS.Components
         public abstract void SetFreeCamera(Vector3 position, Vector3 lookAt, Vector3 up);
 
         ///<summary>
-        ///Sets camera as Free without any parameters
+        ///Sets camera as Free where it stands, looking where it looks.
         ///</summary>
         public abstract void SetFreeCamera();
 
@@ -351,7 +361,7 @@ namespace Adamantium.ECS.Components
         public abstract void SetThirdPersonLookBackwards(bool lookBackwards);
 
         ///<summary>
-        ///Resets all third person related properties and set the camera type to Free.
+        ///Resets all third person related properties and set the camera type to Free; the view stays as it was.
         ///</summary>
         public abstract void DeleteThirdPersonConfig();
 

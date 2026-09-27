@@ -18,8 +18,8 @@ public interface IRenderService : IContentable, IDisplayContent
     /// <summary>
     /// Draws this instance.
     /// </summary>
-    /// <param name="gameTime">The current timing.</param>
-    void Draw(AppTime gameTime);
+    /// <param name="appTime">The current timing.</param>
+    void Draw(AppTime appTime);
 
     /// <summary>
     /// Ends the drawing of a frame. This method is preceded by calls to BeginScene and Draw.
@@ -36,13 +36,6 @@ public interface IRenderService : IContentable, IDisplayContent
     /// </summary>
     /// <value><c>true</c> if this drawable component is visible; otherwise, <c>false</c>.</value>
     bool IsVisible { get; set; }
-
-    /// <summary>
-    /// Gets the draw order relative to other objects. <see cref="IDrawable"/> objects with a lower value are drawn first.
-    /// </summary>
-    /// <value>The draw order.</value>
-    /// <remarks>This property is valid on if <see cref="ExecutionType"/> is <see cref="ExecutionType.Sync"/>. Otherwise priority will bw ignored</remarks>
-    int DrawPriority { get; set; }
 
     /// <summary>
     /// Gets or sets the way how this system will be processed in Draw phase

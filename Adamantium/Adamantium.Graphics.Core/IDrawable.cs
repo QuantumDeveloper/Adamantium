@@ -3,7 +3,7 @@
 namespace Adamantium.Graphics.Core
 {
     /// <summary>
-    /// An interface for a drawable game component that is called by the <see cref="SystemManager.Draw"/> class.
+    /// An interface for a drawable component that is called by the <see cref="SystemManager.Draw"/> class.
     /// </summary>
     public interface IDrawable
    {
@@ -16,8 +16,8 @@ namespace Adamantium.Graphics.Core
       /// <summary>
       /// Draws this instance.
       /// </summary>
-      /// <param name="gameTime">The current timing.</param>
-      void Draw(AppTime gameTime);
+      /// <param name="appTime">The current timing.</param>
+      void Draw(AppTime appTime);
 
       /// <summary>
       /// Ends the drawing of a frame. This method is preceded by calls to BeginScene and Draw.

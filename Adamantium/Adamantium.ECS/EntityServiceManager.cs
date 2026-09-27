@@ -2,8 +2,8 @@
 using Adamantium.Core.Collections;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Adamantium.Core.DependencyInjection;
-using Adamantium.Graphics.Core;
 
 namespace Adamantium.ECS
 {
@@ -19,7 +19,7 @@ namespace Adamantium.ECS
 
         private readonly AdamantiumCollection<EntityService> services;
         
-        private IService appService;
+        private IAdamantiumApplication appService;
 
         public EntityWorld EntityWorld { get; }
         
@@ -41,26 +41,19 @@ namespace Adamantium.ECS
         
         public IReadOnlyCollection<EntityService> Services => services.AsReadOnly();
 
-        // The per-frame phases (Update, Draw, Present) iterate THIS immutable snapshot, not the live collection under a lock.
-        //
-        // They used to hold `syncObject` for their whole body - and Draw's body is an entire GPU frame: BeginDraw's fence wait,
-        // the draw, submit, present. Once Draw moved to the render thread that lock became a hard lock-step: the loop thread
-        // entering Update BLOCKED until the render thread had finished presenting. Measured on the 60k grid: 60-280 ms of a
-        // 200 ms loop frame was the loop standing still on this lock - more than layout and the render record combined, and
-        // invisible to every phase timer, because waiting is not work. It is exactly the backpressure the render-thread split
-        // exists to remove, hidden one layer down.
-        //
-        // The collection itself only ever changes in SyncServices (adds/removes are queued and applied there), so a snapshot
-        // published on each change is all the iterators need - and they need no lock at all.
+        // The per-frame phases iterate this snapshot without a lock: a lock held through Draw made the loop wait out the
+        // whole GPU frame. Republished in SyncServices, ordered by Priority (stable, so equal priorities keep their order).
         private volatile EntityService[] _snapshot = [];
 
-        private void RepublishSnapshot() => _snapshot = [.. services];
+        private void RepublishSnapshot() => _snapshot = services.OrderBy(s => s.Priority).ToArray();
+
+        internal void OnServicePriorityChanged() => RepublishSnapshot();
 
         public Action FrameEnded;
         
         internal void InitializeResources()
         {
-            appService = Container.Resolve<IService>();
+            appService = EntityWorld.Satellites.Get<IAdamantiumApplication>();
             appService.Started += OnServiceStarted;
             appService.ShuttingDown += OnServiceShuttingDown;
         }
@@ -141,30 +134,33 @@ namespace Adamantium.ECS
             }
         }
 
-        // No lock: iterate the published snapshot. Update runs on the loop thread and Draw/Present on the render thread, and
-        // sharing one lock made the loop wait out the whole GPU frame (see _snapshot).
-        public void Update(AppTime gameTime)
+        public void Update(AppTime appTime)
         {
             foreach (var handler in _snapshot)
             {
-                handler.Update(gameTime);
+                handler.Update(appTime);
             }
         }
 
-        public void Draw(AppTime gameTime)
+        /// <summary>Draws every rendering service that agrees to draw this frame. True when at least one did.</summary>
+        public bool Draw(AppTime appTime)
         {
+            var drew = false;
             foreach (var service in _snapshot)
             {
                 if (!service.IsRenderingService) continue;
 
                 if (!service.BeginDraw()) continue;
 
-                OnDrawStarted?.Invoke(service, gameTime);
-                service.Draw(gameTime);
+                drew = true;
+                OnDrawStarted?.Invoke(service, appTime);
+                service.Draw(appTime);
                 service.EndDraw();
-                OnDrawFinished?.Invoke(service, gameTime);
+                OnDrawFinished?.Invoke(service, appTime);
                 service.Submit();
             }
+
+            return drew;
         }
 
         public void Present()
@@ -181,9 +177,7 @@ namespace Adamantium.ECS
         
         public void OnFrameEnded()
         {
-            // Lock-free like Update/Draw/Present: iterate the published snapshot, NOT the live collection under syncObject.
-            // Holding the manager lock here while calling into each service deadlocked the independent render thread against a
-            // service being added (a popup overlay) whose SyncServices init held syncObject during its content load.
+            // The snapshot, not the locked collection: the lock here deadlocked against a service's init in SyncServices.
             foreach (var service in _snapshot)
             {
                 service.FrameEnded();
@@ -192,13 +186,8 @@ namespace Adamantium.ECS
             SyncServices();
         }
 
-        // Apply queued adds/removes. The lock guards ONLY the collection edits + snapshot republish; every SERVICE CALLBACK
-        // (Initialize / LoadContent / UnloadContent and the Added/Removed events) runs OUTSIDE syncObject. A service whose
-        // init or teardown blocks or takes another lock - a popup overlay creating GPU resources - must not do so while
-        // holding the lock the render thread takes each frame (OnFrameEnded), or the independent render thread deadlocks
-        // against it. Snapshot is republished at the SAFE moment per service: after a remove leaves the draw set (before its
-        // content is unloaded) and after an add is initialised (before it enters the draw set), so a service is never drawn
-        // un-initialised or drawn while its content is being freed.
+        // The lock guards only the collection edits; service callbacks run outside it, or the render thread deadlocks. A
+        // service leaves the snapshot before its unload and enters it after its init, so it is never drawn half-made.
         internal void SyncServices()
         {
             EntityService[] toRemove, toAdd;
@@ -221,7 +210,7 @@ namespace Adamantium.ECS
                     if (removed)
                     {
                         services.Remove(service);
-                        RepublishSnapshot();   // hide it from the draw set BEFORE its content is freed
+                        RepublishSnapshot();
                     }
                 }
                 if (!removed) continue;
@@ -237,7 +226,7 @@ namespace Adamantium.ECS
                 }
                 if (appService.IsRunning)
                 {
-                    service.Initialize();   // init BEFORE the service becomes visible to the draw snapshot
+                    service.Initialize();
                     service.LoadContent();
                 }
                 lock (syncObject)

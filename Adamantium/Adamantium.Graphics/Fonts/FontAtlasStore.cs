@@ -7,14 +7,10 @@ namespace Adamantium.Graphics.Fonts
 {
     public static class FontAtlasStore
     {
-        // Concurrent because more than one thread reaches it: text is laid out wherever the layout pass runs, and a
-        // virtualizing panel measures its tiles across cores. Creating the atlas itself is still a GPU call and belongs
-        // to the thread that owns the device.
+        // Concurrent: a virtualizing panel lays text out across cores.
         private static readonly System.Collections.Concurrent.ConcurrentDictionary<FontParameters, FontAtlas> _fontAtlasMap = new();
-        /// <summary>Rasterize glyphs INLINE instead of on a worker. A live window can let text fill in over the next
-        /// frames, because there are next frames; a ONE-SHOT render - a bitmap, a designer preview, an off-screen test -
-        /// has only the frame it is asked for, and text missing from it is text missing for good. Those paths turn this
-        /// on for the duration of the render.</summary>
+        /// <summary>Rasterizes glyphs inline instead of on a worker, for a one-shot render that has no next frame for the
+        /// text to fill in.</summary>
         public static bool SynchronousFill { get; set; }
 
         public static FontAtlas GetOrCreateFrom(IGraphicsDevice graphicsDevice, Typeface typeface, FontParameters fontParameters)
@@ -24,14 +20,24 @@ namespace Adamantium.Graphics.Fonts
             return atlas;
         }
 
+        /// <summary>Drops every atlas while its device is still alive: an atlas belongs to the device that made it, and
+        /// after a device swap the next text asks for one on the new device.</summary>
+        public static void Reset()
+        {
+            foreach (var atlas in _fontAtlasMap.Values)
+            {
+                atlas.Dispose();
+            }
+
+            _fontAtlasMap.Clear();
+            _atlasOwner.Clear();
+        }
+
         private static readonly System.Collections.Concurrent.ConcurrentDictionary<FontParameters, Typeface> _atlasOwner = new();
         private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, byte> _reportedSharing = new();
 
-        // The key of the map above is the RASTERIZATION settings and nothing else - no typeface. Every font in the
-        // application asks with FontParameters.Default, so a second typeface is handed the FIRST one's atlas and then
-        // looks its glyphs up BY INDEX, where the same number means a different letter. This says so out loud, once per
-        // pair, before anything is changed: the shape of the corruption (right advances, wrong letters, and different
-        // letters between runs depending on who asked first) matches, and a matching shape is not a measurement.
+        // The map is keyed by rasterization settings only, so a second typeface gets the first one's atlas and reads wrong
+        // letters by index. Reported once per pair, to measure before fixing.
         private static void ReportSharedAtlas(Typeface typeface, FontParameters parameters, FontAtlas atlas)
         {
             var owner = _atlasOwner.GetOrAdd(parameters, typeface);
@@ -76,12 +82,8 @@ namespace Adamantium.Graphics.Fonts
             return landed;
         }
 
-        /// <summary>Bumped every time letters land. There is more than one render cache - window content, the adorner
-        /// stage, the popup stage - and the pump drains a QUEUE, so only the FIRST one to ask is told that something
-        /// arrived; the rest get false and would never refresh their own text. A version they can each remember answers
-        /// "did anything land since I last looked" for every one of them, independently of who did the pumping.
-        /// <para>Without it a SlidePanel opened with a blank close cross the first time and a correct one the second,
-        /// once the atlas was warm.</para></summary>
+        /// <summary>Bumped every time letters land, so each render cache can tell "anything since I last looked"
+        /// independently of who drained the queue.</summary>
         public static int LandedVersion { get; private set; }
 
         /// <summary>Is any atlas still rasterizing? While this is true the renderer keeps asking for frames, so the

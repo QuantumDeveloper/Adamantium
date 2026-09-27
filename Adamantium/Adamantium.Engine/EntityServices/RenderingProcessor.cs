@@ -1,11 +1,10 @@
 using System;
 using System.Collections.Generic;
-using Adamantium.Engine.Managers;
 using Adamantium.ECS;
 using Adamantium.ECS.Components;
-using Adamantium.Game.Core;
-using Adamantium.Game.Core.Input;
-using Adamantium.Game.Core.Payloads;
+using Adamantium.Multiverse;
+using Adamantium.Multiverse.Input;
+using Adamantium.Multiverse.Payloads;
 using Adamantium.Graphics;
 using Adamantium.Graphics.Core;
 using Adamantium.Graphics.Core.Content;
@@ -19,12 +18,9 @@ public class RenderingProcessor : EntityProcessor<RenderingService>, IDisposable
     protected EntityWorld EntityWorld { get; set; }
 
     protected IContentManager Content { get; set; }
-    protected GameOutput Window { get; set; }
+    protected UniverseOutput Window { get; set; }
 
-    protected LightManager LightManager { get; set; }
-    protected GameInputManager InputManager { get; set; }
-    protected CameraManager CameraManager { get; set; }
-    protected ToolsManager ToolsManager { get; set; }
+    protected InputWormhole InputManager => Window.Input;
 
     protected SpriteBatch SpriteBatch { get; set; }
 
@@ -54,23 +50,22 @@ public class RenderingProcessor : EntityProcessor<RenderingService>, IDisposable
         GraphicsDevice = AssociatedService.GraphicsDevice;
         GraphicsDeviceService.DeviceChangeBegin += DeviceChangeBegin;
         GraphicsDeviceService.DeviceChangeEnd += DeviceChangeEnd;
-        Content = EntityWorld.DependencyResolver.Resolve<IContentManager>();
+        Content = EntityWorld.Satellites.Get<IContentManager>();
         Window = AssociatedService.Window;
-        // Window.ParametersChanging += Window_ParametersChanging;
-        // Window.ParametersChanged += Window_ParametersChanged;
-        //Window.StateChanged += StateChanged;
-        Window.SizeChanged += WindowOnSizeChanged;
-        LightManager = EntityWorld.DependencyResolver.Resolve<LightManager>();
-        InputManager = EntityWorld.DependencyResolver.Resolve<GameInputManager>();
-        CameraManager = EntityWorld.DependencyResolver.Resolve<CameraManager>();
-        ToolsManager = EntityWorld.DependencyResolver.Resolve<ToolsManager>();
-        //SpriteBatch = new SpriteBatch(GraphicsDevice, 80000);
-        LoadContent();
+        CreateDeviceResources();
     }
 
-    protected virtual void LoadContent()
+    /// <summary>Makes what this processor draws with on the current device, on attach and on every device change - not
+    /// the lifecycle's LoadContent, which a device change never repeats.</summary>
+    protected virtual void CreateDeviceResources()
     {
-        
+
+    }
+
+    internal void OnOutputDeviceChanged()
+    {
+        GraphicsDevice = AssociatedService.GraphicsDevice;
+        CreateDeviceResources();
     }
 
     private void DeviceChangeEnd(object sender, EventArgs e)
@@ -94,10 +89,6 @@ public class RenderingProcessor : EntityProcessor<RenderingService>, IDisposable
     protected virtual void OnDeviceChangeEnd()
     {
         SpriteBatch = new SpriteBatch(GraphicsDevice, 25000);
-    }
-
-    private void WindowOnSizeChanged(GameOutputSizeChangedPayload obj)
-    {
     }
 
     public void Dispose()

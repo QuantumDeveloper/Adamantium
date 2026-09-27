@@ -190,7 +190,7 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
         // wrapper (they share one VkDevice). Just reference it — no per-device allocation.
         DescriptorHeapManager = mainDevice.DescriptorHeapManager;
 
-        // The per-frame constant-buffer arena stays per render device: devices render concurrently (parallel games)
+        // The per-frame constant-buffer arena stays per render device: devices render concurrently (parallel universes)
         // and cycle frames independently, so this can't be shared.
         _dynamicBufferPools = new EffectPass.DynamicBufferPool[MaxFramesInFlight];
         for (int i = 0; i < MaxFramesInFlight; i++)
@@ -626,6 +626,22 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
             if (result == Result.Success) return cached;
             // else: incompatible binary (driver/device change) -> fall through and recompile from SPIR-V (re-caches below).
         }
+
+        // Past this line the SPIR-V goes to the driver, and for a shader known to fault that is an access violation no
+        // catch can intercept: an exception loses the effect, a fault loses the application. A cache hit above is safe
+        // by definition and stays unguarded, as does the compile pass, which exists to make this very attempt.
+        if (!ShaderPrecompiler.IsCompilePass && ShaderCompileStats.ForDevice(this).ShouldSkipShader(name))
+        {
+            // Refusing is not giving up - a child can try it while this process keeps drawing.
+            ShaderPrecompiler.TryCompileInBackground(this, name);
+
+            throw new InvalidOperationException(
+                $"Shader '{name}' is not compiled: building it took the process down on this driver before. " +
+                "See compile-stats.xml beside the shader cache.");
+        }
+
+        // The last thing said before the driver gets its chance to take the process down with it.
+        ShaderPrecompiler.NoteShaderInFlight(name);
 
         LogicalDevice.CreateShadersEXT(1, shaderCreateInfo, null, out var shaderObject);
         ShaderBinaryCache.Save(this, shaderCreateInfo, name, shaderObject[0]);

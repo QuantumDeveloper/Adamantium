@@ -159,23 +159,30 @@ namespace Adamantium.Imaging.Png
                 predict += PngDecoder.GetRawSizeIdat(width, height >> 1, colorMode);
             }
             
-            var scanlines = new List<byte>((int)predict);
+            var scanlines = new byte[predict];
 
-            State.Error = compressor.Decompress(frame.FrameData, State.DecoderSettings, scanlines);
+            State.Error = compressor.Decompress(frame.FrameData, State.DecoderSettings, ref scanlines, out var scanlinesLength);
 
-            long bufferSize = PngDecoder.GetRawSizeIdat(width, height, State.InfoPng.ColorMode);
+            // Short data would unfilter whatever lies past it.
+            if (State.Error == 0 && scanlinesLength < predict)
+            {
+                State.Error = 91;
+            }
+
+            // The pixels, not the IDAT size with its filter byte per line: an image needing no conversion is handed out as is.
+            long bufferSize = PngDecoder.GetRawSizeLct(width, height, State.InfoPng.ColorMode);
             frame.RawPixelBuffer = new byte[bufferSize];
 
             if (State.Error == 0)
             {
-                State.Error = PostProcessScanline(frame.RawPixelBuffer, scanlines.ToArray(), width, height, State.InfoPng);
+                State.Error = PostProcessScanline(frame.RawPixelBuffer, scanlines, width, height, State.InfoPng);
             }
 
             if (State.Error > 0)
             {
                 throw new PngDecodeException(State.Error);
             }
-            
+
             ProcessFrame(frame, index);
 
             return frame.RawPixelBuffer;
@@ -299,6 +306,8 @@ namespace Adamantium.Imaging.Png
 
             if (frame.EncodedWidth == 0 || frame.EncodedHeight == 0)
             {
+                // A still image is decoded too: without this every GetRawPixels decoded it again.
+                frame.IsDecoded = true;
                 return;
             }
 

@@ -10,8 +10,8 @@ namespace Adamantium.Graphics.Core
       /// <summary>
       /// This method is called when this application component is updated.
       /// </summary>
-      /// <param name="gameTime">The current timing.</param>
-      void Update(AppTime gameTime);
+      /// <param name="appTime">The current timing.</param>
+      void Update(AppTime appTime);
 
       /// <summary>
       /// Gets a value indicating whether the application component's Update method should be called by <see cref="SystemManager.Update"/>.
@@ -20,7 +20,7 @@ namespace Adamantium.Graphics.Core
       bool Enabled { get; set; }
 
       /// <summary>
-      /// Gets the update order relative to other game components. Lower values are updated first.
+      /// Gets the update order relative to other components. Lower values are updated first.
       /// </summary>
       /// <value>The update order.</value>
       /// <remarks>This property is valid on if <see cref="ExecutionType"/> is <see cref="ExecutionType.Sync"/>. Otherwise priority will bw ignored</remarks>
