@@ -13,6 +13,9 @@
     <AppendTargetFrameworkToOutputPath>true</AppendTargetFrameworkToOutputPath>
     <BaseIntermediateOutputPath>$(MSBuildThisFileDirectory)artifacts\obj\$(MSBuildProjectName)\</BaseIntermediateOutputPath>
     <PackageOutputPath>$(MSBuildThisFileDirectory)artifacts\packages\</PackageOutputPath>
+    <!-- Built from a solution that does not list them (the UI's), our projects would pass no configuration on to
+         each other and land in artifacts\bin\<tfm>. Ours list everything, so for them this changes nothing. -->
+    <ShouldUnsetParentConfigurationAndPlatform>false</ShouldUnsetParentConfigurationAndPlatform>
   </PropertyGroup>
 
   <!-- One identity for every assembly and package of the engine, the same as in QuantumBinding and AdamantiumVulkan. -->
