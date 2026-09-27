@@ -1,4 +1,5 @@
-﻿using Adamantium.Core;
+﻿using System.Collections.Generic;
+using Adamantium.Core;
 
 namespace Adamantium.EffectsCompiler
 {
@@ -7,20 +8,21 @@ namespace Adamantium.EffectsCompiler
       /// <summary>
       /// Initializes a new instance of the <see cref="EffectCompilerResult" /> class.
       /// </summary>
-      /// <param name="dependencyFilePath">The path to dependency file (may be null).</param>
       /// <param name="effectData">The EffectData.</param>
       /// <param name="logger">The logger.</param>
-      public EffectCompilerResult(string dependencyFilePath, EffectData effectData, Logger logger)
+      /// <param name="includes">The headers the compile pulled in.</param>
+      public EffectCompilerResult(EffectData effectData, Logger logger, IReadOnlyList<string> includes)
       {
-         DependencyFilePath = dependencyFilePath;
          EffectData = effectData;
          Logger = logger;
+         Includes = includes;
       }
 
       /// <summary>
-      /// The effect dependency list (a list of files and includes that this effect is timestamp dependent).
+      /// Every header the compile pulled in, nested ones included, as the include set names them (a path when it has
+      /// one, else a file name): what to watch so a change to any of them recompiles this effect.
       /// </summary>
-      public string DependencyFilePath;
+      public IReadOnlyList<string> Includes { get; }
 
       /// <summary>
       /// Gets the EffectData.

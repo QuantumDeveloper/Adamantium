@@ -56,22 +56,12 @@ namespace Adamantium.EffectsCompiler
 
         //private StreamOutputElement[] currentStreamOutputElements;
 
-        private FileDependencyList dependencyList;
+        private readonly List<string> resolvedIncludes = [];
         private SlangShaderCompiler slangCompiler;
 
         public EffectCompilerInternal()
         {
             slangCompiler = new SlangShaderCompiler();
-        }
-
-        /// <summary>
-        /// Checks for changes from a dependency file.
-        /// </summary>
-        /// <param name="dependencyFilePath">The dependency file path.</param>
-        /// <returns><c>true</c> if a file has been updated, <c>false</c> otherwise</returns>
-        public bool CheckForChanges(string dependencyFilePath)
-        {
-            return FileDependencyList.FromFile(dependencyFilePath).CheckForChanges();
         }
 
         /// <summary>
@@ -82,11 +72,10 @@ namespace Adamantium.EffectsCompiler
         /// <param name="macros">The macrosArgs.</param>
         /// <param name="includeDirectoryList">The include directory list.</param>
         /// <param name="allowDynamicCompiling">if set to <c>true</c> [allo dynamic compiling].</param>
-        /// <param name="dependencyFilePath">The dependency file path.</param>
         /// <returns>The result of compilation.</returns>
-        public EffectCompilerResult CompileFromFile(string filePath, EffectCompilerFlags flags = EffectCompilerFlags.None, List<EffectData.ShaderMacro> macros = null, List<string> includeDirectoryList = null, bool allowDynamicCompiling = false, string dependencyFilePath = null)
+        public EffectCompilerResult CompileFromFile(string filePath, EffectCompilerFlags flags = EffectCompilerFlags.None, List<EffectData.ShaderMacro> macros = null, List<string> includeDirectoryList = null, bool allowDynamicCompiling = false)
         {
-            return Compile(File.ReadAllText(filePath, Encoding.UTF8), filePath, flags, macros, includeDirectoryList, allowDynamicCompiling, dependencyFilePath);
+            return Compile(File.ReadAllText(filePath, Encoding.UTF8), filePath, flags, macros, includeDirectoryList, allowDynamicCompiling);
         }
 
         /// <summary>
@@ -98,9 +87,8 @@ namespace Adamantium.EffectsCompiler
         /// <param name="macrosArgs">The macrosArgs.</param>
         /// <param name="includeDirectoryList">The include directory list.</param>
         /// <param name="allowDynamicCompiling">if set to <c>true</c> [allow dynamic compiling].</param>
-        /// <param name="dependencyFilePath">The dependency file path.</param>
         /// <returns>The result of compilation.</returns>
-        public EffectCompilerResult Compile(string sourceCode, string filePath, EffectCompilerFlags flags = EffectCompilerFlags.None, List<EffectData.ShaderMacro> macrosArgs = null, List<string> includeDirectoryList = null, bool allowDynamicCompiling = false, string dependencyFilePath = null)
+        public EffectCompilerResult Compile(string sourceCode, string filePath, EffectCompilerFlags flags = EffectCompilerFlags.None, List<EffectData.ShaderMacro> macrosArgs = null, List<string> includeDirectoryList = null, bool allowDynamicCompiling = false)
         {
             var nativeMacros = new List<EffectData.ShaderMacro>();
             if (macrosArgs != null)
@@ -117,29 +105,23 @@ namespace Adamantium.EffectsCompiler
 
             InternalCompile(sourceCode, filePath);
 
-            var result = new EffectCompilerResult(dependencyFilePath, effectData, logger);
+            var result = new EffectCompilerResult(effectData, logger, resolvedIncludes);
 
-            // Handle Dependency FilePath
-            if (!result.HasErrors && dependencyFilePath != null && dependencyList != null)
+            // If dynamic compiling, store the parameters used to compile this effect directly in the bytecode
+            if (allowDynamicCompiling && !result.HasErrors && result.EffectData != null)
             {
-                dependencyList.Save(dependencyFilePath);
-
-                // If dynamic compiling, store the parameters used to compile this effect directly in the bytecode
-                if (allowDynamicCompiling && result.EffectData != null)
+                var compilerArguments = new EffectData.CompilerArguments { FilePath = filePath, Macros = new List<EffectData.ShaderMacro>(), IncludeDirectoryList = new List<string>() };
+                if (macrosArgs != null)
                 {
-                    var compilerArguments = new EffectData.CompilerArguments { FilePath = filePath, DependencyFilePath = dependencyFilePath, Macros = new List<EffectData.ShaderMacro>(), IncludeDirectoryList = new List<string>() };
-                    if (macrosArgs != null)
-                    {
-                        compilerArguments.Macros.AddRange(macrosArgs);
-                    }
-
-                    if (includeDirectoryList != null)
-                    {
-                        compilerArguments.IncludeDirectoryList.AddRange(includeDirectoryList);
-                    }
-
-                    result.EffectData.Description.Arguments = compilerArguments;
+                    compilerArguments.Macros.AddRange(macrosArgs);
                 }
+
+                if (includeDirectoryList != null)
+                {
+                    compilerArguments.IncludeDirectoryList.AddRange(includeDirectoryList);
+                }
+
+                result.EffectData.Description.Arguments = compilerArguments;
             }
 
             return result;
@@ -162,7 +144,7 @@ namespace Adamantium.EffectsCompiler
 
             InternalCompile(sourceCode, filePath);
 
-            var result = new EffectCompilerResult(null, effectData, logger);
+            var result = new EffectCompilerResult(effectData, logger, resolvedIncludes);
 
             return result;
         }
@@ -180,6 +162,7 @@ namespace Adamantium.EffectsCompiler
         private void InternalCompile(string sourceCode, string fileName)
         {
             effectData = null;
+            resolvedIncludes.Clear();
 
             fileName = fileName.Replace(@"\\", @"\");
 
@@ -206,8 +189,6 @@ namespace Adamantium.EffectsCompiler
             parser.Macros.AddRange(macros);
             parser.IncludeDirectoryList.AddRange(includeDirectoryList);
             parserResult = parser.Parse(sourceCode, fileName);
-            
-            dependencyList = parserResult.DependencyList;
 
             if (logger.HasErrors) return;
 
@@ -1027,10 +1008,17 @@ namespace Adamantium.EffectsCompiler
 
             foreach (var include in includes)
             {
-                if (include.Path != null && include.Path.EndsWith(includePath, StringComparison.OrdinalIgnoreCase))
+                if ((include.Path != null && include.Path.EndsWith(includePath, StringComparison.OrdinalIgnoreCase))
+                    || string.Equals(include.FileName, fileName, StringComparison.OrdinalIgnoreCase))
+                {
+                    var resolved = include.Path ?? include.FileName;
+                    if (!resolvedIncludes.Contains(resolved))
+                    {
+                        resolvedIncludes.Add(resolved);
+                    }
+
                     return include.Content;
-                if (string.Equals(include.FileName, fileName, StringComparison.OrdinalIgnoreCase))
-                    return include.Content;
+                }
             }
 
             return null;

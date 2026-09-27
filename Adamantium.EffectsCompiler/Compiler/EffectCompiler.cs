@@ -11,26 +11,6 @@ namespace Adamantium.EffectsCompiler
    /// </summary>
    public static class EffectCompiler
    {
-      public static string GetDependencyFileNameFromSourcePath(string pathToFxFile)
-      {
-         return FileDependencyList.GetDependencyFileNameFromSourcePath(pathToFxFile);
-      }
-
-      public static List<string> LoadDependency(string dependencyFilePath)
-      {
-         return FileDependencyList.FromFileRaw(dependencyFilePath);
-      }
-
-      /// <summary>
-      /// Checks for changes from a dependency file.
-      /// </summary>
-      /// <param name="dependencyFilePath">The dependency file path.</param>
-      /// <returns><c>true</c> if a file has been updated, <c>false</c> otherwise</returns>
-      public static bool CheckForChanges(string dependencyFilePath)
-      {
-         return FileDependencyList.CheckForChanges(dependencyFilePath);
-      }
-
       /// <summary>
       /// Compiles an effect from file.
       /// </summary>
@@ -39,11 +19,10 @@ namespace Adamantium.EffectsCompiler
       /// <param name="macros">The macrosArgs.</param>
       /// <param name="includeDirectoryList">The include directory list.</param>
       /// <param name="allowDynamicCompiling">Whether or not to allow dynamic compilation.</param>
-      /// <param name="dependencyFilePath">Path to dependency files.</param>
       /// <returns>The result of compilation.</returns>
-      public static EffectCompilerResult CompileFromFile(string filePath, EffectCompilerFlags flags = EffectCompilerFlags.None, List<EffectData.ShaderMacro> macros = null, List<string> includeDirectoryList = null, bool allowDynamicCompiling = false, string dependencyFilePath = null)
+      public static EffectCompilerResult CompileFromFile(string filePath, EffectCompilerFlags flags = EffectCompilerFlags.None, List<EffectData.ShaderMacro> macros = null, List<string> includeDirectoryList = null, bool allowDynamicCompiling = false)
       {
-         return Compile(File.ReadAllText(filePath, Encoding.UTF8), filePath, flags, macros, includeDirectoryList, allowDynamicCompiling, dependencyFilePath);
+         return Compile(File.ReadAllText(filePath, Encoding.UTF8), filePath, flags, macros, includeDirectoryList, allowDynamicCompiling);
       }
 
       /// <summary>
@@ -55,12 +34,11 @@ namespace Adamantium.EffectsCompiler
       /// <param name="macrosArgs">The macrosArgs.</param>
       /// <param name="includeDirectoryList">The include directory list.</param>
       /// <param name="allowDynamicCompiling">Whether or not to allow dynamic compilation.</param>
-      /// <param name="dependencyFilePath">Path to dependency files.</param>
       /// <returns>The result of compilation.</returns>
-      public static EffectCompilerResult Compile(string sourceCode, string filePath, EffectCompilerFlags flags = EffectCompilerFlags.None, List<EffectData.ShaderMacro> macrosArgs = null, List<string> includeDirectoryList = null, bool allowDynamicCompiling = false, string dependencyFilePath = null)
+      public static EffectCompilerResult Compile(string sourceCode, string filePath, EffectCompilerFlags flags = EffectCompilerFlags.None, List<EffectData.ShaderMacro> macrosArgs = null, List<string> includeDirectoryList = null, bool allowDynamicCompiling = false)
       {
          var compiler = new EffectCompilerInternal();
-         return compiler.Compile(sourceCode, filePath, flags, macrosArgs, includeDirectoryList, allowDynamicCompiling, dependencyFilePath);
+         return compiler.Compile(sourceCode, filePath, flags, macrosArgs, includeDirectoryList, allowDynamicCompiling);
       }
       
       public static EffectCompilerResult Compile(string sourceCode, string filePath, ImmutableArray<ShaderFileInfo> includes, List<EffectData.ShaderMacro> macrosArgs = null, List<string> includeDirectoryList = null)

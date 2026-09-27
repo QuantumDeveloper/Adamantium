@@ -15,12 +15,6 @@ namespace Adamantium.EffectsCompiler
          public string FilePath;
 
          /// <summary>
-         /// The absolute path to dependency file path generated when compiling this effect.
-         /// </summary>
-         [IgnoreMember]
-         public string DependencyFilePath;
-
-         /// <summary>
          /// The flags used to compile an effect.
          /// </summary>
          [Key(1)]

@@ -141,6 +141,26 @@ float4 PS(float4 p : SV_Position) : SV_Target0 { return Tint(float4(1, 1, 1, 1))
 technique T { pass P { VertexShader = VS; PixelShader = PS; } }
 ";
 
+        /// <summary>What a hot reload watches: every header the compile pulled in, the nested one too, and nothing it
+        /// was merely offered.</summary>
+        [Test]
+        public void Includes_NameEveryHeaderPulledIn_NestedOnesToo()
+        {
+            var offered = TintInclude().Add(new ShaderFileInfo
+            {
+                FileName = "Unused.fxh",
+                Path = Path.Combine("Includes", "Unused.fxh"),
+                Content = "float Unused() { return 0; }\n"
+            });
+
+            string[] pulledIn = [Path.Combine("Includes", "Tint.fxh"), Path.Combine("Includes", "Bee.fxh")];
+
+            var result = EffectCompiler.Compile(EffectCalling("#include \"Includes/Tint.fxh\"\n"), "Probe.fx", offered);
+
+            Assert.That(result.HasErrors, Is.False, string.Join(Environment.NewLine, result.Logger.Messages));
+            Assert.That(result.Includes, Is.EquivalentTo(pulledIn));
+        }
+
         /// <summary>The baseline for the test below: a REAL #include is expanded, so the function it defines resolves.</summary>
         [Test]
         public void IncludeIsExpanded()

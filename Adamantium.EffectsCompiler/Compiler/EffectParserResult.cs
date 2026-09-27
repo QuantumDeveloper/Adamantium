@@ -8,8 +8,6 @@ namespace Adamantium.EffectsCompiler
 
       public String PreprocessedSource;
 
-      public FileDependencyList DependencyList;
-
       public Ast.Shader Shader;
    }
 }
