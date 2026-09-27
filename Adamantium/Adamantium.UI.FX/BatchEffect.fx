@@ -11,8 +11,7 @@
 // world transform + colour fetched from a StructuredBuffer by SV_InstanceID; docs/RENDER_CACHE_REDESIGN.md sec. 4h/4j).
 
 // In dependency order - each header builds on the ones above it. NOTHING after the path on these lines: a trailing
-// comment on an #include makes the preprocessor stop with "unexpected tokens after directive", and the failure then
-// arrives as every shader in the file falling back to DXC.
+// comment on an #include makes the preprocessor stop with "unexpected tokens after directive".
 #include "Includes/CommonData.fxh"
 #include "Includes/ClipMath.fxh"
 #include "Includes/ShapeMath.fxh"

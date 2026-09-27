@@ -763,7 +763,7 @@ technique Stroke
     // Expand (compute): continuous polyline -> miter ribbon + round-join disc fans, written via BDA. Plain Draw.
     pass Expand
     {
-        // Slang ignores this (targets spirv_1_6); kept non-zero for the parser + SM 6.6 for the DXC fallback.
+        // Slang ignores this (targets spirv_1_6); kept non-zero for the parser.
         EffectName = "StrokeEffect";
         ComputeShader = StrokeExpandCS;
     }
