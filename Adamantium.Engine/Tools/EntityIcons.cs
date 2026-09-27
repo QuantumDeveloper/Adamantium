@@ -13,7 +13,8 @@ namespace Adamantium.Engine.Tools;
 
 /// <summary>
 /// Icons for what a scene has but does not draw - lights and cameras - facing every camera at a steady size on screen. A
-/// click on an icon selects its entity. A camera has no icon in its own view.
+/// directional light's icon also has rays running where it shines. A click on an icon selects its entity. A camera has
+/// no icon in its own view.
 /// </summary>
 public class EntityIcons : EditorProcessor
 {
@@ -21,9 +22,11 @@ public class EntityIcons : EditorProcessor
     private readonly Entity pointIcon = new PointLightIconTemplate().BuildEntity(null, "Point light");
     private readonly Entity spotIcon = new SpotLightIconTemplate().BuildEntity(null, "Spot light");
     private readonly Entity directionalIcon = new DirectionalLightIconTemplate().BuildEntity(null, "Directional light");
+    private readonly Entity directionalRays = new DirectionalLightVisualTemplate().BuildEntity(null, "Rays");
     private readonly Entity cameraIcon = new CameraIconTemplate().BuildEntity(null, "Camera");
     private readonly Dictionary<Entity, Entity> iconOf = new();
     private readonly Dictionary<Entity, Entity> targetOf = new();
+    private readonly Dictionary<Entity, Entity> raysOf = new();
     private readonly HashSet<Entity> seen = [];
     private readonly List<Entity> gone = [];
 
@@ -82,15 +85,25 @@ public class EntityIcons : EditorProcessor
         seen.Add(entity);
         if (!iconOf.TryGetValue(entity, out var icon))
         {
-            icon = Instance(look);
+            icon = Instance(root, look);
+            icon.AddComponent(new BoxCollider());
             iconOf[entity] = icon;
             targetOf[icon] = entity;
+            if (look == directionalIcon)
+            {
+                raysOf[entity] = Instance(icon, directionalRays);
+            }
         }
 
         icon.IsSelected = entity.IsSelected;
         if (entity.GetComponent<Light>() is { } light)
         {
             icon.GetComponent<Material>().MeshColor = light.Color;
+            if (raysOf.TryGetValue(entity, out var rays))
+            {
+                rays.IsSelected = entity.IsSelected;
+                rays.GetComponent<Material>().MeshColor = light.Color;
+            }
         }
     }
 
@@ -109,19 +122,18 @@ public class EntityIcons : EditorProcessor
         return ShowsCameras && entity.GetComponent<Camera>() != null ? cameraIcon : null;
     }
 
-    private Entity Instance(Entity look)
+    private static Entity Instance(Entity owner, Entity look)
     {
-        var icon = new Entity(root, look.Name);
-        icon.AddComponent(new MeshData { Mesh = look.GetComponent<MeshData>().Mesh });
+        var instance = new Entity(owner, look.Name);
+        instance.AddComponent(new MeshData { Mesh = look.GetComponent<MeshData>().Mesh });
         var material = look.GetComponent<Material>();
-        icon.AddComponent(new Material
+        instance.AddComponent(new Material
         {
             MeshColor = material.MeshColor,
             HighlightColor = material.HighlightColor,
             Transparency = material.Transparency
         });
-        icon.AddComponent(new BoxCollider());
-        return icon;
+        return instance;
     }
 
     private void DropGone()
@@ -140,6 +152,7 @@ public class EntityIcons : EditorProcessor
             var icon = iconOf[gone[i]];
             iconOf.Remove(gone[i]);
             targetOf.Remove(icon);
+            raysOf.Remove(gone[i]);
             icon.Owner = null;
         }
     }
@@ -159,5 +172,24 @@ public class EntityIcons : EditorProcessor
                                 * Matrix4x4F.RotationQuaternion(ScreenSpace.Facing(camera))
                                 * Matrix4x4F.Translation(ScreenSpace.InRender(at, camera));
         metadata.Enabled = true;
+
+        if (raysOf.TryGetValue(target, out var rays))
+        {
+            var raysMetadata = rays.Transform.GetMetadata(camera);
+            raysMetadata.WorldMatrixF = Matrix4x4F.Scaling(size)
+                                        * TurnOf(target)
+                                        * Matrix4x4F.Translation(ScreenSpace.InRender(at, camera));
+            raysMetadata.Enabled = true;
+        }
+    }
+
+    private static Matrix4x4F TurnOf(Entity target)
+    {
+        var world = target.Transform.GetWorldMatrixF();
+        var turn = Matrix4x4F.Identity;
+        turn.Right = Vector3F.Normalize(world.Right);
+        turn.Up = Vector3F.Normalize(world.Up);
+        turn.Forward = Vector3F.Normalize(world.Forward);
+        return turn;
     }
 }
