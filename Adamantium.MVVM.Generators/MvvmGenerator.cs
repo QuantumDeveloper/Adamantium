@@ -60,7 +60,7 @@ public sealed class MvvmGenerator : IIncrementalGenerator
         "[Command] CanExecute must name a bool member",
         "CanExecute names '{0}', which is not a bool property, a bool [Bindable] field, or a bool method taking no " +
         "argument (or the command's own argument) on this type or its bases. The command is generated WITHOUT a gate, " +
-        "so it would always be enabled",
+        "so it would always be enabled.",
         "Adamantium.MVVM",
         DiagnosticSeverity.Error,
         isEnabledByDefault: true);
@@ -267,6 +267,10 @@ public sealed class MvvmGenerator : IIncrementalGenerator
         if (ctx.TargetSymbol is not INamedTypeSymbol type) return null;
         if (type.ContainingType is not null) return Nested<ViewModelClassInfo>(type);
         if (ImplementsInpc(type)) return null;                                // already has INPC via a base → nothing to inject
+        if (AncestorIsViewModel(type))
+        {
+            return null;
+        }
 
         // A plain class with no explicit base can simply derive from the ready AdamantiumViewModel (which supplies INPC
         // + SetProperty/RaisePropertyChanged) - no per-VM INPC boilerplate. A struct/record, or a class that already
@@ -499,6 +503,21 @@ public sealed class MvvmGenerator : IIncrementalGenerator
         {
             if (b.SpecialType == SpecialType.System_Object) break;
             if (b.AllInterfaces.Any(i => i.ToDisplayString() == InpcName)) return true;
+        }
+
+        return false;
+    }
+
+    // An ancestor marked [ViewModel] gets its INPC from this same generator, in a part not visible while it runs:
+    // injecting it again here only hides those members.
+    private static bool AncestorIsViewModel(INamedTypeSymbol type)
+    {
+        for (var b = type.BaseType; b is not null; b = b.BaseType)
+        {
+            if (b.GetAttributes().Any(a => a.AttributeClass?.ToDisplayString() == ViewModelAttr))
+            {
+                return true;
+            }
         }
 
         return false;

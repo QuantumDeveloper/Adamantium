@@ -25,20 +25,52 @@ namespace Adamantium.MVVM
 
     private static System.Collections.Generic.IList<Diagnostic> RunGenerator(string source)
     {
+        Drive().RunGeneratorsAndUpdateCompilation(Compile(source), out _, out var diagnostics);
+        return diagnostics;
+    }
+
+    private static string[] GeneratedFiles(string source)
+    {
+        return Drive().RunGenerators(Compile(source)).GetRunResult().GeneratedTrees
+            .Select(tree => Path.GetFileName(tree.FilePath))
+            .ToArray();
+    }
+
+    private static GeneratorDriver Drive()
+    {
+        return CSharpGeneratorDriver.Create(new MvvmGenerator().AsSourceGenerator());
+    }
+
+    private static CSharpCompilation Compile(string source)
+    {
         var references = ((string)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES"))
             .Split(Path.PathSeparator)
             .Where(p => p.Length > 0)
             .Select(p => (MetadataReference)MetadataReference.CreateFromFile(p))
             .ToArray();
 
-        var compilation = CSharpCompilation.Create("DiagProbe",
+        return CSharpCompilation.Create("DiagProbe",
             new[] { CSharpSyntaxTree.ParseText(Attributes), CSharpSyntaxTree.ParseText(source) },
             references,
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+    }
 
-        var driver = CSharpGeneratorDriver.Create(new MvvmGenerator().AsSourceGenerator());
-        driver.RunGeneratorsAndUpdateCompilation(compilation, out _, out var diagnostics);
-        return diagnostics;
+    [Test]
+    public void ViewModel_UnderAViewModelBase_GetsNoSecondCopyOfTheNotifications()
+    {
+        const string source = @"
+namespace Demo
+{
+    [Adamantium.MVVM.ViewModel]
+    public abstract partial class Base { }
+
+    [Adamantium.MVVM.ViewModel]
+    public sealed partial class Derived : Base { }
+}";
+        var files = GeneratedFiles(source);
+
+        Assert.That(files, Does.Contain("Demo.Base.ViewModel.INPC.g.cs"));
+        Assert.That(files, Does.Not.Contain("Demo.Derived.ViewModel.INPC.g.cs"));
     }
 
     [Test]
