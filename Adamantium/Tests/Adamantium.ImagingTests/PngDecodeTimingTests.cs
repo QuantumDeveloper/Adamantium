@@ -37,14 +37,14 @@ public class PngDecodeTimingTests
     {
         for (var dir = new DirectoryInfo(TestContext.CurrentContext.TestDirectory); dir != null; dir = dir.Parent)
         {
-            var candidate = Path.Combine(dir.FullName, "Adamantium.UI.Sandbox", "Models", "F15C");
+            var candidate = Path.Combine(dir.FullName, "Tests", "TestAssets", "F15C");
             if (Directory.Exists(candidate))
             {
                 return candidate;
             }
         }
 
-        throw new DirectoryNotFoundException("Adamantium.UI.Sandbox/Models/F15C");
+        throw new DirectoryNotFoundException("Tests/TestAssets/F15C");
     }
 
     [Test]
