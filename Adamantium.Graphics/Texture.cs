@@ -677,8 +677,7 @@ public unsafe class Texture : GraphicsResource, ITexture
     private void CopyImageThroughStagingBuffer(Image destination)
     {
         CreateBuffer(destination.TotalSizeInBytes, BufferUsageFlagBits.TransferSrcBit | BufferUsageFlagBits.TransferDstBit,
-            MemoryPropertyFlags.HostVisible | MemoryPropertyFlags.HostCoherent, out var stagingBuffer,
-            out var stagingBufferMemory);
+            ReadbackMemory(), out var stagingBuffer, out var stagingBufferMemory);
         this.TransitionImageLayout(ImageLayout.TransferSrcOptimal);
         CopyImageToBuffer(stagingBuffer);
         this.TransitionImageLayout(Description.DesiredImageLayout);
@@ -690,6 +689,23 @@ public unsafe class Texture : GraphicsResource, ITexture
 
         GraphicsDevice.Destroy(stagingBuffer);
         GraphicsDevice.Destroy(stagingBufferMemory);
+    }
+
+    // Cached host memory where the device has it: the CPU reads an uncached mapping about six times slower - 80 ms against
+    // 13 for a 3200x1800 frame, which is what a zoomed designer preview reads back every frame.
+    private MemoryPropertyFlags ReadbackMemory()
+    {
+        const MemoryPropertyFlags cached = MemoryPropertyFlags.HostVisible | MemoryPropertyFlags.HostCoherent | MemoryPropertyFlags.HostCached;
+        var types = GraphicsDevice.Adapter.Adapter.GetPhysicalDeviceMemoryProperties();
+        for (var i = 0; i < types.MemoryTypeCount; i++)
+        {
+            if (((MemoryPropertyFlags)types.MemoryTypes.Span[i].PropertyFlags).HasFlag(cached))
+            {
+                return cached;
+            }
+        }
+
+        return MemoryPropertyFlags.HostVisible | MemoryPropertyFlags.HostCoherent;
     }
 
     /// <summary>Swaps red and blue in place for a B8G8R8A8 image so the RGBA-oriented encoders save correct colours.</summary>
