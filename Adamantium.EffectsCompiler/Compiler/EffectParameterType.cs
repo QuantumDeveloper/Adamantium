@@ -384,8 +384,28 @@
       /// <dd> <p>The variable is a storage (structured) buffer. </p> <p>For more information about structured buffer, see the <strong>Remarks</strong> section.</p> </dd>	
       /// </summary>	
       /// <msdn-id>ff728735</msdn-id>	
-      /// <unmanaged>D3D_SVT_STRUCTURED_BUFFER</unmanaged>	
-      /// <unmanaged-short>D3D_SVT_STRUCTURED_BUFFER</unmanaged-short>	
+      /// <unmanaged>D3D_SVT_STRUCTURED_BUFFER</unmanaged>
+      /// <unmanaged-short>D3D_SVT_STRUCTURED_BUFFER</unmanaged-short>
       StorageBuffer = unchecked((int)48),
+
+      /// <summary>A 16-bit signed integer.</summary>
+      /// <unmanaged>D3D_SVT_INT16</unmanaged>
+      Int16 = 58,
+
+      /// <summary>A 16-bit unsigned integer.</summary>
+      /// <unmanaged>D3D_SVT_UINT16</unmanaged>
+      UInt16 = 59,
+
+      /// <summary>A 16-bit floating-point number.</summary>
+      /// <unmanaged>D3D_SVT_FLOAT16</unmanaged>
+      Float16 = 60,
+
+      /// <summary>A 64-bit signed integer.</summary>
+      /// <unmanaged>D3D_SVT_INT64</unmanaged>
+      Int64 = 61,
+
+      /// <summary>A 64-bit unsigned integer, a buffer device address among others.</summary>
+      /// <unmanaged>D3D_SVT_UINT64</unmanaged>
+      UInt64 = 62,
    }
 }

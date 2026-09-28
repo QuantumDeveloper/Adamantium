@@ -49,11 +49,7 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
     // Invalidated (_stateInitialized=false) at BeginDraw - a fresh command buffer has undefined dynamic state.
     private bool _stateInitialized;
 
-    // What the command buffer was last TOLD, for the state that was being re-sent on every draw. Measured on the Layout
-    // tab: a frame replays ~16 draws and each one sent its viewport and scissor TWICE (once from SetViewports/SetScissors,
-    // once unconditionally here) plus three colour-blend calls - and every one of those marshals a struct through
-    // Marshal.SizeOf, which was 27% of the whole draw phase. Sending only what CHANGED is the same picture with a third
-    // of the calls.
+    // What the command buffer was last told, so unchanged viewport, scissor and blend state is not re-sent on every draw.
     private Viewport _cViewport;
     private uint _cViewportCount;
     private Rect2D _cScissor;
@@ -433,12 +429,8 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
         CurrentCommandBuffer.ClearAttachments(1, new[] { attachment }, 1, new[] { clearRect });
     }
 
-    // A clear rect that leaves the RENDER AREA is invalid use, not a no-op - and this driver answers it with a lost
-    // device rather than an error, so it is cut here rather than trusted from the caller. The caller has only the
-    // VIEWPORT to clamp against, which is not the same rectangle: an off-screen pass (a captured backdrop, a baked
-    // brush) renders into a smaller target while the viewport still describes the window. The render area is what
-    // BeginRendering hands the driver - the first target's full extent - so it is known HERE and nowhere else.
-    // False = nothing of the rectangle survives the cut, so there is nothing to clear.
+    // A clear rect outside the render area is invalid use; callers only know the viewport, so it is cut here. False: nothing
+    // is left to clear.
     private bool ClampToRenderArea(ref Rect2D rect)
     {
         if (renderTargets is not { Length: > 0 }) return false;
@@ -491,11 +483,8 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
 
     private void InitializeSyncObject()
     {
-        // Always enabled. The old condition (only sync when graphics == transfer queue) wrongly assumed separate queues
-        // never need host synchronization - but our devices (primary render + resource loader) submit and record from
-        // different threads, and command pools / a shared VkQueue require external sync regardless of queue families.
-        // Leaving it off on separate-queue hardware produced vkQueueSubmit / vkAllocate/Free/EndCommandBuffer
-        // THREADING ERRORs during concurrent content-load uploads. The mutex is process-shared (SyncGuid) + reentrant.
+        // Always on: devices submit and record from different threads, and a shared queue and command pools need external
+        // sync whatever the queue families.
         _submissionSync = new SyncObject(SyncGuid, true);
     }
 
@@ -594,13 +583,8 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
         return LogicalDevice.GetDescriptorSetLayoutOffset(layout, bindingSlot);
     }
 
-    // SERIALISED for CALLERS THAT ARE PARALLEL - which the application is not: it renders on one thread
-    // (AdamantiumRenderThread), and every shader here is created from a draw on it. The parallel caller is the TEST
-    // RUNNER, which runs fixtures concurrently; there two threads meant two writers for one on-disk cache file and two
-    // concurrent vkCreateShadersEXT calls, and the host died natively partway through a run once the brushes split into
-    // a pass per kind and there were finally enough shaders to overlap.
-    // Static rather than per-instance because every render device shares one VkDevice and one cache folder. Creation is
-    // lazy and once per pass, so this is never on a hot path - and if rendering ever does go parallel, it already holds.
+    // Serializes shader creation for parallel callers such as the test runner; static because all render devices share
+    // one VkDevice and one cache folder.
     private static readonly object ShaderCreateLock = new();
 
     public ShaderEXT CreateShader(ShaderCreateInfoEXT shaderCreateInfo, string name = null)
@@ -613,12 +597,8 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
 
     private ShaderEXT CreateShaderCore(ShaderCreateInfoEXT shaderCreateInfo, string name)
     {
-        // Shader-object binary cache (dodges the Turing vkCreateShadersEXT NVVM flake). On a cache hit, create from the
-        // driver-compiled BINARY - no NVVM, no flake. On a miss (or an incompatible binary after a driver/device change),
-        // compile from SPIR-V once and persist the binary for next launch. The binary path goes through
-        // CreateShaderFromBinary, which honours the mandatory 16-byte pCode alignment for VK_SHADER_CODE_TYPE_BINARY_EXT.
-        // `name` is what the cache file is called - effect.technique.pass.stage - so the folder says which shaders exist
-        // and which ones a launch actually compiled.
+        // Create from the cached driver binary when there is one; otherwise compile from SPIR-V and persist the binary as
+        // `name` (effect.technique.pass.stage).
         if (ShaderBinaryCache.TryLoad(this, shaderCreateInfo, name, out var binary))
         {
             var result = LogicalDevice.CreateShaderFromBinary(ShaderBinaryCache.AsBinary(shaderCreateInfo, binary), out var cached);
@@ -626,20 +606,19 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
             // else: incompatible binary (driver/device change) -> fall through and recompile from SPIR-V (re-caches below).
         }
 
-        // Past this line the SPIR-V goes to the driver, and for a shader known to fault that is an access violation no
-        // catch can intercept: an exception loses the effect, a fault loses the application. A cache hit above is safe
-        // by definition and stays unguarded, as does the compile pass, which exists to make this very attempt.
+        // Creation below can fault natively, which no catch intercepts, so a shader recorded as having taken the process
+        // down is refused here. Cache hits and the compile pass stay unguarded.
         if (!ShaderPrecompiler.IsCompilePass && ShaderCompileStats.ForDevice(this).ShouldSkipShader(name))
         {
             // Refusing is not giving up - a child can try it while this process keeps drawing.
             ShaderPrecompiler.TryCompileInBackground(this, name);
 
             throw new InvalidOperationException(
-                $"Shader '{name}' is not compiled: building it took the process down on this driver before. " +
+                $"Shader '{name}' is not compiled: building it took the process down before. " +
                 "See compile-stats.xml beside the shader cache.");
         }
 
-        // The last thing said before the driver gets its chance to take the process down with it.
+        // Recorded before creation, so a native fault still leaves the shader's name behind.
         ShaderPrecompiler.NoteShaderInFlight(name);
 
         LogicalDevice.CreateShadersEXT(1, shaderCreateInfo, null, out var shaderObject);
@@ -741,11 +720,8 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
         => InsertImageMemoryBarrier(commandBuffer, texture, sourceAccessMask, destinationAccessMask,
             oldLayout, newLayout, sourceStageMask, destinationStageMask, 0, ~0U);
 
-    /// <summary>The same barrier over ONE RANGE OF MIP LEVELS. Building a pyramid needs it: each level is written as a
-    /// transfer destination and then read as the source of the next, so the levels are in different layouts at the same
-    /// time and a whole-image barrier cannot say that.
-    /// <para>The texture's own <see cref="ITexture.ImageLayout"/> is only updated for a barrier that covers the WHOLE
-    /// image - a partial one would leave that field claiming something untrue of most of it.</para></summary>
+    /// <summary>The same barrier over one range of mip levels, for building a pyramid. <see cref="ITexture.ImageLayout"/> is
+    /// updated only when the range covers the whole image.</summary>
     public void InsertImageMemoryBarrier(
         CommandBuffer commandBuffer,
         ITexture texture,
@@ -873,11 +849,7 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
 
         var barrier = new ImageMemoryBarrier2
         {
-            // The swapchain image is filled by a BLIT (EndDraw copies the resolved render target into it), not by
-            // colour-attachment writes, so the source side has to name the transfer stage as well. Naming only
-            // ColorAttachmentOutput left the layout transition unsynchronized with the blit that had just written the
-            // image - a WRITE_AFTER_WRITE hazard the layer reports by name, and one that lets the presented image
-            // carry a partially copied frame.
+            // The swapchain image is filled by a blit, so the source side names the transfer stage too.
             SrcStageMask = PipelineStageFlagBits2.ColorAttachmentOutputBit | PipelineStageFlagBits2.AllTransferBit,
             SrcAccessMask = AccessFlagBits2.ColorAttachmentWriteBit | AccessFlagBits2.TransferWriteBit,
             DstStageMask = PipelineStageFlagBits2.BottomOfPipeBit,
@@ -1042,6 +1014,7 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
 
         FrameTicket++;
         MainDevice.OnFrameStarted();
+        MainDevice.ShaderHotReload.ApplyTo(this);
 
         if (result != Result.Success && result != Result.Timeout)
         {
@@ -1057,11 +1030,7 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
         }
         _lastFenceWaitError = Result.Success;   // recovered - re-arm the log for the next new error
 
-        // Swapchain image is ACQUIRED LATE - at the very end of BeginDraw, after the command buffer + beforeRenderPass
-        // record (see below). The frame renders to an OFFSCREEN target; the swapchain image is only needed for EndDraw's
-        // blit + present. Acquiring HERE (before the fallible record) leaked the image + its ImageAvailable semaphore
-        // whenever anything after it aborted the frame before Submit - the acquire/present imbalance that exhausted the
-        // swapchain until AcquireNextImage blocked forever (VUID-vkAcquireNextImageKHR-semaphore-01286 / -surface-07783).
+        // The swapchain image is acquired late, after all fallible recording, so an aborted frame holds no image or semaphore.
 
         // if (Presenter is SwapChainGraphicsPresenter swapchain)
         // {
@@ -1129,13 +1098,8 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
         return true;
     }
 
-    /// <summary>Break the render pass OPEN in the middle of a frame, so work that may not run inside one - copying out of
-    /// the colour target, a blit - can be recorded into the SAME command buffer. Pair it with
-    /// <see cref="ResumeRendering"/>; everything already drawn is kept, because the resume loads the attachment instead
-    /// of clearing it.
-    /// <para>This exists for the backdrop materials: acrylic and its family read what is already composited BEHIND the
-    /// element, and that read is a transfer, not a draw. Doing it through a one-off command buffer (BeginSingleTimeCommand)
-    /// would stall the pipeline mid-frame, which is the whole reason this pair is here.</para></summary>
+    /// <summary>Suspends the render pass mid-frame so transfer work, such as a backdrop material reading what is behind it,
+    /// goes into the same command buffer. Pair with <see cref="ResumeRendering"/>, which loads the attachment.</summary>
     public void SuspendRendering()
     {
         if (!EnableDynamicRendering) return;
@@ -1254,13 +1218,8 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
 
     public void EndDraw()
     {
-        // The image is taken HERE, not in BeginDraw. The frame renders to an OFFSCREEN target and the swapchain image is
-        // needed only for the blit below, so acquiring first meant BLOCKING BEFORE doing the work instead of after it.
-        // Measured on the Layout tab: acquire 0.71-0.79 ms, ~90% of BeginDraw and about a third of the frame, with the
-        // GPU fence wait at 0.00 - the frame was never waiting for the GPU, only for the present engine's schedule.
-        // A fourth swapchain image was tried first and changed nothing, which is what ruled out "not enough images".
-        // Everything fallible still runs before this point, so a frame that aborts earlier holds no image and leaks no
-        // semaphore - the reason the acquire was moved late in the first place.
+        // Acquired here, after the work: the frame renders offscreen, and acquiring first blocked on the present engine.
+        // Everything fallible runs before this, so an aborted frame leaks nothing.
         HasSwapchainImage = false;
         if (Presenter is SwapChainGraphicsPresenter)
         {
@@ -1373,11 +1332,7 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
         if (Presenter is SwapChainGraphicsPresenter swapChainGraphicsPresenter)
         {
             waitSems.Add(ImageAvailableSemaphores[CurrentFrame]);
-            // The first thing this command buffer does to the acquired image is a LAYOUT TRANSITION into TransferDst,
-            // followed by the blit - both transfer-stage work. Waiting only at ColorAttachmentOutput left those two free
-            // to run before the image was actually available, so the frame was written into an image the presentation
-            // engine had not released yet: a WRITE_AFTER_READ against vkAcquireNextImageKHR, and on screen a frame that
-            // flickers as a whole regardless of what it contains.
+            // The acquired image is first transitioned and blitted, both transfer work, so the wait covers the transfer stage.
             waitStageList.Add(PipelineStageFlagBits.ColorAttachmentOutputBit | PipelineStageFlagBits.TransferBit);
             waitValues.Add(0);
             signalSems.Add(swapChainGraphicsPresenter.CurrentRenderFinishedSemaphore);
@@ -1703,9 +1658,8 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
         ulong offset = 0;
         var commandBuffer = commandBuffers[CurrentFrame];
 
-        // BIND the vertex buffer BEFORE SetDrawingState (the proven SetVertexBuffer()+Draw() order). SetDrawingState emits
-        // the DYNAMIC vertex-input (SetVertexInputEXT); binding the buffer AFTER that emit read back as zero on this driver
-        // (a valid, populated buffer that the shader still fetched as 0 -> collapsed geometry, no fragments, no VL error).
+        // Bind the vertex buffer before SetDrawingState, which emits the dynamic vertex input (the SetVertexBuffer()+Draw()
+        // order).
         commandBuffer.BindVertexBuffers(0, 1, vertexBuffer.GetBuffer(), offset);
 
         SetDrawingState(commandBuffer);

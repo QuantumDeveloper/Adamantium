@@ -161,6 +161,37 @@ internal class EffectResourceLinker : IEffectResourceLinker
         BoundResources[resourceName] = value;
     }
 
+    public object[] GetBoundValues(EffectData.Parameter resource)
+    {
+        if (SamplerStates.TryGetValue(resource, out var samplers))
+        {
+            return ResourcesOf(samplers);
+        }
+
+        if (ShaderResourceViews.TryGetValue(resource, out var textures))
+        {
+            return ResourcesOf(textures);
+        }
+
+        if (ShaderResourceBuffers.TryGetValue(resource, out var buffers))
+        {
+            return ResourcesOf(buffers);
+        }
+
+        return UnorderedAccessViews.TryGetValue(resource, out var views) ? ResourcesOf(views) : null;
+    }
+
+    private static object[] ResourcesOf<T>(ResourceInfo<T>[] infos) where T : class
+    {
+        var resources = new object[infos.Length];
+        for (int i = 0; i < infos.Length; i++)
+        {
+            resources[i] = infos[i]?.Resource;
+        }
+
+        return resources;
+    }
+
     public void SetResource(EffectData.ResourceParameter resourceName, EffectResourceType type,
         VulkanBuffer[] valueArray, int[] uavInitialCount)
     {

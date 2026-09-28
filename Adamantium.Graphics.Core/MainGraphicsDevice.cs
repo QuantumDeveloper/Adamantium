@@ -5,7 +5,6 @@ using System.Linq;
 using Adamantium.Core;
 using Adamantium.Graphics.Core.Extensions;
 using Adamantium.Vulkan.Core;
-using QuantumBinding.Utils;
 using Serilog;
 
 namespace Adamantium.Graphics.Core
@@ -34,6 +33,9 @@ namespace Adamantium.Graphics.Core
 
         /// <summary>The resource-loader device, owned by the main device for its whole lifetime.</summary>
         public IGraphicsDevice ResourceLoaderDevice { get; private set; }
+
+        /// <summary>Recompiles the effects of every device of this one when their sources change; see <see cref="EffectsFramework.ShaderHotReload"/>.</summary>
+        public EffectsFramework.ShaderHotReload ShaderHotReload { get; } = new();
 
         // Deferred disposal for every GPU resource of this logical device, held until every drawing wrapper has retired
         // the frames in flight at hand-over: the wrappers share one VkDevice and share resources.
@@ -534,13 +536,17 @@ namespace Adamantium.Graphics.Core
         protected override void Dispose(bool disposeManaged)
         {
             Log.Logger.Debug("Start disposing main device");
+            ShaderHotReload.Dispose();
             LogicalDevice?.DeviceWaitIdle();
+            FlushRetiredAfterIdle();
             // A copy: a device takes itself off this list as it is disposed.
             foreach (var device in graphicsDevices.ToArray())
             {
                 device?.Dispose();
             }
 
+            // What the devices retired as they went.
+            FlushRetiredAfterIdle();
             graphicsDevices.Clear();
             deviceMap.Clear();
 

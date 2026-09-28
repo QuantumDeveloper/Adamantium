@@ -38,7 +38,9 @@ public class EffectsGenerator : IIncrementalGenerator
             {
                 pair.Right.GlobalOptions.TryGetValue("build_property.projectdir", out var projectDir);
                 pair.Right.GlobalOptions.TryGetValue("build_property.adamantiumslangpath", out var slangPath);
-                return (AssemblyName: pair.Left.AssemblyName, ProjectDir: projectDir, SlangPath: slangPath);
+                pair.Right.GlobalOptions.TryGetValue("build_property.adamantiumshaderhotreload", out var hotReload);
+                return (AssemblyName: pair.Left.AssemblyName, ProjectDir: projectDir, SlangPath: slangPath,
+                    HotReload: string.Equals(hotReload, "true", System.StringComparison.OrdinalIgnoreCase));
             });
 
         var sourceProvider = fxNamesAndContents
@@ -73,6 +75,11 @@ public class EffectsGenerator : IIncrementalGenerator
                 }
                 else
                 {
+                    if (place.HotReload)
+                    {
+                        compilerResult.EffectData.Description.Arguments = SourceOf(file.path, includes, compilerResult.Includes);
+                    }
+
                     var @namespace = ComposeNamespace(place.AssemblyName, place.ProjectDir, file.path);
                     var result = GenerateEffect(compilerResult, file.fxName, @namespace);
                     spc.AddSource($"{file.fxName}.g.cs", result);
@@ -83,6 +90,22 @@ public class EffectsGenerator : IIncrementalGenerator
                 CreateDiagnostic(ref spc, file.name, ex.Message, DiagnosticSeverity.Error);
             }
         });
+    }
+
+    private static EffectData.CompilerArguments SourceOf(string effectPath, IEnumerable<ShaderFileInfo> offered,
+        IReadOnlyList<string> pulledIn)
+    {
+        return new EffectData.CompilerArguments
+        {
+            FilePath = effectPath,
+            Macros = [],
+            IncludeDirectoryList = offered
+                .Select(include => Path.GetDirectoryName(include.Path))
+                .Where(directory => !string.IsNullOrEmpty(directory))
+                .Distinct(System.StringComparer.OrdinalIgnoreCase)
+                .ToList(),
+            Includes = pulledIn.ToList()
+        };
     }
 
     /// <summary>The assembly, then the folders the .fx sits in - the rule a .cs file already follows. The class name

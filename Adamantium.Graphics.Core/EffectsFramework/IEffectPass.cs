@@ -1,12 +1,19 @@
 ﻿using System;
 using Adamantium.Core;
+using Adamantium.EffectsCompiler;
 
 namespace Adamantium.Graphics.Core.EffectsFramework;
 
 public interface IEffectPass : INamedObject, IDisposable
 {
     void Initialize(Logger logger);
-    
+
+    /// <summary>
+    /// Takes a recompiled declaration of this same pass: the next <see cref="Initialize"/> and <see cref="PrepareData"/>
+    /// build it again on this object, and the shaders it had are released once no frame in flight can use them.
+    /// </summary>
+    void Reset(EffectTechnique technique, EffectData.Pass pass, Logger logger);
+
     void PrepareData();
     
     void Apply();

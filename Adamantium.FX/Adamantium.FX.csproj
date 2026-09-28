@@ -19,6 +19,8 @@
 
     <PropertyGroup>
         <AdamantiumSlangPath>$(PKGAdamantium_Vulkan_Slang)</AdamantiumSlangPath>
+        <!-- Debug builds carry each effect's source path, so a running app can recompile it when it changes. -->
+        <AdamantiumShaderHotReload Condition="'$(AdamantiumShaderHotReload)' == '' And '$(Configuration)' == 'Debug'">true</AdamantiumShaderHotReload>
     </PropertyGroup>
 
     <ItemGroup>
@@ -42,6 +44,7 @@
         <CompilerVisibleProperty Include="ProjectDir" />
         <!-- Where the Slang runtime is, so shaders build without the Vulkan SDK installed. -->
         <CompilerVisibleProperty Include="AdamantiumSlangPath" />
+        <CompilerVisibleProperty Include="AdamantiumShaderHotReload" />
         <AdditionalFiles Remove="obj\**" />
         <!-- IDE up-to-date check: rebuild when generator inputs (AdditionalFiles) change. -->
         <UpToDateCheckInput Include="@(AdditionalFiles)" Visible="false" />

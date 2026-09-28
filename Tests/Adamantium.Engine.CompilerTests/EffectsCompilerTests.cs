@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.IO;
+using System.Linq;
 using Adamantium.EffectsCompiler;
 using MessagePack;
 using NUnit.Framework;
@@ -141,6 +142,60 @@ float4 PS(float4 p : SV_Position) : SV_Target0 { return Tint(float4(1, 1, 1, 1))
 technique T { pass P { VertexShader = VS; PixelShader = PS; } }
 ";
 
+        /// <summary>A file name without a folder is in the current one, as everywhere else: looking for its headers in
+        /// the folder "" threw before anything was compiled.</summary>
+        [Test]
+        public void ASourceNamedWithoutAFolder_Compiles()
+        {
+            var result = EffectCompiler.Compile(@"
+float4 VS(float4 p : POSITION) : SV_Position { return p; }
+float4 PS(float4 p : SV_Position) : SV_Target0 { return p; }
+technique T { pass P { VertexShader = VS; PixelShader = PS; } }
+", "Probe.fx");
+
+            Assert.That(result.HasErrors, Is.False, string.Join(Environment.NewLine, result.Logger.Messages));
+        }
+
+        /// <summary>A value parameter is described by its own type. The reflected base type used to be cast straight to
+        /// the D3D-numbered enum, so a uint came out as Texture3D and a float as Sampler3D.</summary>
+        [Test]
+        public void AValueParameter_IsDescribedByItsType()
+        {
+            var result = EffectCompiler.Compile(@"
+uint64_t Address;
+uint Count;
+int Offset;
+float Scale;
+float4 Tint;
+double Precise;
+
+[shader(""compute"")]
+[numthreads(1, 1, 1)]
+void MainCS(uint3 tid : SV_DispatchThreadID)
+{
+    uint* output = (uint*)Address;
+    output[0] = Count + (uint)Offset + (uint)(Scale * Tint.x) + (uint)Precise;
+}
+
+technique T { pass P { ComputeShader = MainCS; } }
+", "Probe.fx");
+
+            Assert.That(result.HasErrors, Is.False, string.Join(Environment.NewLine, result.Logger.Messages));
+            var types = result.EffectData.Shaders
+                .SelectMany(shader => shader.ConstantBuffers)
+                .SelectMany(buffer => buffer.Parameters)
+                .ToDictionary(parameter => parameter.Name, parameter => parameter.Type);
+            Assert.That(types, Is.EquivalentTo(new Dictionary<string, EffectParameterType>
+            {
+                ["Address"] = EffectParameterType.UInt64,
+                ["Count"] = EffectParameterType.UInt,
+                ["Offset"] = EffectParameterType.Int,
+                ["Scale"] = EffectParameterType.Float,
+                ["Tint"] = EffectParameterType.Float,
+                ["Precise"] = EffectParameterType.Double,
+            }));
+        }
+
         /// <summary>What a hot reload watches: every header the compile pulled in, the nested one too, and nothing it
         /// was merely offered.</summary>
         [Test]
@@ -171,12 +226,8 @@ technique T { pass P { VertexShader = VS; PixelShader = PS; } }
             Assert.That(result.HasErrors, Is.False, $"a real include did not resolve:{Environment.NewLine}{messages}");
         }
 
-        /// <summary>A preprocessor directive written inside a COMMENT is not a directive. The tokenizer handed `/` to the
-        /// divide rule before the comment rule could claim `//`, so comments were tokenised as ordinary code and every
-        /// `#` in one was obeyed - this shape reports "Unsupported preprocessor token".
-        /// <para>It guards more than it used to: the source reaching the parser was stripped of comments by regex first,
-        /// which hid this everywhere except inside a header. That stripping was there for the DXC backend and went with
-        /// it, so comments now reach the parser exactly as written.</para></summary>
+        /// <summary>A preprocessor directive inside a comment is not a directive; comments reach the parser as written, so the
+        /// tokenizer must hand them to the comment rule.</summary>
         [Test]
         public void DirectiveInsideACommentIsNotObeyed()
         {

@@ -24,14 +24,14 @@ public sealed class EffectPass : DisposableObject, IEffectPass
     ///   Gets the attributes associated with this pass.
     /// </summary>
     /// <value> The attributes. </value>
-    public readonly PropertyKeyCollection PropertiesKey;
+    public PropertyKeyCollection PropertiesKey { get; private set; }
 
     /// <summary>
     /// The parent effect of this pass.
     /// </summary>
     public readonly Effect Effect;
 
-    private readonly EffectData.Pass pass;
+    private EffectData.Pass pass;
     private readonly IGraphicsDevice graphicsDevice;
 
     private readonly List<StageBlock> pipelineStages;
@@ -97,17 +97,7 @@ public sealed class EffectPass : DisposableObject, IEffectPass
         layoutBindings.Clear();
     }
 
-    /// <summary>
-    ///   Applies this pass to the device pipeline.
-    /// </summary>
-    /// <remarks>
-    ///   This method is responsible to:
-    ///   <ul>
-    ///     <li>Setup the shader on each stage.</li>
-    ///     <li>Upload constant buffers with dirty flag</li>
-    ///     <li>Set all input constant buffers, shader resource view, unordered access views and sampler states to the stage.</li>
-    ///   </ul>
-    /// </remarks>
+    /// <summary>Applies this pass: binds each stage's shader, uploads dirty constant buffers and binds its resources.</summary>
     public void Apply()
     {
        ApplyInternal();
@@ -158,11 +148,8 @@ public sealed class EffectPass : DisposableObject, IEffectPass
                 *(ulong*)(pushDataBytes + pushOffset) = pageBuffer.GetDeviceAddress() + bufferOffset;
             }
 
-            // 2-4. Write each bound resource's heap-slot index into push data. One loop for all resource kinds: textures
-            // AND read-only StructuredBuffers share the SRV list (the buffer ones tagged IsStorageBuffer -> a different
-            // linker collection), samplers and UAVs are their own lists. link.Parameter is ALREADY the resolved
-            // EffectParameter, so there is no per-draw string lookup (the old Effect.Parameters[name] was redundant - the
-            // constant-buffer loop above already keys parameterPushOffsets by link.Parameter directly).
+            // Write each bound resource's heap-slot index into push data; link.Parameter is already resolved, so there is
+            // no per-draw lookup.
             WriteHeapOffsets(pushDataBytes, stageBlock.ShaderResourceViewSlotLinks, HeapResourceKind.ShaderResource);
             WriteHeapOffsets(pushDataBytes, stageBlock.SamplerStateSlotLinks, HeapResourceKind.Sampler);
             WriteHeapOffsets(pushDataBytes, stageBlock.UnorderedAccessViewSlotLinks, HeapResourceKind.Uav);
@@ -271,6 +258,25 @@ public sealed class EffectPass : DisposableObject, IEffectPass
     /// <param name="fullUnApply">if set to <c>true</c> this will unbind all resources; otherwise <c>false</c> will unbind only ShaderResourceView and UnorderedAccessView. Default is false.</param>
     public void UnApply(bool fullUnApply = false)
     {
+    }
+
+    /// <inheritdoc />
+    public void Reset(EffectTechnique technique, EffectData.Pass pass, Logger logger)
+    {
+        RetireStages();
+        stages.Clear();
+        shaderStages.Clear();
+        ClearLayoutBindings();
+        parameterPushOffsets.Clear();
+        totalPushDataSize = 0;
+        geometryStagePresent = false;
+        Technique = technique;
+        this.pass = pass;
+        PropertiesKey = PrepareProperties(logger, pass.Properties);
+        if (graphicsDevice.ShadersBoundFor(this))
+        {
+            graphicsDevice.ShadersBound(null);
+        }
     }
 
     /// <summary>
@@ -453,10 +459,9 @@ public sealed class EffectPass : DisposableObject, IEffectPass
                     if (previousParameter == null)
                     {
                         // Add an effect parameter linked to the appropriate constant buffer at the effect level.
-                        Effect.Parameters.Add(
-                            new EffectParameter(
-                                (EffectData.ValueTypeParameter)parameter.ParameterDescription,
-                                constantBuffer));
+                        Effect.DeclareValueParameter(
+                            (EffectData.ValueTypeParameter)parameter.ParameterDescription,
+                            constantBuffer);
                     }
                     else if (parameter.ParameterDescription != previousParameter.ParameterDescription ||
                              parameter.Buffer != previousParameter.Buffer)
@@ -490,15 +495,7 @@ public sealed class EffectPass : DisposableObject, IEffectPass
             if (previousParameter == null)
             {
                 var paramType = EffectResourceTypeHelper.ConvertFromParameterType(parameterRaw.Type);
-                parameter = new EffectParameter(
-                    parameterRaw,
-                    paramType,
-                    Effect.ResourceLinker.Count,
-                    Effect.ResourceLinker);
-
-                Effect.Parameters.Add(parameter);
-
-                Effect.ResourceLinker.Count += parameterRaw.Count;
+                parameter = Effect.DeclareResourceParameter(parameterRaw, paramType);
             }
             else
             {
@@ -749,8 +746,19 @@ public sealed class EffectPass : DisposableObject, IEffectPass
         Log.Logger.Debug("Disposing EffectPass resources");
         graphicsDevice.MainDevice.FrameFinished -= GraphicsDeviceOnFrameFinished;
         ClearLayoutBindings();
-        pipelineStages.Clear();
+        RetireStages();
         base.Dispose(disposeManagedResources);
+    }
+
+    // Frames in flight may still bind these shaders.
+    private void RetireStages()
+    {
+        foreach (var stage in pipelineStages)
+        {
+            graphicsDevice.MainDevice.RetireResource(stage);
+        }
+
+        pipelineStages.Clear();
     }
 
     #endregion

@@ -1,5 +1,4 @@
-﻿using System;
-using Adamantium.Core;
+﻿using Adamantium.Core;
 using Adamantium.EffectsCompiler;
 using Adamantium.Mathematics;
 
@@ -10,12 +9,10 @@ namespace Adamantium.Graphics.Core.EffectsFramework;
 /// </summary>
 public sealed class EffectParameter : NamedObject
 {
-    public readonly EffectData.Parameter ParameterDescription;
-    public readonly EffectConstantBuffer Buffer;
-    private readonly IEffectResourceLinker resourceLinker;
-    private readonly GetMatrixDelegate GetMatrixImpl;
-    private readonly CopyMatrixDelegate CopyMatrix;
-    private readonly int matrixSize;
+    private IEffectResourceLinker resourceLinker;
+    private GetMatrixDelegate GetMatrixImpl;
+    private CopyMatrixDelegate CopyMatrix;
+    private int matrixSize;
     private int offset;
 
     /// <summary>
@@ -24,8 +21,33 @@ public sealed class EffectParameter : NamedObject
     public EffectParameter(EffectData.ValueTypeParameter parameterDescription, EffectConstantBuffer buffer)
         : base(parameterDescription.Name)
     {
+        BindValue(parameterDescription, buffer);
+    }
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="EffectParameter"/> class.
+    /// </summary>
+    public EffectParameter(EffectData.ResourceParameter parameterDescription, EffectResourceType resourceType,
+        int offset, IEffectResourceLinker resourceLinker)
+        : base(parameterDescription.Name)
+    {
+        BindResource(parameterDescription, resourceType, offset, resourceLinker);
+    }
+
+    /// <summary>The declaration this parameter was built from.</summary>
+    public EffectData.Parameter ParameterDescription { get; private set; }
+
+    /// <summary>The constant buffer a value parameter lives in; null for a resource.</summary>
+    public EffectConstantBuffer Buffer { get; private set; }
+
+    internal void BindValue(EffectData.ValueTypeParameter parameterDescription, EffectConstantBuffer buffer)
+    {
         ParameterDescription = parameterDescription;
         Buffer = buffer;
+        resourceLinker = null;
+        CopyMatrix = null;
+        GetMatrixImpl = null;
+        matrixSize = 0;
 
         ResourceType = EffectResourceType.None;
         IsValueType = true;
@@ -40,8 +62,6 @@ public sealed class EffectParameter : NamedObject
         // If the expected matrix is column_major, or its size differs from Matrix4x4F, ours has to be remapped into it.
         if (ParameterClass is EffectParameterClass.MatrixRows or EffectParameterClass.MatrixColumns)
         {
-            var isMatrixToMap = RowCount != 4 || ColumnCount != 4 ||
-                                ParameterClass == EffectParameterClass.MatrixRows;
             matrixSize = (ParameterClass == EffectParameterClass.MatrixColumns ? ColumnCount : RowCount) * 4 *
                          sizeof(float);
 
@@ -55,34 +75,19 @@ public sealed class EffectParameter : NamedObject
                 CopyMatrix = CopyMatrixDirect;
                 GetMatrixImpl = GetMatrixDirectFrom;
             }
-                
-            // Use the correct function for this parameter
-            // if (isMatrixToMap)
-            //     CopyMatrix = (ParameterClass == EffectParameterClass.MatrixRows)
-            //         ? CopyMatrixColumnMajor 
-            //         : new CopyMatrixDelegate(CopyMatrixRowMajor);
-            // else
-            // {
-            //     CopyMatrix = CopyMatrixDirect;
-            //     if (isMatrixToMap)
-            //         GetMatrixImpl = (ParameterClass == EffectParameterClass.MatrixRows)
-            //             ? new GetMatrixDelegate(GetMatrixRowMajorFrom)
-            //             : GetMatrixColumnMajorFrom;
-            //     else
-            //         GetMatrixImpl = GetMatrixDirectFrom;
-            // }
+               
         }
     }
 
-    /// <summary>
-    /// Initializes a new instance of the <see cref="EffectParameter"/> class.
-    /// </summary>
-    public EffectParameter(EffectData.ResourceParameter parameterDescription, EffectResourceType resourceType,
+    internal void BindResource(EffectData.ResourceParameter parameterDescription, EffectResourceType resourceType,
         int offset, IEffectResourceLinker resourceLinker)
-        : base(parameterDescription.Name)
     {
         ParameterDescription = parameterDescription;
+        Buffer = null;
         this.resourceLinker = resourceLinker;
+        CopyMatrix = null;
+        GetMatrixImpl = null;
+        matrixSize = 0;
 
         ResourceType = resourceType;
         IsValueType = false;
@@ -107,45 +112,45 @@ public sealed class EffectParameter : NamedObject
     /// Gets the parameter class.
     /// </summary>
     /// <value>The parameter class.</value>
-    public readonly EffectParameterClass ParameterClass;
+    public EffectParameterClass ParameterClass { get; private set; }
 
     /// <summary>
     /// Gets the resource type.
     /// </summary>
-    public readonly EffectResourceType ResourceType;
+    public EffectResourceType ResourceType { get; private set; }
 
     /// <summary>
     /// Gets the type of the parameter.
     /// </summary>
     /// <value>The type of the parameter.</value>
-    public readonly EffectParameterType ParameterType;
+    public EffectParameterType ParameterType { get; private set; }
 
     /// <summary>
     /// Gets a boolean indicating if this parameter is a value type (true) or a resource type (false).
     /// </summary>
-    public readonly bool IsValueType;
+    public bool IsValueType { get; private set; }
 
-    /// <summary>	
-    /// Number of rows in a matrix. Otherwise a numeric type returns 1, any other type returns 0. 	
-    /// </summary>	
+    /// <summary>
+    /// Number of rows in a matrix. Otherwise a numeric type returns 1, any other type returns 0.
+    /// </summary>
     /// <unmanaged>int Rows</unmanaged>
-    public readonly int RowCount;
+    public int RowCount { get; private set; }
 
-    /// <summary>	
-    /// Number of columns in a matrix. Otherwise a numeric type returns 1, any other type returns 0. 	
-    /// </summary>	
+    /// <summary>
+    /// Number of columns in a matrix. Otherwise a numeric type returns 1, any other type returns 0.
+    /// </summary>
     /// <unmanaged>int Columns</unmanaged>
-    public readonly int ColumnCount;
+    public int ColumnCount { get; private set; }
 
     /// <summary>
     /// Gets the collection of effect parameters.
     /// </summary>
-    public readonly uint ElementCount;
+    public uint ElementCount { get; private set; }
 
     /// <summary>
     /// Size in bytes of the element, only valid for value types.
     /// </summary>
-    public readonly int Size;
+    public int Size { get; private set; }
 
     /// <summary>
     /// Offset of this parameter.
@@ -443,15 +448,6 @@ public sealed class EffectParameter : NamedObject
     }
 
     /// <summary>
-    /// Sets a shader resource for the associated parameter.
-    /// </summary>
-    /// <param name="resourceView">The resource.</param>
-//      public void SetResource(UnorderedAccessView resourceView)
-//      {
-//         resourceLinker.SetResource((EffectData.ResourceParameter)ParameterDescription, ResourceType, resourceView);
-//      }
-
-    /// <summary>
     /// Sets a an array of shader resource views for the associated parameter.
     /// </summary>
     /// <typeparam name = "T">The type of the resource view.</typeparam>
@@ -461,16 +457,6 @@ public sealed class EffectParameter : NamedObject
         resourceLinker.SetResource((EffectData.ResourceParameter) ParameterDescription, ResourceType,
             resourceViewArray);
     }
-
-    /// <summary>
-    /// Sets a an array of shader resource views for the associated parameter.
-    /// </summary>
-    /// <param name="resourceViewArray">The resource view array.</param>
-    /// <param name="uavCounts">Sets the initial uavCount</param>
-//      public void SetResource(UnorderedAccessView[] resourceViewArray, int[] uavCounts)
-//      {
-//         resourceLinker.SetResource((EffectData.ResourceParameter)ParameterDescription, ResourceType, resourceViewArray, uavCounts);
-//      }
 
     /// <summary>
     /// Sets a shader resource at the specified index for the associated parameter.
@@ -495,21 +481,11 @@ public sealed class EffectParameter : NamedObject
             resourceViewArray);
     }
 
-    /// <summary>
-    /// Sets a an array of shader resource views at the specified index for the associated parameter.
-    /// </summary>
-    /// <param name="index">Index to start to set the resource views</param>
-    /// <param name="resourceViewArray">The resource view array.</param>
-    /// <param name="uavCount">Sets the initial uavCount</param>
-//      public void SetResource(int index, UnorderedAccessView[] resourceViewArray, int[] uavCount)
-//      {
-//         resourceLinker.SetResource((EffectData.ResourceParameter)ParameterDescription, ResourceType, resourceViewArray, uavCount);
-//      }
     internal void SetDefaultValue()
     {
         if (IsValueType)
         {
-            var defaultValue = ((EffectData.ValueTypeParameter) ParameterDescription).DefaultValue;
+            var defaultValue = ((EffectData.ValueTypeParameter)ParameterDescription).DefaultValue;
             if (defaultValue != null)
             {
                 SetRawValue(defaultValue);

@@ -57,6 +57,7 @@ namespace Adamantium.EffectsCompiler
         //private StreamOutputElement[] currentStreamOutputElements;
 
         private readonly List<string> resolvedIncludes = [];
+        private readonly Dictionary<(EffectShaderType Type, string EntryPoint, string Profile, string Preprocessor), int> compiledShaders = [];
         private SlangShaderCompiler slangCompiler;
 
         public EffectCompilerInternal()
@@ -110,7 +111,7 @@ namespace Adamantium.EffectsCompiler
             // If dynamic compiling, store the parameters used to compile this effect directly in the bytecode
             if (allowDynamicCompiling && !result.HasErrors && result.EffectData != null)
             {
-                var compilerArguments = new EffectData.CompilerArguments { FilePath = filePath, Macros = new List<EffectData.ShaderMacro>(), IncludeDirectoryList = new List<string>() };
+                var compilerArguments = new EffectData.CompilerArguments { FilePath = filePath, Macros = new List<EffectData.ShaderMacro>(), IncludeDirectoryList = new List<string>(), Includes = new List<string>(resolvedIncludes) };
                 if (macrosArgs != null)
                 {
                     compilerArguments.Macros.AddRange(macrosArgs);
@@ -163,21 +164,22 @@ namespace Adamantium.EffectsCompiler
         {
             effectData = null;
             resolvedIncludes.Clear();
+            compiledShaders.Clear();
 
             fileName = fileName.Replace(@"\\", @"\");
 
             logger = new EffectCompilerLogger();
 
-            // The include SET, for Slang to resolve against (ResolveSlangInclude). Nothing here expands anything: Slang
-            // pulls each header itself through its VFS callback, which is why the sources below go to it untouched -
-            // #include directives intact, comments intact, line numbers therefore honest in its diagnostics.
-            //
-            // It used to be otherwise. Every header was pre-parsed and spliced into one flat string, and both it and the
-            // main source were stripped of comments by regex first - all of it to feed DXC, which needed the whole
-            // effect as one blob. DXC is gone; so is the flattening, the pre-parse and the stripping.
+            // Slang pulls each header itself through its VFS callback, so sources go to it untouched and its diagnostics
+            // keep honest line numbers.
             if (includes == null)
             {
                 var directory = Path.GetDirectoryName(fileName);
+                if (string.IsNullOrEmpty(directory))
+                {
+                    directory = ".";
+                }
+
                 var includeFiles = Directory.GetFiles(directory, "*.hlsl").Concat(Directory.GetFiles(directory, "*.fxh"));
                 includes = includeFiles.Select(x => new ShaderFileInfo()
                 { Content = File.ReadAllText(x), Path = x, FileName = Path.GetFileName(x) }).ToImmutableArray();
@@ -388,9 +390,6 @@ namespace Adamantium.EffectsCompiler
                 case "GeometryShader":
                     CompileShader(EffectShaderType.Geometry, expression.Value);
                     break;
-                case "StreamOutput":
-                    HandleStreamOutput(expression.Value);
-                    break;
                 case "StreamOutputRasterizedStream":
                     HandleStreamOutputRasterizedStream(expression.Value);
                     break;
@@ -428,139 +427,6 @@ namespace Adamantium.EffectsCompiler
 
             pass.Pipeline[EffectShaderType.Geometry].StreamOutputRasterizedStream = (int)value;
         }
-
-        private void HandleStreamOutput(Ast.Expression expression)
-        {
-//            var values = ExtractStringOrArrayOfStrings(expression);
-//            if (values == null) return;
-//
-//            if (values.Count == 0 || values.Count > 4)
-//            {
-//                logger.Error("Invalid number [{0}] of stream output declarations. Maximum allowed is 4", expression.Span, values.Count);
-//                return;
-//            }
-//
-//            var elements = new List<StreamOutputElement>();
-//
-//            int streamIndex = 0;
-//            foreach (var soDeclarationTexts in values)
-//            {
-//                if (string.IsNullOrEmpty(soDeclarationTexts))
-//                {
-//                    logger.Error("StreamOutput declaration cannot be null or empty", expression.Span);
-//                    return;
-//                }
-//
-//                // Parse a single string "[<slot> :] <semantic>[<index>][.<mask>]; [[<slot> :] <semantic>[<index>][.<mask>][;]]"
-//                var text = soDeclarationTexts.Trim(' ', '\t', ';');
-//                var declarationTextItems = splitSODeclartionRegex.Split(text);
-//                foreach (var soDeclarationText in declarationTextItems)
-//                {
-//                    StreamOutputElement element;
-//                    if (!ParseStreamOutputElement(soDeclarationText, expression.Span, out element))
-//                    {
-//                        return;
-//                    }
-//
-//                    element.Stream = streamIndex;
-//                    elements.Add(element);
-//                }
-//
-//                streamIndex++;
-//            }
-//
-//            if (elements.Count == 0)
-//            {
-//                logger.Error("Invalid number [0] of stream output declarations. Expected > 0", expression.Span);
-//                return;
-//            }
-//
-//            if (pass.Pipeline[EffectShaderType.Geometry] == null)
-//            {
-//                pass.Pipeline[EffectShaderType.Geometry] = new EffectData.ShaderLink();
-//            }
-//
-//            pass.Pipeline[EffectShaderType.Geometry].StreamOutputElements = elements.ToArray();
-        }
-
-//        private bool ParseStreamOutputElement(string text, SourceSpan span, out StreamOutputElement streamOutputElement)
-//        {
-//            streamOutputElement = new StreamOutputElement();
-//
-//            var match = soDeclarationItemRegex.Match(text);
-//
-//            if (!match.Success)
-//            {
-//                logger.Error("Invalid StreamOutput declaration [{0}]. Must be of the form [<slot> :] <semantic>[<index>][.<mask>]", span, text);
-//                return false;
-//            }
-//
-//            // Parse slot if any
-//            var slot = match.Groups[1].Value;
-//            int slotIndex = 0;
-//            if (!string.IsNullOrEmpty(slot))
-//            {
-//                int.TryParse(slot, out slotIndex);
-//                streamOutputElement.OutputSlot = (byte)slotIndex;
-//            }
-//
-//            // Parse semantic index if any
-//            var semanticAndIndex = match.Groups[2].Value;
-//            var matchSemanticAndIndex = soSemanticIndex.Match(semanticAndIndex);
-//            streamOutputElement.SemanticName = matchSemanticAndIndex.Groups[1].Value;
-//            var semanticIndexText = matchSemanticAndIndex.Groups[2].Value;
-//            int semanticIndex = 0;
-//            if (!string.IsNullOrEmpty(semanticIndexText))
-//            {
-//                int.TryParse(semanticIndexText, out semanticIndex);
-//                streamOutputElement.SemanticIndex = (byte)semanticIndex;
-//            }
-//
-//            // Parse the mask
-//            var mask = match.Groups[3].Value;
-//            int startComponent = -1;
-//            int currentIndex = 0;
-//            int countComponent = 1;
-//            if (!string.IsNullOrEmpty(mask))
-//            {
-//                mask = mask.Substring(1);
-//                foreach (var maskItem in mask.ToCharArray())
-//                {
-//                    var nextIndex = xyzwrgbaComponents.IndexOf(maskItem);
-//                    if (startComponent < 0)
-//                    {
-//                        startComponent = nextIndex;
-//                    }
-//                    else if (nextIndex != (currentIndex + 1))
-//                    {
-//                        logger.Error("Invalid mask [{0}]. Must be of the form [xyzw] or [rgba] with increasing consecutive component and no duplicate", span, mask);
-//                        return false;
-//                    }
-//                    else
-//                    {
-//                        countComponent++;
-//                    }
-//
-//                    currentIndex = nextIndex;
-//                }
-//
-//                // If rgba components?
-//                if (startComponent > 3)
-//                {
-//                    startComponent -= 4;
-//                }
-//            }
-//            else
-//            {
-//                startComponent = 0;
-//                countComponent = 4;
-//            }
-//
-//            streamOutputElement.StartComponent = (byte)startComponent;
-//            streamOutputElement.ComponentCount = (byte)countComponent;
-//
-//            return true;
-//        }
 
         private void HandleExport(Ast.Expression expression)
         {
@@ -939,6 +805,14 @@ namespace Adamantium.EffectsCompiler
                 return;
             }
 
+            // Passes often share a stage: compile it once and link the rest to the same shader.
+            var key = (type, entryPoint, passSpirvProfile, preprocessorText);
+            if (compiledShaders.TryGetValue(key, out var compiled))
+            {
+                LinkShader(type, compiled, entryPoint);
+                return;
+            }
+
             try
             {
                 var result = CompileParsedShader(type, entryPoint);
@@ -951,12 +825,16 @@ namespace Adamantium.EffectsCompiler
                 {
                     //logger.Warnings(result.Warnings);
 
-                    var shader = CreateEffectShader(type, effect.Name, entryPoint, result);
+                    // Only an exported shader is named: the pool merges unnamed copies silently and treats a name as
+                    // the one other effects import it by.
+                    var shaderName = currentExports.Contains(entryPoint) ? entryPoint : null;
+                    var shader = CreateEffectShader(type, shaderName, entryPoint, result);
 
                     if (logger.HasErrors)
                         return;
 
                     ProcessShaderData(type, result, shader);
+                    compiledShaders[key] = pass.Pipeline[type].Index;
                 }
             }
             catch (Exception ex)
@@ -1148,11 +1026,16 @@ namespace Adamantium.EffectsCompiler
                 effectData.Shaders.Add(shader);
             }
 
+            LinkShader(type, shaderIndex, shader.EntryPoint);
+        }
+
+        private void LinkShader(EffectShaderType type, int shaderIndex, string entryPoint)
+        {
             if (pass.Pipeline[type] == null)
                 pass.Pipeline[type] = new EffectData.ShaderLink();
 
             pass.Pipeline[type].Index = shaderIndex;
-            pass.Pipeline[type].EntryPoint = shader.EntryPoint;
+            pass.Pipeline[type].EntryPoint = entryPoint;
         }
 
         private void HandleMethodExpression(Ast.MethodExpression expression)
@@ -1272,12 +1155,34 @@ namespace Adamantium.EffectsCompiler
                 Size = (int)variable.Size,
                 Count = variable.ElementCount,
                 Class = (EffectParameterClass)variable.VariableType,
-                Type = (EffectParameterType)variable.Type,
+                Type = ToParameterType(variable.Type),
                 RowCount = (byte)variable.RowCount,
                 ColumnCount = (byte)variable.ColumnCount,
             };
 
             return parameter;
+        }
+
+        // spirv-cross numbers its base types its own way; the effect keeps D3D's numbering, so a cast lands on the
+        // wrong names.
+        private static EffectParameterType ToParameterType(Basetype type)
+        {
+            switch (type)
+            {
+                case Basetype.Boolean: return EffectParameterType.Bool;
+                case Basetype.Int8:
+                case Basetype.Int32: return EffectParameterType.Int;
+                case Basetype.Uint8: return EffectParameterType.UInt8;
+                case Basetype.Uint32: return EffectParameterType.UInt;
+                case Basetype.Int16: return EffectParameterType.Int16;
+                case Basetype.Uint16: return EffectParameterType.UInt16;
+                case Basetype.Int64: return EffectParameterType.Int64;
+                case Basetype.Uint64: return EffectParameterType.UInt64;
+                case Basetype.Fp16: return EffectParameterType.Float16;
+                case Basetype.Fp32: return EffectParameterType.Float;
+                case Basetype.Fp64: return EffectParameterType.Double;
+                default: return EffectParameterType.Void;
+            }
         }
 
         /// <summary>

@@ -33,6 +33,12 @@ namespace Adamantium.EffectsCompiler
          public List<string> IncludeDirectoryList;
 
          /// <summary>
+         /// Every header this compile pulled in, nested ones included (may be null).
+         /// </summary>
+         [Key(4)]
+         public List<string> Includes;
+
+         /// <summary>
          /// Returns a string that represents the current object.
          /// </summary>
          /// <returns>
