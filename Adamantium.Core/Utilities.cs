@@ -15,17 +15,8 @@ namespace Adamantium.Core
 {
     public static class Utilities
     {
-        /// <summary>
-        /// Release memory obtained from <see cref="AllocateMemory(int, int)"/> or <see cref="AllocateMemory(nuint)"/>.
-        /// <para>
-        /// Must match the allocator EXACTLY, which is why both allocate through <c>NativeMemory</c> and this frees
-        /// through it - the MODERN allocator, which is where the engine is heading. It used to free with
-        /// <c>Marshal.FreeHGlobal</c> while one of the two overloads allocated with
-        /// <c>NativeMemory.Alloc</c> - handing a block from one heap to another allocator corrupts the process heap,
-        /// and the crash surfaces later at an unrelated allocation. That is what killed the app on a DDS cube map
-        /// (STATUS_HEAP_CORRUPTION, 0xC0000374), with the pixel buffers taking the <c>nuint</c> overload.
-        /// </para>
-        /// </summary>
+        /// <summary>Releases memory from <see cref="AllocateMemory(int, int)"/> or <see cref="AllocateMemory(nuint)"/>. All three
+        /// go through <c>NativeMemory</c>: mixing allocators corrupts the process heap.</summary>
         public static unsafe void FreeMemory(IntPtr pointer)
         {
             if (pointer == IntPtr.Zero) return;
@@ -39,13 +30,15 @@ namespace Adamantium.Core
 
         public static unsafe void ClearMemory(ref IntPtr dest, byte value, int sizeInBytesToClear)
         {
-            #if NETCORE
-            Span<byte> bytes = new Span<byte>(dest.ToPointer(), sizeInBytesToClear);
-            bytes.Fill(value);
-            #else
-            var bytes = new byte[sizeInBytesToClear];
-            Marshal.Copy(dest, bytes, 0, sizeInBytesToClear);
-            #endif
+#if NET6_0_OR_GREATER
+            new Span<byte>(dest.ToPointer(), sizeInBytesToClear).Fill(value);
+#else
+            var bytes = (byte*)dest.ToPointer();
+            for (int i = 0; i < sizeInBytesToClear; i++)
+            {
+                bytes[i] = value;
+            }
+#endif
         }
 
         public static bool IsEnum<T>(T type)
@@ -54,31 +47,15 @@ namespace Adamantium.Core
         }
 
 #if NET6_0_OR_GREATER
-        /// <summary>
-        /// Allocate native memory. Goes through the SAME heap as every other allocation here, because
-        /// <see cref="FreeMemory"/> is the only release path and it cannot know which allocator a pointer came from.
-        /// <para>
-        /// This used to call <c>NativeMemory.Alloc</c> while <see cref="FreeMemory"/> released with
-        /// <c>Marshal.FreeHGlobal</c>. Handing a block from one allocator to another corrupts the process heap, and the
-        /// damage only surfaces later at some unrelated allocation - which is how a dropped DDS cube map killed the app
-        /// with STATUS_HEAP_CORRUPTION (0xC0000374). Callers passing a <c>uint</c> size bound to this overload, and the
-        /// image pixel buffers do exactly that.
-        /// </para>
-        /// </summary>
+        /// <summary>Allocates native memory through <c>NativeMemory</c>, the allocator <see cref="FreeMemory"/> releases
+        /// with.</summary>
         public static unsafe IntPtr AllocateMemory(nuint sizeInBytes)
         {
             return new IntPtr(NativeMemory.Alloc(sizeInBytes));
         }
 #endif
-        /// <summary>
-        /// Allocate native memory. <paramref name="align"/> is a MINIMUM the platform allocator already satisfies (it
-        /// hands back memory aligned for any primitive - 16 bytes on both x64 targets), so it needs no arithmetic here.
-        /// <para>
-        /// It used to over-allocate and return a pointer offset INTO the block to force alignment - which threw the
-        /// base address away, so the matching free released an address the allocator never handed out and corrupted the
-        /// heap. Nothing in the engine asks for more than 16.
-        /// </para>
-        /// </summary>
+        /// <summary>Allocates native memory. <paramref name="align"/> is a minimum the allocator already meets (16 bytes), so the
+        /// block's own base address is returned and <see cref="FreeMemory"/> can release it.</summary>
         public static unsafe IntPtr AllocateMemory(int sizeInBytes, int align = 1)
         {
             if (align > 16)
@@ -163,12 +140,8 @@ namespace Adamantium.Core
             Buffer.MemoryCopy(source.ToPointer(), destination.ToPointer(), sizeInBytesToCopy, sizeInBytesToCopy);
         }
 
-        /// <summary>Write one value into unmanaged memory.
-        /// <para>A BLITTABLE value - which is every shader parameter the engine writes: floats, vectors, matrices, device
-        /// addresses - goes straight in. The general path below allocates native memory, marshals the value through
-        /// reflection (<see cref="Marshal.StructureToPtr(object,IntPtr,bool)"/> takes an <c>object</c>, so a struct
-        /// BOXES), copies it and frees again - per call. Measured on an idle frame: ~37 bytes of GC garbage plus a
-        /// malloc/free for EVERY parameter write of EVERY draw, and one batched glyph draw makes nine of them.</para></summary>
+        /// <summary>Writes one value into unmanaged memory. A blittable value is copied directly, without the boxing and
+        /// temporary native allocation of the marshaling path.</summary>
         public static unsafe void Write<T>(IntPtr destination, ref T value) where T : struct
         {
             if (Blittable<T>.Yes)
@@ -211,16 +184,8 @@ namespace Adamantium.Core
             }
         }
 
-        /// <summary>
-        /// Copy <paramref name="count"/> elements starting at <paramref name="data"/>[<paramref name="offset"/>] to
-        /// <paramref name="destination"/>, and return the address just past what was written.
-        /// <para>
-        /// It used to ignore BOTH arguments and copy the whole array - so a caller asking for the first N elements of a
-        /// longer array wrote straight past the end of the destination allocation. That is a heap overrun: the process
-        /// dies later, at some unrelated allocation, with STATUS_HEAP_CORRUPTION. A dropped DDS cube map hit it through
-        /// the pixel-buffer flip, which allocates exactly one row-stride and passes a full-image array.
-        /// </para>
-        /// </summary>
+        /// <summary>Copies <paramref name="count"/> elements from <paramref name="data"/>[<paramref name="offset"/>] to
+        /// <paramref name="destination"/> and returns the address just past what was written.</summary>
         public static IntPtr Write<T>(IntPtr destination, T[] data, int offset, int count) where T : struct
         {
             var size = SizeOf<T>();

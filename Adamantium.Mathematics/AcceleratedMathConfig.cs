@@ -1,4 +1,4 @@
-#if NETCORE
+#if NET
 using System.Runtime.Intrinsics.X86;
 
 namespace Adamantium.Mathematics

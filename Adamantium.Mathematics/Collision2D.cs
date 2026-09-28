@@ -8,7 +8,7 @@ namespace Adamantium.Mathematics
 {
     public static class Collision2D
     {
-        #if NETCORE
+        #if NET
         [MethodImpl(MethodImplOptions.AggressiveInlining|MethodImplOptions.AggressiveOptimization)]
         #else
         [MethodImpl(MethodImplOptions.AggressiveInlining)]

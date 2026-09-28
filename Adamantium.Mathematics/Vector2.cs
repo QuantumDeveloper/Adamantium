@@ -3,7 +3,7 @@ using System;
 using System.Globalization;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
-#if NETCORE
+#if NET
 using System.Runtime.Intrinsics;
 using System.Runtime.Intrinsics.X86;
 #endif

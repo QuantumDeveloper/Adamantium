@@ -12,7 +12,7 @@ namespace Adamantium.Mathematics
 
         public override int GetHashCode()
         {
-            #if NETCORE
+            #if NET
             return HashCode.Combine(Start, End);
             #else
             return Start.GetHashCode() + End.GetHashCode();
