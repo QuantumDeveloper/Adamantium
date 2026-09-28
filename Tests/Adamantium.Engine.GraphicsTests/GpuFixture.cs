@@ -1,0 +1,51 @@
+using System.Collections.Generic;
+using Adamantium.Graphics;
+using Adamantium.Graphics.Core;
+using NUnit.Framework;
+
+namespace Adamantium.Engine.GraphicsTests
+{
+    /// <summary>One Vulkan instance and device for the whole assembly, since repeated instances made the loader reject new
+    /// ones mid-run. Each test still gets its own render device.</summary>
+    [SetUpFixture]
+    public class GpuFixture
+    {
+        public static MainGraphicsDevice Main { get; private set; }
+
+        private static readonly List<IGraphicsDevice> PerTest = new();
+
+        [OneTimeSetUp]
+        public void CreateSharedDevice()
+        {
+            Main = MainGraphicsDevice.Create(new GraphicsDeviceFactory(), 3, "TestApp", true);
+        }
+
+        [OneTimeTearDown]
+        public void DisposeSharedDevice()
+        {
+            ReleaseRenderDevices();
+            Main?.Dispose();
+            Main = null;
+        }
+
+        /// <summary>A render device for the current test, tracked so the fixture can release it however the test ends -
+        /// including on a failed assertion, which throws before any cleanup line the test itself might carry.</summary>
+        public static IGraphicsDevice CreateRenderDevice()
+        {
+            var device = Main.CreateRenderDevice();
+            PerTest.Add(device);
+            return device;
+        }
+
+        /// <summary>Called from each fixture's TearDown. RemoveDevice both unregisters and disposes, so the shared main
+        /// device is not left holding a device the next test knows nothing about.</summary>
+        public static void ReleaseRenderDevices()
+        {
+            if (Main == null) { PerTest.Clear(); return; }
+
+            Main.DeviceWaitIdle();
+            foreach (var device in PerTest) Main.RemoveDevice(device);
+            PerTest.Clear();
+        }
+    }
+}
