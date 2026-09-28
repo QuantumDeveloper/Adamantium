@@ -2,15 +2,8 @@ using System;
 
 namespace Adamantium.Mathematics
 {
-    /// <summary>A real number carried as an unevaluated pair of doubles, <see cref="Hi"/> + <see cref="Lo"/>, where Lo is
-    /// exactly what Hi could not hold. That buys roughly 32 significant digits against a double's 16.
-    /// <para>It exists for iterations that feed their own rounding error forward. A deep-zoom fractal is the case that
-    /// forced it: z = z² + c is chaotic, so a rounding error at one step is amplified by every step after it, and a few
-    /// hundred steps of plain double arithmetic drift by ~1e-14 - wider than the whole visible frame at high zoom.</para>
-    /// <para>Every operation here is exact to the pair. A sum keeps its own rounding residue, which is recoverable from
-    /// the sum itself; a product's residue is not, and is recovered instead by splitting each factor into halves narrow
-    /// enough that their products are exact. Without that the pair would be theatre - exact addition around an inexact
-    /// multiply.</para></summary>
+    /// <summary>A real number as an unevaluated pair of doubles (<see cref="Hi"/> + <see cref="Lo"/>), about 32 significant
+    /// digits, for iterations such as deep-zoom fractals that amplify their own rounding error.</summary>
     public readonly struct DoubleDouble : IEquatable<DoubleDouble>
     {
         /// <summary>The leading part - the value a plain double would have held on its own.</summary>

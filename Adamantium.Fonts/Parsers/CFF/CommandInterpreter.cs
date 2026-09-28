@@ -68,11 +68,7 @@ namespace Adamantium.Fonts.Parsers.CFF
                     //appends a horizontal line of length 
                     //dx1 to the current point. 
 
-                    //With an odd number of arguments, subsequent argument pairs 
-                    //are interpreted as alternating values of 
-                    //dy and dx, for which additional lineto
-                    //operators draw alternating vertical and 
-                    //horizontal lines.
+                    //An odd argument count: the remaining pairs alternate dy and dx, drawing vertical and horizontal lines.
 
                     //With an even number of arguments, the 
                     //arguments are interpreted as alternating horizontal and 
@@ -117,10 +113,7 @@ namespace Adamantium.Fonts.Parsers.CFF
                     //lineto operators draw alternating horizontal and 
                     //vertical lines.
 
-                    //With an even number of arguments, the 
-                    //arguments are interpreted as alternating vertical and 
-                    //horizontal lines. The number of lines is determined from the 
-                    //number of arguments on the stack. 
+                    //An even argument count: the arguments alternate vertical and horizontal lines, one per argument.
                     //first elem
                     
                     if (command.BlendedOperands.Count % 2 != 0)
@@ -287,11 +280,8 @@ namespace Adamantium.Fonts.Parsers.CFF
                             
                             //|- dx1 dx2 dy2 dy3 {dya dxb dyb dxc dxd dxe dye dyf}* dxf? hvcurveto (31) |-
 
-                            //If there is a multiple of four arguments, the curve starts
-                            //horizontal and ends vertical.
-                            //Note that the curves alternate between start horizontal, end vertical, and start vertical, and
-                            //end horizontal.The last curve(the odd argument case) need not
-                            //end horizontal/vertical.
+                            //A multiple of four arguments starts horizontal and ends vertical; the curves alternate, and the
+                            //last one (odd argument count) need not end horizontal or vertical.
                             
                             i = 0;
 
@@ -433,11 +423,8 @@ namespace Adamantium.Fonts.Parsers.CFF
                             
                             //|- dx1 dx2 dy2 dy3 {dya dxb dyb dxc dxd dxe dye dyf}* dxf? hvcurveto (31) |-
 
-                            //If there is a multiple of four arguments, the curve starts
-                            //horizontal and ends vertical.
-                            //Note that the curves alternate between start horizontal, end vertical, and start vertical, and
-                            //end horizontal.The last curve(the odd argument case) need not
-                            //end horizontal/vertical.
+                            //A multiple of four arguments starts horizontal and ends vertical; the curves alternate, and the
+                            //last one (odd argument count) need not end horizontal or vertical.
                             
                             i = 0;
 

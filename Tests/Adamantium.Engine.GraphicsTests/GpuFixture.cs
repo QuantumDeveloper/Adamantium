@@ -5,16 +5,8 @@ using NUnit.Framework;
 
 namespace Adamantium.Engine.GraphicsTests
 {
-    /// <summary>
-    /// ONE Vulkan instance and logical device for the whole assembly.
-    /// <para>Every GPU test used to create and destroy its own <see cref="MainGraphicsDevice"/> - i.e. its own
-    /// VkInstance. After a handful of those cycles the loader starts rejecting the next instance
-    /// (<c>vkGetInstanceProcAddr: Invalid instance</c>) and the test host dies mid-run, so the suite reported "aborted"
-    /// instead of results and every failure anywhere else became impossible to tell apart from this one. Creating the
-    /// instance once is also what the engine itself does: an application has one.</para>
-    /// <para>Per-test isolation is kept where it matters - each test still gets its OWN render device, released in the
-    /// fixture's TearDown, so no test inherits another's render targets, presenter or MSAA level.</para>
-    /// </summary>
+    /// <summary>One Vulkan instance and device for the whole assembly, since repeated instances made the loader reject new
+    /// ones mid-run. Each test still gets its own render device.</summary>
     [SetUpFixture]
     public class GpuFixture
     {

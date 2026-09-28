@@ -3,13 +3,8 @@ using Adamantium.Vulkan.Core;
 
 namespace Adamantium.Graphics.Core.Models;
 
-/// <summary>
-/// Flat, serializable snapshot of a <see cref="Mesh"/>'s geometry. Produced and consumed by
-/// <see cref="MeshSerializationExtensions"/> and persisted as part of a baked model (.aemf).
-/// Topology is stored as the underlying <see cref="PrimitiveTopology"/> (the <see cref="PrimitiveType"/>
-/// wrapper has no public members for contractless serialization). Derived data not stored here
-/// (Bounds, Semantic) is recomputed when the mesh is rebuilt.
-/// </summary>
+/// <summary>Flat serializable snapshot of a <see cref="Mesh"/>'s geometry, persisted in a baked model (.aemf); bounds and
+/// semantic are recomputed on rebuild.</summary>
 public class MeshGeometry
 {
     public string Name { get; set; }

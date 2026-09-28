@@ -136,14 +136,8 @@ namespace Adamantium.Core.Collections
             {
                 if (currentIndex == 0) return;
 
-                // OnClearing sees exactly the items that are about to leave, while they are still HERE - a window onto the
-                // live storage, no copy, and nothing beyond them. Whoever must remember them takes their own snapshot there
-                // (only a collection with listeners does); everyone else pays nothing at all.
-                //
-                // This used to hand the backing array to OnClear, which runs AFTER it has been zeroed - so a listener could
-                // learn that "something" was cleared but never WHAT. Everything a removal has to unwind per item (a visual
-                // child's parent link, a mirror collection's state, a behaviour's attachment) was then silently skipped, and
-                // the item lived on believing it still belonged here.
+                // Listeners see the leaving items while they are still here: OnClear runs after the array is zeroed and
+                // could not say WHAT left, so per-item unwinding was silently skipped.
                 OnClearing(new ArraySegment<T>(items, 0, currentIndex));
                 ClearItems();
                 OnCleared();

@@ -1,4 +1,4 @@
-// Line-rendering Phase B (step 2): minimal draw of the GPU-expanded stroke geometry. The compute stroke-expander
+// Minimal draw of the GPU-expanded stroke geometry. The compute stroke-expander
 // (StrokeExpand.fx) writes float2 positions into a vertex buffer; this just transforms them by an ortho projection
 // and fills them with a solid colour, so a render + pixel check proves the rasterizer consumes the compute output.
 // Shader body is Slang.

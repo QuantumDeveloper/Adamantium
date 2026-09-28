@@ -102,11 +102,8 @@ namespace Adamantium.MathTests
             Assert.IsTrue(NearlyEqual(-0.3f, -0.30000003f));
         }
 
-        /** Comparisons involving zero.
-         *  NOTE: Adamantium's MathHelper.WithinEpsilon deliberately uses an ABSOLUTE comparison near zero (the
-         *  relative *Normal term from the floating-point-gui.de reference is intentionally disabled) so the
-         *  triangulator gets a usable near-zero tolerance. Therefore a value within 'epsilon' of zero IS "nearly
-         *  equal" to it — these assertions reflect that real contract, not the original reference behaviour. */
+        /** Comparisons involving zero. MathHelper.WithinEpsilon is deliberately absolute near zero (for the triangulator),
+         *  so a value within epsilon of zero is nearly equal to it. */
         [Test]
         public void Zero()
         {

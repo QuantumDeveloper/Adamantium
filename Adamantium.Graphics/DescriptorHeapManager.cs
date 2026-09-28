@@ -155,13 +155,7 @@ public class DescriptorHeapManager : DisposableObject, IDescriptorHeapManager
     private readonly System.Collections.Generic.Dictionary<IBuffer, uint> _bufferHeapOffsets = new();
 
     // ---- RETURNING SLOTS ----------------------------------------------------------------------------------------
-    // A slot used to be handed out and never taken back: allocation was a bump pointer and nothing was ever removed from
-    // the caches above. Two costs, both real. The dictionaries key on the RESOURCE OBJECT, so a dead texture stayed
-    // reachable and never reached the collector; and the 8 MB resource heap drained monotonically until it threw.
-    //
-    // A freed slot goes to a per-KIND free list, because a slot fits only a descriptor of the size and alignment it was
-    // cut for. And it is not reusable immediately: frames still in flight may be sampling through it, so it waits out
-    // the pipeline depth first - the same rule every GPU buffer here follows.
+    // A freed slot goes to a per-kind free list (slots fit one descriptor size) after the frames in flight are done with it.
     private readonly System.Collections.Generic.Queue<uint> _freeImageSlots = new();
     private readonly System.Collections.Generic.Queue<uint> _freeBufferSlots = new();
     private readonly System.Collections.Generic.Queue<uint> _freeSamplerSlots = new();
@@ -272,14 +266,8 @@ public class DescriptorHeapManager : DisposableObject, IDescriptorHeapManager
     }
 
     // ---- THE FALLBACK DESCRIPTOR --------------------------------------------------------------------------------
-    // What a shader samples when a parameter was never bound. Before this it received uint.MaxValue - an index OUTSIDE
-    // the heap - and the draw had to be refused outright, because sampling there returns whatever descriptor the driver
-    // finds: in practice another effect's live texture, smeared across the frame.
-    //
-    // RED AND 4x4 IN DEBUG, transparent and 1x1 in release. A transparent square is the right answer for a shipped
-    // build - the worst case is that something is missing rather than wrong - but it is also invisible, and a bug that
-    // shows nothing is a bug nobody finds. Red says "this draw asked for a texture and nobody gave it one", and 4x4
-    // because a single texel stretched over a shape can pass for a solid colour someone chose on purpose.
+    // Sampled when a parameter was never bound, instead of an out-of-heap index. Red 4x4 in Debug so the miss shows,
+    // transparent 1x1 in Release.
     private uint _fallbackTextureOffset = uint.MaxValue;
     private uint _fallbackSamplerOffset = uint.MaxValue;
     private ITexture _fallbackTexture;

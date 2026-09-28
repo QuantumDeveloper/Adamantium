@@ -114,11 +114,8 @@ namespace Adamantium.Graphics.Core
                 imageCount = Description.BuffersCount;
             }
 
-            // ...and at least one image per frame the CPU is allowed to have in flight, PLUS one for the present engine to
-            // hold. These two numbers were picked independently until now - the depth from the device (the same value for
-            // every window it hosts), the image count from the surface - so a surface offering the usual two images against
-            // three frames in flight left the third frame with nowhere to draw, blocking in the acquire every lap. The
-            // surface still has the last word through the clamp below: it is the one that says what it can give.
+            // One image per frame in flight plus one for the present engine, or the last frame blocks in acquire; the
+            // surface still clamps it below.
             var wanted = GraphicsDevice.MaxFramesInFlight + 1;
             if (imageCount < wanted)
             {
@@ -279,60 +276,8 @@ namespace Adamantium.Graphics.Core
                 };
             }
 
-            // A window being dragged changes size faster than a swapchain can be torn down and rebuilt, so there are
-            // always frames in flight whose image is a pixel or two off the window. Both answers below beat the
-            // undefined behaviour that produced the ragged edge; they differ in WHERE the error goes.
-            //
-            // ONE-TO-ONE is chosen first, and deliberately. STRETCH scales the stale image onto the window, so a
-            // one-pixel size difference becomes a scale factor applied to the WHOLE window, changing every frame: the
-            // content visibly jitters, more the further from the anchored corner, and in both directions - measured on
-            // the live stand, and worse to look at than what it replaced. One-to-one never scales anything, so the
-            // error stays where it is: a thin uncovered strip at the corner away from the gravity, for the frames
-            // between one rebuild and the next.
-            // ONE-TO-ONE, always, together with the oversized image that ChooseSwapExtent builds once _oversizeAllowed
-            // is set below. The two only work as a pair, and together they answer the whole problem:
-            //
-            //   stretch alone       - the trailing image is scaled onto the window, so a lag of a few pixels becomes a
-            //                         scale factor over the WHOLE window, changing every frame. Growing is invisible;
-            //                         shrinking squeezes the picture by ~30 px and snaps back (measured).
-            //   one-to-one alone    - no scaling ever, but an image smaller than the window leaves a bare band.
-            //   one-to-one + margin - the image is never smaller than the window, so there is no band to leave and
-            //                         nothing to scale: the presentation engine simply takes the window-sized corner of
-            //                         a slightly larger picture.
-            //
-            // And it is per-AXIS for free, which is what a mixed resize needs: gravity is two independent fields, so
-            // shrinking one side while growing the other is no longer a special case. Scaling behaviour is ONE value
-            // for the swapchain and cannot be split per axis, so the direction-based choice this replaces could never
-            // have handled that.
-            // TRIED AND REJECTED, on the stand: one-to-one over an oversized image. The surface does free the extent
-            // once scaling is declared (measured: minScaledImageExtent 1x1, max 4294967294), and a swapchain with a
-            // margin does skip the rebuild - but the picture came out worse than what it replaced, with wide bare bands
-            // when growing. The engine renders and lays out at the WINDOW's size, so an image larger than the window
-            // has a region no pass ever writes, and the presentation engine shows it. Making that work needs the whole
-            // render path to treat target size and window size as different things, which is a far bigger change than
-            // this one - so stretch stays, and the lag it scales away is kept small by not pacing the loop mid-drag.
-            // What IS left is choosing by direction, and the two halves are not symmetric:
-            //
-            //   shrinking - layout has already rebuilt for the smaller window and drawn into the still-larger image, so
-            //               the content occupies only part of it. Stretch then squeezes THAT proportion onto the window
-            //               and the content ends up smaller than the window it should fill. One-to-one takes the
-            //               window-sized corner instead, and content laid out for exactly that window lands exactly.
-            //   growing   - the image is smaller than the window, so one-to-one has nothing to put in the remainder and
-            //               leaves it bare. Stretch scales the image up by well under a percent, which is invisible.
-            //
-            // Scaling behaviour is ONE value per swapchain and cannot be split per axis, so a mixed resize - one side
-            // in, the other out - has to pick. It picks stretch: a growing axis left bare is far worse than a shrinking
-            // axis scaled slightly. Hence "both axes shrank" rather than "either did".
-            // AND CHOOSING BY DIRECTION DOES NOT WORK EITHER - tried, and rejected on the stand. The behaviour is fixed
-            // for the LIFE of a swapchain, while the direction it was chosen from is the LAST step of a drag that has
-            // not finished. A hand shakes, a drag reverses, and a swapchain built one-to-one for a shrink meets a
-            // window that has just grown: the image is now smaller than the window and the remainder is bare, the full
-            // width of the reversal. Predicting the next step is not possible, and the price of guessing wrong is a
-            // black band, where the price of stretch is a fraction of a percent of scale.
-            //
-            // So: stretch, always. It is wrong in a small way all of the time instead of very wrong some of the time,
-            // and the amount it is wrong by is the frame lag - which is why the real work went into keeping that small
-            // (the loop no longer paces itself mid-drag) rather than into choosing between two ways to hide it.
+            // Stretch, always: during a drag it scales the stale image by the frame lag, a fraction of a percent. One-to-one
+            // leaves bare bands whenever the drag reverses, since the choice is fixed for the swapchain's life.
             var oneToOne = false;
 
             if (oneToOne)
@@ -436,12 +381,8 @@ namespace Adamantium.Graphics.Core
 
         PresentModeKHR ChooseSwapPresentMode(PresentModeKHR[] availablePresentModes)
         {
-            // IMMEDIATE first, Mailbox second, Fifo last. Mailbox looks like the better choice and is the usual advice -
-            // but it hands images back to the application on the DISPLAY's schedule, and AcquireNextImage is a
-            // SYNCHRONOUS block in the frame loop: with update and render on one thread, that back-pressure paces the
-            // whole engine, not just the presenting. Measured on the Layout tab: acquire 0.6-0.8 ms per frame with the
-            // GPU fence wait at 0.00, unchanged by a fourth image and unchanged by acquiring late. Immediate has no such
-            // schedule to wait on.
+            // Immediate first, then Mailbox, then Fifo: Mailbox returns images on the display's schedule, and the blocking
+            // acquire then paces the whole frame loop.
             var wanted = WantedPresentMode();
 
             foreach (var availablePresentMode in availablePresentModes)

@@ -172,13 +172,8 @@ namespace Adamantium.Mathematics.Triangulation
             foreach (var container in contourContainers)
                 foreach (var contour in container.Contours)
                 {
-                    // FOR A FILL A CONTOUR IS CLOSED whether or not it says so: a ring of points bounds an area, and
-                    // "Z" is about the OUTLINE - it joins the ends and makes the corner there. Refusing an open one
-                    // here sent it to the general pipeline, which fills by a different rule, so a drawing whose
-                    // sub-paths carry no Z - which exporters leave out freely - came out filled inside out.
-                    //
-                    // The contour itself is NOT touched: closing it would put a phantom edge in the STROKE, which is
-                    // what turns an open mark - a check, an arc, an icon drawn as three lines - into a triangle.
+                    // A fill treats the contour as closed without a Z; the contour stays open so the stroke gets no phantom
+                    // edge.
                     if (contour.Points == null || contour.Points.Length < 3) return false;
                     var copy = contour.Copy();
                     copy.SplitOnSegments();
@@ -197,11 +192,7 @@ namespace Adamantium.Mathematics.Triangulation
                 return true;
             }
 
-            // CROSSINGS ARE NOT A REFUSAL ANY MORE. Where contours genuinely cross, what is filled is a question
-            // about each REGION they cut the plane into, not about any one contour - PlanarFill cuts them apart,
-            // walks the regions out and asks the rule once per region. Sent to the general pipeline instead, they
-            // were merely united: the fill rule is never consulted there, so every hole in a drawing was lost the
-            // moment anything overlapped anywhere.
+            // Crossing contours go to PlanarFill, which asks the fill rule once per region they cut the plane into.
             if (HasProperIntersections(rings))
             {
                 ProcessedContours.AddRange(processedContours);
@@ -227,11 +218,8 @@ namespace Adamantium.Mathematics.Triangulation
                 for (var j = 0; j < rings.Count; j++)
                     if (i != j && PointInPolygon(rings[i][0], rings[j])) depth[i]++;
 
-            // NonZero is the WINDING rule: a region is filled when the rings enclosing it do not cancel out, and a
-            // ring cancels the one round it by running the other way. Read as "fill the outermost ring solid" instead,
-            // a hole could only ever be made by even-odd - so every ring in an imported drawing came out filled and a
-            // magnifier arrived as a solid disc.
-            // EvenOdd: even-depth rings fill, odd-depth rings directly inside them are holes.
+            // NonZero is the winding rule: a region fills when the rings enclosing it do not cancel out. EvenOdd: even-depth
+            // rings fill, odd-depth rings directly inside them are holes.
             var nonZero = rule == FillRule.NonZero;
             var winding = new int[rings.Count];
 
@@ -309,12 +297,8 @@ namespace Adamantium.Mathematics.Triangulation
             return false;
         }
 
-        /// <summary>Whether two segments cross PROPERLY - each passing through the inside of the other. Touching is not
-        /// crossing: rings that share a vertex, or lie along the same line, still nest cleanly and earcut fills them
-        /// with their holes.
-        /// <para>Counting a touch as a crossing sent anything drawn on a grid to the general pipeline, where the
-        /// winding rule is not applied - so an imported icon whose cells sit corner to corner came out solid.</para>
-        /// </summary>
+        /// <summary>Whether two segments cross properly, each through the other's inside; touching is not crossing, so rings
+        /// sharing a vertex still nest.</summary>
         private static bool SegmentsIntersect(Vector2 p1, Vector2 p2, Vector2 p3, Vector2 p4)
         {
             int o1 = Orient(p1, p2, p3), o2 = Orient(p1, p2, p4), o3 = Orient(p3, p4, p1), o4 = Orient(p3, p4, p2);

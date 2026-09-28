@@ -8,13 +8,8 @@ using Microsoft.CodeAnalysis.Text;
 
 namespace Adamantium.MVVM.Generators;
 
-/// <summary>
-/// The Adamantium MVVM incremental source generator: turns <c>[Bindable]</c> fields into observable properties,
-/// <c>[Command]</c> methods into <c>ICommand</c> properties, and injects INPC into <c>[ViewModel]</c> classes.
-/// Built for performance at 10k+ usages: one provider per attribute via <c>ForAttributeWithMetadataName</c> (the
-/// fast attribute-indexed path), tiny value-equatable models out of every transform (no symbols/syntax carried
-/// downstream), and one cached output file per member — so a keystroke regenerates only what actually changed.
-/// </summary>
+/// <summary>Turns <c>[Bindable]</c> fields into observable properties and <c>[Command]</c> methods into <c>ICommand</c>
+/// properties, and injects INPC into <c>[ViewModel]</c> classes; one cached output per member.</summary>
 [Generator(LanguageNames.CSharp)]
 public sealed class MvvmGenerator : IIncrementalGenerator
 {
@@ -438,13 +433,8 @@ public sealed class MvvmGenerator : IIncrementalGenerator
     private static string TypeNameWithGenerics(INamedTypeSymbol type) =>
         type.TypeParameters.Length == 0 ? type.Name : $"{type.Name}<{string.Join(", ", type.TypeParameters.Select(p => p.Name))}>";
 
-    // WHERE A CHANGE IS RAISED FROM - the base the property's setter will call into. Either an ancestor that already
-    // supplies it, or the [ViewModel] attribute, which promises it on this class or on one above it.
-    //
-    // The attribute is asked of the ANCESTORS as well, and it has to be: what [ViewModel] gives a class is written by
-    // this same generator, in a part the compilation cannot see while this runs. A base marked [ViewModel] therefore
-    // does not yet DERIVE from anything - so a derived class's [Bindable] field would silently produce no property at
-    // all, which is a partial property with no implementation and a build that stops on it.
+    // Where a change is raised from: an ancestor that supplies it, or [ViewModel] on this class or an ancestor, whose
+    // generated base this pass cannot see yet.
     private static bool HasInpcHost(INamedTypeSymbol type)
     {
         if (DerivesFrom(type, PropertyChangedBaseName)) return true;
@@ -489,12 +479,8 @@ public sealed class MvvmGenerator : IIncrementalGenerator
         return sb.ToString();
     }
 
-    // WHETHER THE IMPLEMENTATION IS ALREADY THERE - not whether the interface is in the list.
-    //
-    // Asking the interface list was wrong, and wrong in exactly the case [ViewModel] exists for: a contract an
-    // application implements - a node on a canvas, a thing on a plane - REQUIRES INotifyPropertyChanged, so every class
-    // implementing one "had" INPC and got nothing injected, then failed to compile for not implementing the event. What
-    // counts is an ancestor that supplies it, or the class writing the event itself.
+    // Whether the implementation is already there, not whether the interface is listed: a contract may require INPC
+    // without implementing it.
     private static bool ImplementsInpc(INamedTypeSymbol type)
     {
         if (DeclaresInpcMember(type)) return true;

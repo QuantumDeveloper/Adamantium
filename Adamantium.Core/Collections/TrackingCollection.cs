@@ -130,13 +130,8 @@ namespace Adamantium.Core.Collections
 
         private List<T> _clearing;   // the items a Clear() is about to drop - kept only while it is being reported
 
-        // A Clear() IS a bulk removal, so it is reported as a Remove, with the items: a downstream mirror needs to know WHAT
-        // left to unwind its per-item state (a visual child's parent link, a logical child's Parent), and an itemless Reset
-        // cannot convey that. They must be captured HERE, before the array is wiped - by the time the clear is done they are
-        // gone.
-        //
-        // And captured ONLY when somebody is listening: with no subscriber there is nothing to report, and a Clear() of an
-        // unobserved collection must not allocate a thing. With one, the copy is not extra - the event carries the list.
+        // A Clear() is reported as a Remove WITH the items, so a mirror can unwind per-item state; they are copied here,
+        // before the wipe, and only when someone listens.
         protected override void OnClearing(ArraySegment<T> items)
         {
             if (CollectionChanged == null || items.Count == 0) return;

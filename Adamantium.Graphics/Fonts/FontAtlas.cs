@@ -116,32 +116,15 @@ namespace Adamantium.Graphics.Fonts
             Atlas = Texture.New(GraphicsDevice, description, "Dynamic Font Atlas");
         }
 
-        /// <summary>
-        /// Rasterize every character of <paramref name="text"/> this atlas does not have yet - in ONE batch.
-        ///
-        /// The atlas grows LAZILY, one <see cref="Update"/> per text block, and that is deliberate: a UI must not pay for
-        /// glyphs it never shows. But a lazy path hands the generator only the characters ONE block introduced, and
-        /// rasterizing a glyph is MSDF work - ~23 ms in Debug. A cold fill realizes ~50 new text blocks, each contributing
-        /// about one new character, so ~50 glyphs were rasterized one after another, on a single core: 1.1 s of a 1.9 s 4K
-        /// viewport fill, and by far its biggest single cost.
-        ///
-        /// The generator ALREADY parallelises across glyphs (TextureAtlasGenerator.GenerateTextureForGlyphs) - it was simply
-        /// never given more than one at a time. So the fix is not to abandon laziness (prewarming a charset up front just moves
-        /// the same cost into startup, and pays for glyphs nobody asked for) - it is to let a caller that is about to build
-        /// MANY blocks pool their characters and warm them together. Nothing is rasterized that the UI does not use; the work
-        /// simply stops being serial.
-        /// </summary>
+        /// <summary>Rasterizes every missing character of <paramref name="text"/> in one parallel batch, so a caller about to
+        /// build many text blocks does not pay for their glyphs one by one.</summary>
         public void Warm(string text)
         {
             if (!string.IsNullOrEmpty(text)) Update(text);
         }
 
-        /// <summary>Ask for a text's glyphs WITHOUT waiting for them. What is missing goes to a worker (MSDF generation is
-        /// arithmetic - no device, no shared mutable state), and the result is uploaded later by <see cref="PumpReady"/> on
-        /// the thread that owns the device. The frame does not stop for it: text draws with the glyphs it has and the rest
-        /// arrive over the next frames, each landing bumping <see cref="Version"/> so the blocks rebuild themselves.
-        /// <para>Measured on the Brushes tab: 80 new glyphs cost 650-830 ms of MSDF, which was 88% of the apply phase and
-        /// the single biggest item in opening a tab. It is the same work either way - it simply stops being in the way.</para></summary>
+        /// <summary>Requests a text's glyphs without waiting: MSDF runs on a worker and <see cref="PumpReady"/> uploads the
+        /// result; each landing bumps <see cref="Version"/> so blocks rebuild.</summary>
         public void RequestAsync(string text)
         {
             if (string.IsNullOrEmpty(text)) return;

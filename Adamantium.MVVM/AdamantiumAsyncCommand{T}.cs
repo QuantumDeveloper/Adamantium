@@ -6,14 +6,8 @@ using Adamantium.Core.Commands;
 
 namespace Adamantium.MVVM;
 
-/// <summary>
-/// An async command that passes a typed parameter to its handler. The MVVM generator's <c>[Command]</c> on a
-/// <c>Task</c> method taking a single argument (optionally plus a trailing <c>CancellationToken</c>) emits one of
-/// these (<c>AdamantiumAsyncCommand&lt;T&gt;</c>). Same disable-while-running / cancellation / exception semantics
-/// as <see cref="AdamantiumAsyncCommand"/>; the UI binds it through the non-generic <see cref="IAsyncCommand"/> —
-/// the parameter arrives as <c>object</c> and is coerced to <typeparamref name="T"/> — while code can call the typed
-/// <see cref="ExecuteAsync(T, CancellationToken)"/> directly.
-/// </summary>
+/// <summary>An <see cref="AdamantiumAsyncCommand"/> with a typed parameter: the UI binds it untyped through
+/// <see cref="IAsyncCommand"/>, code calls <see cref="ExecuteAsync(T, CancellationToken)"/>.</summary>
 public sealed class AdamantiumAsyncCommand<T> : IAsyncCommand
 {
     private readonly Func<T, CancellationToken, Task> _execute;

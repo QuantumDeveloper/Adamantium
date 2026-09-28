@@ -8,14 +8,8 @@ using Microsoft.CodeAnalysis.Text;
 
 namespace Adamantium.Engine.Generators;
 
-/// <summary>
-/// Emits a typed, compile-checked registry of a project's content resources so assets are loaded by a
-/// const member instead of a hand-typed path: <c>Content.Load&lt;SceneData&gt;(SandboxAssets.Models.F15C.F_15C_Eagle_dae)</c>.
-/// The registry is <c>{RootNamespace}.{Project}Assets</c> (namespace + class name both project-scoped, so two
-/// projects never collide), with nested static classes mirroring folders and a <c>const string</c> per asset
-/// holding its logical load name. The source format is appended to a member name only when two files in the
-/// same folder would otherwise collide.
-/// </summary>
+/// <summary>Emits <c>{RootNamespace}.{Project}Assets</c>: a <c>const string</c> per content asset in nested classes mirroring
+/// folders, so assets load by a checked member instead of a hand-typed path.</summary>
 [Generator]
 public class AssetsGenerator : IIncrementalGenerator
 {

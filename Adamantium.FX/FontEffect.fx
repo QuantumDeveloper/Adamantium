@@ -14,21 +14,7 @@ struct FontItem
     float Layer : PSIZE2;
 };
 
-// ============================================================================================================
-// THE ATLAS LAYER IS DYNAMIC AGAIN. It was pinned to a compile-time 0 for a long time: this driver's shader-object
-// compiler (NVIDIA Quadro RTX 4000, VK_EXT_shader_object) AVd in vkCreateShadersEXT on ANY non-trivial
-// Texture2DArray use here - a runtime layer index, an extra VS->PS varying, even a switch over constant indices -
-// and bisection at the time left a single sample at a constant layer as the only form that compiled. Text was
-// therefore limited to one 1024x1024 layer; glyphs the packer spilled to layers 1+ silently sampled layer 0.
-//
-// What changed is not the driver. This effect used to carry two passes nothing could reach (a gradient-derivative
-// AA variant and an outline verification pass) and it was sitting at the limit where that compiler gives up - the
-// same limit that made a second read of the transform table fatal. With those gone there is room, and the layer
-// index compiles and runs. Measured: a cold compile still flakes (the AV is a floating one and hits any changed
-// shader), but once through it starts 6 of 6 and the glyphs are the same as before.
-//
-// So if this ever AVs again, the question to ask is what the EFFECT has grown, not what the sampler is doing.
-// ============================================================================================================
+// The atlas layer is a runtime index, so glyphs the packer spills to layers 1+ are sampled from their own layer.
 
 struct PSInput
 {
@@ -62,19 +48,13 @@ float2 MSDFAtlasSize;
 float SdfBlendLo;
 float SdfBlendHi;
 
-// The rounded ancestor clip for the PER-BLOCK (direct) draw, as plain uniforms: xy = the clip rect's origin in device
-// pixels, zw = its size (zw = 0 means no clip), and the four corner radii. The batched pass fetches the same two
-// values from the transform table by slot, which this pass cannot do - it never binds the table, and a first read
-// from it would be a new compile shape on the effect that is tightest on this driver. One draw = one block = one
-// clip, so a uniform says it exactly.
+// Rounded ancestor clip for the per-block draw: xy origin and zw size in device pixels (zw = 0: no clip), plus corner
+// radii. One draw is one block with one clip; the batched pass reads the same values from the transform table.
 float4 DirectClipBox;
 float4 DirectClipRadii;
 
-// BDA (buffer device address) storage for the INSTANCED glyph batch (pass RenderMsdfBatchInstanced) - the SAME proven
-// pattern BatchEffect.fx uses for rect/ellipse fills. GlyphInstancesAddress -> the per-instance GlyphData buffer;
-// TransformsAddress -> the transform table the VS indexes by each glyph's slot (slot 0 = identity). This lets glyph rects
-// be uploaded ONCE in node-local space and transformed to world on the GPU, so a scrolling block moves via one matrix
-// write instead of a per-glyph CPU re-bake (and the text batch becomes node-aware). See docs/RENDER_THREAD_PLAN.md.
+// Instanced glyph batch: per-instance GlyphData, and the transform table indexed by slot (0 = identity), so node-local
+// glyphs move with one matrix write instead of a CPU re-bake.
 uint64_t GlyphInstancesAddress;
 uint64_t TransformsAddress;
 
@@ -124,8 +104,7 @@ void ClipFromSlot(float slotIndex, out float4 box, out float4 radii)
 }
 
 // Per-glyph quad expansion, now in the VERTEX stage (corner from SV_VertexID), so the geometry shader is gone:
-// plain instanced rendering (4-vertex triangle strip x N glyphs), portable to Metal/MoltenVK and free of the
-// NVIDIA Turing GS NVVM bug.
+// plain instanced rendering (4-vertex triangle strip x N glyphs), portable to Metal/MoltenVK.
 PSInput ExpandGlyphCorner(FontItem item, int corner)
 {
     PSInput vertex;
@@ -206,17 +185,8 @@ float4 FontPixelShaderMsdf(PSInput input) : SV_Target
     float4 samp = Texture.Sample(TextureSampler, float3(input.UV, input.Layer));
     float sd = SampleGlyphCoverage(samp, input.UV);
     float opacity = clamp(ScreenPxRange(input.UV) * (sd - 0.5 + FontWeight) + 0.5, 0.0, 1.0);
-    // Gamma-boost the coverage (same as the gradient pass): raises partial opacities so thin stems keep
-    // their colour instead of washing out toward the background. The engine blends in sRGB, so this also
-    // compensates the perceptual lightening of un-gamma-corrected coverage AA.
-    //
-    // The boost is taken on the PRODUCT, colour alpha included, and that is NOT an oversight to "fix" by reordering:
-    // splitting them (pow(coverage) * alpha) was tried twice and both times made text look washed out. The reason is
-    // that UI text is rarely fully opaque - secondary text in the theme is not - so the boost has been carrying that
-    // alpha too, and taking it out thins every half-covered stem.
-    // The ELEMENT's fade is a different number and does not belong under the boost either. The CPU folds it into
-    // ForegroundColor.a for this pass, so it arrives ALREADY raised to 2.2 and the boost hands it back linear - the
-    // same trick the batch shader plays in its vertex stage (FontRenderer.DrawLayoutDirect).
+    // Gamma-boost coverage times the color's alpha so thin stems keep their color; splitting the two washed text out.
+    // The element's fade arrives pre-raised to 2.2, so the boost hands it back linear.
     float alpha = pow(ForegroundColor.a * opacity, 1.0 / 2.2);
     // The rounded ancestor clip, as coverage, exactly as the batch pass applies it. Both the premultiplied colour and
     // the alpha are cut: this pass outputs rgb*alpha, so cutting one without the other leaves colour where the glyph
@@ -225,11 +195,8 @@ float4 FontPixelShaderMsdf(PSInput input) : SV_Target
     return float4(ForegroundColor.rgb * alpha, alpha);
 }
 
-// Batch variant of FontPixelShaderMsdf: the foreground comes from the per-instance vertex colour (input.Color,
-// baked per glyph on the CPU) instead of the ForegroundColor uniform, so ONE instanced draw can render glyphs
-// of many text blocks - each its own colour - from the shared atlas. Identical MSDF reconstruction otherwise.
-// Used by the CPU pre-transform text batch (docs/TEXT_GLYPH_BATCH_PLAN.md sec. 9 Stage 2). input.Color is a plain
-// interpolated attribute (no matrix), so it is driver-safe on this Turing.
+// Batch variant of FontPixelShaderMsdf: the color comes per instance (input.Color), so one instanced draw renders glyphs
+// of many text blocks, each in its own color.
 [shader("fragment")]
 float4 FontPixelShaderMsdfBatch(PSInput input) : SV_Target
 {
@@ -279,17 +246,9 @@ PSInput FontBatchInstancedVS(uint vertexId : SV_VertexID, uint instanceId : SV_I
     float fadeSlot = g.Params.w;
     float fade = nodes[(uint)max(fadeSlot, 0.0)].Params.x;
     fade = lerp(1.0, fade, step(0.0, fadeSlot));
-    // FADE, pre-compensated for the pixel shader's gamma boost. That boost is taken on the whole product
-    // (pow(Color.a * coverage, 1/2.2)) and must stay that way - moving the colour's alpha out of it washes text out,
-    // tried twice. But the ELEMENT's fade is not coverage, and inside the boost it came out too strong: a block at
-    // Opacity 0.5 kept 0.755 of its ink while every shape beside it was at 0.501. Raising it to 2.2 here makes the
-    // boost hand back exactly `fade`, and at fade = 1 the expression is the old one unchanged.
-    // Carrying it as a fifth varying instead works too - measured, the effect compiles with one - but it spends an
-    // interpolant on the effect that is tightest on this driver, and makes the pixel shader carry the knowledge.
+    // The fade is raised to 2.2 so the pixel shader's gamma boost hands back exactly `fade`, matching the shapes beside it.
     o.Color = float4(g.Color.rgb, g.Color.a * pow(fade, 2.2));
     // The clip's shape, from the table by the slot the record carries - one fetch per instance, as everywhere else.
-    // Together with the fade this shader now reads that table THREE times; it used to AV the compiler on the second,
-    // and what made the difference is the two dead passes this effect no longer carries.
     o.Layer = g.Params.y;   // the atlas layer this glyph was packed into
     ClipFromSlot(g.Clip.x, o.ClipBox, o.ClipRadii);
     return o;

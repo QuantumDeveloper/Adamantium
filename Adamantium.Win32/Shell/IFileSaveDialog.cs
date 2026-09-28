@@ -3,19 +3,8 @@ using System.Runtime.InteropServices;
 
 namespace Adamantium.Win32.Shell;
 
-/// <summary>
-/// The shell's Save-As dialog (<c>CLSID_FileSaveDialog</c>, Windows Vista and later).
-///
-/// <para>Used instead of <c>GetSaveFileName</c> from comdlg32, which predates this one by fifteen years: it draws the
-/// old Windows XP chrome, has no places bar the user recognises, and takes its filters as a packed string of
-/// NUL-separated pairs.</para>
-///
-/// <para>The vtable is FLATTENED here - <c>IModalWindow</c>'s one method, then <c>IFileDialog</c>'s - because that is
-/// the layout a save dialog actually has, and declaring the bases separately buys nothing when nothing else implements
-/// them. Only the members we call are declared, but the ORDER of every method up to them is part of the vtable and
-/// cannot be shortened, hence the unused slots kept as named placeholders. The slots AFTER the last one we call
-/// (<c>IFileSaveDialog</c>'s own properties) are simply absent, which is safe: they are at the end.</para>
-/// </summary>
+/// <summary>The shell's Save-As dialog (<c>CLSID_FileSaveDialog</c>) with a flattened vtable; only used members are declared,
+/// and earlier slots stay as placeholders.</summary>
 [ComImport]
 [Guid("84BCCD23-5FDE-4CDB-AEA4-AF64B83D78AB")]
 [InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]

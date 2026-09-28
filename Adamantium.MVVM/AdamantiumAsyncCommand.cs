@@ -6,13 +6,8 @@ using Adamantium.Core.Commands;
 
 namespace Adamantium.MVVM;
 
-/// <summary>
-/// An async command wrapping a <c>Func&lt;CancellationToken, Task&gt;</c>. While it runs, <see cref="IsRunning"/>
-/// is true (bindable, change-notified) and <see cref="CanExecute"/> returns false — so a bound control auto-disables
-/// and re-entry is blocked. <see cref="Cancel"/> cancels the in-flight run; the method's own exceptions propagate
-/// (via the awaited <see cref="ExecuteAsync"/>, or onto the UI thread from the fire-and-forget <see cref="Execute"/>),
-/// while expected cancellation is swallowed. The generator's <c>[Command]</c> on a <c>Task</c> method emits one.
-/// </summary>
+/// <summary>An async command: <see cref="CanExecute"/> is false while it runs (<see cref="IsRunning"/>), <see cref="Cancel"/>
+/// cancels the run, and the method's exceptions propagate while cancellation is swallowed.</summary>
 public sealed class AdamantiumAsyncCommand : IAsyncCommand
 {
     private readonly Func<CancellationToken, Task> _execute;

@@ -6,17 +6,8 @@ using MessagePack;
 
 namespace Adamantium.Graphics.Core.Models;
 
-/// <summary>
-/// Reads and writes a mesh's vertex arrays as flat byte blobs. The contractless resolver writes every
-/// <c>Vector3</c> as a map - the keys "X", "Y", "Z" spelled out for each of a million elements - which cost
-/// roughly two fifths of a baked model. A blob carries the numbers and nothing else.
-/// <para>
-/// Nothing here is allowed to lose a thing: a mesh must come back exactly as it went in. Where a narrower form
-/// would be smaller, the writer proves it is exact for the data at hand and falls back to the wide one when it
-/// is not, so a model can never quietly arrive degraded.
-/// </para>
-/// <para>Byte order is the machine's. Every platform the engine targets is little-endian.</para>
-/// </summary>
+/// <summary>Reads and writes mesh vertex arrays as flat, lossless byte blobs; a narrower form is used only when it is exact
+/// for the data. Byte order is the machine's (little-endian).</summary>
 internal static class MeshBlobs
 {
     public static void WriteSingles(ref MessagePackWriter writer, float[] values)

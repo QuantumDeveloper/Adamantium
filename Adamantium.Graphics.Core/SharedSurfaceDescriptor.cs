@@ -23,13 +23,8 @@ public enum SharedHandleType
     // generate; on macOS use OpaqueFd (MoltenVK) until that extension is added to the generator.
 }
 
-/// <summary>
-/// The cross-API contract describing an externally produced surface so it can be imported zero-copy. The
-/// producer fills it in after exporting its image memory and synchronization primitives; the consumer (e.g.
-/// <c>RenderTargetPanel</c>) imports the surface from it and samples the frame during compositing. Lives in
-/// Graphics.Core so both the UI layer (which only sees the graphics interfaces) and the Vulkan implementation
-/// can pass it across the <see cref="IGraphicsDevice"/> boundary.
-/// </summary>
+/// <summary>Describes an externally produced surface - exported memory and semaphores - so a consumer such as
+/// <c>RenderTargetPanel</c> can import it zero-copy.</summary>
 public sealed class SharedSurfaceDescriptor
 {
     /// <summary>The kind of handle in <see cref="MemoryHandle"/> (decides the Vulkan handle type on import).</summary>

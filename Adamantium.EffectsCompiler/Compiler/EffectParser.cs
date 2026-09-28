@@ -326,11 +326,8 @@ namespace Adamantium.EffectsCompiler
                 }
                 else if (currentToken.Type == TokenType.Comment)
                 {
-                    // Skipped like a newline, never handed to the grammar: a comment is not code, and the preprocessor
-                    // rules above act on a `#` wherever they see one - which is how an #include quoted inside a comment
-                    // used to be obeyed (a file that mentioned its own include line included itself until the stack ran
-                    // out). A BLOCK comment can span lines, so its newlines are counted here or every diagnostic after
-                    // one points at the wrong line.
+                    // Skipped like a newline, so an #include quoted in a comment is never obeyed; a block comment's newlines
+                    // are still counted to keep diagnostic line numbers right.
                     for (var i = 0; i < currentToken.Value.Length; i++)
                     {
                         if (currentToken.Value[i] != '\n') continue;

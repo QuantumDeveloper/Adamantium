@@ -35,14 +35,7 @@ namespace Adamantium.EffectsCompiler
         /// Saves this <see cref="EffectData"/> instance to the specified stream.
         /// </summary>
         /// <param name="stream">The stream.</param>
-        /// <remarks>
-        /// Both LZ4 and deflate, in that order, because they do different jobs and the second feeds on what the
-        /// first leaves behind. LZ4 takes repeats and does no entropy coding at all; deflate's Huffman stage then
-        /// crushes the literals left over, and SPIR-V is nothing but opcodes and small integers. Measured on the
-        /// largest effect here: 1786 KB raw, 996 KB through LZ4 alone, 567 KB through deflate alone - and 179 KB
-        /// through both. The payload ends up as a string in generated C#, so its size is build time and assembly
-        /// size, not just disk.
-        /// </remarks>
+        /// <remarks>LZ4, then deflate: deflate's entropy coding shrinks what LZ4 leaves (largest effect: 1786 KB to 179 KB).</remarks>
         public void Save(Stream stream)
         {
             stream.Write(Magic, 0, Magic.Length);

@@ -5,20 +5,8 @@ using Adamantium.Vulkan.Core;
 
 namespace Adamantium.Graphics;
 
-/// <summary>
-/// On-disk cache of DRIVER-compiled shader-object binaries (VK_EXT_shader_object). Its whole purpose is to dodge the
-/// Turing/Quadro <c>vkCreateShadersEXT</c> flake: creating a shader from SPIR-V runs the driver's NVVM compiler in-process
-/// and intermittently access-violates (a corrupted-state exception that can't be caught). A shader created ONCE from
-/// SPIR-V can hand back its compiled binary (<c>vkGetShaderBinaryDataEXT</c>); persisting that lets every LATER launch
-/// create the shader from the BINARY instead - the driver just loads it, no NVVM, no flake.
-/// </summary>
-/// <remarks>
-/// Binaries are device + driver specific: the cache is keyed by the physical device's pipeline-cache UUID + driver
-/// version, so a driver update or a different GPU simply misses (and recompiles once). The FIRST cold compile of a shader
-/// still runs NVVM (still flaky) - that launch warms the cache; a respawn-until-success wrapper turns "warm the cache"
-/// into "reliable startup". Not our bug to fix (buggy driver); this is the durable workaround. Single-threaded (shader
-/// objects are created serially at startup). All IO is best-effort: any failure falls back to the SPIR-V path.
-/// </remarks>
+/// <summary>On-disk cache of driver-compiled shader-object binaries, keyed by pipeline-cache UUID and driver version, so later
+/// launches create shaders from the binary instead of SPIR-V. Any IO failure falls back to SPIR-V.</summary>
 public static class ShaderBinaryCache
 {
     /// <summary>Master switch (off = always compile from SPIR-V, the pre-cache behaviour).</summary>
@@ -92,7 +80,8 @@ public static class ShaderBinaryCache
         catch { return false; }
     }
 
-    /// <summary>Persist the driver-compiled binary of a freshly created shader object, so later launches skip NVVM.</summary>
+    /// <summary>Persist the driver-compiled binary of a freshly created shader object, so later launches skip compiling
+    /// from SPIR-V.</summary>
     public static void Save(GraphicsDevice device, ShaderCreateInfoEXT info, string name, ShaderEXT shader)
     {
         if (!Enabled) return;

@@ -7,14 +7,8 @@ using NUnit.Framework;
 
 namespace Adamantium.ImagingTests;
 
-/// <summary>
-/// The eighth-scale preview decode against the full one.
-///
-/// <para>It skips the inverse DCT entirely and reads each block's average instead, so the question is not whether it is
-/// pixel-identical - it cannot be - but whether it is the same PICTURE: same size, same colours in the same places. A
-/// preview that is subtly shifted, or that has its chroma planes misplaced under subsampling, would still look like a
-/// photograph and be quietly wrong wherever it is used.</para>
-/// </summary>
+/// <summary>The eighth-scale preview decode (block averages, no IDCT) against the full one: same size, same colors in the
+/// same places.</summary>
 [TestFixture]
 public class JpegPreviewDecodeTests
 {
@@ -64,12 +58,8 @@ public class JpegPreviewDecodeTests
         var fullPixels = full.GetRawPixels(0);
         var channels = (int)(fullPixels.Length / (full.Width * full.Height));
 
-        // Each preview pixel against the AVERAGE of the block it stands for - which is what a DC coefficient is.
-        //
-        // Edge blocks are measured SEPARATELY. Where the picture does not fill a whole block, the encoder padded it
-        // with samples of its own choosing, and the DC term is the average including that padding - while the full
-        // decode only ever shows the part inside the picture. The two therefore disagree there by construction, and
-        // holding the edge to the same standard would be testing the encoder's padding, not this decoder.
+        // Each preview pixel against its block's average. Edge blocks are measured separately: their DC term includes the
+        // encoder's padding, which the full decode never shows.
         double worst = 0;
         double worstEdge = 0;
         for (var by = 0u; by < preview.Height; by++)

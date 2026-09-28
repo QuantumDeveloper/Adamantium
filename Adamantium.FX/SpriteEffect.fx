@@ -3,7 +3,7 @@ const static int VERTICES_PER_SPRITE = 4;
 
 // Per-instance sprite data (one element = one sprite quad). The quad corners come from SV_VertexID, so the old
 // geometry-shader expansion is gone: this runs as plain instanced rendering (4-vertex triangle strip x N instances),
-// which is portable (no GS on Metal/MoltenVK) and dodges the NVIDIA Turing GS NVVM bug.
+// which is portable (no GS on Metal/MoltenVK).
 struct SpriteItem
 {
     float4 Destination: Position;

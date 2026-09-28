@@ -5,13 +5,8 @@ using NUnit.Framework;
 
 namespace Adamantium.Engine.CompilerTests
 {
-    /// <summary>
-    /// A pass's <c>Profile</c> is the SPIR-V version its shaders are compiled to. It used to be parsed and dropped -
-    /// 163 declarations across 21 files that reached nothing but a field nobody read, with neighbouring passes carrying
-    /// different numbers as though it mattered. These tests hold it to being real: the number in the source has to come
-    /// back out of the SPIR-V header, and a number this compiler cannot target has to be an ERROR rather than a
-    /// silently ignored one.
-    /// </summary>
+    /// <summary>A pass's <c>Profile</c> is the SPIR-V version its shaders compile to: it must come back out of the SPIR-V
+    /// header, and an untargetable number must be an error.</summary>
     [TestFixture]
     public class SpirvProfileTests
     {

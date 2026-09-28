@@ -1,13 +1,5 @@
-// Line-rendering Phase B: GPU stroke expander with MITER joins. Evolves the step-1 per-segment quads into the
-// canonical model - one thread per polyline POINT emits two offset vertices (along the miter normal = bisector of the
-// adjacent segment normals), and the points are drawn as a triangle STRIP. That makes the stroke one connected ribbon
-// with mitered corners (no gaps/overlaps at joins), instead of disconnected per-segment quads.
-//
-//   output layout (triangle strip):  [ p0+, p0-, p1+, p1-, ... ]   -> PointCount * 2 vertices
-//
-// Endpoints use the single adjacent segment's normal (flat ends; round/square caps come later). The miter length is
-// halfThickness / dot(miter, segmentNormal), clamped so a sharp corner can't shoot the tip to infinity (a proper
-// miter-limit -> bevel fallback is a later refinement). Shader body is Slang.
+// GPU stroke expander with miter joins: one thread per point emits two vertices along the miter normal, drawn as a
+// triangle strip [p0+, p0-, p1+, p1-, ...]; the miter length is clamped at sharp corners.
 
 uint64_t PointsAddress;   // float2[] polyline points (PointCount of them)
 uint64_t OutputAddress;   // float2[] output vertices (PointCount * 2, triangle strip)

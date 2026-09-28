@@ -15,10 +15,10 @@ public sealed class ShaderCompileStats
 {
     public const string FileName = "compile-stats.xml";
 
-    // Deaths after which an effect is not tried again on this driver: a fault that repeats is not a flake.
+    // Deaths after which an effect is no longer retried (until RetryAfter passes).
     private const int DeathsBeforeGivingUp = 3;
 
-    // Long enough that a repeatable fault costs no child process per launch, short enough that a flake recovers.
+    // Long enough that a repeatable fault costs no child process per launch, short enough that a one-off recovers.
     private static readonly TimeSpan RetryAfter = TimeSpan.FromDays(7);
 
     // The render path asks per shader, so it cannot read the file each time. Refresh brings a background child's
@@ -185,8 +185,7 @@ public sealed class ShaderCompileStats
         e.LastOutcome = "Skipped: " + reason;
     }
 
-    /// <param name="stage">The shader the driver held when it went down. Kept apart from the effect, which holds many
-    /// and usually builds all but one of them.</param>
+    /// <param name="stage">The shader being created when the process died; an effect holds many.</param>
     public void RecordDeath(string name, string stage = null)
     {
         var e = Get(name);

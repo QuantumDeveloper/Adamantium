@@ -22,11 +22,7 @@ public static class TextureExtensions
         imageMemoryBarrier.SubresourceRange.BaseMipLevel = 0;
         imageMemoryBarrier.SubresourceRange.LevelCount = 1;
         imageMemoryBarrier.SubresourceRange.BaseArrayLayer = 0;
-        // ALL layers, not just the first. A layout transition applies to the subresources the barrier names, so with a
-        // count of 1 an array texture had only layer 0 moved: the rest stayed as created, and both the upload into them
-        // and the shader's read of them were reads of an image in the wrong layout. Validation says it plainly
-        // ("arrayLayer = 1 ... expects TRANSFER_DST_OPTIMAL, current layout is PREINITIALIZED"), and the draw that
-        // followed took the whole renderer down with it.
+        // All layers: with a count of 1 only layer 0 of an array texture changed layout.
         imageMemoryBarrier.SubresourceRange.LayerCount = Constants.VK_REMAINING_ARRAY_LAYERS;
 
         if (newLayout == ImageLayout.DepthStencilAttachmentOptimal)
@@ -211,11 +207,8 @@ public static class TextureExtensions
             PipelineStageFlagBits.TransferBit
         );
         
-        // destination (swapchain) texture. The source side names the SAME stages the submit waits the imageAvailable
-        // semaphore on (colour output + transfer): a layout transition is a WRITE, and with TopOfPipe as its source it
-        // carried no execution dependency on that wait - so the transition could run against an image the presentation
-        // engine had not released yet (the layer reports it as WRITE_AFTER_READ vs vkAcquireNextImageKHR). Undefined as
-        // the old layout still discards the contents; what changes is WHEN the transition is allowed to happen.
+        // Destination (swapchain) texture: the source stages match the imageAvailable wait, or the transition could run
+        // before the presentation engine releases the image.
         graphicsDevice.InsertImageMemoryBarrier(commandBuffer,
             dstTexture,
             0,

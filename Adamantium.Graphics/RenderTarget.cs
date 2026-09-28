@@ -32,11 +32,8 @@ namespace Adamantium.Graphics
         {
             usage |= ImageUsageFlagBits.ColorAttachmentBit | ImageUsageFlagBits.SampledBit;
 
-            // NOTE: do NOT add HostTransferBit here. On GPUs without Resizable BAR (e.g. the dev Quadro RTX 4000: a
-            // 214 MB DEVICE_LOCAL|HOST_VISIBLE heap), that flag forces the image into a host-visible memory type, and
-            // FindMemoryIndex(DeviceLocal) then lands it in that tiny 214 MB BAR window instead of the 8 GB VRAM heap
-            // -> a single 4K MSAA target exhausts it (ErrorOutOfDeviceMemory). Plain render targets must live in pure
-            // DEVICE_LOCAL VRAM. Texture.Save falls back to a staging read-back when HostTransferBit is absent.
+            // No HostTransferBit: without Resizable BAR it puts the image in the small BAR heap, which one 4K MSAA target
+            // exhausts.
 
             var description = new TextureDescription
             {

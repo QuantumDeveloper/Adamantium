@@ -1,14 +1,5 @@
-// Compute smoke test for the line-rendering GPU pipeline (Step A3). Validates the whole compute path end to end on
-// real hardware: creating + binding + DISPATCHING a compute shader-object, a produce->consume buffer barrier, and
-// BDA output - the destination buffer's device address is passed as a uniform and written through a pointer (no UAV
-// descriptor, matching the chosen approach). Writes a known pattern (index+1) so a CPU readback can verify it.
-//
-// SHADER BODY IS SLANG (not HLSL) - first step of the gradual move to Slang. The technique/pass block stays in the
-// engine's FX-effect syntax; only the shader code is Slang.
-//
-// NOTE (GPU-iterate): `(uint*)OutputAddress` is the BDA write via Slang's first-class pointers (bufferDeviceAddress
-// is enabled engine-wide). If this exact cast is rejected, fallbacks are `Ptr<uint>(OutputAddress)` or a
-// `[[vk::buffer_reference]]` struct.
+// Compute smoke test: a shader object writes index+1 through a BDA pointer for a CPU readback to verify. The shader body
+// is Slang; the technique block uses the engine's FX syntax.
 
 uint64_t OutputAddress;   // GetDeviceAddress() of the output buffer
 uint Count;               // number of uints to write

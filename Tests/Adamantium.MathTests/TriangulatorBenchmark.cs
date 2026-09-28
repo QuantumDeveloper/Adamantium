@@ -9,7 +9,7 @@ using NUnit.Framework;
 namespace Adamantium.MathTests
 {
     /// <summary>
-    /// Re-runnable triangulator benchmark (Phase 0.5). Category "Benchmark" so it's excluded from normal runs.
+    /// Re-runnable triangulator benchmark. Category "Benchmark" so it's excluded from normal runs.
     /// Run: dotnet test -c Release --filter "TestCategory=Benchmark"
     /// </summary>
     [Category("Benchmark")]

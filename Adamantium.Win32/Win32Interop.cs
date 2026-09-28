@@ -83,7 +83,7 @@ namespace Adamantium.Win32
         [DllImport("user32.dll")]
         public static extern bool GetClientRect(IntPtr hWnd, out RECT lpRect);
 
-        // --- Per-Monitor DPI (PMv2). See docs/PER_MONITOR_DPI_PLAN.md. ---
+        // --- Per-Monitor DPI (PMv2). ---
         [DllImport("user32.dll", SetLastError = true)]
         public static extern bool SetProcessDpiAwarenessContext(IntPtr value);
 
@@ -341,11 +341,7 @@ namespace Adamantium.Win32
         [DllImport("dwmapi.dll")]
         public static extern int DwmSetWindowAttribute(IntPtr hwnd, int attribute, ref int pvAttribute, int cbAttribute);
 
-        // Whether Windows currently asks applications to look dark. The personalisation setting lives in the registry
-        // and there is no API for it, so this reads the value directly - here, in the assembly that owns the platform
-        // calls, rather than as a DllImport dropped wherever it happened to be needed.
-        // HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize\AppsUseLightTheme,
-        // a DWORD: 0 = dark, 1 = light. Absent on older Windows, which had no dark mode - hence light by default.
+        // Whether Windows asks apps to look dark: HKCU AppsUseLightTheme, 0 = dark; absent (older Windows) means light.
         private const string PersonalizeKey = @"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize";
         private static readonly IntPtr HkeyCurrentUser = new(unchecked((int)0x80000001));
         private const uint RrfRtRegDword = 0x00000010;
@@ -434,7 +430,7 @@ namespace Adamantium.Win32
         public static extern bool DeleteObject(IntPtr hObject);
 
         /*
-            OLE drag-drop (docs/DRAG_DROP_PLAN.md phases 5-6): the bridge to other applications.
+            OLE drag-drop: the bridge to other applications.
         */
 
         /// <summary>Standard clipboard format ids (CF_UNICODETEXT sits with the clipboard block above). The drag payload

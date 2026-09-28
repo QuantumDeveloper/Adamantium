@@ -46,11 +46,8 @@ namespace Adamantium.ProceduralGeometry.Shapes
                 return mesh;
             }
 
-            /// <summary>The polygon's corners, corner 0 at <paramref name="startAngle"/> degrees from the +x axis. One
-            /// statement of where they are, so the fill, the outline and anything reading the contour cannot drift apart.
-            /// <para>The angle turns the shape along the ELLIPSE the box inscribes (it offsets the parameter, it does not
-            /// rotate the result), so a squashed polygon stays inside its box however far it is turned - which is also
-            /// what the SDF batch does with the same number.</para></summary>
+            /// <summary>The polygon's corners, corner 0 at <paramref name="startAngle"/> degrees from +x, shared by fill and
+            /// outline. The angle offsets the inscribed ellipse's parameter, so a squashed polygon stays in its box.</summary>
             public static List<Vector3> Corners(Vector2 radii, int tessellation, double startAngle)
             {
                 var start = MathHelper.DegreesToRadians(startAngle);

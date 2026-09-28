@@ -64,13 +64,8 @@ namespace Adamantium.Fonts.TextureGeneration
 
         private void CalculateTextureDataForAtlas(GlyphTextureData[] textureData)
         {
-            // Tight shelf packing (next-fit): place each glyph's bitmap (FullGlyphSize) right after the
-            // previous one on the current shelf; when it would overflow the atlas width, drop to a new shelf
-            // just below the tallest bitmap on the shelf so far. The shelf is only as tall as its tallest
-            // glyph (no reserved per-row height), so vertical space isn't wasted and the texture holds the
-            // most glyphs. Each glyph is already centred inside its own cell (cell = body + margin on every
-            // side, body centred by the generator), so no extra alignment is needed here. The cursor lives on
-            // atlasData so packing continues correctly as the dynamic atlas keeps adding glyphs across calls.
+            // Next-fit shelf packing; a shelf is as tall as its tallest glyph. The cursor lives on atlasData, so packing
+            // continues as the dynamic atlas grows.
             var atlasWidth = (int)atlasData.AtlasSize.Width;
             var atlasHeight = (int)atlasData.AtlasSize.Height;
 

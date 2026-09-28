@@ -8,11 +8,7 @@ public static class TypeParser
 {
     public static TTarget Parse<TTarget>(string value) => (TTarget)Parse(value, typeof(TTarget));
 
-    // One resolved parser per target type, built once and cached. Parse USED to reflect on EVERY call -
-    // GetCustomAttribute + Activator.CreateInstance + GetMethod + MethodInfo.Invoke - which is fine for one-shot AUML
-    // parsing but murders a hot binding path: a value-converter on a virtualized list re-runs per realized item, so a
-    // resize/scroll that realizes hundreds of items did hundreds of full-reflection parses per frame = a visible freeze.
-    // With the cache a call is just a delegate invoke (the parser instance + Parse method are resolved a single time).
+    // Cached per target type: reflecting on every call froze virtualized lists that re-parse per realized item.
     private static readonly ConcurrentDictionary<Type, Func<string, object>> _parsers = new();
 
     /// <summary>
@@ -60,11 +56,8 @@ public static class TypeParser
         var parse = parserType.GetMethod(nameof(ITypeParser<object>.Parse), [typeof(string)])
                     ?? throw new InvalidOperationException($"{parserType.FullName} has no Parse(string) method");
 
-        // Bind the parser's Parse(string) as a direct delegate ONCE, so each parse is a plain call - not a per-call
-        // MethodInfo.Invoke (reflection dispatch + a `[value]` args-array allocation). A converter on a virtualized list
-        // re-parses per realized item every scroll frame (e.g. a colour string -> Brush per tile), so the reflection
-        // Invoke + array alloc was steady CPU + GC churn on the hot path. Return types are reference (Brush, etc.), so
-        // Func<string,object> binds by reference-covariance; a value-type return can't, so fall back to Invoke there.
+        // A direct delegate avoids per-call reflection and allocation on the hot parse path; a value-type return cannot
+        // bind covariantly and falls back to Invoke.
         try
         {
             return (Func<string, object>)Delegate.CreateDelegate(typeof(Func<string, object>), parser, parse);

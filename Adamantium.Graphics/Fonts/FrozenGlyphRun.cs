@@ -2,13 +2,8 @@ using System;
 
 namespace Adamantium.Graphics.Fonts;
 
-/// <summary>An immutable snapshot of a <see cref="TextLayout"/>'s shaped glyphs in LOCAL coordinates, taken on the
-/// record/update thread so the render/applier path bakes text WITHOUT reading the live layout (which the owning TextBlock
-/// reshapes IN PLACE). It holds a private copy of the glyph items; the <see cref="FontAtlas"/> is shared by reference -
-/// its glyph tiles are append-only and never move, so an already-captured run's UVs stay valid even as other text adds
-/// glyphs. The glyphs are LOCAL: the batch packs them into a per-instance GPU buffer and the glyph shader applies the
-/// block's world/node transform; the direct/composite fallback uploads them into the component's own vertex buffer. Either
-/// way there is no per-glyph CPU world bake and no live-layout read at draw (docs/RENDER_THREAD_PLAN.md).</summary>
+/// <summary>An immutable snapshot of a <see cref="TextLayout"/>'s shaped glyphs in local coordinates, taken on the record
+/// thread so rendering never reads the live layout. The shared <see cref="FontAtlas"/> tiles never move.</summary>
 public sealed class FrozenGlyphRun(FontItem[] glyphs, int count, FontAtlas atlas, float fontSize)
 {
     public FontItem[] Glyphs { get; } = glyphs;

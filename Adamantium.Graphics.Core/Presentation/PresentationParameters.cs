@@ -48,11 +48,8 @@ namespace Adamantium.Graphics.Core.Presentation
         /// it onto whatever the surface actually offers, and Fifo is always there as the floor.</summary>
         public PresentPolicy PresentPolicy { get; set; }
 
-        /// <summary>Ask the desktop to compose this surface with PER-PIXEL alpha instead of treating it as opaque.
-        /// <para>Honoured only if the surface reports it (<c>supportedCompositeAlpha</c>) - it is a property of the
-        /// surface, not of the application: measured on one machine, one surface offered pre-multiplied and another in
-        /// the same process offered opaque only. When it is not offered the swapchain stays opaque, and the caller is
-        /// told rather than left wondering why a window it asked to be transparent is not.</para></summary>
+        /// <summary>Ask the desktop to compose this surface with per-pixel alpha. Honored only when the surface offers it
+        /// (<c>supportedCompositeAlpha</c>); otherwise the swapchain stays opaque and the caller is told.</summary>
         public bool TransparentComposition { get; set; }
 
         public PresentationParameters(

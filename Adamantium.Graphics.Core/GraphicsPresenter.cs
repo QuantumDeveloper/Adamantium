@@ -9,11 +9,8 @@ namespace Adamantium.Graphics.Core
 {
     public abstract class GraphicsPresenter : DisposableObject
     {
-        // ONE COLOUR TARGET AND DEPTH BUFFER PER FRAME IN FLIGHT, indexed by the device's frame slot - the same slot whose
-        // fence BeginDraw waits on, so the surfaces this frame draws into are provably free. A single shared pair meant
-        // the GPU could still be blitting frame N out of them while frame N+1 was already clearing and redrawing them,
-        // and the blit then published a half-drawn frame: whole-window flicker - missing scissors, text bleeding past a
-        // tab edge, backgrounds gone for one frame. Command buffers and fences were already per frame; these were not.
+        // One color target and depth buffer per frame in flight, indexed by the fenced frame slot: a shared pair was redrawn
+        // while the GPU still blitted the previous frame, which flickered.
         protected IRenderTarget[] renderTargets;
         protected IDepthStencilBuffer[] depthBuffers;
         
@@ -145,11 +142,8 @@ namespace Adamantium.Graphics.Core
             return true;
         }
         
-        /// <summary>Whether the images this presenter draws into no longer match what they are presented to. Asked every
-        /// frame, because the only reliable answer comes from the surface itself: a swapchain that declares what it does
-        /// when the sizes differ is not doing anything WRONG by presenting a stale image, so the driver reports neither
-        /// an error nor a suboptimal - there is no complaint left to listen for. Presenters that own their images have
-        /// nothing to compare against and say no.</summary>
+        /// <summary>Whether the images no longer match the surface they are presented to. Asked every frame: a swapchain that
+        /// scales a stale image reports no error to listen for.</summary>
         public virtual bool NeedsRebuild => false;
 
         /// <summary>The size the surface says it is right now, or 0x0 when it has no opinion / there is no surface.</summary>

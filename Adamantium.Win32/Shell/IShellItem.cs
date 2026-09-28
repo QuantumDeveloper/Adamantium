@@ -3,12 +3,8 @@ using System.Runtime.InteropServices;
 
 namespace Adamantium.Win32.Shell;
 
-/// <summary>One thing in the shell's namespace - what a file dialog answers with. Not a path: the shell's namespace
-/// holds items that have no path at all (a library, a device, a search result), so the path is something an item is
-/// ASKED for and may not have.
-///
-/// <para>Only the members we call are declared; see <see cref="IFileSaveDialog"/> on why the order of the ones above
-/// them still matters.</para></summary>
+/// <summary>One item in the shell namespace, as a file dialog returns it; it may have no file path. Only used members are
+/// declared.</summary>
 [ComImport]
 [Guid("43826D1E-E718-42EE-BC55-A1E261C37BFE")]
 [InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]

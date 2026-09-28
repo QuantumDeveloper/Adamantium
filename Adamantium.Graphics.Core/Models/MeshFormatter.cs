@@ -5,14 +5,8 @@ using MessagePack.Formatters;
 
 namespace Adamantium.Graphics.Core.Models;
 
-/// <summary>
-/// Writes a <see cref="Mesh"/> as a fixed row of flat blobs rather than letting the contractless resolver spell
-/// out "X", "Y", "Z" for every element of every array. Losing nothing is the rule, so the narrower forms are the
-/// ones that provably cost nothing: positions as float where every one of them is exactly representable,
-/// indices as ushort where the mesh has fewer than 65536 vertices, and no bitangents at all when they are
-/// exactly <c>cross(normal, tangent) * tangent.W</c>, which is how they were made. Each of those is checked per
-/// mesh and falls back to the wide form on its own.
-/// </summary>
+/// <summary>Writes a <see cref="Mesh"/> as flat blobs. Narrower forms (float positions, ushort indices, derived
+/// bitangents) are used per mesh only when provably lossless.</summary>
 public sealed class MeshFormatter : IMessagePackFormatter<Mesh>
 {
     /// <summary>Bumped whenever the row below changes shape. A file written by an older engine is refused by

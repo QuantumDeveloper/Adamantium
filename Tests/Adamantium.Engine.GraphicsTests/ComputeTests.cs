@@ -76,7 +76,7 @@ namespace Adamantium.Engine.GraphicsTests
 
         }
 
-        // Line-rendering Phase B (step 1): the GPU stroke expander turns a polyline + half-thickness into per-segment
+        // The GPU stroke expander turns a polyline + half-thickness into per-segment
         // quads (straight segments, no joins/caps yet). We dispatch it, read the output vertices back and compare to a
         // CPU offset computation - proving the GPU builds the stroke geometry (the whole point: no CPU re-tessellation).
         [Test]
@@ -196,7 +196,7 @@ namespace Adamantium.Engine.GraphicsTests
             [VertexInputElement("POSITION")] public Vector2F Position;
         }
 
-        // Line-rendering Phase B (step 2): render the GPU-expanded stroke. Compute writes the quad vertices, then the
+        // Render the GPU-expanded stroke. Compute writes the quad vertices, then the
         // SAME frame binds that buffer as a vertex buffer and draws it (white on black). A pixel readback proves the
         // rasterizer consumes the compute output: pixels on the stroke differ from the background and match each other.
         [Test]
@@ -249,11 +249,8 @@ namespace Adamantium.Engine.GraphicsTests
             var sc = new Rect2D { Offset = new Offset2D(), Extent = new Extent2D { Width = 64, Height = 64 } };
 
             uint groups = ((uint)pointCount + 63) / 64;
-            // The whole frame executing without a GPU/validation error IS the assertion: compute dispatch (writing the
-            // vertex buffer), then binding that compute-produced buffer as a vertex buffer and drawing it, all in one
-            // graphics frame. Geometry correctness is already proven pixel-exact by StrokeExpand_StraightSegments_MatchCpu.
-            // (A pixel readback of the target would need RenderTarget.Save, which hits a pre-existing Core/Imaging TFM
-            // mismatch in this test project - unrelated to line rendering - so it's deferred.)
+            // The frame running without a GPU or validation error is the assertion; geometry is checked by
+            // StrokeExpand_StraightSegments_MatchCpu.
             Assert.That(device.BeginDraw(beforeRenderPass: cmd =>
             {
                 expandPass.Apply();
@@ -416,11 +413,8 @@ namespace Adamantium.Engine.GraphicsTests
 
         }
 
-        // One-pass GPU "cutting" (dashes + trim) prototype: a single compute thread walks a contour by arc length and
-        // emits a quad per visible dash piece, writing the vertex count into a VkDrawIndirectCommand. Deterministic
-        // (sequential, no atomics) so we can check the count and the first piece's exact corners against the CPU walk.
-        // Line (0,0)->(100,0), pattern [20 on, 10 off], offset 0, full trim => pieces [0,20] [30,50] [60,80] [90,100]
-        // = 4 pieces = 24 vertices; half-thickness 5 -> the first quad is the rectangle x in [0,20], y in [-5,5].
+        // One-pass GPU dash cutting against the CPU walk: (0,0)-(100,0) with [20 on, 10 off] gives 4 pieces = 24 vertices,
+        // and half-thickness 5 makes the first quad x in [0,20], y in [-5,5].
         [Test]
         public void DashCut_OnePassWalk_MatchesCpu()
         {

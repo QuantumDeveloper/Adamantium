@@ -304,13 +304,8 @@ namespace Adamantium.Fonts.TextureGeneration
 
             var glyphBoundingRectangle = glyph.BoundingRectangle;
 
-            // Isotropic scale relative to the EM square (the typographic design reference): the SAME factor
-            // for X and Y, so the distance field is NOT stretched anisotropically (the old square-fit used
-            // scaleX != scaleY) and relative glyph sizes are preserved (M larger than i). We scale against
-            // the em, NOT the font's global max-glyph bbox: that bbox is the union over all glyphs and is
-            // routinely inflated by a few outliers (ornaments, .notdef, composites), which would shrink
-            // every normal letter to a speck. The rare glyph taller/wider than the em is scaled down
-            // uniformly so it still fits the fixed cell while keeping scaleX == scaleY.
+            // One scale for X and Y against the em, not the font's max-glyph bbox, which outliers inflate; a glyph
+            // larger than the em is scaled down uniformly to fit its cell.
             var unitScale = (double)originalSize / unitsPerEm;
             var glyphWidth = glyphBoundingRectangle.Width * unitScale;
             var glyphHeight = glyphBoundingRectangle.Height * unitScale;

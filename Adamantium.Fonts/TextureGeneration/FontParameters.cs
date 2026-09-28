@@ -31,14 +31,8 @@ public class FontParameters
         
     public byte SampleRate { get; }
     
-    // PixelRange: distance-field range in atlas texels = how far (in texels) from the contour the field
-    // stays a usable gradient before it saturates to 0/1 (black/white). It is ALSO the width of the
-    // colored field that fills the cell around each glyph: at pxRange=6 the field dies ~3 texels out, so
-    // the cell reads as black; a wider range carries the colored field across the whole cell margin
-    // (the msdf-atlas-gen look) and gives later shadow/glow/outline effects real distance to sample.
-    // This does NOT blur text: screenPxRange() scales with PxRange, so the AA band stays ~1 screen pixel
-    // at any range. The only cost of a larger range is coarser 8-bit precision of the gradient right at
-    // the contour, which is negligible here. GlyphMargin auto-tracks this (= ceil(pxRange/2)).
+    // Distance-field range in atlas texels. A wide range gives glow/outline effects distance to sample without blurring
+    // text: the AA band stays ~1 screen pixel. GlyphMargin tracks it.
     public byte PixelRange { get; }
         
     public uint StartGlyphIndex { get; }

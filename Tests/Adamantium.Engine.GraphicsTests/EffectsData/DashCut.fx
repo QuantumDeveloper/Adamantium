@@ -1,10 +1,5 @@
-// Prototype + de-risk for one-pass GPU "cutting": a SINGLE compute thread walks the contour by arc length, applies a
-// trim range [TrimStart,TrimEnd] (fractions of total length) and a dash pattern, and emits each visible piece as a
-// quad (two triangles) - writing the running vertex count into a VkDrawIndirectCommand. Sequential single-thread
-// emission is deterministic (no atomics), so a readback test can compare piece-for-piece against the CPU. Once proven
-// this logic ports into StrokeEffect.fx so dashes/trim need zero per-frame CPU (just uniforms). Shader body is Slang.
-//
-// Output is a triangle LIST; the indirect command's vertexCount is the GPU-decided draw size.
+// One-pass GPU cutting: a single thread walks the contour by arc length, applies trim and dashes, and emits each visible
+// piece as a quad into a triangle list, writing the vertex count into a VkDrawIndirectCommand. Deterministic for readback.
 
 uint64_t PointsAddress;     // float2[] contour points
 uint64_t PatternAddress;    // float[] dash pattern (on,off,on,off,...); PatternCount entries

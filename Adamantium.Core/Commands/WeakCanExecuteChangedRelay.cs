@@ -2,14 +2,8 @@ using System;
 
 namespace Adamantium.Core.Commands;
 
-/// <summary>
-/// Subscribes to a command's <see cref="ICommand.CanExecuteChanged"/> on behalf of a target, holding the target
-/// <em>weakly</em>. A command often lives as long as its view-model; without this, the subscription's delegate would
-/// keep the target (e.g. a Button) — and its whole visual subtree — alive after it's gone from the UI. Here the
-/// command keeps only the relay; the relay keeps the target weakly and detaches itself the first time it fires after
-/// the target has been collected. The <c>invoke</c> callback must be a <em>static</em> delegate (no captured target),
-/// otherwise it would re-introduce a strong reference and defeat the purpose.
-/// </summary>
+/// <summary>Subscribes to a command's <see cref="ICommand.CanExecuteChanged"/> holding the target weakly, so a long-lived
+/// command does not keep a control and its subtree alive. The <c>invoke</c> callback must be a static delegate.</summary>
 public sealed class WeakCanExecuteChangedRelay<TTarget> where TTarget : class
 {
     private readonly WeakReference<TTarget> _target;

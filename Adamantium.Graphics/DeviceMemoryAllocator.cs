@@ -5,20 +5,8 @@ using Adamantium.Vulkan.Core;
 
 namespace Adamantium.Graphics;
 
-/// <summary>
-/// Persistent GPU memory sub-allocator (VMA-style). Vulkan caps the number of live <c>vkAllocateMemory</c> allocations
-/// (<c>maxMemoryAllocationCount</c>, guaranteed as low as 4096); the old model gave every <see cref="Buffer"/> its own
-/// dedicated allocation, so a few thousand small per-fill buffers (the analytic-AA fringe rents two BDA buffers per
-/// contour) exhausted that limit and threw <c>ErrorOutOfDeviceMemory</c> even though the bytes were tiny. This allocator
-/// carves buffer memory out of a handful of large shared blocks instead: N small buffers collapse to a few allocations.
-///
-/// Blocks are grouped by (memory-type index, needs-device-address) - a block's <c>DeviceAddressBit</c> alloc flag is set
-/// only for the BDA group. A host-visible block is mapped ONCE for its whole life and every sub-allocation writes through
-/// <c>MappedBase + offset</c>, which both sidesteps Vulkan's one-map-per-<c>VkDeviceMemory</c> rule and skips a map/unmap
-/// syscall per upload. Buffer-device-address stays correct because <c>vkGetBufferDeviceAddress</c> reports the address for
-/// the buffer wherever it is bound (its bind offset included). Images are NOT routed here (buffer-image granularity, and
-/// they are few + large); this is buffers only.
-/// </summary>
+/// <summary>Sub-allocates buffer memory from a few large blocks, staying under Vulkan's <c>maxMemoryAllocationCount</c>.
+/// Host-visible blocks are mapped once for life. Buffers only.</summary>
 public sealed class DeviceMemoryAllocator : IDeviceMemoryAllocator
 {
     // 64 MB blocks in a big VRAM heap, but never more than heapSize/8 so the tiny (~214 MB) host-visible BAR window still

@@ -4,16 +4,8 @@ using NUnit.Framework;
 
 namespace Adamantium.ImagingTests;
 
-/// <summary>
-/// The fast inverse DCT against the direct one, block for block.
-///
-/// <para>The round-trip test next door proves a picture survives the codec; it cannot prove the transform is RIGHT,
-/// because JPEG is lossy and a slightly wrong transform still produces a picture that looks fine. This one compares the
-/// factorised transform against the definition it replaced, on the same coefficients - the only way to tell "faster"
-/// apart from "quietly different".</para>
-///
-/// <para>Both are private to the codec, so they are reached by reflection rather than by widening the API for a test.</para>
-/// </summary>
+/// <summary>The fast inverse DCT against the direct one, block for block: a lossy round trip cannot tell a slightly wrong
+/// transform from a right one. Both are private and reached by reflection.</summary>
 [TestFixture]
 public class IdctEquivalenceTests
 {

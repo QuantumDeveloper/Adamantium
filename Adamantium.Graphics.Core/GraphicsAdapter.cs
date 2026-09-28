@@ -38,11 +38,8 @@ public unsafe class GraphicsAdapter
         DeviceBufferProperties = bufferProperties;
         DeviceHeapProperties = heapProperties;
 
-        // descriptor-heap capture/replay is what tools like NSight need; host image copy (Vulkan 1.4) lets a render
-        // target be read back straight to host memory, skipping the staging buffer + queue submit (used by
-        // Texture.Save, which falls back when absent); swapchainMaintenance1 is a FEATURE and having the extension is
-        // not the same thing - passing one of its structures with the feature off is invalid use, not a no-op, so it
-        // is asked here and device creation enables it before anything may use it.
+        // swapchainMaintenance1 is a feature, not just an extension: its structures are invalid with the feature off, so it
+        // is queried here and enabled at device creation.
         var maintenance = new PhysicalDeviceSwapchainMaintenance1FeaturesKHR();
         var hostCopy = new PhysicalDeviceVulkan14Features { PNext = maintenance };
         var heapFeatures = new PhysicalDeviceDescriptorHeapFeaturesEXT { PNext = hostCopy };

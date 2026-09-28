@@ -49,11 +49,8 @@ namespace Adamantium.Engine.GraphicsTests
             img.Dispose();
         }
 
-        /// <summary>A 24-bit source encoded to JPEG must come back as the SAME PICTURE. "It did not throw" was all the
-        /// fixture ever asked, which is how a component extractor that stepped four bytes through a three-byte-per-pixel
-        /// buffer went unnoticed - and, once it was made not to throw, would have gone unnoticed again had it merely
-        /// produced a scrambled image. JPEG is lossy, so this compares within a tolerance, and it compares CORNERS as
-        /// well as the middle: a transposed or shifted extraction moves those first.</summary>
+        /// <summary>A 24-bit JPEG round trip returns the same picture within tolerance, corners included, where a shifted
+        /// extraction shows first.</summary>
         [Test]
         public void Jpeg24BitRoundTrip_KeepsThePicture()
         {

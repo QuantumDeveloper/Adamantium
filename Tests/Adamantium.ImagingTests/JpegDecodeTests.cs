@@ -6,18 +6,8 @@ using NUnit.Framework;
 
 namespace Adamantium.ImagingTests;
 
-/// <summary>
-/// What the JPEG decoder must keep producing while it is made faster.
-///
-/// <para>Written BEFORE optimising it, and that is the point: the decoder is a hand-tuned port with an inverse DCT in
-/// its hot path, nothing covered it, and "faster" is worthless if it quietly changes pixels. A 4K wallpaper took 6.4
-/// seconds through it, of which 3.9 were the IDCT alone - so it is going to be edited, and this is what says the edits
-/// were harmless.</para>
-///
-/// <para>Lossy, so the comparison is a TOLERANCE, not equality: the encoder throws away high-frequency detail by
-/// design. The pictures below are deliberately smooth for that reason - a gradient survives quantisation, a checkerboard
-/// would not, and a test that fails on the format's own behaviour teaches nothing.</para>
-/// </summary>
+/// <summary>Pins what the JPEG decoder produces, within a tolerance since the format is lossy; the pictures are smooth so
+/// quantization alone does not fail them.</summary>
 [TestFixture]
 public class JpegDecodeTests
 {

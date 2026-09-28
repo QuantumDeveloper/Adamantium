@@ -7,8 +7,8 @@ using NUnit.Framework;
 namespace Adamantium.MathTests
 {
     /// <summary>
-    /// Locks the triangulator's fill-rule behaviour (truth table, see plan §2) and the convex fast-path,
-    /// so the Phase 0.5 perf work (convex fan, earcut later) can't silently change rendered results.
+    /// Locks the triangulator's fill-rule behaviour (truth table) and the convex fast-path,
+    /// so perf work (convex fan, earcut later) can't silently change rendered results.
     /// </summary>
     public class FillRuleAndConvexTests
     {
@@ -103,11 +103,7 @@ namespace Adamantium.MathTests
             Assert.AreEqual(2, nz.Count / 3, "solid quad => 2 triangles");
         }
 
-        // OPEN. A hole must survive a neighbour that crosses the outline: clean nesting is resolved by the fast path
-        // and its winding rule, but ONE crossing sends the whole shape to the general pipeline, where no fill rule is
-        // consulted at all - the contours are merely united and every hole is lost. Closing it means finding the FACES
-        // of the cut-up contours (a walk over the planar graph); the scanline there pairs crossings by their upper
-        // point, which is not their order across a slanted edge.
+        // A hole must survive a neighbor that crosses the outline: the fill rule applies to the faces of the cut-up contours.
         [Test]
         public void NonZero_KeepsHoles_WhenSomethingCrossesTheOutline()
         {

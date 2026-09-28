@@ -4,19 +4,8 @@ using Adamantium.Fonts.Tables.CFF;
 
 namespace Adamantium.Fonts.Tables.CMAP
 {
-    /// <summary>
-    /// Many-to-one range mappings
-    /// This subtable provides for situations in which the same glyph is used for
-    /// hundreds or even thousands of consecutive characters spanning across multiple ranges of the code space.
-    /// This subtable format may be useful for “last resort” fonts, although these fonts may use other suitable
-    /// subtable formats as well. (For “last-resort” fonts, see also the 'head' table flags, bit 14.)
-
-    /// Unicode Variation Sequences
-    /// Subtable format 14 specifies the Unicode Variation Sequences (UVSes) supported by the font.
-    /// A Variation Sequence, according to the Unicode Standard, comprises a base character
-    /// followed by a variation selector. For example, <U+82A6, U+E0101>.
-    /// This subtable format must only be used under platform ID 0 and encoding ID 5.
-    /// </summary>
+    /// <summary>Format 14: the Unicode Variation Sequences (a base character plus a variation selector) the font supports;
+    /// used only under platform 0, encoding 5.</summary>
     public class CharacterMapFormat14 : CharacterMap
     {
         public CharacterMapFormat14()

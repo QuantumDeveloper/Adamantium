@@ -44,13 +44,8 @@ namespace Adamantium.Fonts.Parsers.CFF
                         var startCoord = regionList.VariationRegions[r].RegionAxes[a].StartCoord;
                         var peakCoord = regionList.VariationRegions[r].RegionAxes[a].PeakCoord;
                         var endCoord = regionList.VariationRegions[r].RegionAxes[a].EndCoord;
-                        /* If a region definition is not valid in relation to some axis,
-                        then ignore the axis. For a region to be valid in relation to a
-                        given axis, it must have a peak that is between the start and
-                        end values, and the start and end values cannot have different
-                        signs if the peak is non-zero. (Start and end can have different
-                        signs if the peak is zero, however: this can be used if an axis is
-                        to be ignored in the scalar calculation.) */
+                        // An axis is ignored when the region is invalid for it: the peak must lie between start and end,
+                        // and those may differ in sign only when the peak is zero.
 
                         if (startCoord > peakCoord ||
                             peakCoord > endCoord)

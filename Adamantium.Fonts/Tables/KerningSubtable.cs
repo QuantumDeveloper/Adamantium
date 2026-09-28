@@ -11,15 +11,8 @@ namespace Adamantium.Fonts.Tables
         public bool Horizontal { get; internal set; } // true - horizontal kerning, false - vertical
         public bool Minimum { get; internal set; }
         
-        /// <summary>
-        /// Cross-stream:                                                        
-        /// If text is normally written horizontally, kerning will be vertical.  
-        /// If kerning values are positive, the text will be kerned up.          
-        /// If they are negative, the text will be kerned down.                  
-        /// If text is normally written vertically, kerning will be horizontal.  
-        /// If kerning values are positive, the text will be kerned to the right.
-        /// If they are negative, the text will be kerned to the left.           
-        /// </summary>
+        /// <summary>Kerning across the writing direction: vertical for horizontal text, horizontal for vertical text;
+        /// positive values move up or right.</summary>
         public bool CrossStream { get; internal set; }
         public bool Override { get; internal set; }
         public Byte Format { get; internal set; } // set the format of this subtable (0-3 currently defined)

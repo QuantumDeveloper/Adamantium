@@ -8,13 +8,8 @@ namespace Adamantium.Graphics;
 
 public static class GraphicsDeviceExtension
 {
-    /// <summary>
-    /// Records (into the device's CURRENT command buffer, no separate submit) a copy of a just-resolved render
-    /// target into a shared surface that is sampled directly by the consumer. Producer calls this after EndDraw and
-    /// before Submit; the Submit then signals Produce. The resolve <paramref name="source"/> is transitioned
-    /// ColorAttachment↔TransferSrc and the shared <paramref name="destination"/> ShaderReadOnly↔TransferDst, so the
-    /// destination is left in ShaderReadOnly ready for the consumer's sample.
-    /// </summary>
+    /// <summary>Records into the current command buffer a copy of a resolved render target into a shared surface, leaving the
+    /// destination in ShaderReadOnly for the consumer. Call after EndDraw, before Submit.</summary>
     public static void RecordSharedSurfaceCopy(this IGraphicsDevice graphicsDevice, ITexture source, ITexture destination)
     {
         if (source == null || destination == null) return;

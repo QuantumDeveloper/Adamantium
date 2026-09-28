@@ -11,20 +11,8 @@ using VulkanImage = Adamantium.Vulkan.Core.Image;
 
 namespace Adamantium.Graphics;
 
-/// <summary>
-/// A GPU surface shareable across processes/APIs via an OS handle. Two ways in:
-/// <list type="bullet">
-/// <item><see cref="CreateExportable"/> — allocate a dedicated, externally-shareable image and export OS handles
-/// for its memory and its produce/consume semaphores; hand the resulting <see cref="Descriptor"/> to a consumer.</item>
-/// <item><see cref="Import"/> — given a producer's descriptor, allocate a local image bound zero-copy to the
-/// imported memory and import the same semaphores, then sample it during compositing.</item>
-/// </list>
-/// The handle flavour follows the surface's <see cref="SharedHandleType"/> (the producer decides), not the
-/// consumer's OS: Win32/D3D11/D3D12 are NT-handle transports, OpaqueFd is a POSIX fd (Linux, macOS via MoltenVK,
-/// and possible on Windows too). Backed by <see cref="Texture"/> (image + view + memory), so it is an
-/// <see cref="ITexture"/> usable with <c>DrawImage</c>. Owners free it explicitly via <see cref="IDisposable.Dispose"/>
-/// from their lifecycle hook (e.g. a control's detach) — controls themselves stay non-disposable.
-/// </summary>
+/// <summary>A GPU surface shared across processes and APIs through an OS handle: <see cref="CreateExportable"/> exports one,
+/// <see cref="Import"/> binds a producer's zero-copy. Owners dispose it explicitly.</summary>
 public sealed unsafe class SharedSurface : Texture
 {
     private static bool IsWindows => RuntimeInformation.IsOSPlatform(OSPlatform.Windows);
@@ -90,7 +78,7 @@ public sealed unsafe class SharedSurface : Texture
 
         var surface = new SharedSurface(device, description, externalInfo, allocFactory, name);
         surface._useFd = IsFdHandle(resolvedType);
-        // TODO(Phase 4): producer/consumer ownership transfer (VK_QUEUE_FAMILY_EXTERNAL) on the shared queue.
+        // TODO: producer/consumer ownership transfer (VK_QUEUE_FAMILY_EXTERNAL) on the shared queue.
         surface.TransitionImageLayout(description.DesiredImageLayout);
 
         var logical = surface.GraphicsDevice.LogicalDevice;
@@ -146,7 +134,7 @@ public sealed unsafe class SharedSurface : Texture
 
         var surface = new SharedSurface(device, description, externalInfo, allocFactory, name);
         surface._useFd = useFd;
-        // TODO(Phase 4): acquire ownership from VK_QUEUE_FAMILY_EXTERNAL instead of a plain transition.
+        // TODO: acquire ownership from VK_QUEUE_FAMILY_EXTERNAL instead of a plain transition.
         surface.TransitionImageLayout(description.DesiredImageLayout);
 
         if (descriptor.ProduceSemaphoreHandle != IntPtr.Zero)

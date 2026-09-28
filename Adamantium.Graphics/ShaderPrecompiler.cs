@@ -11,24 +11,8 @@ using Serilog;
 
 namespace Adamantium.Graphics;
 
-/// <summary>
-/// Compiles every shader the application owns BEFORE it opens anything, in a THROWAWAY child process, starting another
-/// one whenever that child dies. Creating a shader from SPIR-V runs the driver's NVVM compiler in-process and
-/// intermittently access-violates; that is a corrupted-state exception, so nothing INSIDE the process can catch it -
-/// only a parent can make another attempt. Every attempt persists what it did compile (see <see cref="ShaderBinaryCache"/>),
-/// so the retries converge (measured on 596.97 / Quadro RTX 4000: ~7 attempts from an empty cache, sometimes stalling
-/// for six in a row on one shader).
-/// </summary>
-/// <remarks>
-/// Why the whole effect list rather than "restart until a window appears": effects are constructed lazily - the font
-/// effect on the first text draw, others on first use - so a launch can get its window up and die a minute later on a
-/// shader nobody had touched yet. Compiling the enumerated set is what makes "compiled" mean compiled.
-/// <para>The stamp lives in the cache folder, which is keyed by GPU + DRIVER VERSION, so a driver update invalidates it
-/// by itself and an already-compiled launch costs one File.Exists - no child process, no device work.</para>
-/// <para>This is a workaround for a driver defect, not a fix, and it only covers the crash WHILE CREATING a shader. A
-/// shader that is created successfully but compiled wrongly (a GPU fault, VK_ERROR_DEVICE_LOST) is a different failure
-/// and precompiling cannot help it.</para>
-/// </remarks>
+/// <summary>Compiles every shader the application owns in a throwaway child process before startup, restarting it when it
+/// dies; each attempt persists its binaries (<see cref="ShaderBinaryCache"/>), and a stamp per GPU and driver skips it next time.</summary>
 public static class ShaderPrecompiler
 {
     /// <summary>Master switch (off = the earlier behaviour: cold launches die until the cache happens to fill).</summary>
@@ -38,7 +22,7 @@ public static class ShaderPrecompiler
     public const string PassArgument = "--precompile-shaders";
 
     private const int MaxAttempts = 25;
-    private const int MaxAttemptsWithoutProgress = 3;   // no longer flake - something is permanently wrong
+    private const int MaxAttemptsWithoutProgress = 3;   // beyond this, something is permanently wrong
     private static readonly TimeSpan AttemptTimeout = TimeSpan.FromMinutes(2);
 
     private static readonly object BackgroundGate = new();
@@ -93,9 +77,8 @@ public static class ShaderPrecompiler
                 return;
             }
 
-            // The child left behind the name of what it was building when it died. Writing that down is progress of
-            // its own kind - the next attempt starts past it - and without this one effect the driver will not
-            // compile holds the whole cache cold, for every launch, forever.
+            // The child left the name of what it was building when it died; recording it lets the next attempt skip it, or
+            // one such effect would keep the whole cache cold.
             if (TakePoisoned(device) is { } poisoned)
             {
                 Log.Logger.Warning($"Shader precompile: {poisoned} took the process down - skipping it from now on");
@@ -103,8 +86,8 @@ public static class ShaderPrecompiler
                 continue;
             }
 
-            // A dead child still made progress if it persisted something new; only a run that adds NOTHING counts
-            // against us, because that is the shape of a permanent failure rather than the driver's flake.
+            // A dead child still made progress if it persisted something new; only a run that adds nothing counts as a
+            // failure.
             var now = CachedCount(folder);
             if (now > compiled)
             {
@@ -173,9 +156,8 @@ public static class ShaderPrecompiler
             }
             catch (Exception e)
             {
-                // A managed exception is DETERMINISTIC: the driver fault we are here for kills the process, it never
-                // throws. So this effect will fail identically on every retry - count it as uncompilable, not as a
-                // failed attempt, or one such effect would keep the cache "cold" forever and re-run this on every launch.
+                // A managed exception is deterministic (a native fault kills the process instead), so count the effect
+                // as uncompilable rather than retrying it on every launch.
                 skipped++;
                 // Reflection wraps whatever the ctor threw; the wrapper's message says nothing about the real fault.
                 var cause = (e as TargetInvocationException)?.InnerException ?? e;
@@ -349,8 +331,7 @@ public static class ShaderPrecompiler
     // no exception to catch, so this is the only thing that says what was being built.
     private static string InFlightFile(GraphicsDevice device) => SideFile(device, "compiling.txt");
 
-    /// <summary>Called by the device just before the driver is handed a shader. Writes only inside the compile pass -
-    /// a file per shader would be pure cost in an application that has nothing to recover from.</summary>
+    /// <summary>Called by the device just before a shader is created. Writes only inside the compile pass.</summary>
     internal static void NoteShaderInFlight(string shaderName)
     {
         if (_inFlightPath == null || _inFlightEffect == null) return;
@@ -378,7 +359,7 @@ public static class ShaderPrecompiler
 
         try
         {
-            // The effect, then the shader the driver held - a child that died before any shader leaves just the first.
+            // The effect, then the shader being created - a child that died before any shader leaves just the first.
             var lines = File.ReadAllLines(inFlight);
             File.Delete(inFlight);
 

@@ -6,13 +6,8 @@ using NUnit.Framework;
 
 namespace Adamantium.Engine.CompilerTests
 {
-    /// <summary>
-    /// A pass per KIND - the shape the pattern family already has - needs one shared shading function and a thin entry
-    /// point per pass that calls it with a literal. Adding that shape to an effect took the compiler down with an
-    /// access violation and no diagnostic, so this pins the smallest source that does it, away from any real effect.
-    /// <para>Compiling a STRING rather than editing a real .fx and rebuilding: the question is about one construct, and
-    /// the answer came back in seconds instead of three minutes a guess.</para>
-    /// </summary>
+    /// <summary>Pins the smallest pass-per-kind source (one shared shading function, a thin entry point per pass), a shape
+    /// that once crashed the compiler without a diagnostic.</summary>
     [TestFixture]
     public class HelperCallCompileTests
     {

@@ -3,14 +3,8 @@ using Adamantium.Core.Commands;
 
 namespace Adamantium.MVVM;
 
-/// <summary>
-/// A synchronous command that passes a typed parameter to its handler. The MVVM generator's <c>[Command]</c> on a
-/// <c>void</c> method taking a single argument (e.g. <c>void Delete(Guid id)</c>) emits one of these
-/// (<c>AdamantiumCommand&lt;Guid&gt;</c>). The UI binds it through the non-generic <see cref="ICommand"/> — the
-/// parameter arrives as <c>object</c> and is coerced to <typeparamref name="T"/> — while code can call the typed
-/// <see cref="Execute(T)"/>/<see cref="CanExecute(T)"/> directly. There is deliberately NO generic command interface;
-/// type safety lives here, in the class, and the UI boundary stays untyped (as it must for any XAML binding).
-/// </summary>
+/// <summary>A synchronous command with a typed parameter: the UI binds it untyped through <see cref="ICommand"/>, code calls
+/// <see cref="Execute(T)"/> and <see cref="CanExecute(T)"/>.</summary>
 public sealed class AdamantiumCommand<T> : ICommand
 {
     private readonly Action<T> _execute;

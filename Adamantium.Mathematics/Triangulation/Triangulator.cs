@@ -32,20 +32,10 @@ namespace Adamantium.Mathematics.Triangulation
               |             |
               |_____________|
         */
-        /// <summary>
-        /// Triangulate given <see cref="Polygon"/> by raycasting algorithm.
-        /// </summary>
+        /// <summary>Triangulates a <see cref="Polygon"/> by vertical raycasting: sorted points cut it into trapezoids, which are
+        /// filled by the fill rule.</summary>
         /// <param name="polygon"></param>
         /// <returns></returns>
-        /// <remarks>
-        /// First all point in <see cref="Polygon"/> should be sorted from left to right. 
-        /// After that you need to cast rays on each point from the highest point in <see cref="Polygon"/> vertically down.
-        /// This will produce a collection of trapezoids where each 4 points (2 from first ray and 2 from next) will create 2 triangles.
-        /// Further according to triangulation rule you should fill <see cref="Polygon"/> with triangles.
-        /// According to Even-Odd rule, when you first found an intersection, you enter in polygon, on the second time - you leave a polygon and should
-        /// fill it only between even and odd segment pairs (Zero is also even number)
-        /// According to Non-Zero rule you should fill also self intersecting parts of polygon in addition to written above.
-        /// </remarks>
         public static List<Vector3> Triangulate(Polygon polygon)
         {
             var additionalRayIntersections = new Dictionary<GeometrySegment, SortedList<double, GeometryIntersection>>();

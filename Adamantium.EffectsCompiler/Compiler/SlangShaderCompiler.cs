@@ -4,14 +4,8 @@ using Adamantium.Vulkan.Slang;
 
 namespace Adamantium.EffectsCompiler.Compiler
 {
-    /// <summary>
-    /// Engine-side adapter over the shared <see cref="Adamantium.Vulkan.Slang.SlangCompiler"/>: the native Slang
-    /// session, <c>#include</c> callback and SPIR-V extraction live in that one class (reused by the Vulkan demo too),
-    /// while this wrapper supplies the engine's configuration and translates between engine and Slang types - it maps
-    /// <see cref="EffectShaderType"/> to <see cref="SlangcStage"/>, routes the engine's include collection through the
-    /// compiler's resolver, and wraps the output as a <see cref="ShaderCompilationResult"/>. One instance per effect
-    /// compile; the session is reused across that effect's stages.
-    /// </summary>
+    /// <summary>Engine-side adapter over <see cref="Adamantium.Vulkan.Slang.SlangCompiler"/>: engine configuration and type
+    /// mapping. One instance per effect compile; the session is reused across its stages.</summary>
     internal sealed class SlangShaderCompiler : IDisposable
     {
         /// <summary>The SPIR-V versions a pass may ask for by <c>Profile</c>, newest last. The last is what a pass that

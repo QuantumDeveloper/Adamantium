@@ -25,14 +25,13 @@ public class FontRenderer : GraphicsResource
     // larger and get downsampled when the texture is composited onto the control = SSAA. 1 = off.
     public float RenderScale { get; set; } = 1f;
 
-    // The LIVE text path (docs/TEXT_GLYPH_BATCH_PLAN.md §9): text draws straight into the main pass via a single
-    // CPU-built MVP (Translation(TextArea) x World x Projection - the only driver-safe form on this Turing: no
-    // indirect/indexed matrix in a graphics shader). Off = the old private-RT rasterize + composite fallback (A/B).
+    // The LIVE text path: text draws straight into the main pass via a single CPU-built MVP
+    // (Translation(TextArea) x World x Projection). Off = the old private-RT rasterize + composite fallback (A/B).
     public static bool UseDirectTextDraw = true;
 
-    // Stage 2 of the text batch (docs/TEXT_GLYPH_BATCH_PLAN.md §9): aggregate MANY visible text blocks into ONE
+    // The text batch: aggregate MANY visible text blocks into ONE
     // DrawBatch - the actual FPS win (collapse ~N per-block draws to ~1). When off, batchable text falls back to the
-    // per-block DrawLayoutDirect (Stage 1). Requires UseDirectTextDraw too; the aggregator/fallback live in RenderCache.
+    // per-block DrawLayoutDirect. Requires UseDirectTextDraw too; the aggregator/fallback live in RenderCache.
     public static bool UseTextBatch = true;
 
     // The glyph pixel shader used to be selectable - canonical MSDF against a gradient-derivative variant, plus an
@@ -119,11 +118,8 @@ public class FontRenderer : GraphicsResource
         currentScreenSize = new Vector2F(renderTarget.Width, renderTarget.Height);
         transformMatrix = Matrix4x4F.Translation(translation);
 
-        // Snapshot the viewport + scissor active in the pass we're about to interrupt, so RestoreState can put back the
-        // exact clip (e.g. a virtualized list item's narrowed scissor) instead of resetting to the full attachment.
-        // COPIES. CurrentScissors/CurrentViewports are the device's own arrays, refilled IN PLACE by the setters (they
-        // take a span now and cannot keep the caller's array), so holding the reference across the interrupted pass
-        // would "restore" whatever the clip happens to be by then - which is not a restore at all.
+        // Copies of the interrupted pass's clip for RestoreState: the device refills these arrays in place, so a reference
+        // would restore whatever the clip is by then.
         _savedScissors = (Rect2D[])((GraphicsDevice)GraphicsDevice).CurrentScissors.Clone();
         _savedViewports = (Viewport[])((GraphicsDevice)GraphicsDevice).CurrentViewports.Clone();
 
@@ -204,13 +200,8 @@ public class FontRenderer : GraphicsResource
         GraphicsDevice.Draw(4, count);   // 4 strip verts x glyph instances (composite path)
     }
 
-    // Direct main-pass glyph draw (CPU pre-transform batch, Stage 1, docs/TEXT_GLYPH_BATCH_PLAN.md §9): renders the
-    // layout's glyphs straight into the CURRENT (main) pass with a single caller-supplied MVP, instead of rasterizing
-    // into a private RT and compositing a quad. No SetState/RestoreState, no render-target switch, no viewport/scissor
-    // override (the main pass's clip stands), MSAA left as the main pass set it. Depth matches the other main-pass UI
-    // units (CompareOp.Always, test+write on) - NOT the RT path's depth-off (that target had no depth buffer).
-    // Behind FontRenderer.UseDirectTextDraw. The MVP is built on the CPU (Translation(TextArea) x World x Projection)
-    // because an indirect/indexed matrix in a graphics shader AVs vkCreateShadersEXT on this Turing - see the plan.
+    // Draws one block's glyphs straight into the current main pass with a caller-built MVP, instead of a private target
+    // and a composite; the main pass's clip, MSAA and depth state stand.
     public void DrawLayoutDirect(SamplerState samplerState, Buffer<FontItem> glyphs, uint count, FontAtlas atlas, float fontSize, Color foreground, Matrix4x4F mvp, float opacity,
         Vector4F clipBox = default, Vector4F clipRadii = default)
     {
@@ -225,11 +216,8 @@ public class FontRenderer : GraphicsResource
         GraphicsDevice.DepthCompareFunction = CompareOp.Always;
 
         var fg = foreground.ToVector4();
-        // Fold the element's Opacity (fade animation, dimmed container) into the glyph alpha, RAISED TO 2.2 first: the
-        // pixel shader gamma-boosts what it gets (pow(alpha * coverage, 1/2.2)), and a fade that went in raw came back
-        // boosted - a block at Opacity 0.5 kept 0.755 of its ink while the shapes beside it were at 0.501. The colour's
-        // OWN alpha still goes in raw and stays under the boost; taking it out from there washes text out (see
-        // FontPixelShaderMsdf). Same correction as the batch path makes in its vertex stage.
+        // The fade goes in raised to 2.2 so the pixel shader's gamma boost hands it back linear; the color's own alpha stays
+        // under the boost.
         fg.W *= MathF.Pow(opacity, 2.2f);
 
         effectSampler.SetResource(samplerState);
@@ -254,13 +242,8 @@ public class FontRenderer : GraphicsResource
         GraphicsDevice.Draw(4, count);   // 4 strip verts x glyph instances
     }
 
-    // Aggregated text batch (docs/TEXT_GLYPH_BATCH_PLAN.md §9 Stage 2): draws MANY blocks' glyphs sharing one atlas in a
-    // SINGLE instanced draw straight into the main pass = the FPS win. Per-instance GlyphItem read from a BDA storage
-    // buffer by SV_InstanceID, and each glyph's NODE-LOCAL rect transformed to world on the GPU via the transform table
-    // at its slot (slot 0 = identity). Mirrors the SDF rect/ellipse fills (SdfBatchCollector) - no per-instance vertex
-    // buffer, no CPU per-glyph world bake, and a scrolling block moves by one table matrix write instead of re-baking N
-    // glyphs. Foreground is per-instance, so blocks of different colours share one draw. instancesAddress is pre-offset
-    // to THIS segment's slice (drawn at base instance 0). State/depth/blend match DrawLayoutDirect (main pass).
+    // Aggregated text batch: glyphs of many blocks sharing one atlas in one instanced draw, node-local rects moved to world
+    // on the GPU by the transform table. instancesAddress is pre-offset to this segment's slice.
     /// <summary>What one batched glyph draw ALLOCATES, split between binding its parameters/resources and applying the
     /// pass + issuing the draw. Lives here rather than in RuntimeStats: Adamantium.Graphics does not (and should not)
     /// reference the UI layer. Cumulative; the probe samples by per-second delta.</summary>

@@ -64,12 +64,8 @@ namespace Adamantium.Graphics.Fonts
                        $"{owner.Glyph} ({owner.W}x{owner.H}), now glyph {data.GlyphIndex} ('{data.Character}') " +
                        $"({cell.Item4}x{cell.Item5})");
 
-            // THE GLYPH MOVED. The three traps above all watch the WRITE - two writers, one cell claimed twice, one
-            // glyph written differently - and none of them fires when the atlas simply re-packs and gives a glyph a new
-            // place. That is the shape the corruption actually has: the layout stays perfect (the shaper had the right
-            // ids all along) while every letter is drawn as some other letter, because the text units already on
-            // screen still hold the rectangle the glyph used to live at. Digits survived it, which is what says the
-            // pixels are fine and only the addresses are stale.
+            // The glyph moved: the traps above watch writes and miss a re-pack, after which units on screen keep the old cell
+            // and draw other letters.
             var placed = state.GlyphCell.GetOrAdd(data.GlyphIndex, _ => cell);
             if (!placed.Equals(cell))
                 Report($"GLYPH MOVED: glyph {data.GlyphIndex} ('{data.Character}') was at layer {placed.Layer} " +

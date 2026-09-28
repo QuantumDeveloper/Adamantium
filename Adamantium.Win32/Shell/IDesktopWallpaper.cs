@@ -4,17 +4,8 @@ using Adamantium.Win32;
 
 namespace Adamantium.Win32.Shell;
 
-/// <summary>
-/// The shell's wallpaper service (<c>CLSID_DesktopWallpaper</c>, Windows 8 and later).
-///
-/// <para>Used instead of <c>SystemParametersInfo(SPI_GETDESKWALLPAPER)</c> because that one predates multiple monitors:
-/// it returns a single path for the whole desktop, and says nothing about how the picture is laid out. A material that
-/// samples the wallpaper needs both - a window on the second screen must show THAT screen's picture, placed the way the
-/// desktop places it.</para>
-///
-/// <para>Only the members we answer with are declared, but the ORDER of every method up to them is part of the vtable
-/// and cannot be shortened - hence the unused slots below, kept as named placeholders rather than deleted.</para>
-/// </summary>
+/// <summary>The shell's wallpaper service (<c>CLSID_DesktopWallpaper</c>): each monitor's picture and its placement. Only used
+/// members are declared; earlier vtable slots stay as placeholders.</summary>
 [ComImport]
 [Guid("B92B56A9-8B55-4E14-9A89-0199BBB6F93B")]
 [InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]

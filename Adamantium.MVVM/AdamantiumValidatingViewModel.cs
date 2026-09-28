@@ -8,13 +8,8 @@ using System.Runtime.CompilerServices;
 
 namespace Adamantium.MVVM;
 
-/// <summary>
-/// A view-model base that adds validation on top of <see cref="AdamantiumViewModel"/>. Derive from this (instead of
-/// AdamantiumViewModel) when a <c>[Bindable]</c> field carries DataAnnotations attributes (<c>[Required]</c>,
-/// <c>[Range]</c>, ...): the generator forwards those attributes onto the generated property and calls
-/// <see cref="ValidateProperty"/> from its setter, surfacing messages through <see cref="INotifyDataErrorInfo"/>
-/// (which the binding layer / controls consume).
-/// </summary>
+/// <summary>A view-model base with validation, for <c>[Bindable]</c> fields that carry DataAnnotations attributes; errors
+/// surface through <see cref="INotifyDataErrorInfo"/>.</summary>
 public abstract class AdamantiumValidatingViewModel : AdamantiumViewModel, INotifyDataErrorInfo
 {
     private readonly Dictionary<string, List<string>> _errors = new();
