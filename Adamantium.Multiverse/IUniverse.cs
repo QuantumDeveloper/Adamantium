@@ -20,7 +20,13 @@ namespace Adamantium.Multiverse
         public void InitializeUniverse();
 
         public void Submit();
-        
+
+        /// <summary>
+        /// Stops the game while drawing goes on: no time passes for the services and no input reaches them. Set from
+        /// any thread; the change takes effect with the next frame.
+        /// </summary>
+        public bool IsSimulationPaused { get; set; }
+
         /// <summary>
         /// The container the whole process shares.
         /// </summary>

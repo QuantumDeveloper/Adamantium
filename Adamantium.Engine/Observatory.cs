@@ -41,13 +41,14 @@ public class Observatory : IInputRouting
     public IReadOnlyList<UniverseOutput> Outputs => snapshot.Outputs;
 
     /// <summary>
-    /// The output taking the keyboard - keyboard focus in the active OS window, keyboard enabled; null if none.
+    /// The output taking the keyboard - keyboard focus in the active OS window, keyboard enabled; null if none or while
+    /// the simulation is paused.
     /// </summary>
     public UniverseOutput KeyboardOutput => snapshot.KeyboardOutput;
 
     /// <summary>
-    /// The output under the pointer, or holding it during a drag, mouse enabled; null if none. May differ from
-    /// <see cref="KeyboardOutput"/>.
+    /// The output under the pointer, or holding it during a drag, mouse enabled; null if none or while the simulation is
+    /// paused. May differ from <see cref="KeyboardOutput"/>.
     /// </summary>
     public UniverseOutput PointerOutput => snapshot.PointerOutput;
 
@@ -81,6 +82,7 @@ public class Observatory : IInputRouting
     {
         UniverseOutput keyboardOutput = null;
         UniverseOutput pointerOutput = null;
+        var routesInput = !universe.IsSimulationPaused;
 
         scratchOutputs.Clear();
         for (int i = 0; i < scratchByState.Length; i++)
@@ -96,12 +98,13 @@ public class Observatory : IInputRouting
             scratchOutputs.Add(output);
             scratchByState[(int)output.State].Add(output);
 
-            if (keyboardOutput == null && output.IsKeyboardFocused && output.Input is { IsKeyboardEnabled: true })
+            if (routesInput && keyboardOutput == null && output.IsKeyboardFocused
+                && output.Input is { IsKeyboardEnabled: true })
             {
                 keyboardOutput = output;
             }
 
-            if (pointerOutput == null && output.IsPointerOver && output.Input is { IsMouseEnabled: true })
+            if (routesInput && pointerOutput == null && output.IsPointerOver && output.Input is { IsMouseEnabled: true })
             {
                 pointerOutput = output;
             }

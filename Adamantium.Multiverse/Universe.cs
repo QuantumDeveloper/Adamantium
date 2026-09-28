@@ -34,6 +34,8 @@ public class Universe : PropertyChangedBase, IUniverse
     private AppTime appTime;
 
     private TimeSpan totalTime;
+    private volatile bool simulationPauseRequested;
+    private bool isSimulationPaused;
 
     private readonly System.Diagnostics.Stopwatch renderTimer = new();
     private double renderSeconds, renderWindow;
@@ -154,7 +156,17 @@ public class Universe : PropertyChangedBase, IUniverse
             Resumed?.Invoke(this, EventArgs.Empty);
         }
     }
-        
+
+    /// <summary>
+    /// Stops the game while drawing goes on: no time passes for the services and no input reaches them. Set from any
+    /// thread; the change takes effect with the next frame.
+    /// </summary>
+    public bool IsSimulationPaused
+    {
+        get => isSimulationPaused;
+        set => simulationPauseRequested = value;
+    }
+
     /// <summary>
     /// Read only collection of <see cref="UniverseOutput"/>s
     /// </summary>
@@ -277,7 +289,7 @@ public class Universe : PropertyChangedBase, IUniverse
 
         UpdateAppTime(time.FrameTime);
         MakePreparations();
-        Update(appTime);
+        Update(SimulationTime());
         ExecuteDrawSequence2(appTime);
         FrameFinished?.Invoke(this, EventArgs.Empty);
     }
@@ -428,7 +440,7 @@ public class Universe : PropertyChangedBase, IUniverse
     protected void UpdateAppTime(double elapsed)
     {
         TimeSpan frameTimeSpan = TimeSpan.FromSeconds(appTime.FrameTime);
-        if (!IsPaused)
+        if (!IsPaused && !isSimulationPaused)
         {
             totalTime += frameTimeSpan;
         }
@@ -462,6 +474,11 @@ public class Universe : PropertyChangedBase, IUniverse
         }
     }
 
+    private AppTime SimulationTime()
+    {
+        return isSimulationPaused ? appTime with { FrameTime = 0 } : appTime;
+    }
+
     /// <summary>
     /// Runs the universe's own loop
     /// </summary>
@@ -480,7 +497,7 @@ public class Universe : PropertyChangedBase, IUniverse
                     if (accumulatedFrameTime >= TimeStep)
                     {
                         MakePreparations();
-                        Update(appTime);
+                        Update(SimulationTime());
                         ExecuteDrawSequence(appTime);
 
                         UpdateAppTime(accumulatedFrameTime);
@@ -492,7 +509,7 @@ public class Universe : PropertyChangedBase, IUniverse
                     var frameTime = loopTimer.GetElapsedTime();
 
                     MakePreparations();
-                    Update(appTime);
+                    Update(SimulationTime());
                     ExecuteDrawSequence(appTime);
 
                     UpdateAppTime(frameTime);
@@ -683,6 +700,7 @@ public class Universe : PropertyChangedBase, IUniverse
     /// </summary>
     protected virtual void MakePreparations()
     {
+        isSimulationPaused = simulationPauseRequested;
         platform.MakePreparationsForNextFrame();
         if (deviceResourcesLost)
         {
