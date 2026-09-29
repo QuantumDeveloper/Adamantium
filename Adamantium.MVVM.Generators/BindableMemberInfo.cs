@@ -12,6 +12,7 @@ internal sealed record BindableMemberInfo(
     bool HasInpcBase,
     bool IsPartialProperty,
     bool Validates,
+    bool Overridable,
     EquatableArray<string> AffectsProperties,
     EquatableArray<string> AffectsCommands,
     EquatableArray<string> ValidationAttributes,

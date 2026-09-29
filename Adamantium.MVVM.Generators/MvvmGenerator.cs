@@ -148,6 +148,15 @@ public sealed class MvvmGenerator : IIncrementalGenerator
         var validationAttributes = new List<string>();
         var hasValidationAttributes = false;
         var validates = DerivesFrom(type, ValidatingBaseName);
+        var overridable = false;
+        foreach (var na in ctx.Attributes[0].NamedArguments)
+        {
+            if (na.Key == "Overridable" && na.Value.Value is true)
+            {
+                overridable = true;
+            }
+        }
+
         foreach (var attr in member.GetAttributes())
         {
             var attrName = attr.AttributeClass?.ToDisplayString();
@@ -183,6 +192,7 @@ public sealed class MvvmGenerator : IIncrementalGenerator
             HasInpcHost(type),
             isPartialProperty,
             hasValidationAttributes && validates,
+            overridable,
             new EquatableArray<string>(affectsProperties.ToArray()),
             new EquatableArray<string>(affectsCommands.ToArray()),
             new EquatableArray<string>(validationAttributes.ToArray()),
@@ -294,8 +304,17 @@ public sealed class MvvmGenerator : IIncrementalGenerator
         else EmitFieldProperty(sb, m);
 
         sb.AppendLine();
-        sb.AppendLine($"    partial void On{m.PropertyName}Changing({m.PropertyType} value);");
-        sb.AppendLine($"    partial void On{m.PropertyName}Changed({m.PropertyType} value);");
+        if (m.Overridable)
+        {
+            sb.AppendLine($"    protected virtual void On{m.PropertyName}Changing({m.PropertyType} value) {{ }}");
+            sb.AppendLine($"    protected virtual void On{m.PropertyName}Changed({m.PropertyType} value) {{ }}");
+        }
+        else
+        {
+            sb.AppendLine($"    partial void On{m.PropertyName}Changing({m.PropertyType} value);");
+            sb.AppendLine($"    partial void On{m.PropertyName}Changed({m.PropertyType} value);");
+        }
+
         CloseType(sb);
         return SourceText.From(sb.ToString(), Encoding.UTF8);
     }
