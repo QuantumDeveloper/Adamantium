@@ -28,6 +28,13 @@ public readonly struct PickRay
         return pixelAtOrigin + pixelPerDepth * depth;
     }
 
+    /// <summary>The same ray starting <paramref name="offset"/> away: in this render space, the ray an eye standing there
+    /// would cast.</summary>
+    public PickRay Moved(Vector3F offset)
+    {
+        return new PickRay(new Ray(Ray.Position + offset, Ray.Direction), Camera, pixelAtOrigin, pixelPerDepth);
+    }
+
     /// <summary>Through the camera's own view and projection.</summary>
     public static PickRay FromCamera(CameraBase camera, Vector2F pixel)
     {

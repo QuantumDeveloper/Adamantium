@@ -1,5 +1,6 @@
 using Adamantium.Core.Events;
 using Adamantium.Graphics.Core;
+using Adamantium.Graphics.Core.Presentation;
 using Adamantium.Imaging;
 using Adamantium.Mathematics;
 using Adamantium.Multiverse;
@@ -16,6 +17,7 @@ public class TestOutput : UniverseOutput
     {
         gamepads = new GamepadHub(backend ?? new NoGamepadBackend(), EventAggregator);
         Input = new InputWormhole(this, gamepads);
+        Description = new UniverseOutputDescription(PresenterType.RenderTarget) { Width = 800, Height = 600 };
     }
 
     public bool KeyboardFocused { get; set; } = true;
