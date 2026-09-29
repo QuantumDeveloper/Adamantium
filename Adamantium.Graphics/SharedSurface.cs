@@ -28,6 +28,7 @@ public sealed unsafe class SharedSurface : Texture
     private IntPtr _memoryHandle;
     private IntPtr _produceHandle;
     private IntPtr _consumeHandle;
+    private ulong _latched;
 
     public SharedSurfaceDescriptor Descriptor { get; private set; }
 
@@ -42,6 +43,23 @@ public sealed unsafe class SharedSurface : Texture
 
     /// <summary>Current value of the consume timeline (last frame the consumer finished latching).</summary>
     public ulong ConsumeValue => GetCounter(_consumeSemaphore);
+
+    /// <summary>
+    /// For the consumer: the newest frame the producer has finished, handed out once - 0 when nothing is new since the
+    /// last call, whoever made it. Wait on <see cref="ProduceSemaphore"/> for it before sampling and signal
+    /// <see cref="ConsumeSemaphore"/> with it, so the consume timeline only moves forward.
+    /// </summary>
+    public ulong LatchNewFrame()
+    {
+        var latest = ProduceValue;
+        if (latest <= _latched)
+        {
+            return 0;
+        }
+
+        _latched = latest;
+        return latest;
+    }
 
     private ulong GetCounter(Semaphore semaphore)
     {
