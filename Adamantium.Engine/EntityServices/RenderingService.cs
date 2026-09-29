@@ -109,7 +109,7 @@ public class RenderingService : EntityService
         // An opaque scene must not inherit the blend the UI pass left set.
         GraphicsDevice.ColorBlendEquation = Adamantium.Graphics.Core.ColorBlendEquations.Opaque;
 
-        if (!GraphicsDevice.BeginDraw())
+        if (!GraphicsDevice.BeginDraw(beforeRenderPass: _ => PreRenderProcessors()))
         {
             return false;
         }

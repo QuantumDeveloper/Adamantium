@@ -48,6 +48,10 @@
     <Content Include="EffectsData\FontEffect.fx">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
+    <!-- The engine's own Forward+ effect, linked rather than copied, so the cluster tests run the shader the scene uses. -->
+    <Content Include="..\..\Adamantium.FX\ForwardPlusEffect.fx" Link="EffectsData\ForwardPlusEffect.fx">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
   </ItemGroup>
 
   <ItemGroup>
