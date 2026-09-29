@@ -7,4 +7,7 @@ namespace Adamantium.MVVM;
 [AttributeUsage(AttributeTargets.Field | AttributeTargets.Property)]
 public sealed class BindableAttribute : Attribute
 {
+    /// <summary>Emits the hooks as empty <c>protected virtual</c> methods instead of <c>partial</c> ones, so a derived
+    /// class can override them.</summary>
+    public bool Overridable { get; set; }
 }

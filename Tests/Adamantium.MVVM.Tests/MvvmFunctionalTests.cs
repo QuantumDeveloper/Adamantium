@@ -183,6 +183,23 @@ public class MvvmFunctionalTests
     }
 
     [Test]
+    public void OverridableHooks_ReachTheDerivedClass()
+    {
+        var vm = new DerivedHooksViewModel();
+        var raised = new List<string>();
+        vm.PropertyChanged += (_, e) => raised.Add(e.PropertyName);
+
+        vm.Name = "Neo";
+        vm.Count = 3;
+
+        Assert.That(vm.Changing, Is.EqualTo("Neo"));
+        Assert.That(vm.Changed, Is.EqualTo("Neo"));
+        Assert.That(vm.CountChanged, Is.EqualTo(3));
+        List<string> expected = ["Name", "Count"];
+        Assert.That(raised, Is.EqualTo(expected));
+    }
+
+    [Test]
     public void Validation_SurfacesErrorsViaINotifyDataErrorInfo()
     {
         var vm = new RegistrationViewModel();

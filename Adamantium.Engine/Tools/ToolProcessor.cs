@@ -3,6 +3,7 @@ using Adamantium.Core;
 using Adamantium.ECS;
 using Adamantium.ECS.Components.Extensions;
 using Adamantium.Engine.EntityServices;
+using Adamantium.Mathematics;
 using Adamantium.Multiverse.Input;
 
 namespace Adamantium.Engine.Tools;
@@ -10,7 +11,8 @@ namespace Adamantium.Engine.Tools;
 /// <summary>
 /// A tool: a modifier or creator driven by the mouse, one in use at a time. A drag goes to the nearest of its handles; a
 /// click anywhere else selects what is under the pointer. A selected light brings its own handles to whichever tool is in
-/// use, so a light is moved and sized without switching tools.
+/// use, so a light is moved and sized without switching tools. A drag is measured from where the eye stood when it began,
+/// so a camera riding on what is dragged does not carry the pointer, and the target after it, further every frame.
 /// </summary>
 public abstract class ToolProcessor : EditorProcessor
 {
@@ -18,6 +20,7 @@ public abstract class ToolProcessor : EditorProcessor
     private readonly Handles[] lightHandles = [new PointLightHandles(), new SpotLightHandles()];
     private readonly List<Handles> active = [];
     private Handles dragged;
+    private Vector3 dragEye;
 
     protected ToolProcessor(params Handles[] own)
     {
@@ -55,7 +58,7 @@ public abstract class ToolProcessor : EditorProcessor
         {
             if (input.IsMouseButtonDown(MouseButton.Left) && active.Contains(dragged))
             {
-                dragged.Drag(target, ray);
+                dragged.Drag(target, ray.Moved((Vector3F)(dragEye - camera.WorldPosition)));
                 return;
             }
 
@@ -81,6 +84,7 @@ public abstract class ToolProcessor : EditorProcessor
         if (hit.IsHit)
         {
             dragged = owner;
+            dragEye = camera.WorldPosition;
             dragged.BeginDrag(target, hit.Entity, ray);
         }
         else
