@@ -6,6 +6,9 @@
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>disable</Nullable>
         <LangVersion>latest</LangVersion>
+        <IsPackable>true</IsPackable>
+        <Description>Procedural meshes for the Adamantium engine: rectangles, ellipses, arcs, polygons, lines, cubes, spheres, cylinders, cones, capsules and grids.</Description>
+        <PackageTags>adamantium;engine;geometry;mesh;procedural</PackageTags>
     </PropertyGroup>
 
     <PropertyGroup Condition=" '$(Configuration)' == 'Debug' ">

@@ -23,6 +23,40 @@
     <Authors>Adamantium Studio</Authors>
     <Company>Adamantium Studio</Company>
     <Copyright>Copyright © 2019-2026 Adamantium Studio</Copyright>
+    <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
+    <PackageProjectUrl>https://github.com/AdamantiumStudio/AdamantiumEngine</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/AdamantiumStudio/AdamantiumEngine</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
   </PropertyGroup>
+
+  <!-- One version for every package of the engine: they are built together and move together, so the number alone says
+       which ones work with each other. A release sets the suffix: dotnet pack -p:VersionSuffix=alpha.2 -->
+  <PropertyGroup>
+    <VersionPrefix>0.1.0</VersionPrefix>
+    <VersionSuffix>alpha</VersionSuffix>
+  </PropertyGroup>
+
+  <!-- Off by default, on per project, as in AdamantiumVulkan: tests, sandboxes and tools are not products, and a
+       published version can be unlisted but never deleted. -->
+  <PropertyGroup>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="$(MSBuildThisFileDirectory)README.md" Pack="true" PackagePath="\" Visible="false" />
+  </ItemGroup>
+
+  <!-- Each package carries its own icon.png from beside its csproj. The icons are generated with the studio's brand
+       assets and copied here by their deploy script; both halves are guarded on the file, because PackageIcon naming
+       a file that is not packed breaks the pack (NU5046). -->
+  <PropertyGroup Condition="Exists('$(MSBuildProjectDirectory)\icon.png')">
+    <PackageIcon>icon.png</PackageIcon>
+  </PropertyGroup>
+
+  <ItemGroup Condition="Exists('$(MSBuildProjectDirectory)\icon.png')">
+    <None Include="$(MSBuildProjectDirectory)\icon.png" Pack="true" PackagePath="\" Visible="false" />
+  </ItemGroup>
 
 </Project>

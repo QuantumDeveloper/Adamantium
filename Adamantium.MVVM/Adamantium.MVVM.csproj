@@ -7,6 +7,9 @@
         <LangVersion>latest</LangVersion>
         <Nullable>disable</Nullable>
         <ImplicitUsings>disable</ImplicitUsings>
+        <IsPackable>true</IsPackable>
+        <Description>MVVM for Adamantium: view models with validation, sync and async commands, and the attributes its source generator reads.</Description>
+        <PackageTags>adamantium;mvvm;viewmodel;commands</PackageTags>
     </PropertyGroup>
 
     <ItemGroup>

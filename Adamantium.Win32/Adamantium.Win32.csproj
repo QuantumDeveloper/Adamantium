@@ -5,6 +5,9 @@
 		<Platforms>AnyCPU</Platforms>
 		<Configurations>Debug;Release</Configurations>
 		<LangVersion>latest</LangVersion>
+		<IsPackable>true</IsPackable>
+		<Description>Win32 interop for the Adamantium engine: windows, messages, system metrics, cursors and Shell dialogs.</Description>
+		<PackageTags>adamantium;win32;windows;interop</PackageTags>
 	</PropertyGroup>
 
 	<PropertyGroup Condition="'$(Configuration)'=='Debug'">

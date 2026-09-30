@@ -1,0 +1,42 @@
+# Builds the engine, runs the tests that need no GPU and packs the packages, on every push and pull request.
+# Windows only: the effects generator compiles the built-in shaders during the build and loads Slang through kernel32.
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    # A branch of this repository is built on push, so pull_request builds only the ones from forks.
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v7
+
+      # Version comes from global.json, so CI and a developer's machine build with the same SDK.
+      - uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+
+      - name: Build
+        run: dotnet build AdamantiumEngine.sln -c Release -warnaserror
+
+      # The runners have no GPU. Adamantium.Engine.GraphicsTests is the one project that creates a Vulkan device, so it
+      # is left out; every other test runs without one.
+      - name: Test
+        shell: bash
+        run: |
+          for p in Tests/*/*.csproj; do
+            case "$p" in *GraphicsTests*) continue ;; esac
+            dotnet test "$p" -c Release
+          done
+
+      - name: Pack
+        run: dotnet pack AdamantiumEngine.sln -c Release --no-build -o artifacts/nupkg

@@ -94,7 +94,7 @@
 			isa = PBXProject;
 			attributes = {
 				LastUpgradeCheck = 1110;
-				ORGANIZATIONNAME = "Denys Zaporozhets";
+				ORGANIZATIONNAME = "Adamantium Studio";
 				TargetAttributes = {
 					ECB86DEB236CDFB2008ACA15 = {
 						CreatedOnToolsVersion = 11.1;

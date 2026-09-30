@@ -10,6 +10,20 @@
 		<EmitCompilerGeneratedFiles>true</EmitCompilerGeneratedFiles>
 		<CompilerGeneratedFilesOutputPath>Generated</CompilerGeneratedFilesOutputPath>
         <EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>
+        <IsPackable>true</IsPackable>
+        <Description>Source generators of the Adamantium engine: compiles the project's effects (.fx) into typed effect classes at build time, and emits a checked constant for every content asset.</Description>
+        <PackageTags>adamantium;sourcegenerator;shader;effects;assets</PackageTags>
+    </PropertyGroup>
+
+    <!-- An analyzer, not a library: the generator and every assembly it loads go to analyzers/dotnet/cs, nothing goes to
+         lib, and nothing is a package dependency - the consumer's compiler loads all of it from this one folder. -->
+    <PropertyGroup>
+        <IncludeBuildOutput>false</IncludeBuildOutput>
+        <DevelopmentDependency>true</DevelopmentDependency>
+        <SuppressDependenciesWhenPacking>true</SuppressDependenciesWhenPacking>
+        <TargetsForTfmSpecificContentInPackage>$(TargetsForTfmSpecificContentInPackage);PackAnalyzerAssemblies</TargetsForTfmSpecificContentInPackage>
+        <!-- dotnet pack no-build: the references are resolved from what is already built instead of being built again. -->
+        <BuildProjectReferences Condition="'$(NoBuild)' == 'true'">false</BuildProjectReferences>
     </PropertyGroup>
 
     <!--<PropertyGroup>
@@ -55,10 +69,6 @@
         <EmbeddedResource Include="slang-c-shared.dll"/>
     </ItemGroup>
 
-	<ItemGroup>
-	  <Content Remove="C:\Users\dzapo\.nuget\packages\adamantium.vulkan.spirv\1.0.3\contentFiles\any\netstandard2.0\spirv-cross-c-shared.dll" />
-	</ItemGroup>
-    
     <PropertyGroup>
         <GetTargetPathDependsOn>$(GetTargetPathDependsOn);GetDependencyTargetPaths</GetTargetPathDependsOn>
     </PropertyGroup>
@@ -82,6 +92,16 @@
             <TargetPathWithTargetPlatformMoniker Include="$(PKGMessagePack_Annotations)\lib\netstandard2.0\MessagePack.Annotations.dll" IncludeRuntimeDependency="false" />
             <TargetPathWithTargetPlatformMoniker Include="$(PKGSystem_Runtime_CompilerServices_Unsafe)\lib\netstandard2.0\System.Runtime.CompilerServices.Unsafe.dll" IncludeRuntimeDependency="false" />
 		</ItemGroup>
+    </Target>
+
+    <!-- The same set a project reference hands the compiler: the generator, the engine assemblies it references and the
+         package assemblies listed above. -->
+    <Target Name="PackAnalyzerAssemblies" DependsOnTargets="ResolveReferences;GetDependencyTargetPaths">
+        <ItemGroup>
+            <TfmSpecificPackageFile Include="$(TargetPath)" PackagePath="analyzers/dotnet/cs" />
+            <TfmSpecificPackageFile Include="@(ReferencePath)" Condition="'%(ReferencePath.ReferenceSourceTarget)' == 'ProjectReference'" PackagePath="analyzers/dotnet/cs" />
+            <TfmSpecificPackageFile Include="@(TargetPathWithTargetPlatformMoniker)" Condition="'%(TargetPathWithTargetPlatformMoniker.IncludeRuntimeDependency)' == 'false'" PackagePath="analyzers/dotnet/cs" />
+        </ItemGroup>
     </Target>
 
 </Project>

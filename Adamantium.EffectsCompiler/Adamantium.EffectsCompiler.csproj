@@ -4,13 +4,10 @@
         <TargetFramework>netstandard2.0</TargetFramework>
         <LangVersion>latest</LangVersion>
         <Platforms>AnyCPU</Platforms>
+        <IsPackable>true</IsPackable>
+        <Description>Compiles Adamantium effects (.fx) to SPIR-V with the Slang compiler, along with the reflection data the engine binds them by.</Description>
+        <PackageTags>adamantium;shader;effects;slang;spirv</PackageTags>
     </PropertyGroup>
-
-	<PropertyGroup>
-		<PackageId>Adamantium.EffectsCompiler</PackageId>
-		<Version>1.0.0</Version>
-		<GeneratePackageOnBuild>true</GeneratePackageOnBuild>
-	</PropertyGroup>
 
     <ItemGroup>
       <PackageReference Include="Adamantium.Vulkan.Spirv" Version="1.0.12" />

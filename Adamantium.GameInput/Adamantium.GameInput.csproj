@@ -7,6 +7,9 @@
     <LangVersion>latest</LangVersion>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <ImplicitUsings>enable</ImplicitUsings>
+    <IsPackable>true</IsPackable>
+    <Description>Microsoft GameInput gamepads for the Adamantium engine, with the native shim that exposes the GameInput API to C#.</Description>
+    <PackageTags>adamantium;gameinput;gamepad;input</PackageTags>
   </PropertyGroup>
 
   <ItemGroup>
@@ -22,7 +25,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Content Include="gameinput-c-shared.dll" Condition="Exists('gameinput-c-shared.dll')">
+    <!-- In the package the shim is a native runtime asset: the consumer's build copies it for the platform it runs on. -->
+    <Content Include="gameinput-c-shared.dll" Condition="Exists('gameinput-c-shared.dll')" PackagePath="runtimes\win-x64\native">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
   </ItemGroup>

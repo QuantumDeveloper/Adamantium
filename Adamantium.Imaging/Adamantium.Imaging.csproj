@@ -5,6 +5,9 @@
 		<Platforms>AnyCPU</Platforms>
 		<Configurations>Debug;Release</Configurations>
 		<LangVersion>latest</LangVersion>
+		<IsPackable>true</IsPackable>
+		<Description>Image codecs of the Adamantium engine - PNG and APNG, JPEG, GIF, BMP, TGA, TIFF, ICO, DDS - with mipmaps, format conversion and palette quantizers.</Description>
+		<PackageTags>adamantium;imaging;png;jpeg;dds;codec</PackageTags>
 	</PropertyGroup>
 
 	<PropertyGroup Condition="'$(Configuration)'=='Debug'">

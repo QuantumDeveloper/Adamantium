@@ -1,11 +1,3 @@
-//
-//  Cursor.h
-//  MacOSAppWrapper
-//
-//  Created by Denys Zaporozhets on 9/14/19.
-//  Copyright © 2019 Denys Zaporozhets. All rights reserved.
-//
-
 #ifndef Cursor_h
 #define Cursor_h
 

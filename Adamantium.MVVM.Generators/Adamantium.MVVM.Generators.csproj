@@ -8,7 +8,24 @@
         <Nullable>disable</Nullable>
         <EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>
         <IsRoslynComponent>true</IsRoslynComponent>
+        <IsPackable>true</IsPackable>
+        <Description>Source generator for Adamantium.MVVM: bindable properties, commands and view-model plumbing from the attributes on a view model.</Description>
+        <PackageTags>adamantium;mvvm;sourcegenerator;viewmodel</PackageTags>
     </PropertyGroup>
+
+    <!-- An analyzer, not a library: the generator goes to analyzers/dotnet/cs and nothing to lib. -->
+    <PropertyGroup>
+        <IncludeBuildOutput>false</IncludeBuildOutput>
+        <DevelopmentDependency>true</DevelopmentDependency>
+        <SuppressDependenciesWhenPacking>true</SuppressDependenciesWhenPacking>
+        <TargetsForTfmSpecificContentInPackage>$(TargetsForTfmSpecificContentInPackage);PackAnalyzerAssembly</TargetsForTfmSpecificContentInPackage>
+    </PropertyGroup>
+
+    <Target Name="PackAnalyzerAssembly">
+        <ItemGroup>
+            <TfmSpecificPackageFile Include="$(TargetPath)" PackagePath="analyzers/dotnet/cs" />
+        </ItemGroup>
+    </Target>
 
     <ItemGroup>
         <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="5.3.0" PrivateAssets="all" />
