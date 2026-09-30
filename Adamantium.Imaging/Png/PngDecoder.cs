@@ -431,13 +431,13 @@ namespace Adamantium.Imaging.Png
         {
             switch(colorType)
             {
-                case PngColorType.Grey:
+                case PngColorType.Gray:
                     if (!(bitDepth == 1 || bitDepth == 2 || bitDepth == 4 || bitDepth == 8|| bitDepth == 16))
                     {
                         return 37;
                     }
                     break;
-                case PngColorType.GreyAlpha:
+                case PngColorType.GrayAlpha:
                 case PngColorType.RGB:
                 case PngColorType.RGBA:
                     if (!(bitDepth == 8 || bitDepth == 16))

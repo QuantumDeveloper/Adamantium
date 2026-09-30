@@ -407,7 +407,7 @@ namespace Adamantium.Imaging.Png.IO
                 bkgd.BackgroundR = bkgd.BackgroundG = bkgd.BackgroundB = (uint)colorByte;
                 info.BackgroundR = info.BackgroundG = info.BackgroundB = (uint)colorByte;
             }
-            else if (info.ColorMode.ColorType == PngColorType.Grey || info.ColorMode.ColorType == PngColorType.GreyAlpha)
+            else if (info.ColorMode.ColorType == PngColorType.Gray || info.ColorMode.ColorType == PngColorType.GrayAlpha)
             {
                 /*error: this chunk must be 2 bytes for grayscale image*/
                 if (chunkLength != 2)
@@ -470,7 +470,7 @@ namespace Adamantium.Imaging.Png.IO
                     colorMode.Palette[4 * i + 3] = (byte)ReadByte();
                 }
             }
-            else if (colorMode.ColorType == PngColorType.Grey)
+            else if (colorMode.ColorType == PngColorType.Gray)
             {
                 /*error: this chunk must be 2 bytes for grayscale image*/
                 if (chunkLength != 2)

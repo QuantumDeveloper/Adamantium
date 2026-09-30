@@ -293,7 +293,7 @@ namespace Adamantium.Engine.GraphicsTests
             var counter = Adamantium.Graphics.Buffer.New(gd, (ulong)sizeof(uint),
                 BufferUsageFlags.StorageBuffer | BufferUsageFlags.ShaderDeviceAddress,
                 MemoryPropertyFlags.HostVisible | MemoryPropertyFlags.DeviceLocal);
-            var cinit = counter.MapMemory();              // zero-initialise the counter before dispatch
+            var cinit = counter.MapMemory();              // zero-initialize the counter before dispatch
             Marshal.WriteInt32((IntPtr)(nint)cinit, 0);
             counter.UnmapMemory();
 

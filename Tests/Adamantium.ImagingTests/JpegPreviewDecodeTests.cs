@@ -12,7 +12,7 @@ namespace Adamantium.ImagingTests;
 [TestFixture]
 public class JpegPreviewDecodeTests
 {
-    // Smooth, with a strong diagonal: shifted output shows up as a colour error, and a plane placed wrong shows up as
+    // Smooth, with a strong diagonal: shifted output shows up as a color error, and a plane placed wrong shows up as
     // the wrong hue rather than as noise.
     private static byte[] Picture(uint width, uint height)
     {
@@ -91,7 +91,7 @@ public class JpegPreviewDecodeTests
         }
 
         // The blocks fully inside the picture are what actually proves the traversal: a misplaced plane or an
-        // off-by-one walk shows up here immediately, since a preview pixel would then carry a neighbour's colour.
+        // off-by-one walk shows up here immediately, since a preview pixel would then carry a neighbor's color.
         Assert.That(worst, Is.LessThan(40.0), $"interior block differs by {worst:F1} from its average");
 
         // The edge is still checked, only loosely - it must be the right REGION of the picture even if the padding

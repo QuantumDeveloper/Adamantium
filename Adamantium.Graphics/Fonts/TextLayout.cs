@@ -467,7 +467,7 @@ public class TextLayout : DisposableObject
             {
                 case VerticalTextAlignment.Center:
                 {
-                    // Centred by ascent above the baseline, not the ink: ink differs per string and made same-size
+                    // Centered by ascent above the baseline, not the ink: ink differs per string and made same-size
                     // text wobble. No descent reserve, so descenders hang below.
                     var lineCount = glyphsData.Max(x => x.LineIndex) + 1;
                     var ascent = Font.Ascender * scale;
@@ -672,7 +672,7 @@ public class TextLayout : DisposableObject
             }
             else
             {
-                // Not rasterized yet: no quad, or it draws a piece of a neighbour.
+                // Not rasterized yet: no quad, or it draws a piece of a neighbor.
                 continue;
             }
             if (ElementsCount >= MaxItemsCount) break;

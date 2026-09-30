@@ -22,7 +22,7 @@ public class FontParameters
         SortingVariant = sortingVariant;
         PlacingVariant = placingVariant;
         // Never let the margin drop below the field's outside ramp (pxRange/2 texels): a smaller margin
-        // lets the distance field bleed into the neighbouring atlas cell under bilinear sampling. Callers
+        // lets the distance field bleed into the neighboring atlas cell under bilinear sampling. Callers
         // may pass a larger margin for extra padding, but not a smaller (unsafe) one.
         GlyphMargin = Math.Max(glyphMargin, (uint)Math.Ceiling(pixelRange / 2.0));
     }

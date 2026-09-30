@@ -9,7 +9,7 @@ namespace Adamantium.Imaging.PaletteQuantizer.Quantizers
     /// <summary>
     /// The NeuQuant Neural-Net image quantization algorithm (© Anthony Dekker 1994) 
     /// is a replacement for the common Median Cut algorithm. It is described in the 
-    /// article Kohonen neural networks for optimal colour quantization  in Volume 5, 
+    /// article Kohonen neural networks for optimal color quantization  in Volume 5, 
     /// pp 351-367 of the journal Network: Computation in Neural Systems, Institute of 
     /// Physics Publishing, 1994 (PDF version available).
     /// </summary>

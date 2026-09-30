@@ -16,7 +16,7 @@ namespace Adamantium.Fonts.TextureGeneration
             BoundingRect.Height = (int)height;
             GlyphIndex = glyphIndex;
             Margin = margin;
-            // cellSize > 0: the body (width x height) sits centred inside a fixed square cell and the field
+            // cellSize > 0: the body (width x height) sits centered inside a fixed square cell and the field
             // is computed across the whole cell. Otherwise fall back to a tight body + margin bitmap.
             FullGlyphSize = cellSize > 0
                 ? new Size(cellSize, cellSize)
@@ -51,8 +51,8 @@ namespace Adamantium.Fonts.TextureGeneration
 
         public void CalculateUV(Size atlasSize)
         {
-            // The body is centred inside its (FullGlyphSize) cell; the UV must point at the body, not the
-            // whole cell. The centring offset (cell - body)/2 reduces to Margin in the tight body+margin
+            // The body is centered inside its (FullGlyphSize) cell; the UV must point at the body, not the
+            // whole cell. The centering offset (cell - body)/2 reduces to Margin in the tight body+margin
             // layout, so this stays correct for both layouts.
             var padX = ((int)FullGlyphSize.Width - BoundingRect.Width) / 2;
             var padY = ((int)FullGlyphSize.Height - BoundingRect.Height) / 2;

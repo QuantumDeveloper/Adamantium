@@ -470,7 +470,7 @@ namespace Adamantium.Engine.Compiler.Models.ConversionUtils
                     }
                 }
 
-                // The neighbouring inputs got their null check, these two lines did not - a skin without
+                // The neighboring inputs got their null check, these two lines did not - a skin without
                 // <vertex_weights> is legal (the mesh is simply bound to nothing) and gave an NRE here.
                 if (skin.vertex_weights?.vcount == null || skin.vertex_weights.v == null)
                 {

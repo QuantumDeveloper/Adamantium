@@ -90,7 +90,7 @@ namespace Adamantium.Engine.Compiler.Models.Converters
          ColladaDataContainer dataContainer = (ColladaDataContainer) Parser.ParseData(Config);
          if (!dataContainer.IsFileValid)
          {
-            IsCancelled = true;
+            IsCanceled = true;
             return;
          }
 
@@ -148,7 +148,7 @@ namespace Adamantium.Engine.Compiler.Models.Converters
 
       private sealed record GeometryParts(List<IndicesContainer> Indices, Mesh Mesh, String MeshId, String MeshName);
 
-      //Reads one mesh. Nothing in here touches the scene tree, so it runs alongside the neighbouring geometries
+      //Reads one mesh. Nothing in here touches the scene tree, so it runs alongside the neighboring geometries
       private GeometryParts PrepareGeometry(geometry geometry)
       {
          List<RawIndicesSemanticData> rawIndicesList = executor.GetRawIndicesCollada(geometry);

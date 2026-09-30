@@ -392,7 +392,7 @@ namespace Adamantium.Graphics
         private UInt64 _deviceAddress;
 
         /// <summary>The buffer's GPU address. It does not change while the buffer lives, and it was being asked of the
-        /// driver on EVERY draw that reads through it - a marshalled call each time, on the frame's hot path.</summary>
+        /// driver on EVERY draw that reads through it - a marshaled call each time, on the frame's hot path.</summary>
         public UInt64 GetDeviceAddress()
         {
             if (_deviceAddress != 0) return _deviceAddress;

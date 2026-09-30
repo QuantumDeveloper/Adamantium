@@ -58,7 +58,7 @@ namespace Adamantium.Mathematics
       }
 
       /// <summary>
-      /// Transform the sphere by a full affine matrix (e.g. a composed hierarchical world transform): the centre goes
+      /// Transform the sphere by a full affine matrix (e.g. a composed hierarchical world transform): the center goes
       /// through the matrix as a point and the radius scales by the LARGEST axis scale, so scale and translation from the
       /// whole parent chain apply. The max axis length keeps the sphere conservative under non-uniform scale.
       /// </summary>

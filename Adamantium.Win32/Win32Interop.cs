@@ -113,7 +113,7 @@ namespace Adamantium.Win32
         public static extern bool GetWindowRect(IntPtr hWnd, out RECT lpRect);
 
         /// <summary>The active window OF THE CALLING THREAD - which is the UI thread, so it is our own window and never
-        /// another application's. What a modal dialog is owned by, so it centres on the window the user pressed in and
+        /// another application's. What a modal dialog is owned by, so it centers on the window the user pressed in and
         /// that window cannot be used behind it.</summary>
         [DllImport("user32.dll")]
         public static extern IntPtr GetActiveWindow();
@@ -130,7 +130,7 @@ namespace Adamantium.Win32
         [DllImport("user32.dll")]
         public static extern IntPtr LoadCursor(IntPtr hInstance, NativeCursors cursorName);
 
-        // CharSet.Unicode is REQUIRED: the entry point is the W (wide) variant, so the path must be marshalled as UTF-16.
+        // CharSet.Unicode is REQUIRED: the entry point is the W (wide) variant, so the path must be marshaled as UTF-16.
         // Without it the string goes as ANSI, the W function reads garbage, the file "isn't found" and it returns NULL.
         [DllImport("user32.dll", EntryPoint = "LoadCursorFromFileW", CharSet = CharSet.Unicode, SetLastError = true)]
         public static extern IntPtr LoadCursorFromFile(string filePath);
@@ -177,7 +177,7 @@ namespace Adamantium.Win32
         [return: MarshalAs(UnmanagedType.Bool)]
         public static extern bool GetCursorPos(out NativePoint lpPoint);
 
-        /// <summary>The window under a SCREEN point, honouring the real z-order. Hidden, disabled and click-through
+        /// <summary>The window under a SCREEN point, honoring the real z-order. Hidden, disabled and click-through
         /// (WS_EX_TRANSPARENT) windows are skipped - which is why the drag ghost never shadows the window behind it.</summary>
         [DllImport("user32.dll")]
         public static extern IntPtr WindowFromPoint(NativePoint point);

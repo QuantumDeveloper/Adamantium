@@ -7,7 +7,7 @@ using Adamantium.MVVM;
 
 namespace Adamantium.ECS.Components
 {
-    // NOT DisposableObject: components are plain data + behaviour and own no unmanaged/GPU resources (GPU buffers live in
+    // NOT DisposableObject: components are plain data + behavior and own no unmanaged/GPU resources (GPU buffers live in
     // the render-layer geometry cache, not on components). Being IDisposable only invited the dispose pattern -
     // use-after-dispose, ownership ambiguity - into the data layer for no benefit. NamedObject still supplies the INPC
     // SetProperty (via PropertyChangedBase) and the Name.

@@ -188,8 +188,8 @@ float4 FontPixelShaderMsdf(PSInput input) : SV_Target
     // Gamma-boost coverage times the color's alpha so thin stems keep their color; splitting the two washed text out.
     // The element's fade arrives pre-raised to 2.2, so the boost hands it back linear.
     float alpha = pow(ForegroundColor.a * opacity, 1.0 / 2.2);
-    // The rounded ancestor clip, as coverage, exactly as the batch pass applies it. Both the premultiplied colour and
-    // the alpha are cut: this pass outputs rgb*alpha, so cutting one without the other leaves colour where the glyph
+    // The rounded ancestor clip, as coverage, exactly as the batch pass applies it. Both the premultiplied color and
+    // the alpha are cut: this pass outputs rgb*alpha, so cutting one without the other leaves color where the glyph
     // was cut away. A zero-size box gives 1 and costs nothing.
     alpha *= ClipCoverage(input.Position.xy, input.ClipBox, input.ClipRadii);
     return float4(ForegroundColor.rgb * alpha, alpha);
@@ -206,8 +206,8 @@ float4 FontPixelShaderMsdfBatch(PSInput input) : SV_Target
     // Unchanged on purpose - the element's fade is pre-compensated in the vertex stage so that this very boost hands
     // it back linear. See the FADE line in FontBatchInstancedVS.
     float alpha = pow(input.Color.a * opacity, 1.0 / 2.2);
-    // The rounded ancestor clip, as coverage. Applied to the PREMULTIPLIED colour as well as the alpha - this pass
-    // outputs rgb*alpha, so cutting only the alpha would leave the colour standing where the glyph was cut away.
+    // The rounded ancestor clip, as coverage. Applied to the PREMULTIPLIED color as well as the alpha - this pass
+    // outputs rgb*alpha, so cutting only the alpha would leave the color standing where the glyph was cut away.
     alpha *= ClipCoverage(input.Position.xy, input.ClipBox, input.ClipRadii);
     return float4(input.Color.rgb * alpha, alpha);
 }
@@ -215,7 +215,7 @@ float4 FontPixelShaderMsdfBatch(PSInput input) : SV_Target
 // ---- Instanced glyph batch: per-instance GlyphData read from a BDA STORAGE buffer by SV_InstanceID (mirrors
 // RectBatchInstancedVS in BatchEffect.fx); the quad comes from SV_VertexID. Node-local glyph rects are transformed to
 // world on the GPU by the instance's transform-table slot (0 = identity), so a scrolling block moves via one matrix
-// write, not a per-glyph CPU re-bake, and the batch is node-aware. Reuses FontPixelShaderMsdfBatch (per-instance colour).
+// write, not a per-glyph CPU re-bake, and the batch is node-aware. Reuses FontPixelShaderMsdfBatch (per-instance color).
 struct GlyphData
 {
     float4 LocalRect;   // node-local x, y, w, h (world for slot-0 legacy bakes)

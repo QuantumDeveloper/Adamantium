@@ -41,7 +41,7 @@ namespace Adamantium.Imaging.Png.Chunks
                     transparencyBytes.Add(info.Palette[4 * i + 3]);
                 }
             }
-            else if (info.ColorType == PngColorType.Grey)
+            else if (info.ColorType == PngColorType.Gray)
             {
                 transparencyBytes.Add((byte)(KeyR >> 8));
                 transparencyBytes.Add((byte)(KeyR & 255));

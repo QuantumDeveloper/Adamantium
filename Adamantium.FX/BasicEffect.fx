@@ -5,7 +5,7 @@ float4x4 world;
 float3 meshColor;
 float transparency;
 
-// One draw, many copies of the SAME mesh: each copy's own world matrix and colour, with the projection shared. The
+// One draw, many copies of the SAME mesh: each copy's own world matrix and color, with the projection shared. The
 // gizmo's seven balls are one sphere seven times over, its three arms one cylinder, its four arrows one triangle.
 // The length is the cap on a single instanced draw - see InstanceCapacity.
 float4x4 instanceWorld[64];
@@ -104,7 +104,7 @@ PS_OUTPUT_BASIC BasicLit_VS(MESH_VERTEX input)
     return output;
 }
 
-// The instanced twin: the placement and the colour come from the tables above, everything else is identical. The
+// The instanced twin: the placement and the color come from the tables above, everything else is identical. The
 // normal rides the copy's OWN matrix, so copies of one mesh may be turned any way and still light correctly, then the
 // view's, since the light is fixed in the view.
 PS_OUTPUT_BASIC BasicLitInstanced_VS(MESH_VERTEX input, uint instanceId : SV_InstanceID)
@@ -121,7 +121,7 @@ PS_OUTPUT_BASIC BasicLitInstanced_VS(MESH_VERTEX input, uint instanceId : SV_Ins
     return output;
 }
 
-// Flat colour gives a shape no form at all - every face of it reads as one silhouette. Lit from just off the viewer's
+// Flat color gives a shape no form at all - every face of it reads as one silhouette. Lit from just off the viewer's
 // shoulder, so a gizmo shades the same however the view turns: a diffuse term for the body, a tight specular so a ball
 // reads as round, and a rim that keeps a dark one off a dark background without an outline pass.
 float4 BasicLit_PS(PS_OUTPUT_BASIC input) : SV_TARGET
@@ -308,7 +308,7 @@ float4 SdfRing_PS(PS_OUTPUT_RING input) : SV_TARGET
 }
 
 // The selection outline: every copy drawn once per direction, shifted that way by the outline's width on screen, and
-// the stencil keeps only what lands outside the selection itself. Copy k's placement and colour sit at k / directions.
+// the stencil keeps only what lands outside the selection itself. Copy k's placement and color sit at k / directions.
 static const uint outlineDirections = 8;
 
 PS_OUTPUT_BASIC OutlineInstanced_VS(MESH_VERTEX input, uint instanceId : SV_InstanceID)
@@ -392,7 +392,7 @@ technique Basic
         PixelShader = BasicLit_PS;
     }
 
-    // Lines have no normals to light: flat colour, placed the same way.
+    // Lines have no normals to light: flat color, placed the same way.
     pass FlatInstanced
     {
         VertexShader = BasicLitInstanced_VS;

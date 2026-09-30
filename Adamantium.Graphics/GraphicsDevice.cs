@@ -528,7 +528,7 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
     }
 
     // Which pass's shader objects the CURRENT command buffer already has bound. A pass applied again for the next draw of
-    // the same material rebound the same handles, stage by stage, through a marshalled call each - and a frame is mostly
+    // the same material rebound the same handles, stage by stage, through a marshaled call each - and a frame is mostly
     // runs of the same material. Cleared with the rest of the dynamic state at BeginDraw, because a fresh command buffer
     // has none of it.
     private object _boundShaderPass;
@@ -1095,7 +1095,7 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
         CurrentCommandBuffer.EndRendering();
     }
 
-    /// <summary>Re-open the pass suspended by <see cref="SuspendRendering"/>. LoadOp is Load, so the colour and depth
+    /// <summary>Re-open the pass suspended by <see cref="SuspendRendering"/>. LoadOp is Load, so the color and depth
     /// already in the target survive - a Clear here would wipe the frame drawn so far.</summary>
     public void ResumeRendering()
     {
@@ -1274,7 +1274,7 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
 
         // No image means the acquire in EndDraw failed (an out-of-date swapchain, i.e. a resize). The submit below WAITS
         // on this frame's ImageAvailable semaphore, which nothing will ever signal - submitting would hang the device.
-        // Skipping is safe for the fence: it is reset inside the submit, so an un-submitted frame leaves it signalled and
+        // Skipping is safe for the fence: it is reset inside the submit, so an un-submitted frame leaves it signaled and
         // the next BeginDraw walks straight through. The presenter self-heals on the next frame (OutOfDate rebuild).
         if (Presenter is SwapChainGraphicsPresenter && !HasSwapchainImage) return;
 
@@ -1593,8 +1593,8 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
         if (!_stateInitialized || _cLogicOp != LogicOperationsEnabled)
         { commandBuffer.SetLogicOpEnableEXT(LogicOperationsEnabled); _cLogicOp = LogicOperationsEnabled; }
 
-        // Colour-blend state DOES vary between UI draws (text uses premultiplied), which is why it used to be sent every
-        // time - but comparing six enum fields is nothing against three marshalled calls, and a run of same-material draws
+        // Color-blend state DOES vary between UI draws (text uses premultiplied), which is why it used to be sent every
+        // time - but comparing six enum fields is nothing against three marshaled calls, and a run of same-material draws
         // sends none of them.
         if (!_stateInitialized || !_cBlendKnown || !SameBlend(_cBlendEq, ColorBlendEquation))
         { commandBuffer.SetColorBlendEquationEXT(0, 1, ColorBlendEquation); _cBlendEq = ColorBlendEquation; }

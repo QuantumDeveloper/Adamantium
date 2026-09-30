@@ -18,7 +18,7 @@ using System.Collections.Generic;
 namespace Adamantium.Mathematics.Triangulation
 {
     /// <summary>
-    /// C# port of mapbox/earcut (ISC licence) — robust, near-linear ear-clipping triangulation of a polygon with
+    /// C# port of mapbox/earcut (ISC license) — robust, near-linear ear-clipping triangulation of a polygon with
     /// optional holes. Input is a flat coordinate array [x0,y0,x1,y1,...]; <paramref name="holeIndices"/> gives the
     /// start vertex index of each hole ring (or null/empty for none). Output is a flat list of triangle vertex
     /// indices (groups of 3) into the input array. Produces ~n-2 triangles and degrades gracefully on imperfect

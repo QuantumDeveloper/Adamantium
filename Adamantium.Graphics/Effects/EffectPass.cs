@@ -45,7 +45,7 @@ public sealed class EffectPass : DisposableObject, IEffectPass
     private readonly List<StageBlock> stages = new List<StageBlock>();
 
     // The push-data wrappers, made ONCE. Both are generated as CLASSES, not structs, so `new` here allocated two objects
-    // on EVERY Apply - i.e. on every draw call, tens of thousands a second. They are marshalled to a pointer inside
+    // on EVERY Apply - i.e. on every draw call, tens of thousands a second. They are marshaled to a pointer inside
     // PushDataEXT and nothing keeps a reference past the call, so one instance per pass can be refilled and re-sent.
     // Same lesson as the delegate this method already avoids (see WriteHeapOffsets): per-draw garbage in the draw path.
     private readonly HostAddressRangeConstEXT _pushRange = new();
@@ -159,7 +159,7 @@ public sealed class EffectPass : DisposableObject, IEffectPass
         }
 
         // 5. BIND SHADERS - unless this command buffer already has THIS pass's shaders on it. A run of draws of one
-        // material re-bound the same handles per draw, and every bind is a marshalled call.
+        // material re-bound the same handles per draw, and every bind is a marshaled call.
         if (!graphicsDevice.ShadersBoundFor(this))
         {
             BindAllStages();

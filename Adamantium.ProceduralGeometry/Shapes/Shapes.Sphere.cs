@@ -81,7 +81,7 @@ namespace Adamantium.ProceduralGeometry.Shapes
                     }
 
                     var mesh = new Mesh();
-                    // A sphere's normal IS its direction from the centre, so it is written rather than averaged back
+                    // A sphere's normal IS its direction from the center, so it is written rather than averaged back
                     // out of the triangles: exact at the poles and the seam, where averaging has the least to work with.
                     mesh.SetTopology(PrimitiveType.TriangleList).
                         SetPoints(vertices).

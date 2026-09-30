@@ -147,7 +147,7 @@ namespace Adamantium.Imaging.PaletteQuantizer.Quantizers.DistinctSelection
                 ColorSaturationComparer saturationComparer = new ColorSaturationComparer();
                 ColorBrightnessComparer brightnessComparer = new ColorBrightnessComparer();
 
-                // generates catalogue
+                // generates catalog
                 List<IEqualityComparer<DistinctColorInfo>> comparers = new List<IEqualityComparer<DistinctColorInfo>> { hueComparer, saturationComparer, brightnessComparer };
 
                 // take adequate number from each slot

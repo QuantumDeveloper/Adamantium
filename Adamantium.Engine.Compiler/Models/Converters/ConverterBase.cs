@@ -23,7 +23,7 @@ namespace Adamantium.Engine.Compiler.Converter.Converters
       /// import: half a model lost in silence looks whole right up until someone notices it is not.</summary>
       public List<String> UnsupportedFeatures { get; } = new List<String>();
 
-      protected Boolean IsCancelled { get; set; }
+      protected Boolean IsCanceled { get; set; }
 
       protected ModelFileParser Parser { get; set; }
 
@@ -43,7 +43,7 @@ namespace Adamantium.Engine.Compiler.Converter.Converters
       {
          CancellationToken = cancellationToken;
          Convert();
-         if (IsCancelled)
+         if (IsCanceled)
          {
             return null;
          }

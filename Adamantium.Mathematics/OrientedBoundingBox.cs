@@ -160,7 +160,7 @@ namespace Adamantium.Mathematics
         }
 
         /// <summary>
-        /// Transform the box by a full affine matrix (e.g. a composed hierarchical world transform). The centre goes
+        /// Transform the box by a full affine matrix (e.g. a composed hierarchical world transform). The center goes
         /// through the matrix as a point and each oriented half-extent axis through its linear part, so scale and rotation
         /// from the WHOLE parent chain apply - unlike the scale/rotation/translation overloads, which only take a single
         /// node's local TRS. Reads the box axes with the same Right/Up/Forward accessors <see cref="GetCorners()"/> uses,

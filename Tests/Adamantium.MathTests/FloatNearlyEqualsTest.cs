@@ -10,7 +10,7 @@ namespace Adamantium.MathTests
  *
  * Note: this function attempts a "one size fits all" solution. There may be
  * some edge cases for which it still produces unexpected results, and some of
- * the tests it was developed to pass probably specify behaviour that is not
+ * the tests it was developed to pass probably specify behavior that is not
  * appropriate for some applications, especially concerning very small values
  * with differing signs.
  *

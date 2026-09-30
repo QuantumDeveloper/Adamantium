@@ -10,7 +10,7 @@ namespace Adamantium.Win32.Shell;
 [InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
 public interface IFileSaveDialog
 {
-    /// <summary>Runs the dialog modally against an owner window, and does not return until it closes. A cancelled
+    /// <summary>Runs the dialog modally against an owner window, and does not return until it closes. A canceled
     /// dialog is not an error but it is not S_OK either: it answers HRESULT_FROM_WIN32(ERROR_CANCELLED).</summary>
     [PreserveSig]
     int Show(IntPtr owner);

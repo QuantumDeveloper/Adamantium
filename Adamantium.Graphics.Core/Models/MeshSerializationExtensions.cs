@@ -1,7 +1,7 @@
 namespace Adamantium.Graphics.Core.Models;
 
 /// <summary>
-/// Bridges the rich behavioural <see cref="Mesh"/> class to a flat serializable <see cref="MeshGeometry"/>
+/// Bridges the rich behavioral <see cref="Mesh"/> class to a flat serializable <see cref="MeshGeometry"/>
 /// snapshot using only Mesh's public API (getters + Set* methods). This keeps <see cref="Mesh"/> itself
 /// free of any serialization concern.
 /// </summary>

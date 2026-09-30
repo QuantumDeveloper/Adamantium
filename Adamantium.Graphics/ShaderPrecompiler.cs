@@ -15,7 +15,7 @@ namespace Adamantium.Graphics;
 /// dies; each attempt persists its binaries (<see cref="ShaderBinaryCache"/>), and a stamp per GPU and driver skips it next time.</summary>
 public static class ShaderPrecompiler
 {
-    /// <summary>Master switch (off = the earlier behaviour: cold launches die until the cache happens to fill).</summary>
+    /// <summary>Master switch (off = the earlier behavior: cold launches die until the cache happens to fill).</summary>
     public static bool Enabled = true;
 
     /// <summary>Marks the child process whose whole job is to compile and persist, then exit.</summary>

@@ -19,7 +19,7 @@ namespace Adamantium.Graphics.Core
         private Semaphore[] imageAvailableSemaphores;
         private Semaphore[] renderFinishedSemaphores;
 
-        // ONE FENCE PER SWAPCHAIN IMAGE, signalled when the present engine is finished with that image AND with the
+        // ONE FENCE PER SWAPCHAIN IMAGE, signaled when the present engine is finished with that image AND with the
         // semaphores the present waited on - the thing an acquire alone does not tell us. Null when the device has no
         // swapchain_maintenance1, and then every path below falls back to idling the device.
         private Fence[] presentFences;
@@ -213,7 +213,7 @@ namespace Adamantium.Graphics.Core
 
             if (GraphicsDevice.MainDevice.SupportsSwapchainMaintenance)
             {
-                // Created ALREADY SIGNALLED: the first present of an image has no earlier present of it to wait for.
+                // Created ALREADY SIGNALED: the first present of an image has no earlier present of it to wait for.
                 var fenceInfo = new FenceCreateInfo { Flags = FenceCreateFlagBits.SignaledBit };
                 presentFences = logicalDevice.CreateFences(fenceInfo, (uint)swapchainTextures.Length);
             }
@@ -558,7 +558,7 @@ namespace Adamantium.Graphics.Core
 
             if (UsePresentFences)
             {
-                // The fence must be unsignalled when the present is queued, so the PREVIOUS present of this same image
+                // The fence must be unsignaled when the present is queued, so the PREVIOUS present of this same image
                 // is settled first. It practically always is - we only got here because the image was re-acquired - so
                 // the wait is a formality that costs nothing, and it is what makes renderFinishedSemaphores[imageIndex]
                 // safe to hand to the queue again.
@@ -680,7 +680,7 @@ namespace Adamantium.Graphics.Core
 
             if (result != Result.Success)
             {
-                // A fence that never signalled leaves the images' state unknown, and destroying a fence still in use is
+                // A fence that never signaled leaves the images' state unknown, and destroying a fence still in use is
                 // invalid - so fall back to the blunt wait rather than carry on with a guess.
                 Log.Logger.Error($"Present fences did not settle before a swapchain rebuild ({result}); idling the device.");
                 GraphicsDevice.LogicalDevice.DeviceWaitIdle();

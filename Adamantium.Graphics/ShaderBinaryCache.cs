@@ -9,14 +9,14 @@ namespace Adamantium.Graphics;
 /// launches create shaders from the binary instead of SPIR-V. Any IO failure falls back to SPIR-V.</summary>
 public static class ShaderBinaryCache
 {
-    /// <summary>Master switch (off = always compile from SPIR-V, the pre-cache behaviour).</summary>
+    /// <summary>Master switch (off = always compile from SPIR-V, the pre-cache behavior).</summary>
     public static bool Enabled = true;
 
     private static string _deviceDir;   // per-device cache folder, resolved once
 
     // The per-device cache folder: %LOCALAPPDATA%/Adamantium/ShaderCache/<deviceHash>/. Keyed by the STABLE identity of
     // the GPU + driver (device name + vendor/device id + driver version) - which changes exactly when a cached binary
-    // would become incompatible. NB pipelineCacheUUID is deliberately NOT used: its marshalled bytes were not stable
+    // would become incompatible. NB pipelineCacheUUID is deliberately NOT used: its marshaled bytes were not stable
     // across runs here, so it spawned a fresh folder every launch and the cache never hit (the whole point defeated).
     private static string DeviceDir(GraphicsDevice device)
     {
@@ -44,7 +44,7 @@ public static class ShaderBinaryCache
         var buf = new MemoryStream();
         if (!info.PCode.IsEmpty) buf.Write(info.PCode.Span);
         buf.Write(BitConverter.GetBytes((uint)info.Stage));
-        // Hash the entry-point NAME's bytes, not String.GetHashCode - the latter is RANDOMISED per process, so it made
+        // Hash the entry-point NAME's bytes, not String.GetHashCode - the latter is RANDOMIZED per process, so it made
         // the file name differ every run and the cache never hit.
         if (!string.IsNullOrEmpty(info.PName)) buf.Write(System.Text.Encoding.UTF8.GetBytes(info.PName));
         var hash = Convert.ToHexString(sha.ComputeHash(buf.ToArray())).Substring(0, 16);

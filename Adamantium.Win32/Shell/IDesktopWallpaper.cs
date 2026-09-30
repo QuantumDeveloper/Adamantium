@@ -31,7 +31,7 @@ public interface IDesktopWallpaper
     [PreserveSig]
     int GetMonitorRECT([MarshalAs(UnmanagedType.LPWStr)] string monitorId, out RECT displayRect);
 
-    /// <summary>The colour behind the picture, and the whole desktop when there is no picture at all. COLORREF:
+    /// <summary>The color behind the picture, and the whole desktop when there is no picture at all. COLORREF:
     /// 0x00BBGGRR.</summary>
     [PreserveSig]
     int SetBackgroundColor(uint color);

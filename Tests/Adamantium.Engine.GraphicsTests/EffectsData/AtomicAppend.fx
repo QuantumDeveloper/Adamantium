@@ -3,7 +3,7 @@
 // to an output buffer. If this works, the expander can emit a variable number of triangles in a single dispatch and a
 // DrawIndirect can read the count. Shader body is Slang.
 
-uint64_t CounterAddress;   // single uint, the running append count (must be zero-initialised before dispatch)
+uint64_t CounterAddress;   // single uint, the running append count (must be zero-initialized before dispatch)
 uint64_t OutputAddress;    // uint[] output (>= Count elements)
 uint Count;
 

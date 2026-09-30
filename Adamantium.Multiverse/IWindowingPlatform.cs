@@ -12,7 +12,7 @@ public interface IWindowingPlatform
     UniverseOutput CreateWindow(uint width, uint height, IUniverseEventAggregator events);
 
     /// <summary>
-    /// Runs the message loop until <paramref name="token"/> is cancelled.
+    /// Runs the message loop until <paramref name="token"/> is canceled.
     /// </summary>
     void Run(CancellationToken token);
 }

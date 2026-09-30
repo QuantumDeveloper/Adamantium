@@ -152,7 +152,7 @@ namespace Adamantium.Graphics.Fonts
 
             if (toGenerate == null) return;
 
-            // ONE task for the whole batch: the generator parallelises across the glyphs it is given, so handing it the
+            // ONE task for the whole batch: the generator parallelizes across the glyphs it is given, so handing it the
             // batch keeps every core busy - the reason the caller pools a frame's text in the first place.
             System.Threading.Tasks.Task.Run(() =>
             {

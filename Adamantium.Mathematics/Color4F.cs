@@ -590,12 +590,12 @@ namespace Adamantium.Mathematics
          /// <param name="result">When the method completes, contains the adjusted color.</param>
          public static void AdjustSaturation(ref Color4F value, float saturation, out Color4F result)
          {
-            float grey = value.Red * 0.2125f + value.Green * 0.7154f + value.Blue * 0.0721f;
+            float gray = value.Red * 0.2125f + value.Green * 0.7154f + value.Blue * 0.0721f;
 
             result.Alpha = value.Alpha;
-            result.Red = grey + saturation * (value.Red - grey);
-            result.Green = grey + saturation * (value.Green - grey);
-            result.Blue = grey + saturation * (value.Blue - grey);
+            result.Red = gray + saturation * (value.Red - gray);
+            result.Green = gray + saturation * (value.Green - gray);
+            result.Blue = gray + saturation * (value.Blue - gray);
          }
 
          /// <summary>
@@ -606,12 +606,12 @@ namespace Adamantium.Mathematics
          /// <returns>The adjusted color.</returns>
          public static Color4F AdjustSaturation(Color4F value, float saturation)
          {
-            float grey = value.Red * 0.2125f + value.Green * 0.7154f + value.Blue * 0.0721f;
+            float gray = value.Red * 0.2125f + value.Green * 0.7154f + value.Blue * 0.0721f;
 
             return new Color4F(
-                grey + saturation * (value.Red - grey),
-                grey + saturation * (value.Green - grey),
-                grey + saturation * (value.Blue - grey),
+                gray + saturation * (value.Red - gray),
+                gray + saturation * (value.Green - gray),
+                gray + saturation * (value.Blue - gray),
                 value.Alpha);
          }
 

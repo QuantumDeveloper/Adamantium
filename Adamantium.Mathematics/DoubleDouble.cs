@@ -36,7 +36,7 @@ namespace Adamantium.Mathematics
         {
             var s = a.Hi + b.Hi;
             var t = s - a.Hi;
-            return Renormalise(s, ((a.Hi - (s - t)) + (b.Hi - t)) + (a.Lo + b.Lo));
+            return Renormalize(s, ((a.Hi - (s - t)) + (b.Hi - t)) + (a.Lo + b.Lo));
         }
 
         /// <summary>Negation.</summary>
@@ -52,10 +52,10 @@ namespace Adamantium.Mathematics
             Split(a.Hi, out var ah, out var al);
             Split(b.Hi, out var bh, out var bl);
             var e = ((ah * bh - p) + ah * bl + al * bh) + al * bl;
-            return Renormalise(p, e + (a.Hi * b.Lo + a.Lo * b.Hi));
+            return Renormalize(p, e + (a.Hi * b.Lo + a.Lo * b.Hi));
         }
 
-        /// <summary>Equality of both parts. Two pairs holding the same real number are equal only when normalised the
+        /// <summary>Equality of both parts. Two pairs holding the same real number are equal only when normalized the
         /// same way, so this is identity of the representation, not of the value.</summary>
         public bool Equals(DoubleDouble other) => Hi.Equals(other.Hi) && Lo.Equals(other.Lo);
 
@@ -74,7 +74,7 @@ namespace Adamantium.Mathematics
         /// <inheritdoc/>
         public override string ToString() => $"{Hi:R} + {Lo:R}";
 
-        private static DoubleDouble Renormalise(double hi, double lo)
+        private static DoubleDouble Renormalize(double hi, double lo)
         {
             var s = hi + lo;
             return new DoubleDouble(s, lo - (s - hi));

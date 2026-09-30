@@ -13,7 +13,7 @@ namespace Adamantium.ImagingTests;
 [TestFixture]
 public class PngRoundTripTests
 {
-    // A picture with real variety, so filtering and compression have something to chew on rather than a flat colour
+    // A picture with real variety, so filtering and compression have something to chew on rather than a flat color
     // that hides mistakes.
     private static byte[] Gradient(uint width, uint height)
     {

@@ -158,8 +158,8 @@ namespace Adamantium.Core
         }
 
         /// <summary>Asked ONCE per type (a static generic), not per write. "No GC references AND the in-memory size equals
-        /// the marshalled one" is what makes a raw write equivalent to a marshalled one: a struct carrying a <c>bool</c>
-        /// (one byte in memory, four marshalled) or a fixed buffer fails the size test and keeps the general path.</summary>
+        /// the marshaled one" is what makes a raw write equivalent to a marshaled one: a struct carrying a <c>bool</c>
+        /// (one byte in memory, four marshaled) or a fixed buffer fails the size test and keeps the general path.</summary>
         private static class Blittable<T> where T : struct
         {
             public static readonly bool Yes = Compute();
@@ -174,7 +174,7 @@ namespace Adamantium.Core
                 }
                 catch
                 {
-                    return false;   // no marshalled representation at all - let the general path fail the same way it did
+                    return false;   // no marshaled representation at all - let the general path fail the same way it did
                 }
 #else
                 // netstandard2.0 has no IsReferenceOrContainsReferences; that target keeps the marshalling path, which is

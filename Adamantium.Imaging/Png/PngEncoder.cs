@@ -55,7 +55,7 @@ namespace Adamantium.Imaging.Png
             }
 
             // A PngImage that came out of the DECODER holds its frames still encoded - the pixels AND the frame's size
-            // appear only when somebody asks for them. Everything below reads both, starting with the colour-mode
+            // appear only when somebody asks for them. Everything below reads both, starting with the color-mode
             // choice, so ask first: encoding a picture straight after loading it (which is what transcoding does) was
             // otherwise deciding on a zero-sized image and throwing IndexOutOfRangeException further down.
             // ONLY when the pixels are genuinely missing: an image built from another format (a GIF, a JPEG) already
@@ -102,8 +102,8 @@ namespace Adamantium.Imaging.Png
                         frame = pngImage.Frames[0];
                     }
                     // The frame's size, NOT its APNG sub-rectangle: fed the zeros a plain PNG carries there, the chooser
-                    // inspects no pixels at all and leaves the colour mode at grey/bit-depth-0 - which then sizes every
-                    // buffer downstream to nothing and blows up inside the colour conversion.
+                    // inspects no pixels at all and leaves the color mode at gray/bit-depth-0 - which then sizes every
+                    // buffer downstream to nothing and blows up inside the color conversion.
                     var (chooseWidth, chooseHeight) = SizeOf(frame);
                     PngColorProfile.AutoChooseColor(info.ColorMode, frame.RawPixelBuffer, chooseWidth, chooseHeight, state.ColorModeRaw);
                     //state.InfoRaw.ColorType = info.ColorMode.ColorType;
@@ -115,7 +115,7 @@ namespace Adamantium.Imaging.Png
             if (state.InfoPng.IsIccpDefined)
             {
                 var grayICC = iCCP.IsGrayICCProfile(state.InfoPng.IccpProfile);
-                var grayPng = info.ColorMode.ColorType == PngColorType.Grey || info.ColorMode.ColorType == PngColorType.GreyAlpha;
+                var grayPng = info.ColorMode.ColorType == PngColorType.Gray || info.ColorMode.ColorType == PngColorType.GrayAlpha;
                 /* TODO: perhaps instead of giving errors or less optimal compression, we can automatically modify
                 the ICC profile here to say "GRAY" or "RGB " to match the PNG color type, unless this will require
                 non trivial changes to the rest of the ICC profile */
@@ -141,8 +141,8 @@ namespace Adamantium.Imaging.Png
                     /* Recoverable but an unfortunate loss in compression density: We have grayscale pixels but
                     are forced to store them in more expensive RGB format that will repeat each value 3 times
                     because the PNG spec does not allow an RGB ICC profile with internal grayscale color data */
-                    if (info.ColorMode.ColorType == PngColorType.Grey) info.ColorMode.ColorType = PngColorType.RGB;
-                    if (info.ColorMode.ColorType == PngColorType.GreyAlpha) info.ColorMode.ColorType = PngColorType.RGBA;
+                    if (info.ColorMode.ColorType == PngColorType.Gray) info.ColorMode.ColorType = PngColorType.RGB;
+                    if (info.ColorMode.ColorType == PngColorType.GrayAlpha) info.ColorMode.ColorType = PngColorType.RGBA;
                     if (info.ColorMode.BitDepth < 8) info.ColorMode.BitDepth = 8;
                 }
             }
@@ -153,7 +153,7 @@ namespace Adamantium.Imaging.Png
                 {
                     var (frameWidth, frameHeight) = SizeOf(frame);
                     // PER SCANLINE, not for the image as a whole: PNG pads every row up to a byte boundary, so a
-                    // sub-byte depth (a palette, grey) at a width that is not a multiple of 8/bpp needs one extra byte
+                    // sub-byte depth (a palette, gray) at a width that is not a multiple of 8/bpp needs one extra byte
                     // per row. Sizing it in one go came up short and the conversion wrote past the end of the buffer.
                     var bitsPerPixel = PngColorConversion.GetBitsPerPixel(info.ColorMode);
                     long size = (frameWidth * frameHeight * bitsPerPixel + 7) / 8;
@@ -221,7 +221,7 @@ namespace Adamantium.Imaging.Png
                 pngStream.WritePLTE(state);
             }
             /*tRNS*/
-            if ((info.ColorMode.ColorType == PngColorType.Grey ||
+            if ((info.ColorMode.ColorType == PngColorType.Gray ||
                 info.ColorMode.ColorType == PngColorType.RGB)
                 && info.ColorMode.IsKeyDefined)
             {
