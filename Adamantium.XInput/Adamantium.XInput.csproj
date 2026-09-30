@@ -5,6 +5,9 @@
 		<Platforms>AnyCPU</Platforms>
 		<Configurations>Debug;Release</Configurations>
 		<LangVersion>latest</LangVersion>
+		<IsPackable>true</IsPackable>
+		<Description>XInput gamepads for the Adamantium engine.</Description>
+		<PackageTags>adamantium;xinput;gamepad;input</PackageTags>
 	</PropertyGroup>
 
 	<PropertyGroup Condition="'$(Configuration)'=='Debug'">

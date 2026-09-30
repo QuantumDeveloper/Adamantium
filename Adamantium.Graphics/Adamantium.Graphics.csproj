@@ -7,6 +7,9 @@
 		<Configurations>Debug;Release</Configurations>
 		<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
 		<OutputType>Library</OutputType>
+		<IsPackable>true</IsPackable>
+		<Description>The Vulkan renderer of the Adamantium engine: graphics device, swap chains, memory allocation, pipelines, effects, textures and text.</Description>
+		<PackageTags>adamantium;engine;vulkan;graphics;rendering</PackageTags>
 	</PropertyGroup>
 
 	<ItemGroup>

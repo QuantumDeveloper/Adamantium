@@ -5,6 +5,9 @@
     <Platforms>AnyCPU</Platforms>
     <Configurations>Debug;Release</Configurations>
     <LangVersion>latestmajor</LangVersion>
+    <IsPackable>true</IsPackable>
+    <Description>Rendering and entity services of the Adamantium engine: Forward+ rendering, scene managers, cameras, selection and editing tools.</Description>
+    <PackageTags>adamantium;engine;rendering;3d</PackageTags>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\Adamantium.Engine.Compiler\Adamantium.Engine.Compiler.csproj" />

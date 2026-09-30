@@ -5,6 +5,9 @@
         <Platforms>AnyCPU</Platforms>
         <Configurations>Debug;Release</Configurations>
         <LangVersion>latestmajor</LangVersion>
+        <IsPackable>true</IsPackable>
+        <Description>Reads TrueType, OpenType and CFF fonts - outlines, metrics, kerning and OpenType features - and generates multichannel signed distance field (MSDF) glyph atlases.</Description>
+        <PackageTags>adamantium;fonts;opentype;truetype;cff;msdf</PackageTags>
     </PropertyGroup>
 
     <ItemGroup>

@@ -1,0 +1,84 @@
+# Publishes the engine's packages to nuget.org without a stored key, the same way AdamantiumVulkan does.
+#
+# The job asks GitHub for a short-lived OIDC token, NuGet/login exchanges it for a temporary API key good for one
+# hour, and the push uses that. Nothing to rotate and nothing to leak.
+#
+# The matching policy on nuget.org (Account -> Trusted Publishing) must name:
+#   Repository Owner: AdamantiumStudio
+#   Repository:       AdamantiumEngine
+#   Workflow File:    publish-nuget.yml     <- this file's NAME only, no path
+#   Environment:      (leave empty)
+# Renaming this file breaks publishing until the policy is changed to match: the name is half of what is trusted.
+name: Publish to NuGet
+
+# Manual, and dry by default. A published version can be unlisted but never deleted and never replaced, so it should
+# take a deliberate act rather than follow from a push.
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Pack only, do not publish'
+        type: boolean
+        default: true
+      version_suffix:
+        description: 'Prerelease label: alpha, alpha.2, beta... Empty for a stable release'
+        type: string
+        default: 'alpha'
+
+jobs:
+  publish:
+    # Windows: the effects generator compiles the built-in shaders during the build and loads Slang through kernel32.
+    runs-on: windows-latest
+    permissions:
+      id-token: write   # lets the job ask GitHub for the OIDC token; without it NuGet/login has nothing to exchange
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v7
+
+      # Version comes from global.json, so CI and a developer's machine build with the same SDK.
+      - uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+
+      # The solution, not a list: only the projects that set IsPackable are packed, and every one of them shares the
+      # version in Directory.Build.props.
+      - name: Pack
+        run: dotnet pack AdamantiumEngine.sln -c Release -o artifacts/nupkg "-p:VersionSuffix=${{ inputs.version_suffix }}"
+
+      # Printed, because the things worth checking before an irreversible push are all in here: the version, the
+      # licence, the dependencies, and that analyzers and native files landed where a consumer looks for them.
+      - name: Show what was packed
+        shell: bash
+        run: |
+          ls -la artifacts/nupkg
+          for f in artifacts/nupkg/*.nupkg; do
+            echo "===== $f"
+            unzip -p "$f" '*.nuspec'
+            echo "--- files"
+            unzip -l "$f" | grep -E 'README.md|icon.png|\.dll' || true
+          done
+
+      - name: Upload packages as an artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: nupkg
+          path: artifacts/nupkg/*.nupkg
+
+      # Asked for as late as possible: the key expires an hour after it is issued.
+      - name: NuGet login (OIDC to a temporary key)
+        if: ${{ !inputs.dry_run }}
+        uses: NuGet/login@v1
+        id: login
+        with:
+          user: ${{ secrets.NUGET_USER }}   # nuget.org profile name, not the e-mail address
+
+      # The packages depend on each other, but nuget.org does not check dependencies on push, so one push takes them all.
+      - name: Push
+        if: ${{ !inputs.dry_run }}
+        shell: bash
+        run: >
+          dotnet nuget push "artifacts/nupkg/*.nupkg"
+          --api-key ${{ steps.login.outputs.NUGET_API_KEY }}
+          --source https://api.nuget.org/v3/index.json
+          --skip-duplicate

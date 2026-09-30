@@ -5,6 +5,9 @@
 		<Platforms>AnyCPU</Platforms>
 		<Configurations>Debug;Release</Configurations>
 		<LangVersion>latest</LangVersion>
+		<IsPackable>true</IsPackable>
+		<Description>Graphics abstractions of the Adamantium engine: devices, presenters, buffers, textures, vertex layouts, meshes and the effects framework, apart from their Vulkan implementation.</Description>
+		<PackageTags>adamantium;engine;graphics;rendering</PackageTags>
 	</PropertyGroup>
 
 	<PropertyGroup Condition=" '$(Configuration)' == 'Debug' ">
