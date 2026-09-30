@@ -18,14 +18,14 @@ public class EffectsGenerator : IIncrementalGenerator
         var fxNamesAndContents = effectFiles.Select((text, cancellationToken) => (
             name: Path.GetFileName(text.Path),
             path: text.Path,
-            content: text.GetText(cancellationToken)!.ToString(),
+            content: text.GetText(cancellationToken).ToString(),
             fxName: Path.GetFileNameWithoutExtension(text.Path)));
 
         var includesAndContents = includeFiles.Select((text, cancellationToken) => new ShaderFileInfo()
         {
             FileName = Path.GetFileName(text.Path),
             Path = text.Path,
-            Content = text.GetText(cancellationToken)!.ToString()
+            Content = text.GetText(cancellationToken).ToString()
         });
 
         var includesProvider = includesAndContents.Collect();

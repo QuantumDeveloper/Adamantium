@@ -236,13 +236,6 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
     /// <summary>TEMP: how long the last frame spent blocked on its slot's fence - the CPU waiting for the GPU.</summary>
     public static double LastFenceWaitMs;
 
-    /// <summary>TEMP: how long the last frame spent inside AcquireNextImage - the CPU waiting for the PRESENT ENGINE.</summary>
-    public static double LastAcquireMs;
-
-    /// <summary>TEMP: BeginDraw with the fence wait, the acquire and the beforeRenderPass callback taken off - command
-    /// buffer reset/begin, image transitions and BeginRendering. Pure driver-side setup work.</summary>
-    public static double LastBeginSetupMs;
-
     public ulong FrameTicket { get; private set; }
 
     public List<EffectPool> EffectPools { get; private set; }
@@ -1048,7 +1041,6 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
         //     }
         // }
 
-        var setupStart = System.Diagnostics.Stopwatch.GetTimestamp();
         var commandBuffer = commandBuffers[CurrentFrame];
 
         var beginInfo = new CommandBufferBeginInfo();
@@ -1082,15 +1074,11 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
         TransitionImagesForRendering(commandBuffer, renderTargets);
         TransitionDepthBufferForRendering(commandBuffer, depthBuffer);
 
-        LastBeginSetupMs = System.Diagnostics.Stopwatch.GetElapsedTime(setupStart).TotalMilliseconds;
-
         // Out-of-render-pass work (e.g. shared-surface latch copies) must be recorded here, before BeginRendering,
         // so a later in-pass draw can sample the result the SAME frame (no latency).
         beforeRenderPass?.Invoke(commandBuffer);
 
-        var renderingStart = System.Diagnostics.Stopwatch.GetTimestamp();
         BeginRendering(commandBuffer, false, depth, stencil);
-        LastBeginSetupMs += System.Diagnostics.Stopwatch.GetElapsedTime(renderingStart).TotalMilliseconds;
 
         // LATE acquire (see the note near the top of BeginDraw): every fallible step above - CB begin, image transitions,
         // the beforeRenderPass record, BeginRendering - has run WITHOUT touching the swapchain image, so a failure there
@@ -1223,9 +1211,7 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
         HasSwapchainImage = false;
         if (Presenter is SwapChainGraphicsPresenter)
         {
-            var acquireStart = System.Diagnostics.Stopwatch.GetTimestamp();
             HasSwapchainImage = Presenter.AcquireNextImage(null, ImageAvailableSemaphores[CurrentFrame]);
-            LastAcquireMs = System.Diagnostics.Stopwatch.GetElapsedTime(acquireStart).TotalMilliseconds;
 
             if (!HasSwapchainImage)
                 LastFrameError = $"swapchain AcquireNextImage failed{DescribeRecentValidation()}";

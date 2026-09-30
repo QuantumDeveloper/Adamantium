@@ -64,7 +64,7 @@ public static class ShaderPrecompiler
         var stamp = StampFile(device);
         if (stamp == null || File.Exists(stamp)) return;
 
-        var folder = Path.GetDirectoryName(stamp)!;
+        var folder = Path.GetDirectoryName(stamp);
         var compiled = CachedCount(folder);
         var withoutProgress = 0;
 
@@ -179,7 +179,7 @@ public static class ShaderPrecompiler
             try
             {
                 var stamp = StampFile(device);
-                Directory.CreateDirectory(Path.GetDirectoryName(stamp)!);
+                Directory.CreateDirectory(Path.GetDirectoryName(stamp));
                 File.WriteAllText(stamp, $"{created} effects precompiled ({skipped} skipped) at {DateTime.UtcNow:O}");
                 stamped = true;
             }
@@ -282,7 +282,7 @@ public static class ShaderPrecompiler
             }
             catch (ReflectionTypeLoadException e)
             {
-                types = e.Types.Where(t => t != null).ToArray()!;
+                types = e.Types.Where(t => t != null).ToArray();
             }
 
             foreach (var type in types)
@@ -382,7 +382,7 @@ public static class ShaderPrecompiler
         try
         {
             if (path == null) return;
-            Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+            Directory.CreateDirectory(Path.GetDirectoryName(path));
             File.WriteAllText(path, text);
         }
         catch

@@ -93,7 +93,7 @@ public static class ShaderBinaryCache
             if (device.LogicalDevice.GetShaderBinaryDataEXT(shader, ref size, bytes) != Result.Success) return;
 
             var file = FileFor(device, info, name);
-            Directory.CreateDirectory(Path.GetDirectoryName(file)!);
+            Directory.CreateDirectory(Path.GetDirectoryName(file));
             var tmp = file + ".tmp";
             File.WriteAllBytes(tmp, bytes);
             File.Move(tmp, file, overwrite: true);   // atomic-ish: a partial write never leaves a half file as the cache

@@ -20,7 +20,7 @@ public class IdctEquivalenceTests
         var method = Dct.GetMethod("FastIDCT", BindingFlags.Instance | BindingFlags.NonPublic);
 
         var buffer = new byte[192];
-        method!.Invoke(instance, new object[] { coefficients, buffer, 64 });
+        method.Invoke(instance, new object[] { coefficients, buffer, 64 });
 
         var block = new byte[64];
         Array.Copy(buffer, 64, block, 0, 64);
@@ -31,7 +31,7 @@ public class IdctEquivalenceTests
     {
         var method = Dct.GetMethod("ReferenceIDCT", BindingFlags.Static | BindingFlags.NonPublic);
         var output = new byte[8, 8];
-        method!.Invoke(null, new object[] { coefficients, new float[64], output });
+        method.Invoke(null, new object[] { coefficients, new float[64], output });
         return output;
     }
 
