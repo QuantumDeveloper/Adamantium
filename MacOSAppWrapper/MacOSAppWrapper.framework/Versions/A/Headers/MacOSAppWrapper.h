@@ -1,11 +1,3 @@
-//
-//  MacOSAppWrapper.h
-//  MacOSAppWrapper
-//
-//  Created by Denys Zaporozhets on 9/13/19.
-//  Copyright © 2019 Denys Zaporozhets. All rights reserved.
-//
-
 #import <Cocoa/Cocoa.h>
 #import "AppWrapper.h"
 

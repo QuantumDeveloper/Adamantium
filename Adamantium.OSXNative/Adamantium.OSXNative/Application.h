@@ -1,11 +1,3 @@
-//
-//  Adamantium_OSXNative.h
-//  Adamantium.OSXNative
-//
-//  Created by Denys Zaporozhets on 01.11.2019.
-//  Copyright © 2019 Denys Zaporozhets. All rights reserved.
-//
-
 #import <Foundation/Foundation.h>
 #import <AppKit/AppKit.h>
 #import "AppWrapper.h"

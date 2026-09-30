@@ -1,11 +1,3 @@
-//
-//  AppWrapper.h
-//  MacOSAppWrapper
-//
-//  Created by Denys Zaporozhets on 9/13/19.
-//  Copyright © 2019 Denys Zaporozhets. All rights reserved.
-//
-
 #ifndef AppWrapper_h
 #define AppWrapper_h
 

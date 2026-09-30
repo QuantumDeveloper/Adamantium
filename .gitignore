@@ -346,3 +346,7 @@ logs/
 # CMake build tree and fetched SDK packages of the native shims (the built .dll is staged next to the project and
 # committed separately).
 **/native/build/
+
+# Xcode per-user state: window layout and scheme choices of whoever opened the project.
+xcuserdata/
+.DS_Store
