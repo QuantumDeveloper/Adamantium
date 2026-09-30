@@ -934,12 +934,12 @@ namespace Adamantium.Mathematics
         /// <param name="result">When the method completes, contains the adjusted color.</param>
         public static void AdjustSaturation(ref Color value, float saturation, out Color result)
         {
-            float grey = value.R / 255.0f * 0.2125f + value.G / 255.0f * 0.7154f + value.B / 255.0f * 0.0721f;
+            float gray = value.R / 255.0f * 0.2125f + value.G / 255.0f * 0.7154f + value.B / 255.0f * 0.0721f;
 
             result.A = value.A;
-            result.R = ToByte(grey + saturation * (value.R / 255.0f - grey));
-            result.G = ToByte(grey + saturation * (value.G / 255.0f - grey));
-            result.B = ToByte(grey + saturation * (value.B / 255.0f - grey));
+            result.R = ToByte(gray + saturation * (value.R / 255.0f - gray));
+            result.G = ToByte(gray + saturation * (value.G / 255.0f - gray));
+            result.B = ToByte(gray + saturation * (value.B / 255.0f - gray));
         }
 
         /// <summary>
@@ -950,12 +950,12 @@ namespace Adamantium.Mathematics
         /// <returns>The adjusted color.</returns>
         public static Color AdjustSaturation(Color value, float saturation)
         {
-            float grey = value.R / 255.0f * 0.2125f + value.G / 255.0f * 0.7154f + value.B / 255.0f * 0.0721f;
+            float gray = value.R / 255.0f * 0.2125f + value.G / 255.0f * 0.7154f + value.B / 255.0f * 0.0721f;
 
             return new Color(
-                ToByte(grey + saturation * (value.R / 255.0f - grey)),
-                ToByte(grey + saturation * (value.G / 255.0f - grey)),
-                ToByte(grey + saturation * (value.B / 255.0f - grey)),
+                ToByte(gray + saturation * (value.R / 255.0f - gray)),
+                ToByte(gray + saturation * (value.G / 255.0f - gray)),
+                ToByte(gray + saturation * (value.B / 255.0f - gray)),
                 value.A);
         }
 

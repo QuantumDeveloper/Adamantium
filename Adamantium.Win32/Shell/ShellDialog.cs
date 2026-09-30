@@ -37,5 +37,5 @@ public static class ShellDialog
 
     /// <summary>HRESULT_FROM_WIN32(ERROR_CANCELLED) - what Show answers when the user closed the dialog without
     /// choosing. A refusal, not a failure.</summary>
-    public const int Cancelled = unchecked((int)0x800704C7);
+    public const int Canceled = unchecked((int)0x800704C7);
 }

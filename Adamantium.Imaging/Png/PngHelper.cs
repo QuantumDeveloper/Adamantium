@@ -26,7 +26,7 @@ namespace Adamantium.Imaging.Png
             switch (colorFormat)
             {
                 case 1:
-                    colorType = PngColorType.Grey;
+                    colorType = PngColorType.Gray;
                     break;
                 default:
                     colorType = PngColorType.RGBA;

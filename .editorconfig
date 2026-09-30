@@ -1,7 +1,7 @@
 # MessagePack v3 pulls a strict analyzer (MessagePackAnalyzer, transitive) that turns full
 # [Key]/[IgnoreMember] coverage, [Union], partial types and a public ctor into BUILD ERRORS.
 # This engine serializes via the runtime reflection resolver (StandardResolverAllowPrivate), not the
-# source generator, so these compile-time gates don't apply. Silence them engine-wide (behaviour
+# source generator, so these compile-time gates don't apply. Silence them engine-wide (behavior
 # matches MessagePack v2). Remove these if/when the types are migrated to v3's source-gen contract.
 [*.cs]
 dotnet_diagnostic.MsgPack001.severity = none

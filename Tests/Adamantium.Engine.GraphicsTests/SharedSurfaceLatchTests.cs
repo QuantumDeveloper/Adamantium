@@ -7,7 +7,7 @@ namespace Adamantium.Engine.GraphicsTests;
 
 /// <summary>
 /// The consumer side of a shared surface: a frame is latched once, however many draws sample it. Latched twice, it was
-/// signalled on the consume timeline twice with the same value, which Vulkan forbids.
+/// signaled on the consume timeline twice with the same value, which Vulkan forbids.
 /// </summary>
 [TestFixture]
 public class SharedSurfaceLatchTests

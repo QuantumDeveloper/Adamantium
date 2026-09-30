@@ -33,7 +33,7 @@ namespace Adamantium.Fonts.TextureGeneration
         public uint LayerCount { get; }
 
         // Set once packing has had to clamp to the last layer (further glyphs overwrite it). The caller can warn; the old
-        // behaviour instead wrote layer 2 into a 1-layer 2D image, which crashed the GPU past ~256 glyphs.
+        // behavior instead wrote layer 2 into a 1-layer 2D image, which crashed the GPU past ~256 glyphs.
         public bool LayersExhausted { get; private set; }
 
         // Move packing to the next array layer: reset the shelf cursor and bump the layer, clamped at the last layer.

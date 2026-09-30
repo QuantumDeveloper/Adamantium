@@ -6,7 +6,7 @@ using Adamantium.Graphics.Core.Vertices;
 namespace Adamantium.Engine.Rendering;
 
 // The bridge between a MeshData component and the render layer: maps the component's explicit render config to a vertex
-// format + device render state, and draws it through the geometry cache. Centralised so the processor and the icon
+// format + device render state, and draws it through the geometry cache. Centralized so the processor and the icon
 // managers share one mapping.
 public static class MeshRenderExtensions
 {

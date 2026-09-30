@@ -622,7 +622,7 @@ public unsafe class Texture : GraphicsResource, ITexture
     }
 
     /// <summary>Reads this texture's pixels into <paramref name="destination"/> via host image copy (fast path) or a
-    /// staging buffer, with no colour swap or encoding.</summary>
+    /// staging buffer, with no color swap or encoding.</summary>
     private void ReadbackInto(Image destination)
     {
         if (GraphicsDevice.Adapter.SupportsHostImageCopy &&
@@ -708,7 +708,7 @@ public unsafe class Texture : GraphicsResource, ITexture
         return MemoryPropertyFlags.HostVisible | MemoryPropertyFlags.HostCoherent;
     }
 
-    /// <summary>Swaps red and blue in place for a B8G8R8A8 image so the RGBA-oriented encoders save correct colours.</summary>
+    /// <summary>Swaps red and blue in place for a B8G8R8A8 image so the RGBA-oriented encoders save correct colors.</summary>
     private static void SwapRedBlueIfBgra(Image image)
     {
         if (image.Description.Format != Format.B8G8R8A8_UNORM)

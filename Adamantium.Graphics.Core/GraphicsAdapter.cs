@@ -21,7 +21,7 @@ public unsafe class GraphicsAdapter
     public void UpdateData()
     {
         // ONE call per kind, with everything wanted chained onto it - which is how Vulkan is meant to be asked. This
-        // used to be a call PER STRUCTURE, each one hand-marshalled into unmanaged memory and read back with a raw
+        // used to be a call PER STRUCTURE, each one hand-marshaled into unmanaged memory and read back with a raw
         // cast, because the binding handed an output chain back as a bare address and dropped the typed objects. It
         // marshals them into the objects the caller supplied now, so the chain can simply be built and read.
         var heapProperties = new PhysicalDeviceDescriptorHeapPropertiesEXT();
@@ -84,7 +84,7 @@ public unsafe class GraphicsAdapter
     public bool SupportsScalarBlockLayout { get; private set; }
 
     /// <summary>Whether a storage buffer may hold 8-bit members and a shader may compute with them - the pair the
-    /// instance records need to carry colour as four BYTES rather than as a packed word.</summary>
+    /// instance records need to carry color as four BYTES rather than as a packed word.</summary>
     public bool Supports8BitStorage { get; private set; }
 
     /// <summary>Whether the device supports the swapchainMaintenance1 FEATURE, not merely the extension.</summary>

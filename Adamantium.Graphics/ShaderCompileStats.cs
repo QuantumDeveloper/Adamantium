@@ -215,7 +215,7 @@ public sealed class ShaderCompileStats
                     new XAttribute("cacheKey", _device.CacheKey ?? "")),
                 _entries.OrderBy(p => p.Key, StringComparer.Ordinal).Select(p => Effect(p.Key, p.Value)));
 
-            Directory.CreateDirectory(Path.GetDirectoryName(_path)!);
+            Directory.CreateDirectory(Path.GetDirectoryName(_path));
             var temp = _path + ".tmp";
             new XDocument(root).Save(temp);
             File.Move(temp, _path, overwrite: true);

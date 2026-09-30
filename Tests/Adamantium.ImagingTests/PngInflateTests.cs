@@ -53,9 +53,9 @@ public class PngInflateTests
         Assert.Throws<PngDecodeException>(() => BitmapLoader.Load(new MemoryStream(png)).GetRawPixels(0));
     }
 
-    // 1-bit grey at a width that is not a multiple of 8 is unfiltered in place, every filter type in turn.
+    // 1-bit gray at a width that is not a multiple of 8 is unfiltered in place, every filter type in turn.
     [Test]
-    public void OneBitGrey_WithPaddingBits_DecodesEveryFilter()
+    public void OneBitGray_WithPaddingBits_DecodesEveryFilter()
     {
         const int width = 509, height = 10;
         const int lineBytes = (width + 7) / 8;

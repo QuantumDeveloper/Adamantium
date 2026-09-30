@@ -7,7 +7,7 @@ using NUnit.Framework;
 namespace Adamantium.MathTests
 {
     /// <summary>
-    /// Locks the triangulator's fill-rule behaviour (truth table) and the convex fast-path,
+    /// Locks the triangulator's fill-rule behavior (truth table) and the convex fast-path,
     /// so perf work (convex fan, earcut later) can't silently change rendered results.
     /// </summary>
     public class FillRuleAndConvexTests
@@ -91,10 +91,10 @@ namespace Adamantium.MathTests
         public void MultiContour_HoleViaEarcut()
         {
             // Donut (outer 0..100, inner 25..75): clean nesting -> earcut-with-holes path.
-            // EvenOdd: ring filled, centre hole; quad + quad-hole earcuts to 8 triangles.
+            // EvenOdd: ring filled, center hole; quad + quad-hole earcuts to 8 triangles.
             var even = FillDonut(FillRule.EvenOdd);
             Assert.IsTrue(Covered(even, V(10, 10)), "ring filled");
-            Assert.IsFalse(Covered(even, V(50, 50)), "centre hole");
+            Assert.IsFalse(Covered(even, V(50, 50)), "center hole");
             Assert.AreEqual(8, even.Count / 3, "quad with quad hole => 8 triangles");
 
             // NonZero (drops inner contour today): solid; outer quad => 2 triangles.

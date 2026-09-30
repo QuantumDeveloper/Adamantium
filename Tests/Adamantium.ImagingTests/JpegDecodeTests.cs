@@ -53,7 +53,7 @@ public class JpegDecodeTests
 
         var actual = decoded.GetRawPixels(0);
         var channels = (int)(actual.Length / (width * height));
-        Assert.That(channels, Is.GreaterThanOrEqualTo(3), "colour is expected back");
+        Assert.That(channels, Is.GreaterThanOrEqualTo(3), "color is expected back");
 
         // MEAN error, not per-pixel: JPEG's own ringing puts a few edge pixels well off, and asserting on the worst one
         // makes the test about the format rather than about the decoder. A drift in the IDCT moves the whole picture.

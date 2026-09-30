@@ -74,7 +74,7 @@ public sealed class ContentBuilder
             manifest.Assets.Add(new ContentAsset
             {
                 Source = relative,
-                Importer = importer.GetType().GetCustomAttribute<ContentImporterAttribute>()!.Name
+                Importer = importer.GetType().GetCustomAttribute<ContentImporterAttribute>().Name
             });
         }
     }
@@ -111,7 +111,7 @@ public sealed class ContentBuilder
                 continue;
             }
 
-            var importerName = importer.GetType().GetCustomAttribute<ContentImporterAttribute>()!.Name;
+            var importerName = importer.GetType().GetCustomAttribute<ContentImporterAttribute>().Name;
             var writer = writersByImporter[importerName];
 
             // The source extension is kept in the logical name so two models that share a base name in
@@ -146,7 +146,7 @@ public sealed class ContentBuilder
             {
                 var content = importer.Import(sourceFull, context);
 
-                var cookedDirectory = Path.GetDirectoryName(cookedFull)!;
+                var cookedDirectory = Path.GetDirectoryName(cookedFull);
                 Directory.CreateDirectory(cookedDirectory);
                 using (var stream = File.Create(cookedFull))
                 {
@@ -156,7 +156,7 @@ public sealed class ContentBuilder
                 foreach (var (from, to) in companions)
                 {
                     var destination = Path.GetFullPath(Path.Combine(cookedDirectory, to));
-                    Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
+                    Directory.CreateDirectory(Path.GetDirectoryName(destination));
                     File.Copy(from, destination, true);
                 }
 

@@ -25,7 +25,7 @@ namespace Adamantium.ProceduralGeometry.Shapes
                     sweepAngle %= 360;
                 }
 
-                // A full ellipse, or a pie sector (whose outline returns through the centre), is a closed loop; an
+                // A full ellipse, or a pie sector (whose outline returns through the center), is a closed loop; an
                 // edge-to-edge ARC is an open polyline. This flag drives MeshContour.IsGeometryClosed, which is what the
                 // GPU stroke reads to decide whether to wrap the ribbon back to the first point.
                 bool isClosed = Math.Abs(sweepAngle) >= 360.0 || ellipseType == EllipseType.Sector;
@@ -178,7 +178,7 @@ namespace Adamantium.ProceduralGeometry.Shapes
                     vertices.Add(new Vector3(x, y, 0));
                 }
 
-                // A pie sector's outline runs arc -> centre -> back to the first radius (closed loop); an edge-to-edge
+                // A pie sector's outline runs arc -> center -> back to the first radius (closed loop); an edge-to-edge
                 // arc stops at the rim.
                 if (!isFull && ellipseType == EllipseType.Sector)
                 {

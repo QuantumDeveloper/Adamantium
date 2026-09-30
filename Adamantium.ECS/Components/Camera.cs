@@ -291,7 +291,7 @@ namespace Adamantium.ECS.Components
 
         public override void Update(AppTime appTime)
         {
-            // Rotation is a STRUCT behind a property: Rotation.Normalize() normalised a copy and dropped it, so the
+            // Rotation is a STRUCT behind a property: Rotation.Normalize() normalized a copy and dropped it, so the
             // quaternion drifted from unit length as mouse-look multiplied into it - and a non-unit quaternion scales
             // the rotation matrix, shrinking the third-person offset until the camera sat inside its subject.
             var rotation = Rotation;
@@ -353,7 +353,7 @@ namespace Adamantium.ECS.Components
 
                 var back = Vector3.Multiply(new Vector3(rotMatrix.M13, rotMatrix.M23, rotMatrix.M33), Radius);
 
-                // In the subject's space, from its CENTRE: an offset from the origin orbits whatever point the model
+                // In the subject's space, from its CENTER: an offset from the origin orbits whatever point the model
                 // was authored around, not the thing on screen.
                 var center = (Vector3)Subject.GetLocalCenter();
                 Owner.Transform.Position = center - back;
@@ -614,7 +614,7 @@ namespace Adamantium.ECS.Components
                     }
                     else
                     {
-                        // From the CENTRE: get out of the body, then stand back far enough for the diameter to
+                        // From the CENTER: get out of the body, then stand back far enough for the diameter to
                         // subtend the field of view. Fov is in DEGREES.
                         var diameter = hostObject.GetDiameter();
 
@@ -626,7 +626,7 @@ namespace Adamantium.ECS.Components
                         else if (Radius <= 0)
                         {
                             // Nothing measurable to frame - a subject whose bounds have not been built yet. Keep the
-                            // distance we already stand at rather than collapsing the orbit onto its centre.
+                            // distance we already stand at rather than collapsing the orbit onto its center.
                             Radius = (WorldPosition - hostObject.GetCenterAbsolute()).Length();
                         }
                     }

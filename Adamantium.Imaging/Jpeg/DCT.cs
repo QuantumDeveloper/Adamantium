@@ -111,12 +111,12 @@ namespace Adamantium.Imaging.Jpeg
         }
 
         /// <summary>
-        /// The inverse DCT as two passes of the Arai-Agui-Nakajima factorisation - columns, then rows.
+        /// The inverse DCT as two passes of the Arai-Agui-Nakajima factorization - columns, then rows.
         ///
         /// <para>Same result as <see cref="ReferenceIDCT"/>, which is what it replaced, at a fraction of the cost: the
         /// direct form is two 8x8x8 matrix multiplies, 1024 multiplies for every block, and a 4K photograph has some
         /// 400 000 blocks in each of three components. Measured on one: 3.9 seconds of a 6.4 second decode was this
-        /// function. The factorisation gets the same numbers out with about a tenth of the arithmetic by sharing
+        /// function. The factorization gets the same numbers out with about a tenth of the arithmetic by sharing
         /// subexpressions between outputs rather than recomputing each one from scratch.</para>
         ///
         /// <para>The all-zero shortcut matters as much as the arithmetic. Most blocks in a photograph carry only a DC

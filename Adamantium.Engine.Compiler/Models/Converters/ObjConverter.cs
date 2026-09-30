@@ -24,7 +24,7 @@ namespace Adamantium.Engine.Compiler.Converter.Converters
          dataContainer = (ObjDataContainer) Parser.ParseData(Config);
          if (!dataContainer.IsFileValid)
          {
-            IsCancelled = true;
+            IsCanceled = true;
             return;
          }
 

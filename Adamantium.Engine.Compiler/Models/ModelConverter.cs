@@ -62,7 +62,7 @@ namespace Adamantium.Engine.Compiler.Models
             }
             catch (OperationCanceledException)
             {
-                IsConvertationCancelled = true;
+                IsConvertationCanceled = true;
                 return null;
             }
             finally
@@ -76,7 +76,7 @@ namespace Adamantium.Engine.Compiler.Models
 
         #region Cancellation
 
-        public Boolean IsConvertationCancelled { get; private set; }
+        public Boolean IsConvertationCanceled { get; private set; }
 
         /// <summary>Asks a running import to stop. Cancellation is checked between libraries and on every geometry,
         /// so it does not take effect instantly - but it does take effect: this method used to only clear flags
@@ -84,7 +84,7 @@ namespace Adamantium.Engine.Compiler.Models
         public void CancelConvertation()
         {
             cancellation.Cancel();
-            IsConvertationCancelled = true;
+            IsConvertationCanceled = true;
         }
 
         #endregion

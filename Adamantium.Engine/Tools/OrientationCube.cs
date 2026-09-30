@@ -31,7 +31,7 @@ public class OrientationCube : EditorProcessor
     private readonly Entity stepUp;
     private readonly Entity stepDown;
     private Entity grabbed;
-    private float travelled;
+    private float traveled;
 
     public OrientationCube()
     {
@@ -96,7 +96,7 @@ public class OrientationCube : EditorProcessor
         }
 
         grabbed = hit.Entity;
-        travelled = 0;
+        traveled = 0;
         input.HoldPointer(true);
     }
 
@@ -111,9 +111,9 @@ public class OrientationCube : EditorProcessor
 
         if (input.IsMouseButtonDown(MouseButton.Left) && delta.LengthSquared() > 0)
         {
-            travelled += delta.Length();
+            traveled += delta.Length();
 
-            if (travelled > ClickSlack)
+            if (traveled > ClickSlack)
             {
                 camera.CancelTravel();
                 camera.RotateRelativeXY(delta.Y * DragDegreesPerPixel, -delta.X * DragDegreesPerPixel);
@@ -127,7 +127,7 @@ public class OrientationCube : EditorProcessor
 
         input.HoldPointer(false);
 
-        if (travelled <= ClickSlack)
+        if (traveled <= ClickSlack)
         {
             Click(camera, grabbed);
         }

@@ -360,7 +360,7 @@ namespace Adamantium.Imaging.Jpeg.Decoder
 
 
         /// <summary>
-        /// Initialisation of the Huffman codes for Luminance and Chrominance.
+        /// Initialization of the Huffman codes for Luminance and Chrominance.
         /// This code results in the same tables created in the IJG Jpeg-6a
         /// library.
         /// </summary>

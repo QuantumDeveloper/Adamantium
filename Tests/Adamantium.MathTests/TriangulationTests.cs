@@ -8,7 +8,7 @@ namespace Adamantium.MathTests
     /// <summary>
     /// Coverage-based triangulation tests. They assert robust invariants (the fill covers interior points and not
     /// exterior ones, and the triangulation is non-empty) instead of an implementation-defined exact triangle
-    /// count. Precise fill-rule behaviour (even-odd vs outer-contour, holes, convex/concave) is in
+    /// count. Precise fill-rule behavior (even-odd vs outer-contour, holes, convex/concave) is in
     /// <see cref="FillRuleAndConvexTests"/>. (Replaces the old brittle count/coordinate goldens.)
     /// </summary>
     public class TriangulationTests
@@ -17,7 +17,7 @@ namespace Adamantium.MathTests
         public void Star_NonZero_FillsSolidBody()
         {
             // A 5-point star is a single self-intersecting contour -> the scanline fallback resolves it.
-            // NonZero fills the whole star solid, so the centre is covered.
+            // NonZero fills the whole star solid, so the center is covered.
             var tris = Fill(Star5(), FillRule.NonZero);
             Assert.Greater(tris.Count, 0, "non-empty triangulation");
             Assert.IsTrue(Covered(tris, new Vector2(0, 13)), "star body filled");

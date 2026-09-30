@@ -61,7 +61,7 @@ namespace Adamantium.Imaging.Png
         For grayscale PNGs, r, g and b will all 3 be set to the same.
         When decoding, by default you can ignore this information, since LodePNG sets
         pixels with this key to transparent already in the raw RGBA output.
-        The color key is only supported for color types Grey and RGB.
+        The color key is only supported for color types Gray and RGB.
         */
 
         /*is a transparent color key given? 0 = false, 1 = true*/

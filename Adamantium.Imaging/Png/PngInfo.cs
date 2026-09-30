@@ -105,7 +105,7 @@ namespace Adamantium.Imaging.Png
         public bool IsPhysDefined; 
         public uint PhysX; /*pixels per unit in x direction*/
         public uint PhysY; /*pixels per unit in y direction*/
-        public Unit PhysUnit; /*may be 0 (unknown unit) or 1 (metre)*/
+        public Unit PhysUnit; /*may be 0 (unknown unit) or 1 (meter)*/
 
         /*
         Color profile related chunks: gAMA, cHRM, sRGB, iCPP

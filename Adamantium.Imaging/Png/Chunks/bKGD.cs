@@ -19,7 +19,7 @@ namespace Adamantium.Imaging.Png.Chunks
         {
             var bytes = new List<byte>();
             bytes.AddRange(GetNameAsBytes());
-            if (state.ColorModeRaw.ColorType == PngColorType.Grey || state.ColorModeRaw.ColorType == PngColorType.GreyAlpha)
+            if (state.ColorModeRaw.ColorType == PngColorType.Gray || state.ColorModeRaw.ColorType == PngColorType.GrayAlpha)
             {
                 bytes.Add((byte)(BackgroundR >> 8));
                 bytes.Add((byte)(BackgroundR & 255));

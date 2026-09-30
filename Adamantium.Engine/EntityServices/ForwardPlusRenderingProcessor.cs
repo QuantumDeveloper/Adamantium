@@ -50,7 +50,7 @@ public class ForwardPlusRenderingProcessor : RenderingProcessor
     /// <summary>The light every surface gets whatever the lights in the scene.</summary>
     public Vector3F Ambient { get; set; } = new(0.08f, 0.08f, 0.1f);
 
-    /// <summary>The colour of a surface that has neither a texture nor a diffuse colour.</summary>
+    /// <summary>The color of a surface that has neither a texture nor a diffuse color.</summary>
     public Vector3F UntexturedColor { get; set; } = new(0.75f, 0.75f, 0.75f);
 
     /// <summary>How far from the camera the clusters reach; a point or spot light beyond it lights nothing.</summary>

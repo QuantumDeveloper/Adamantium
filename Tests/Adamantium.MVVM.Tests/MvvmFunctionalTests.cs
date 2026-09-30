@@ -118,7 +118,7 @@ public class MvvmFunctionalTests
         await task;                                 // cancellation is swallowed → no throw
 
         Assert.That(command.IsRunning, Is.False);
-        Assert.That(vm.LoadCount, Is.Zero);         // cancelled before the increment
+        Assert.That(vm.LoadCount, Is.Zero);         // canceled before the increment
     }
 
     [Test]

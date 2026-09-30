@@ -126,8 +126,8 @@ namespace Adamantium.Imaging.Png
             else /*8-bit or 16-bit per channel*/
             {
                 modeOut.BitDepth = bits;
-                modeOut.ColorType = alpha ? (prof.Colored ? PngColorType.RGBA : PngColorType.GreyAlpha)
-                    : (prof.Colored ? PngColorType.RGB : PngColorType.Grey);
+                modeOut.ColorType = alpha ? (prof.Colored ? PngColorType.RGBA : PngColorType.GrayAlpha)
+                    : (prof.Colored ? PngColorType.RGB : PngColorType.Gray);
 
                 if (key)
                 {

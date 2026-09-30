@@ -64,7 +64,7 @@ public sealed class DeviceMemoryAllocator : IDeviceMemoryAllocator
         }
     }
 
-    /// <summary>Returns a sub-allocation's range to its block's free list (coalescing neighbours). The block itself is
+    /// <summary>Returns a sub-allocation's range to its block's free list (coalescing neighbors). The block itself is
     /// retained for reuse - blocks are freed only on <see cref="Dispose"/>.</summary>
     public void Free(MemoryAllocation allocation)
     {

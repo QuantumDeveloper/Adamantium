@@ -27,7 +27,7 @@ namespace Adamantium.ECS.Components
             set => SetProperty(ref displayCollider, value);
         }
 
-        // The CPU mesh used to visualise the collider bounds (debug draw). Its GPU buffers are built + owned by the
+        // The CPU mesh used to visualize the collider bounds (debug draw). Its GPU buffers are built + owned by the
         // render-layer geometry cache, keyed by this mesh - the collider no longer holds any GPU resource itself.
         public Mesh Geometry { get; protected set; }
 

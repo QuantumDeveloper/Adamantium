@@ -12,9 +12,9 @@ namespace Adamantium.Mathematics
 
         static Colors()
         {
-            // CASE-INSENSITIVE, because a colour's name is a name and not a symbol. Every format that writes one -
+            // CASE-INSENSITIVE, because a color's name is a name and not a symbol. Every format that writes one -
             // CSS, SVG, a theme file typed by hand - spells it however it likes: "tomato", "Tomato", "TOMATO" are one
-            // colour to all of them, and looked up exactly, a drawing that named "blue" came back with no stroke at
+            // color to all of them, and looked up exactly, a drawing that named "blue" came back with no stroke at
             // all rather than a blue one.
             ColorsMap = new Dictionary<string, Color>(StringComparer.OrdinalIgnoreCase);
             ColorsMap["Zero"] = Color.FromBgra(0x00000000);
