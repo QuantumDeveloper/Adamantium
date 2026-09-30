@@ -1,11 +1,19 @@
 <Project>
 
-  <!-- The AUML source generator reads .auml through AdditionalFiles, but MSBuild's CoreCompile does not count those as
-       inputs: editing a theme or a view left the build "up to date", so the app kept running the PREVIOUSLY generated
-       code and a template change looked like it had no effect at all. CustomAdditionalCompileInputs is in CoreCompile's
-       Inputs, which is what makes the incremental check honest. -->
-  <ItemGroup>
-    <CustomAdditionalCompileInputs Include="@(AdditionalFiles)" />
-  </ItemGroup>
+  <!-- The source generators read .auml/.fx through AdditionalFiles, which MSBuild's CoreCompile and Visual Studio's fast
+       up-to-date check do not count as inputs: editing a view left the build "up to date" and the app ran the previously
+       generated code. Added inside targets, not as project items, so an IDE does not list every such file again under
+       each extra item type. -->
+  <Target Name="AdditionalFilesAreCompileInputs" BeforeTargets="CoreCompile">
+    <ItemGroup>
+      <CustomAdditionalCompileInputs Include="@(AdditionalFiles)" />
+    </ItemGroup>
+  </Target>
+
+  <Target Name="AdditionalFilesAreUpToDateInputs" BeforeTargets="CollectUpToDateCheckInputDesignTime">
+    <ItemGroup>
+      <UpToDateCheckInput Include="@(AdditionalFiles)" />
+    </ItemGroup>
+  </Target>
 
 </Project>
