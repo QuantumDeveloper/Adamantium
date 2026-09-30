@@ -22,6 +22,8 @@
         <DevelopmentDependency>true</DevelopmentDependency>
         <SuppressDependenciesWhenPacking>true</SuppressDependenciesWhenPacking>
         <TargetsForTfmSpecificContentInPackage>$(TargetsForTfmSpecificContentInPackage);PackAnalyzerAssemblies</TargetsForTfmSpecificContentInPackage>
+        <!-- dotnet pack no-build: the references are resolved from what is already built instead of being built again. -->
+        <BuildProjectReferences Condition="'$(NoBuild)' == 'true'">false</BuildProjectReferences>
     </PropertyGroup>
 
     <!--<PropertyGroup>
