@@ -12,6 +12,7 @@ namespace Adamantium.Fonts.TextureGeneration
         private Typeface typeface;
         private FontParameters parameters;
         private IFont font;
+        private readonly object packGate = new();
 
         public TextureAtlasGenerator(
             Typeface typeface,
@@ -218,7 +219,10 @@ namespace Adamantium.Fonts.TextureGeneration
             var data = atlasData.GetGlyphData(glyphs.Select(x=>x.Index).ToArray());
             // Shelf-packs each glyph and assigns its BoundingRect, DepthLayer (which array slice) and UV. The layer now
             // comes from the packer overflowing a slice, not a fixed 256 counter.
-            CalculateTextureDataForAtlas(data);
+            lock (packGate)
+            {
+                CalculateTextureDataForAtlas(data);
+            }
 
             return data;
         }
