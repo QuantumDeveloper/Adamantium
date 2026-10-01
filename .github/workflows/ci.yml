@@ -1,9 +1,11 @@
-# Builds the engine, runs the tests that need no GPU and packs the packages, on every push and pull request.
-# Windows only: the effects generator compiles the built-in shaders during the build and loads Slang through kernel32.
+# Builds the engine, runs the tests that need no GPU and packs the packages: for every pull request, and for master
+# once it is merged into. Windows only: the effects generator compiles the built-in shaders during the build and loads
+# Slang through kernel32.
 name: CI
 
 on:
   push:
+    branches: [master]
   pull_request:
   workflow_dispatch:
 
@@ -12,25 +14,60 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # A required check for master: the job always runs and always reports, so a pull request is never left waiting for a
+  # check that did not start. What it skips is the work, when nothing but documents, icons or settings changed.
   build:
-    # A branch of this repository is built on push, so pull_request builds only the ones from forks.
-    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository
     runs-on: windows-latest
 
     steps:
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      # A list of what to skip rather than of what to build, so a new project folder is built without anyone adding it.
+      # With nothing to compare against - a manual run, a history that is not there - everything counts as code.
+      - name: Changes
+        id: changes
+        shell: bash
+        env:
+          EVENT: ${{ github.event_name }}
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+          BEFORE: ${{ github.event.before }}
+          SHA: ${{ github.sha }}
+        run: |
+          code=true
+          range=
+          case "$EVENT" in
+            pull_request) range="$BASE...$HEAD" ;;
+            push) if git cat-file -e "$BEFORE^{commit}" 2>/dev/null; then range="$BEFORE..$SHA"; fi ;;
+          esac
+          if [ -n "$range" ]; then
+            code=false
+            while IFS= read -r f; do
+              case "$f" in
+                ""|*.md|LICENSE|NOTICE|*icon.png|.gitignore|*.DotSettings|.github/workflows/publish-nuget.yml) ;;
+                *) code=true ;;
+              esac
+            done < <(git diff --name-only "$range")
+          fi
+          echo "code=$code" >> "$GITHUB_OUTPUT"
+          echo "Code changed: $code"
 
       # Version comes from global.json, so CI and a developer's machine build with the same SDK.
       - uses: actions/setup-dotnet@v6
+        if: steps.changes.outputs.code == 'true'
         with:
           global-json-file: global.json
 
       - name: Build
+        if: steps.changes.outputs.code == 'true'
         run: dotnet build AdamantiumEngine.sln -c Release -warnaserror
 
       # The runners have no GPU. Adamantium.Engine.GraphicsTests is the one project that creates a Vulkan device, so it
       # is left out; every other test runs without one.
       - name: Test
+        if: steps.changes.outputs.code == 'true'
         shell: bash
         run: |
           for p in Tests/*/*.csproj; do
@@ -39,4 +76,5 @@ jobs:
           done
 
       - name: Pack
+        if: steps.changes.outputs.code == 'true'
         run: dotnet pack AdamantiumEngine.sln -c Release --no-build -o artifacts/nupkg
