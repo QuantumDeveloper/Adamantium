@@ -218,11 +218,14 @@ namespace Adamantium.Graphics.Fonts
         private Glyph[] GetNotProcessedGlyphs(IEnumerable<Glyph> glyphs)
         {
             var processed = new List<Glyph>();
-            foreach (var glyph in glyphs)
+            lock (_asyncGate)
             {
-                if (!processedGlyphs.ContainsKey(glyph.Index))
+                foreach (var glyph in glyphs)
                 {
-                    processed.Add(glyph);
+                    if (!processedGlyphs.ContainsKey(glyph.Index))
+                    {
+                        processed.Add(glyph);
+                    }
                 }
             }
 
@@ -246,9 +249,12 @@ namespace Adamantium.Graphics.Fonts
                 System.Console.WriteLine($"[FONT] Dynamic atlas exhausted all {AtlasLayerCount} layers; further glyphs overwrite the last. Raise FontAtlas.AtlasLayerCount or add dynamic growth.");
             }
 
-            foreach (var glyph in glyphsToProcess)
+            lock (_asyncGate)
             {
-                processedGlyphs[glyph.Index] = glyph;
+                foreach (var glyph in glyphsToProcess)
+                {
+                    processedGlyphs[glyph.Index] = glyph;
+                }
             }
         }
 

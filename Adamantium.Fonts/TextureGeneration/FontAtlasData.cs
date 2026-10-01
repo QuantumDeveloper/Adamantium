@@ -78,29 +78,38 @@ namespace Adamantium.Fonts.TextureGeneration
 
         public GlyphTextureData GetGlyphData(uint index)
         {
-            glyphDataMap.TryGetValue(index, out var data);
-            return data;
+            lock (lockObject)
+            {
+                glyphDataMap.TryGetValue(index, out var data);
+                return data;
+            }
         }
-        
+
         public GlyphTextureData[] GetGlyphData(params uint[] glyphIndices)
         {
             var datas = new List<GlyphTextureData>();
-            for (int i = 0; i < glyphIndices.Length; i++)
+            lock (lockObject)
             {
-                if (glyphDataMap.TryGetValue(glyphIndices[i], out var data))
+                for (int i = 0; i < glyphIndices.Length; i++)
                 {
-                    datas.Add(data);
+                    if (glyphDataMap.TryGetValue(glyphIndices[i], out var data))
+                    {
+                        datas.Add(data);
+                    }
                 }
             }
-            
+
             return datas.ToArray();
         }
 
         public RectangleF GetUVCoordinatesForGlyph(uint index)
         {
-            if (glyphDataMap.TryGetValue(index, out var data))
+            lock (lockObject)
             {
-                return data.UVRect;
+                if (glyphDataMap.TryGetValue(index, out var data))
+                {
+                    return data.UVRect;
+                }
             }
 
             return default;
