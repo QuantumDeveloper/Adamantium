@@ -1,10 +1,28 @@
-# Builds the engine, runs the tests that need no GPU and packs the packages, on every push and pull request.
+# Builds the engine, runs the tests that need no GPU and packs the packages, on a push or a pull request.
 # Windows only: the effects generator compiles the built-in shaders during the build and loads Slang through kernel32.
 name: CI
 
+# Not for changes that cannot affect the build: documents, icons, editor settings, the publish workflow. A list of what
+# to skip rather than of what to build, so a new project folder is built without anyone remembering to add it.
 on:
   push:
+    paths-ignore:
+      - '**.md'
+      - 'LICENSE'
+      - 'NOTICE'
+      - '**/icon.png'
+      - '.gitignore'
+      - '**.DotSettings'
+      - '.github/workflows/publish-nuget.yml'
   pull_request:
+    paths-ignore:
+      - '**.md'
+      - 'LICENSE'
+      - 'NOTICE'
+      - '**/icon.png'
+      - '.gitignore'
+      - '**.DotSettings'
+      - '.github/workflows/publish-nuget.yml'
   workflow_dispatch:
 
 concurrency:
