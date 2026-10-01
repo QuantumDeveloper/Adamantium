@@ -32,10 +32,11 @@
   </PropertyGroup>
 
   <!-- One version for every package of the engine: they are built together and move together, so the number alone says
-       which ones work with each other. A release sets the suffix: dotnet pack -p:VersionSuffix=alpha.2 -->
+       which ones work with each other. The only place it is set: a release changes it here, in the change it ships
+       with, and the publish workflow packs what it says. An empty suffix is a stable release. -->
   <PropertyGroup>
     <VersionPrefix>0.1.0</VersionPrefix>
-    <VersionSuffix>alpha</VersionSuffix>
+    <VersionSuffix>alpha.2</VersionSuffix>
   </PropertyGroup>
 
   <!-- Off by default, on per project, as in AdamantiumVulkan: tests, sandboxes and tools are not products, and a

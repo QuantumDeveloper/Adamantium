@@ -20,10 +20,6 @@ on:
         description: 'Pack only, do not publish'
         type: boolean
         default: true
-      version_suffix:
-        description: 'Prerelease label: alpha, alpha.2, beta... Empty for a stable release'
-        type: string
-        default: 'alpha'
 
 jobs:
   publish:
@@ -42,9 +38,10 @@ jobs:
           global-json-file: global.json
 
       # The solution, not a list: only the projects that set IsPackable are packed, and every one of them shares the
-      # version in Directory.Build.props.
+      # version in Directory.Build.props - the only place a version is set. A version already on nuget.org is skipped
+      # by the push below, so a release that forgot to raise it publishes nothing.
       - name: Pack
-        run: dotnet pack AdamantiumEngine.sln -c Release -o artifacts/nupkg "-p:VersionSuffix=${{ inputs.version_suffix }}"
+        run: dotnet pack AdamantiumEngine.sln -c Release -o artifacts/nupkg
 
       # Printed, because the things worth checking before an irreversible push are all in here: the version, the
       # licence, the dependencies, and that analyzers and native files landed where a consumer looks for them.
