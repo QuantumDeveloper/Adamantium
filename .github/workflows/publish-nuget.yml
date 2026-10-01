@@ -73,12 +73,13 @@ jobs:
         with:
           user: ${{ secrets.NUGET_USER }}   # nuget.org profile name, not the e-mail address
 
-      # The packages depend on each other, but nuget.org does not check dependencies on push, so one push takes them all.
+      # One file at a time: on Windows NuGet's own wildcard finds nothing in "artifacts/nupkg/*.nupkg", so the shell
+      # expands it. The packages depend on each other, but nuget.org does not check dependencies on push, so the order
+      # does not matter, and --skip-duplicate lets a failed run be started again.
       - name: Push
         if: ${{ !inputs.dry_run }}
         shell: bash
-        run: >
-          dotnet nuget push "artifacts/nupkg/*.nupkg"
-          --api-key ${{ steps.login.outputs.NUGET_API_KEY }}
-          --source https://api.nuget.org/v3/index.json
-          --skip-duplicate
+        run: |
+          for f in artifacts/nupkg/*.nupkg; do
+            dotnet nuget push "$f" --api-key "${{ steps.login.outputs.NUGET_API_KEY }}" --source https://api.nuget.org/v3/index.json --skip-duplicate
+          done
