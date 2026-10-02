@@ -307,7 +307,7 @@ technique Sampling { pass Run { ComputeShader = SampleCS; } }
         var device = GpuFixture.CreateRenderDevice();
         using var effect = new Effect(device, Compiled(sampling.Replace("VALUE", "255")));
         var samplerParameter = effect.Parameters["PictureSampler"];
-        var sampler = ((GraphicsDevice)device).SamplerStates.LinearClampToEdge;
+        var sampler = SamplerStates.LinearClampToEdge;
         samplerParameter.SetResource(sampler);
 
         var refused = effect.Reload(Compiled(sampling.Replace("VALUE", "100")));

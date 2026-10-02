@@ -29,15 +29,46 @@ namespace Adamantium.Graphics.Core
 
         public static ReadOnlyCollection<string> ValidationLayers { get; private set; }
 
+        /// <summary>Instance extensions the engine cannot run without.</summary>
+        public static ReadOnlyCollection<string> InstanceExtensions { get; private set; }
+
+        /// <summary>Instance extensions enabled when the loader has them, never required.</summary>
+        public static ReadOnlyCollection<string> OptionalInstanceExtensions { get; private set; }
+
+        /// <summary>Instance extensions this instance actually enabled.</summary>
+        public IReadOnlySet<string> EnabledInstanceExtensions { get; private set; } = new HashSet<string>();
+
+        public bool IsExtensionEnabled(string extension) => EnabledInstanceExtensions.Contains(extension);
+
         private readonly Dictionary<IntPtr, SurfaceKHR> availableSurfaces;
 
         static VulkanInstance()
         {
             var validationLayers = new List<string>();
-            
+
             validationLayers.Add("VK_LAYER_KHRONOS_validation");
             //validationLayers.Add("VK_LAYER_LUNARG_monitor");
             ValidationLayers = new ReadOnlyCollection<string>(validationLayers);
+
+            var instanceExt = new List<string> { Constants.VK_KHR_SURFACE_EXTENSION_NAME };
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+            {
+                instanceExt.Add(Constants.VK_KHR_WIN32_SURFACE_EXTENSION_NAME);
+            }
+            else if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+            {
+                instanceExt.Add(Constants.VK_MVK_MACOS_SURFACE_EXTENSION_NAME);
+            }
+            InstanceExtensions = new ReadOnlyCollection<string>(instanceExt);
+
+            OptionalInstanceExtensions = new ReadOnlyCollection<string>(new List<string>
+            {
+                Constants.VK_EXT_DEBUG_UTILS_EXTENSION_NAME,
+                Constants.VK_EXT_HEADLESS_SURFACE_EXTENSION_NAME,
+                Constants.VK_KHR_GET_SURFACE_CAPABILITIES_2_EXTENSION_NAME,
+                Constants.VK_KHR_SURFACE_MAINTENANCE_1_EXTENSION_NAME,
+                Constants.VK_EXT_SURFACE_MAINTENANCE_1_EXTENSION_NAME,
+            });
         }
 
         public AdamantiumCollection<GraphicsAdapter> GraphicsAdapters { get; private set; }
@@ -106,25 +137,26 @@ namespace Adamantium.Graphics.Core
             createInfo.PApplicationInfo = appInfo;
 
             var layersAvailable = Instance.EnumerateInstanceLayerProperties();
-            var extensions = Instance.EnumerateInstanceExtensionProperties();
+            var available = Instance.EnumerateInstanceExtensionProperties().Select(x => x.ExtensionName).ToHashSet();
 
-            //var ext = new string[] { "VK_MVK_macos_surface", "VK_KHR_surface", "VK_KHR_swapchain" };
-            //createInfo.EnabledExtensionCount = (uint)ext.Length;
-            //createInfo.PpEnabledExtensionNames = ext.ToArray();
-            
-            createInfo.PEnabledExtensionNames = extensions.Select(x => x.ExtensionName).ToArray();
-            createInfo.EnabledExtensionCount = (uint)createInfo.PEnabledExtensionNames.Length;
-            // var ext = new string[] {"VK_KHR_surface", "VK_KHR_win32_surface", "VK_KHR_get_physical_device_properties2", "VK_EXT_debug_utils" };
-            // createInfo.PEnabledExtensionNames = ext;//.Except(new []{"VK_KHR_surface_protected_capabilities"}).ToArray();
-            // createInfo.EnabledExtensionCount = (uint)ext.Length;
+            var missing = InstanceExtensions.Where(x => !available.Contains(x)).ToArray();
+            if (missing.Length > 0)
+            {
+                throw new ExtensionNotSupportedException("Vulkan loader", missing);
+            }
+
+            var enabled = InstanceExtensions.Concat(OptionalInstanceExtensions.Where(available.Contains)).ToArray();
+            EnabledInstanceExtensions = new HashSet<string>(enabled, StringComparer.Ordinal);
+            createInfo.PEnabledExtensionNames = enabled;
+            createInfo.EnabledExtensionCount = (uint)enabled.Length;
 
             if (IsInDebugMode)
             {
                 // Only enable validation layers that are actually installed - asking for a missing layer makes
                 // Instance.Create fail outright, which would take down the whole (e.g. designer) host instead of just
                 // running without validation.
-                var available = new HashSet<string>(layersAvailable.Select(x => x.LayerName));
-                var enabledLayers = ValidationLayers.Where(available.Contains).ToArray();
+                var availableLayers = new HashSet<string>(layersAvailable.Select(x => x.LayerName));
+                var enabledLayers = ValidationLayers.Where(availableLayers.Contains).ToArray();
                 createInfo.EnabledLayerCount = (uint)enabledLayers.Length;
                 createInfo.PEnabledLayerNames = enabledLayers;
                 if (enabledLayers.Length == 0)
@@ -134,7 +166,7 @@ namespace Adamantium.Graphics.Core
             VkInstance = Instance.Create(createInfo);
             NativePointer = new IntPtr(VkInstance.NativePointer);
 
-            if (IsInDebugMode)
+            if (IsInDebugMode && IsExtensionEnabled(Constants.VK_EXT_DEBUG_UTILS_EXTENSION_NAME))
             {
                 EnableDebug();
             }
@@ -182,8 +214,7 @@ namespace Adamantium.Graphics.Core
             // missing one is a clean managed error instead of a native null-function-pointer crash.
             if (parameters.PresenterType == PresenterType.Headless)
             {
-                if (!Instance.EnumerateInstanceExtensionProperties()
-                        .Any(e => e.ExtensionName == Constants.VK_EXT_HEADLESS_SURFACE_EXTENSION_NAME))
+                if (!IsExtensionEnabled(Constants.VK_EXT_HEADLESS_SURFACE_EXTENSION_NAME))
                 {
                     throw new NotSupportedException(
                         $"{Constants.VK_EXT_HEADLESS_SURFACE_EXTENSION_NAME} is not available on this Vulkan loader. " +
@@ -284,7 +315,7 @@ namespace Adamantium.Graphics.Core
                 VkInstance?.DestroySurfaceKHR(surface.Value);
             }
 
-            if (IsInDebugMode)
+            if (debugMessenger != null)
             {
                 DestroyDebugUtilsMessenger(debugMessenger);
             }

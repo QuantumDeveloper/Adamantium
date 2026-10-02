@@ -9,7 +9,7 @@ public static class TextureExtensions
     {
         var commandBuffer = texture.GraphicsDevice.BeginSingleTimeCommand();
 
-        var imageMemoryBarrier = new ImageMemoryBarrier
+        var imageMemoryBarrier = new ImageMemoryBarrier2
         {
             OldLayout = texture.ImageLayout,
             NewLayout = newLayout,
@@ -39,8 +39,8 @@ public static class TextureExtensions
             imageMemoryBarrier.SubresourceRange.AspectMask = ImageAspectFlagBits.ColorBit;
         }
 
-        PipelineStageFlagBits sourceStage;
-        PipelineStageFlagBits destinationStage;
+        PipelineStageFlagBits2 sourceStage;
+        PipelineStageFlagBits2 destinationStage;
 
         switch (texture.ImageLayout)
         {
@@ -49,7 +49,7 @@ public static class TextureExtensions
                 // Only valid as initial layout
                 // No flags required, listed only for completeness
                 imageMemoryBarrier.SrcAccessMask = 0;
-                sourceStage = PipelineStageFlagBits.TopOfPipeBit;
+                sourceStage = PipelineStageFlagBits2.TopOfPipeBit;
                 break;
 
             case ImageLayout.Preinitialized:
@@ -57,51 +57,51 @@ public static class TextureExtensions
                 // Only valid as initial layout for linear images, preserves memory contents
                 // Make sure host writes have been finished
                 imageMemoryBarrier.SrcAccessMask = 0;
-                sourceStage = PipelineStageFlagBits.TopOfPipeBit;
+                sourceStage = PipelineStageFlagBits2.TopOfPipeBit;
                 break;
 
             case ImageLayout.ColorAttachmentOptimal:
                 // Image is a color attachment
                 // Make sure any writes to the color buffer have been finished
-                imageMemoryBarrier.SrcAccessMask = AccessFlagBits.ColorAttachmentWriteBit;
-                sourceStage = PipelineStageFlagBits.ColorAttachmentOutputBit;
+                imageMemoryBarrier.SrcAccessMask = AccessFlagBits2.ColorAttachmentWriteBit;
+                sourceStage = PipelineStageFlagBits2.ColorAttachmentOutputBit;
                 break;
 
             case ImageLayout.DepthStencilAttachmentOptimal:
                 // Image is a depth/stencil attachment
                 // Make sure any writes to the depth/stencil buffer have been finished
-                imageMemoryBarrier.SrcAccessMask = AccessFlagBits.DepthStencilAttachmentWriteBit;
-                sourceStage = PipelineStageFlagBits.EarlyFragmentTestsBit;
+                imageMemoryBarrier.SrcAccessMask = AccessFlagBits2.DepthStencilAttachmentWriteBit;
+                sourceStage = PipelineStageFlagBits2.EarlyFragmentTestsBit;
                 break;
 
             case ImageLayout.TransferSrcOptimal:
                 // Image is a transfer source
                 // Make sure any reads from the image have been finished
-                imageMemoryBarrier.SrcAccessMask = AccessFlagBits.TransferReadBit;
-                sourceStage = PipelineStageFlagBits.TransferBit;
+                imageMemoryBarrier.SrcAccessMask = AccessFlagBits2.TransferReadBit;
+                sourceStage = PipelineStageFlagBits2.AllTransferBit;
                 break;
 
             case ImageLayout.TransferDstOptimal:
                 // Image is a transfer destination
                 // Make sure any writes to the image have been finished
-                imageMemoryBarrier.SrcAccessMask = AccessFlagBits.TransferWriteBit;
-                sourceStage = PipelineStageFlagBits.TransferBit;
+                imageMemoryBarrier.SrcAccessMask = AccessFlagBits2.TransferWriteBit;
+                sourceStage = PipelineStageFlagBits2.AllTransferBit;
                 break;
 
             case ImageLayout.ShaderReadOnlyOptimal:
                 // Image is read by a shader
                 // Make sure any shader reads from the image have been finished
-                imageMemoryBarrier.SrcAccessMask = AccessFlagBits.ShaderReadBit;
-                sourceStage = PipelineStageFlagBits.FragmentShaderBit;
+                imageMemoryBarrier.SrcAccessMask = AccessFlagBits2.ShaderReadBit;
+                sourceStage = PipelineStageFlagBits2.FragmentShaderBit;
                 break;
             case ImageLayout.PresentSrcKhr:
-                imageMemoryBarrier.SrcAccessMask = AccessFlagBits.None;
-                sourceStage = PipelineStageFlagBits.BottomOfPipeBit;
+                imageMemoryBarrier.SrcAccessMask = AccessFlagBits2.None;
+                sourceStage = PipelineStageFlagBits2.BottomOfPipeBit;
                 break;
             case ImageLayout.General:
                 // Host image copy read the image (Texture.Save); the access happened on the host.
-                imageMemoryBarrier.SrcAccessMask = AccessFlagBits.HostReadBit;
-                sourceStage = PipelineStageFlagBits.HostBit;
+                imageMemoryBarrier.SrcAccessMask = AccessFlagBits2.HostReadBit;
+                sourceStage = PipelineStageFlagBits2.HostBit;
                 break;
             default:
                 throw new ArgumentException(
@@ -113,59 +113,57 @@ public static class TextureExtensions
             case ImageLayout.TransferDstOptimal:
                 // Image will be used as a transfer destination
                 // Make sure any writes to the image have been finished
-                imageMemoryBarrier.DstAccessMask = AccessFlagBits.TransferWriteBit;
-                destinationStage = PipelineStageFlagBits.TransferBit;
+                imageMemoryBarrier.DstAccessMask = AccessFlagBits2.TransferWriteBit;
+                destinationStage = PipelineStageFlagBits2.AllTransferBit;
                 break;
 
             case ImageLayout.TransferSrcOptimal:
                 // Image will be used as a transfer source
                 // Make sure any reads from the image have been finished
-                imageMemoryBarrier.DstAccessMask = AccessFlagBits.TransferReadBit;
-                destinationStage = PipelineStageFlagBits.TransferBit;
+                imageMemoryBarrier.DstAccessMask = AccessFlagBits2.TransferReadBit;
+                destinationStage = PipelineStageFlagBits2.AllTransferBit;
                 break;
 
             case ImageLayout.ColorAttachmentOptimal:
                 // Image will be used as a color attachment
                 // Make sure any writes to the color buffer have been finished
-                imageMemoryBarrier.DstAccessMask = AccessFlagBits.ColorAttachmentWriteBit;
-                destinationStage = PipelineStageFlagBits.ColorAttachmentOutputBit;
+                imageMemoryBarrier.DstAccessMask = AccessFlagBits2.ColorAttachmentWriteBit;
+                destinationStage = PipelineStageFlagBits2.ColorAttachmentOutputBit;
                 break;
 
             case ImageLayout.DepthStencilAttachmentOptimal:
                 // Image layout will be used as a depth/stencil attachment
                 // Make sure any writes to depth/stencil buffer have been finished
-                imageMemoryBarrier.DstAccessMask |= AccessFlagBits.DepthStencilAttachmentReadBit |
-                                                    AccessFlagBits.DepthStencilAttachmentWriteBit;
-                destinationStage = PipelineStageFlagBits.EarlyFragmentTestsBit;
+                imageMemoryBarrier.DstAccessMask |= AccessFlagBits2.DepthStencilAttachmentReadBit |
+                                                    AccessFlagBits2.DepthStencilAttachmentWriteBit;
+                destinationStage = PipelineStageFlagBits2.EarlyFragmentTestsBit;
                 break;
 
             case ImageLayout.ShaderReadOnlyOptimal:
-                imageMemoryBarrier.DstAccessMask = AccessFlagBits.ShaderReadBit;
-                destinationStage = PipelineStageFlagBits.FragmentShaderBit;
+                imageMemoryBarrier.DstAccessMask = AccessFlagBits2.ShaderReadBit;
+                destinationStage = PipelineStageFlagBits2.FragmentShaderBit;
                 break;
             case ImageLayout.PresentSrcKhr:
-                imageMemoryBarrier.DstAccessMask = AccessFlagBits.None;
-                destinationStage = PipelineStageFlagBits.BottomOfPipeBit;
+                imageMemoryBarrier.DstAccessMask = AccessFlagBits2.None;
+                destinationStage = PipelineStageFlagBits2.BottomOfPipeBit;
                 break;
             case ImageLayout.General:
                 // Will be read by host image copy (Texture.Save) right after this transition.
-                imageMemoryBarrier.DstAccessMask = AccessFlagBits.HostReadBit;
-                destinationStage = PipelineStageFlagBits.HostBit;
+                imageMemoryBarrier.DstAccessMask = AccessFlagBits2.HostReadBit;
+                destinationStage = PipelineStageFlagBits2.HostBit;
                 break;
             default:
                 throw new ArgumentException($"Transferring to {newLayout} is not handled yet");
         }
 
-        commandBuffer.PipelineBarrier(
-            sourceStage,
-            destinationStage,
-            0,
-            0,
-            null,
-            0,
-            null,
-            1,
-            imageMemoryBarrier);
+        imageMemoryBarrier.SrcStageMask = sourceStage;
+        imageMemoryBarrier.DstStageMask = destinationStage;
+
+        commandBuffer.PipelineBarrier2(new DependencyInfo
+        {
+            PImageMemoryBarriers = new[] { imageMemoryBarrier },
+            ImageMemoryBarrierCount = 1
+        });
 
         texture.ImageLayout = newLayout;
 
@@ -198,13 +196,13 @@ public static class TextureExtensions
 
         graphicsDevice.InsertImageMemoryBarrier(commandBuffer,
             srcTexture,
-            AccessFlagBits.ColorAttachmentWriteBit,
-            AccessFlagBits.TransferReadBit,
+            AccessFlagBits2.ColorAttachmentWriteBit,
+            AccessFlagBits2.TransferReadBit,
             //ImageLayout.ColorAttachmentOptimal,
             srcTexture.ImageLayout,
             ImageLayout.TransferSrcOptimal,
-            PipelineStageFlagBits.ColorAttachmentOutputBit,
-            PipelineStageFlagBits.TransferBit
+            PipelineStageFlagBits2.ColorAttachmentOutputBit,
+            PipelineStageFlagBits2.AllTransferBit
         );
         
         // Destination (swapchain) texture: the source stages match the imageAvailable wait, or the transition could run
@@ -212,11 +210,11 @@ public static class TextureExtensions
         graphicsDevice.InsertImageMemoryBarrier(commandBuffer,
             dstTexture,
             0,
-            AccessFlagBits.TransferWriteBit,
+            AccessFlagBits2.TransferWriteBit,
             ImageLayout.Undefined,
             ImageLayout.TransferDstOptimal,
-            PipelineStageFlagBits.ColorAttachmentOutputBit | PipelineStageFlagBits.TransferBit,
-            PipelineStageFlagBits.TransferBit
+            PipelineStageFlagBits2.ColorAttachmentOutputBit | PipelineStageFlagBits2.AllTransferBit,
+            PipelineStageFlagBits2.AllTransferBit
         );
 
         commandBuffer.BlitImage(

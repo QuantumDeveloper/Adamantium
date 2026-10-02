@@ -147,6 +147,12 @@ namespace Adamantium.Graphics.Core
         /// <summary>Extensions enabled when supported, never required.</summary>
         public static ReadOnlyCollection<string> OptionalDeviceExtensions { get; private set; }
 
+        private static readonly Dictionary<string, string> OptionalExtensionInstancePrerequisites = new()
+        {
+            [Constants.VK_KHR_SWAPCHAIN_MAINTENANCE_1_EXTENSION_NAME] = Constants.VK_KHR_SURFACE_MAINTENANCE_1_EXTENSION_NAME,
+            [Constants.VK_EXT_SWAPCHAIN_MAINTENANCE_1_EXTENSION_NAME] = Constants.VK_EXT_SURFACE_MAINTENANCE_1_EXTENSION_NAME,
+        };
+
         /// <summary>Device extensions this device actually enabled: the required ones plus the supported optional ones.</summary>
         public IReadOnlySet<string> EnabledDeviceExtensions { get; private set; } = new HashSet<string>();
 
@@ -158,15 +164,6 @@ namespace Adamantium.Graphics.Core
             GraphicsAdapter.SupportsSwapchainMaintenance1
             && (IsExtensionEnabled(Constants.VK_KHR_SWAPCHAIN_MAINTENANCE_1_EXTENSION_NAME)
                 || IsExtensionEnabled(Constants.VK_EXT_SWAPCHAIN_MAINTENANCE_1_EXTENSION_NAME));
-
-        /// <summary>Wait for a named present instead of for an image to come free.</summary>
-        public bool SupportsPresentWait =>
-            IsExtensionEnabled(Constants.VK_KHR_PRESENT_WAIT_EXTENSION_NAME)
-            && IsExtensionEnabled(Constants.VK_KHR_PRESENT_ID_EXTENSION_NAME);
-
-        /// <summary>Present only the rectangles that changed.</summary>
-        public bool SupportsIncrementalPresent =>
-            IsExtensionEnabled(Constants.VK_KHR_INCREMENTAL_PRESENT_EXTENSION_NAME);
 
         internal Fence[] InFlightFences { get; private set; }
 
@@ -182,14 +179,7 @@ namespace Adamantium.Graphics.Core
         {
             var deviceExt = new List<string>();
             deviceExt.Add(Constants.VK_KHR_SWAPCHAIN_EXTENSION_NAME);
-            deviceExt.Add(Constants.VK_KHR_MAINTENANCE_4_EXTENSION_NAME);
-            deviceExt.Add(Constants.VK_GOOGLE_HLSL_FUNCTIONALITY_1_EXTENSION_NAME);
-            deviceExt.Add(Constants.VK_GOOGLE_USER_TYPE_EXTENSION_NAME);
-            deviceExt.Add(Constants.VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME);
             deviceExt.Add(Constants.VK_EXT_SHADER_OBJECT_EXTENSION_NAME);
-            deviceExt.Add(Constants.VK_EXT_DESCRIPTOR_BUFFER_EXTENSION_NAME);
-            deviceExt.Add(Constants.VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME);
-            deviceExt.Add(Constants.VK_KHR_SYNCHRONIZATION_2_EXTENSION_NAME);
             deviceExt.Add(Constants.VK_EXT_DESCRIPTOR_HEAP_EXTENSION_NAME);
             DeviceExtensions = new ReadOnlyCollection<string>(deviceExt);
 
@@ -207,9 +197,6 @@ namespace Adamantium.Graphics.Core
                 // Promoted KHR form first, EXT as the fallback: a driver may advertise either.
                 Constants.VK_KHR_SWAPCHAIN_MAINTENANCE_1_EXTENSION_NAME,
                 Constants.VK_EXT_SWAPCHAIN_MAINTENANCE_1_EXTENSION_NAME,
-                Constants.VK_KHR_PRESENT_ID_EXTENSION_NAME,
-                Constants.VK_KHR_PRESENT_WAIT_EXTENSION_NAME,
-                Constants.VK_KHR_INCREMENTAL_PRESENT_EXTENSION_NAME,
             });
         }
 
@@ -311,6 +298,14 @@ namespace Adamantium.Graphics.Core
             queueCreateInfo.PQueuePriorities = queuePriorities;
             queueInfos.Add(queueCreateInfo);
 
+            var apiVersion = GraphicsAdapter.AdapterProperties.ApiVersion;
+            if (apiVersion < Constants.VK_MAKE_API_VERSION(0, 1, 4, 0))
+            {
+                throw new NotSupportedException(
+                    $"{GraphicsAdapter.AdapterProperties.DeviceName} supports Vulkan {apiVersion >> 22}.{(apiVersion >> 12) & 0x3FF}; " +
+                    "the engine needs Vulkan 1.4. Choose another adapter or update drivers");
+            }
+
             uint propCount = 0;
             GraphicsAdapter.Adapter.EnumerateDeviceExtensionProperties(null, ref propCount, null);
             var supportedDeviceExtensions = new ExtensionProperties[propCount];
@@ -334,7 +329,9 @@ namespace Adamantium.Graphics.Core
 
             foreach (var extension in OptionalDeviceExtensions)
             {
-                if (availableDeviceExtensions.Contains(extension) && !finalDeviceExtensions.Contains(extension))
+                if (availableDeviceExtensions.Contains(extension) && !finalDeviceExtensions.Contains(extension)
+                    && (!OptionalExtensionInstancePrerequisites.TryGetValue(extension, out var instanceExtension)
+                        || VulkanInstance.IsExtensionEnabled(instanceExtension)))
                 {
                     finalDeviceExtensions.Add(extension);
                 }
@@ -342,12 +339,6 @@ namespace Adamantium.Graphics.Core
 
             // What was actually enabled: the same binary runs where the optional ones are missing (MoltenVK has none).
             EnabledDeviceExtensions = new HashSet<string>(finalDeviceExtensions, StringComparer.Ordinal);
-
-            var descriptorBufferFeature = new PhysicalDeviceDescriptorBufferFeaturesEXT
-            {
-                DescriptorBuffer = true,
-                DescriptorBufferCaptureReplay = true
-            };
 
             var vulkan11Features = new PhysicalDeviceVulkan11Features
             {
@@ -359,10 +350,8 @@ namespace Adamantium.Graphics.Core
             {
                 TimelineSemaphore = true,
                 BufferDeviceAddress = true,
-                BufferDeviceAddressCaptureReplay = true,
                 SamplerMirrorClampToEdge = true,
-                // Only when reported: requesting a missing feature fails vkCreateDevice.
-                ScalarBlockLayout = GraphicsAdapter.SupportsScalarBlockLayout,
+                ScalarBlockLayout = true,
                 // Byte colors in every instance record; there is no second layout to fall back to.
                 StorageBuffer8BitAccess = true,
                 ShaderInt8 = true,
@@ -381,15 +370,9 @@ namespace Adamantium.Graphics.Core
                 HostImageCopy = GraphicsAdapter.SupportsHostImageCopy
             };
 
-            var primitiveRestart = new PhysicalDevicePrimitiveTopologyListRestartFeaturesEXT
-            {
-                PrimitiveTopologyListRestart = true,
-            };
-
             var heapFeatures = new PhysicalDeviceDescriptorHeapFeaturesEXT
             {
-                DescriptorHeap = true,
-                DescriptorHeapCaptureReplay = GraphicsAdapter.SupportsDescriptorHeapCaptureReplay
+                DescriptorHeap = true
             };
 
             var deviceFeatures2 = GraphicsAdapter.Adapter.GetPhysicalDeviceFeatures2();
@@ -398,9 +381,6 @@ namespace Adamantium.Graphics.Core
             vulkan11Features.PNext = vulkan12Features;
             vulkan12Features.PNext = vulkan13Features;
             vulkan13Features.PNext = features14;
-            //vulkan13Features.PNext = descriptorBufferFeature;
-            features14.PNext = primitiveRestart;
-            primitiveRestart.PNext = descriptorBufferFeature;
 
             if (EnableDynamicRendering &&
                 finalDeviceExtensions.Contains(Constants.VK_EXT_SHADER_OBJECT_EXTENSION_NAME))
@@ -409,12 +389,12 @@ namespace Adamantium.Graphics.Core
                 {
                     ShaderObject = true
                 };
-                descriptorBufferFeature.PNext = shaderObjectFeatures;
+                features14.PNext = shaderObjectFeatures;
                 shaderObjectFeatures.PNext = heapFeatures;
             }
             else
             {
-                descriptorBufferFeature.PNext = heapFeatures;
+                features14.PNext = heapFeatures;
             }
 
             PhysicalDeviceFaultFeaturesEXT faultFeatures = null;
@@ -444,7 +424,6 @@ namespace Adamantium.Graphics.Core
             }
 
             deviceFeatures2.Features.SamplerAnisotropy = true;
-            deviceFeatures2.Features.SampleRateShading = true;
             deviceFeatures2.Features.GeometryShader = true;
             // The stroke expander's compute shader dereferences BDA pointers (uint64_t).
             deviceFeatures2.Features.ShaderInt64 = true;

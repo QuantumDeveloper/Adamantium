@@ -150,18 +150,44 @@ public class DescriptorHeapManager : DisposableObject, IDescriptorHeapManager
     // Bindless slot caches: each unique texture/sampler gets ONE stable heap slot (its descriptor written once),
     // instead of one slot per shader parameter that every bind overwrote (which made the last-bound texture/sampler
     // show up on every draw). Keyed by the resource object; render targets keep a stable view, so the slot stays valid.
+    // Samplers are descriptions: equal ones share a slot, which lives as long as the heap.
     private readonly System.Collections.Generic.Dictionary<ITexture, uint> _textureHeapOffsets = new();
     private readonly System.Collections.Generic.Dictionary<SamplerState, uint> _samplerHeapOffsets = new();
+    private readonly System.Collections.Generic.Dictionary<SamplerKey, uint> _samplerOffsetsByDescription = new();
     private readonly System.Collections.Generic.Dictionary<IBuffer, uint> _bufferHeapOffsets = new();
+
+    private readonly record struct SamplerKey(
+        SamplerCreateFlagBits Flags,
+        Filter MagFilter,
+        Filter MinFilter,
+        SamplerMipmapMode MipmapMode,
+        SamplerAddressMode AddressModeU,
+        SamplerAddressMode AddressModeV,
+        SamplerAddressMode AddressModeW,
+        float MipLodBias,
+        bool AnisotropyEnable,
+        float MaxAnisotropy,
+        bool CompareEnable,
+        CompareOp CompareOp,
+        float MinLod,
+        float MaxLod,
+        BorderColor BorderColor,
+        bool UnnormalizedCoordinates,
+        object Extension)
+    {
+        public static SamplerKey Of(SamplerCreateInfo info) => new(info.Flags, info.MagFilter, info.MinFilter,
+            info.MipmapMode, info.AddressModeU, info.AddressModeV, info.AddressModeW, info.MipLodBias,
+            info.AnisotropyEnable, info.MaxAnisotropy, info.CompareEnable, info.CompareOp, info.MinLod, info.MaxLod,
+            info.BorderColor, info.UnnormalizedCoordinates, info.PNext);
+    }
 
     // ---- RETURNING SLOTS ----------------------------------------------------------------------------------------
     // A freed slot goes to a per-kind free list (slots fit one descriptor size) after the frames in flight are done with it.
     private readonly System.Collections.Generic.Queue<uint> _freeImageSlots = new();
     private readonly System.Collections.Generic.Queue<uint> _freeBufferSlots = new();
-    private readonly System.Collections.Generic.Queue<uint> _freeSamplerSlots = new();
     private readonly System.Collections.Generic.List<(uint Slot, DescriptorKind Kind, uint Frame)> _retiring = new();
 
-    private enum DescriptorKind { Image, Buffer, Sampler }
+    private enum DescriptorKind { Image, Buffer }
 
     private void Retire(uint slot, DescriptorKind kind)
     {
@@ -183,12 +209,7 @@ public class DescriptorHeapManager : DisposableObject, IDescriptorHeapManager
                 // Unsigned wrap is fine: what matters is that a full pipeline's worth of frames has passed.
                 if (now - frame < depth) continue;
 
-                (kind switch
-                {
-                    DescriptorKind.Image => _freeImageSlots,
-                    DescriptorKind.Buffer => _freeBufferSlots,
-                    _ => _freeSamplerSlots
-                }).Enqueue(slot);
+                (kind == DescriptorKind.Image ? _freeImageSlots : _freeBufferSlots).Enqueue(slot);
                 _retiring.RemoveAt(i);
             }
         }
@@ -256,15 +277,6 @@ public class DescriptorHeapManager : DisposableObject, IDescriptorHeapManager
         }
     }
 
-    private void ReleaseSampler(SamplerState sampler)
-    {
-        lock (_heapSync)
-        {
-            if (!_samplerHeapOffsets.Remove(sampler, out var slot)) return;
-            Retire(slot, DescriptorKind.Sampler);
-        }
-    }
-
     // ---- THE FALLBACK DESCRIPTOR --------------------------------------------------------------------------------
     // Sampled when a parameter was never bound, instead of an out-of-heap index. Red 4x4 in Debug so the miss shows,
     // transparent 1x1 in Release.
@@ -295,8 +307,7 @@ public class DescriptorHeapManager : DisposableObject, IDescriptorHeapManager
             {
                 if (_fallbackSamplerOffset != uint.MaxValue) return _fallbackSamplerOffset;
 
-                _fallbackSamplerOffset = GetOrAllocateSamplerOffset(
-                    ((GraphicsDevice)graphicsDevice).SamplerStates.LinearClampToEdge);
+                _fallbackSamplerOffset = GetOrAllocateSamplerOffset(SamplerStates.LinearClampToEdge);
                 return _fallbackSamplerOffset;
             }
         }
@@ -341,11 +352,14 @@ public class DescriptorHeapManager : DisposableObject, IDescriptorHeapManager
         {
             if (_samplerHeapOffsets.TryGetValue(samplerState, out var existing)) return existing;
 
-            uint descSize = (uint)DeviceHeapProperties.SamplerDescriptorSize;
-            uint offset = _freeSamplerSlots.Count > 0 ? _freeSamplerSlots.Dequeue() : AllocateSamplerOffset(descSize);
-            WriteSampler(offset, samplerState);
+            var key = SamplerKey.Of(samplerState.Info);
+            if (!_samplerOffsetsByDescription.TryGetValue(key, out var offset))
+            {
+                offset = AllocateSamplerOffset((uint)DeviceHeapProperties.SamplerDescriptorSize);
+                WriteSampler(offset, samplerState);
+                _samplerOffsetsByDescription[key] = offset;
+            }
             _samplerHeapOffsets[samplerState] = offset;
-            Track(samplerState as DisposableObject, () => ReleaseSampler(samplerState));
             return offset;
         }
     }

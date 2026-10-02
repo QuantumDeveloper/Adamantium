@@ -29,8 +29,7 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
 
     private CommandBuffer[] commandBuffers;
     private Queue resourceQueue;
-        
-    private readonly SubmitInfo[] submitInfos = new SubmitInfo[1];
+
     private uint frame;
         
     private Type vertexType;
@@ -70,6 +69,10 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
         => a.SrcColorBlendFactor == b.SrcColorBlendFactor && a.DstColorBlendFactor == b.DstColorBlendFactor
            && a.ColorBlendOp == b.ColorBlendOp && a.SrcAlphaBlendFactor == b.SrcAlphaBlendFactor
            && a.DstAlphaBlendFactor == b.DstAlphaBlendFactor && a.AlphaBlendOp == b.AlphaBlendOp;
+
+    private static bool IsStripTopology(PrimitiveTopology topology)
+        => topology is PrimitiveTopology.LineStrip or PrimitiveTopology.TriangleStrip or PrimitiveTopology.TriangleFan
+            or PrimitiveTopology.LineStripWithAdjacency or PrimitiveTopology.TriangleStripWithAdjacency;
     private Type _cVertexType;
     private bool _cRasterizerDiscard;
     private PrimitiveTopology _cTopology;
@@ -94,8 +97,6 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
     private IRenderTarget[] renderTargets;
     private IDepthStencilBuffer depthBuffer;
 
-    private readonly PipelineStageFlagBits[] waitStages = [PipelineStageFlagBits.ColorAttachmentOutputBit];
-        
     public Device LogicalDevice => MainDevice?.LogicalDevice;
     public GraphicsAdapter Adapter => VulkanInstance?.MainGraphicsAdapter;
 
@@ -111,21 +112,17 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
     public IDepthStencilBuffer CurrentDepthStencilBuffer { get; private set; }
 
     internal VulkanInstance VulkanInstance => MainDevice?.VulkanInstance;
-        
-    private Semaphore[] waitSemaphoresArray = new Semaphore[1];
-    private Semaphore[] signalSemaphoresArray = new Semaphore[1];
-    private CommandBuffer[] commandBuffersArray = new CommandBuffer[1];
 
     // Per-frame extra GPU sync registered by shared-surface producers/consumers, merged into the next Submit on
     // top of the swapchain semaphores and cleared afterwards. Timeline values are 0 for binary semaphores.
     private readonly System.Collections.Generic.List<Semaphore> _extraWaitSemaphores = new();
-    private readonly System.Collections.Generic.List<PipelineStageFlagBits> _extraWaitStages = new();
+    private readonly System.Collections.Generic.List<PipelineStageFlagBits2> _extraWaitStages = new();
     private readonly System.Collections.Generic.List<ulong> _extraWaitValues = new();
     private readonly System.Collections.Generic.List<Semaphore> _extraSignalSemaphores = new();
     private readonly System.Collections.Generic.List<ulong> _extraSignalValues = new();
 
     /// <summary>Register a semaphore the next <see cref="Submit"/> must wait on (timelineValue=0 for binary).</summary>
-    public void AddWaitSemaphore(Semaphore semaphore, PipelineStageFlagBits stage, ulong timelineValue = 0)
+    public void AddWaitSemaphore(Semaphore semaphore, PipelineStageFlagBits2 stage, ulong timelineValue = 0)
     {
         _extraWaitSemaphores.Add(semaphore);
         _extraWaitStages.Add(stage);
@@ -203,7 +200,6 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
         viewports = new TrackingCollection<Viewport>();
         scissors = new TrackingCollection<Rect2D>();
 
-        SamplerStates = new SamplerStateCollection(this);
         Sampler = SamplerStates.Default;
             
         ClearColor = Colors.CornflowerBlue;
@@ -326,8 +322,6 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
     }
 
     public bool CanPresent { get; private set; }
-        
-    public SamplerStateCollection SamplerStates { get; internal set; }
         
     public Color ClearColor { get; set; }
         
@@ -549,33 +543,6 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
         cmd.BindShadersEXT((uint)stages.Length, stages, shaders);
     }
 
-    public RenderPass CreateRenderPass(RenderPassCreateInfo createInfo)
-    {
-        return LogicalDevice.CreateRenderPass(createInfo);
-    }
-
-    public DescriptorPool CreateDescriptorPool(DescriptorPoolCreateInfo info)
-    {
-        return LogicalDevice.CreateDescriptorPool(info);
-    }
-
-    public DescriptorSetLayout CreateDescriptorSetLayout(DescriptorSetLayoutCreateInfo layoutCreateInfo)
-    {
-        var result = LogicalDevice.CreateDescriptorSetLayout(layoutCreateInfo, null, out var descriptorSetLayout);
-        ResultHelper.CheckResult(result, nameof(CreateDescriptorSetLayout));
-        return descriptorSetLayout;
-    }
-
-    public PipelineLayout CreatePipelineLayout(PipelineLayoutCreateInfo createInfo)
-    {
-        return LogicalDevice.CreatePipelineLayout(createInfo);
-    }
-
-    public uint GetDescriptorSetLayoutOffset(DescriptorSetLayout layout, uint bindingSlot)
-    {
-        return LogicalDevice.GetDescriptorSetLayoutOffset(layout, bindingSlot);
-    }
-
     // Serializes shader creation for parallel callers such as the test runner; static because all render devices share
     // one VkDevice and one cache folder.
     private static readonly object ShaderCreateLock = new();
@@ -696,20 +663,15 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
         return LogicalDevice.WaitForFences((uint)InFlightFences.Length, InFlightFences, true, timeout);
     }
 
-    public Framebuffer CreateFramebuffer(FramebufferCreateInfo info)
-    {
-        return LogicalDevice.CreateFramebuffer(info);
-    }
-        
     public void InsertImageMemoryBarrier(
         CommandBuffer commandBuffer,
         ITexture texture,
-        AccessFlagBits sourceAccessMask,
-        AccessFlagBits destinationAccessMask,
+        AccessFlagBits2 sourceAccessMask,
+        AccessFlagBits2 destinationAccessMask,
         ImageLayout oldLayout,
         ImageLayout newLayout,
-        PipelineStageFlagBits sourceStageMask,
-        PipelineStageFlagBits destinationStageMask)
+        PipelineStageFlagBits2 sourceStageMask,
+        PipelineStageFlagBits2 destinationStageMask)
         => InsertImageMemoryBarrier(commandBuffer, texture, sourceAccessMask, destinationAccessMask,
             oldLayout, newLayout, sourceStageMask, destinationStageMask, 0, ~0U);
 
@@ -718,12 +680,12 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
     public void InsertImageMemoryBarrier(
         CommandBuffer commandBuffer,
         ITexture texture,
-        AccessFlagBits sourceAccessMask,
-        AccessFlagBits destinationAccessMask,
+        AccessFlagBits2 sourceAccessMask,
+        AccessFlagBits2 destinationAccessMask,
         ImageLayout oldLayout,
         ImageLayout newLayout,
-        PipelineStageFlagBits sourceStageMask,
-        PipelineStageFlagBits destinationStageMask,
+        PipelineStageFlagBits2 sourceStageMask,
+        PipelineStageFlagBits2 destinationStageMask,
         uint baseMipLevel,
         uint levelCount)
     {
@@ -738,7 +700,9 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
             LayerCount = (~0U)
         };
 
-        var barrier = new ImageMemoryBarrier();
+        var barrier = new ImageMemoryBarrier2();
+        barrier.SrcStageMask = sourceStageMask;
+        barrier.DstStageMask = destinationStageMask;
         barrier.SrcQueueFamilyIndex = (~0U);
         barrier.DstQueueFamilyIndex = (~0U);
         barrier.SrcAccessMask = sourceAccessMask;
@@ -748,16 +712,11 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
         barrier.Image = texture.GetImage();
         barrier.SubresourceRange = range;
 
-        commandBuffer.PipelineBarrier(
-            sourceStageMask,
-            destinationStageMask,
-            0,
-            0,
-            null,
-            0,
-            null,
-            1,
-            barrier);
+        commandBuffer.PipelineBarrier2(new DependencyInfo
+        {
+            PImageMemoryBarriers = new[] { barrier },
+            ImageMemoryBarrierCount = 1
+        });
 
         if (baseMipLevel == 0 && levelCount == ~0U) texture.ImageLayout = newLayout;
     }
@@ -1304,70 +1263,54 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
 
         CommandBufferStarted = false;
             
-        commandBuffersArray[0] = CurrentCommandBuffer;
-        var submitInfo = new SubmitInfo();
-
-        // Swapchain present-sync (binary) + per-frame extras from shared-surface compositing (timeline). The
-        // timeline value array must align 1:1 with the semaphore arrays (binary entries carry value 0, ignored).
-        var waitSems = new System.Collections.Generic.List<Semaphore>();
-        var waitStageList = new System.Collections.Generic.List<PipelineStageFlagBits>();
-        var waitValues = new System.Collections.Generic.List<ulong>();
-        var signalSems = new System.Collections.Generic.List<Semaphore>();
-        var signalValues = new System.Collections.Generic.List<ulong>();
+        var waits = new System.Collections.Generic.List<SemaphoreSubmitInfo>();
+        var signals = new System.Collections.Generic.List<SemaphoreSubmitInfo>();
 
         if (Presenter is SwapChainGraphicsPresenter swapChainGraphicsPresenter)
         {
-            waitSems.Add(ImageAvailableSemaphores[CurrentFrame]);
-            // The acquired image is first transitioned and blitted, both transfer work, so the wait covers the transfer stage.
-            waitStageList.Add(PipelineStageFlagBits.ColorAttachmentOutputBit | PipelineStageFlagBits.TransferBit);
-            waitValues.Add(0);
-            signalSems.Add(swapChainGraphicsPresenter.CurrentRenderFinishedSemaphore);
-            signalValues.Add(0);
+            waits.Add(new SemaphoreSubmitInfo
+            {
+                Semaphore = ImageAvailableSemaphores[CurrentFrame],
+                // The acquired image is first transitioned and blitted, both transfer work, so the wait covers the transfer stage.
+                StageMask = (ulong)(PipelineStageFlagBits2.ColorAttachmentOutputBit | PipelineStageFlagBits2.AllTransferBit)
+            });
+            signals.Add(new SemaphoreSubmitInfo
+            {
+                Semaphore = swapChainGraphicsPresenter.CurrentRenderFinishedSemaphore,
+                StageMask = (ulong)PipelineStageFlagBits2.AllCommandsBit
+            });
         }
 
-        var hasTimeline = false;
         for (int i = 0; i < _extraWaitSemaphores.Count; i++)
         {
-            waitSems.Add(_extraWaitSemaphores[i]);
-            waitStageList.Add(_extraWaitStages[i]);
-            waitValues.Add(_extraWaitValues[i]);
-            if (_extraWaitValues[i] != 0) hasTimeline = true;
+            waits.Add(new SemaphoreSubmitInfo
+            {
+                Semaphore = _extraWaitSemaphores[i],
+                Value = _extraWaitValues[i],
+                StageMask = (ulong)_extraWaitStages[i]
+            });
         }
         for (int i = 0; i < _extraSignalSemaphores.Count; i++)
         {
-            signalSems.Add(_extraSignalSemaphores[i]);
-            signalValues.Add(_extraSignalValues[i]);
-            if (_extraSignalValues[i] != 0) hasTimeline = true;
+            signals.Add(new SemaphoreSubmitInfo
+            {
+                Semaphore = _extraSignalSemaphores[i],
+                Value = _extraSignalValues[i],
+                StageMask = (ulong)PipelineStageFlagBits2.AllCommandsBit
+            });
         }
         _extraWaitSemaphores.Clear(); _extraWaitStages.Clear(); _extraWaitValues.Clear();
         _extraSignalSemaphores.Clear(); _extraSignalValues.Clear();
 
-        if (waitSems.Count > 0)
+        var submitInfo = new SubmitInfo2
         {
-            submitInfo.WaitSemaphoreCount = (uint)waitSems.Count;
-            submitInfo.PWaitSemaphores = waitSems.ToArray();
-            submitInfo.PWaitDstStageMask = waitStageList.ToArray();
-        }
-        if (signalSems.Count > 0)
-        {
-            submitInfo.SignalSemaphoreCount = (uint)signalSems.Count;
-            submitInfo.PSignalSemaphores = signalSems.ToArray();
-        }
-        if (hasTimeline)
-        {
-            submitInfo.PNext = new TimelineSemaphoreSubmitInfo
-            {
-                WaitSemaphoreValueCount = (uint)waitValues.Count,
-                PWaitSemaphoreValues = waitValues.ToArray(),
-                SignalSemaphoreValueCount = (uint)signalValues.Count,
-                PSignalSemaphoreValues = signalValues.ToArray()
-            };
-        }
-
-        submitInfo.CommandBufferCount = (uint)commandBuffersArray.Length;
-        submitInfo.PCommandBuffers = commandBuffersArray;
-
-        submitInfos[0] = submitInfo;
+            WaitSemaphoreInfoCount = (uint)waits.Count,
+            PWaitSemaphoreInfos = waits.ToArray(),
+            CommandBufferInfoCount = 1,
+            PCommandBufferInfos = new[] { new CommandBufferSubmitInfo { CommandBuffer = CurrentCommandBuffer } },
+            SignalSemaphoreInfoCount = (uint)signals.Count,
+            PSignalSemaphoreInfos = signals.ToArray()
+        };
 
         var renderFence = InFlightFences[CurrentFrame];
             
@@ -1379,7 +1322,7 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
             //throw new Exception($"failed to reset fences. Result: {result}");
         }
 
-        result = GraphicsQueue.QueueSubmit(1, submitInfos, renderFence);
+        result = GraphicsQueue.QueueSubmit2(1, submitInfo, renderFence);
 
         if (result != Result.Success)
         {
@@ -1403,11 +1346,11 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
 
     public void SetObjectDebugName(ulong objectHandle, ObjectType objectType, string name)
     {
-        if (string.IsNullOrEmpty(name))
+        if (string.IsNullOrEmpty(name) || !VulkanInstance.IsExtensionEnabled(Constants.VK_EXT_DEBUG_UTILS_EXTENSION_NAME))
         {
             return;
         }
-            
+
         var nameInfo = new DebugUtilsObjectNameInfoEXT
         {
             ObjectType = objectType,
@@ -1547,8 +1490,9 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
         { commandBuffer.SetRasterizerDiscardEnable(RasterizerDiscardEnabled); _cRasterizerDiscard = RasterizerDiscardEnabled; }
         if (!_stateInitialized || _cTopology != PrimitiveTopology)
         { commandBuffer.SetPrimitiveTopology(PrimitiveTopology); _cTopology = PrimitiveTopology; }
-        if (!_stateInitialized || _cPrimitiveRestart != PrimitiveRestartEnable)
-        { commandBuffer.SetPrimitiveRestartEnable(PrimitiveRestartEnable); _cPrimitiveRestart = PrimitiveRestartEnable; }
+        var primitiveRestart = PrimitiveRestartEnable && IsStripTopology(PrimitiveTopology);
+        if (!_stateInitialized || _cPrimitiveRestart != primitiveRestart)
+        { commandBuffer.SetPrimitiveRestartEnable(primitiveRestart); _cPrimitiveRestart = primitiveRestart; }
         if (!_stateInitialized || _cMsaa != MSAALevel)
         {
             commandBuffer.SetRasterizationSamplesEXT((SampleCountFlagBits)MSAALevel);
@@ -1714,7 +1658,17 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
 
     public void EndSingleTimeCommand(CommandBuffer commandBuffer)
     {
-        LogicalDevice.EndSingleTimeCommands(resourceQueue, TransferCommandPool, commandBuffer);
+        commandBuffer.EndCommandBuffer();
+        var fence = LogicalDevice.CreateFence(new FenceCreateInfo());
+        var submitInfo = new SubmitInfo2
+        {
+            CommandBufferInfoCount = 1,
+            PCommandBufferInfos = new[] { new CommandBufferSubmitInfo { CommandBuffer = commandBuffer } }
+        };
+        resourceQueue.QueueSubmit2(1, submitInfo, fence);
+        LogicalDevice.WaitForFences(1, fence, true, ulong.MaxValue);
+        LogicalDevice.FreeCommandBuffers(TransferCommandPool, 1, commandBuffer);
+        LogicalDevice.DestroyFence(fence);
         _submissionSync?.Release();
     }
 
@@ -1726,52 +1680,6 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
     public void RemoveEffectPool(EffectPool pool)
     {
         EffectPools.Remove(pool);
-    }
-
-    public void BindDescriptorBuffers(CommandBuffer commandBuffer, params DescriptorBufferBindingInfoEXT[] bindings)
-    {
-        commandBuffer.BindDescriptorBuffersEXT((uint)bindings.Length, bindings);
-    }
-
-    // public void SetDescriptorBufferOffsets(CommandBuffer commandBuffer, PipelineBindPoint pipelineBindPoint, PipelineLayout layout,
-    //     uint dataSet, uint setCount, uint[] bufferIndices, ulong[] offsets)
-    // {
-    //     LogicalDevice.SetDescriptorBufferOffsets(commandBuffer, pipelineBindPoint, layout, dataSet, setCount,
-    //         bufferIndices, offsets);
-    // }
-
-    public uint GetDescriptorSetLayoutSize(DescriptorSetLayout layout)
-    {
-        LogicalDevice.GetDescriptorSetLayoutSizeEXT(layout, out var size);
-        return (uint)size;
-    }
-
-    public ulong UniformBufferDescriptorSize => MainDevice.GraphicsAdapter
-        .DeviceBufferProperties.UniformBufferDescriptorSize;
-    public ulong SamplerDescriptorSize => MainDevice.GraphicsAdapter.DeviceBufferProperties.SamplerDescriptorSize;
-    public ulong SampledImageDescriptorSize => MainDevice.GraphicsAdapter.DeviceBufferProperties
-        .SampledImageDescriptorSize;
-
-    public uint DescriptorBufferOffsetAlignment => (uint)MainDevice.GraphicsAdapter
-        .DeviceBufferProperties.DescriptorBufferOffsetAlignment;
-    public void GetDescriptor(DescriptorGetInfoEXT descriptorGetInfoExt, uint descriptorSize, nuint descriptorPtr)
-    {
-        LogicalDevice.GetDescriptorEXT(descriptorGetInfoExt, descriptorSize, descriptorPtr);
-    }
-
-    public void Destroy(DescriptorSetLayout layout)
-    {
-        layout?.Destroy(LogicalDevice);
-    }
-
-    public void Destroy(PipelineLayout layout)
-    {
-        layout?.Destroy(LogicalDevice);
-    }
-
-    public void Destroy(Sampler sampler)
-    {
-        LogicalDevice.DestroySampler(sampler);
     }
 
     public void Destroy(Adamantium.Vulkan.Core.Buffer buffer)
@@ -1816,7 +1724,7 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
 
     public SamplerState CreateSampler(SamplerCreateInfo samplerInfo, string name)
     {
-        return SamplerState.New(this, name, samplerInfo);
+        return SamplerState.New(name, samplerInfo);
     }
 
     internal Semaphore GetImageAvailableSemaphoreForCurrentFrame()
@@ -1872,8 +1780,6 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
             // CreateCommandPool makes TWO pools for every device - graphics and transfer. The render path destroyed only
             // the first, so every render device left a transfer pool behind on the logical device.
             LogicalDevice?.DestroyCommandPool(TransferCommandPool);
-
-            SamplerStates?.Dispose();
         }
 
         // Snapshot: each Dispose() now calls RemoveResource, which mutates the set.

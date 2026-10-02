@@ -16,14 +16,14 @@ public static class GraphicsDeviceExtension
         var commandBuffer = graphicsDevice.CurrentCommandBuffer;
 
         graphicsDevice.InsertImageMemoryBarrier(commandBuffer, source,
-            AccessFlagBits.ColorAttachmentWriteBit, AccessFlagBits.TransferReadBit,
+            AccessFlagBits2.ColorAttachmentWriteBit, AccessFlagBits2.TransferReadBit,
             ImageLayout.ColorAttachmentOptimal, ImageLayout.TransferSrcOptimal,
-            PipelineStageFlagBits.ColorAttachmentOutputBit, PipelineStageFlagBits.TransferBit);
+            PipelineStageFlagBits2.ColorAttachmentOutputBit, PipelineStageFlagBits2.AllTransferBit);
 
         graphicsDevice.InsertImageMemoryBarrier(commandBuffer, destination,
-            AccessFlagBits.ShaderReadBit, AccessFlagBits.TransferWriteBit,
+            AccessFlagBits2.ShaderReadBit, AccessFlagBits2.TransferWriteBit,
             ImageLayout.ShaderReadOnlyOptimal, ImageLayout.TransferDstOptimal,
-            PipelineStageFlagBits.FragmentShaderBit, PipelineStageFlagBits.TransferBit);
+            PipelineStageFlagBits2.FragmentShaderBit, PipelineStageFlagBits2.AllTransferBit);
 
         // Clamp the copy region to the SMALLER of the two images. During a resize the source (resolved RT) and the
         // destination (shared surface / swapchain image) can be different sizes for one frame; copying the full source
@@ -41,14 +41,14 @@ public static class GraphicsDeviceExtension
             destination.GetImage(), ImageLayout.TransferDstOptimal, 1, imageCopy);
 
         graphicsDevice.InsertImageMemoryBarrier(commandBuffer, source,
-            AccessFlagBits.TransferReadBit, AccessFlagBits.ColorAttachmentWriteBit,
+            AccessFlagBits2.TransferReadBit, AccessFlagBits2.ColorAttachmentWriteBit,
             ImageLayout.TransferSrcOptimal, ImageLayout.ColorAttachmentOptimal,
-            PipelineStageFlagBits.TransferBit, PipelineStageFlagBits.ColorAttachmentOutputBit);
+            PipelineStageFlagBits2.AllTransferBit, PipelineStageFlagBits2.ColorAttachmentOutputBit);
 
         graphicsDevice.InsertImageMemoryBarrier(commandBuffer, destination,
-            AccessFlagBits.TransferWriteBit, AccessFlagBits.ShaderReadBit,
+            AccessFlagBits2.TransferWriteBit, AccessFlagBits2.ShaderReadBit,
             ImageLayout.TransferDstOptimal, ImageLayout.ShaderReadOnlyOptimal,
-            PipelineStageFlagBits.TransferBit, PipelineStageFlagBits.FragmentShaderBit);
+            PipelineStageFlagBits2.AllTransferBit, PipelineStageFlagBits2.FragmentShaderBit);
     }
 
     public static void CopyImage(this IGraphicsDevice graphicsDevice, ITexture sourceTexture,
@@ -92,21 +92,21 @@ public static class GraphicsDeviceExtension
 
         graphicsDevice.InsertImageMemoryBarrier(commandBuffer,
             sourceTexture,
-            AccessFlagBits.ColorAttachmentWriteBit,
-            AccessFlagBits.TransferReadBit,
+            AccessFlagBits2.ColorAttachmentWriteBit,
+            AccessFlagBits2.TransferReadBit,
             ImageLayout.ColorAttachmentOptimal,
             ImageLayout.TransferSrcOptimal,
-            PipelineStageFlagBits.ColorAttachmentOutputBit,
-            PipelineStageFlagBits.TransferBit);
+            PipelineStageFlagBits2.ColorAttachmentOutputBit,
+            PipelineStageFlagBits2.AllTransferBit);
 
         graphicsDevice.InsertImageMemoryBarrier(commandBuffer,
             destinationTexture,
-            AccessFlagBits.ShaderReadBit,
-            AccessFlagBits.TransferWriteBit,
+            AccessFlagBits2.ShaderReadBit,
+            AccessFlagBits2.TransferWriteBit,
             ImageLayout.ShaderReadOnlyOptimal,
             ImageLayout.TransferDstOptimal,
-            PipelineStageFlagBits.FragmentShaderBit,
-            PipelineStageFlagBits.TransferBit);
+            PipelineStageFlagBits2.FragmentShaderBit,
+            PipelineStageFlagBits2.AllTransferBit);
 
         commandBuffer.CopyImage(sourceTexture.GetImage(),
             ImageLayout.TransferSrcOptimal,
@@ -117,21 +117,21 @@ public static class GraphicsDeviceExtension
 
         graphicsDevice.InsertImageMemoryBarrier(commandBuffer,
             sourceTexture,
-            AccessFlagBits.TransferReadBit,
-            AccessFlagBits.ColorAttachmentWriteBit,
+            AccessFlagBits2.TransferReadBit,
+            AccessFlagBits2.ColorAttachmentWriteBit,
             ImageLayout.TransferSrcOptimal,
             ImageLayout.ColorAttachmentOptimal,
-            PipelineStageFlagBits.TransferBit,
-            PipelineStageFlagBits.ColorAttachmentOutputBit);
+            PipelineStageFlagBits2.AllTransferBit,
+            PipelineStageFlagBits2.ColorAttachmentOutputBit);
 
         graphicsDevice.InsertImageMemoryBarrier(commandBuffer,
             destinationTexture,
-            AccessFlagBits.TransferWriteBit,
-            AccessFlagBits.ShaderReadBit,
+            AccessFlagBits2.TransferWriteBit,
+            AccessFlagBits2.ShaderReadBit,
             ImageLayout.TransferDstOptimal,
             ImageLayout.ShaderReadOnlyOptimal,
-            PipelineStageFlagBits.TransferBit,
-            PipelineStageFlagBits.FragmentShaderBit);
+            PipelineStageFlagBits2.AllTransferBit,
+            PipelineStageFlagBits2.FragmentShaderBit);
 
         sourceTexture.TransitionImageLayout(ImageLayout.ColorAttachmentOptimal);
         destinationTexture.TransitionImageLayout(ImageLayout.ShaderReadOnlyOptimal);
