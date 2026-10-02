@@ -66,14 +66,30 @@ jobs:
 
       # The runners have no GPU. Adamantium.Engine.GraphicsTests is the one project that creates a Vulkan device, so it
       # is left out; every other test runs without one.
+      #
+      # The suites run at once, each in a process of its own: they share nothing, and one after another the run took
+      # the sum of them all. Built first, because several builds at once would write the same engine projects. The tests
+      # inside a suite stay sequential.
       - name: Test
         if: steps.changes.outputs.code == 'true'
         shell: bash
         run: |
+          dotnet build AdamantiumEngine.Tests.sln -c Release
+          pids=()
+          logs=()
           for p in Tests/*/*.csproj; do
             case "$p" in *GraphicsTests*) continue ;; esac
-            dotnet test "$p" -c Release
+            log="$RUNNER_TEMP/$(basename "$p" .csproj).log"
+            dotnet test "$p" -c Release --no-build > "$log" 2>&1 &
+            pids+=($!)
+            logs+=("$log")
           done
+          status=0
+          for i in "${!pids[@]}"; do
+            wait "${pids[$i]}" || status=1
+            cat "${logs[$i]}"
+          done
+          exit $status
 
       - name: Pack
         if: steps.changes.outputs.code == 'true'
