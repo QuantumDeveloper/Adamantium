@@ -173,6 +173,7 @@ namespace Adamantium.Graphics
                 memoryRequirements.Size,
                 memoryRequirements.Alignment,
                 memoryTypeIndex,
+                memoryRequirements.MemoryTypeBits,
                 memoryProperties.HasFlag(MemoryPropertyFlags.HostVisible),
                 usage.HasFlag(BufferUsageFlags.ShaderDeviceAddress));
 

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using Adamantium.Graphics.Core;
 using Adamantium.Vulkan.Core;
+using Serilog;
 
 namespace Adamantium.Graphics;
 
@@ -9,32 +10,46 @@ namespace Adamantium.Graphics;
 /// Host-visible blocks are mapped once for life. Buffers only.</summary>
 public sealed class DeviceMemoryAllocator : IDeviceMemoryAllocator
 {
-    // 64 MB blocks in a big VRAM heap, but never more than heapSize/8 so the tiny (~214 MB) host-visible BAR window still
-    // fits several blocks. A single allocation larger than the block size gets its own exact-size dedicated block.
+    // 64 MB blocks, but never more than a 64th of the heap: the host-visible BAR window (~214 MB without Resizable BAR) is
+    // shared by every process on the GPU, so blocks there stay at the floor. A larger allocation gets a block of its own.
     private const ulong DefaultBlockSize = 64UL * 1024 * 1024;
     private const ulong MinBlockSize = 4UL * 1024 * 1024;
+    private const ulong HeapShareOfBlock = 64;
+    private const uint NoType = uint.MaxValue;
 
     private readonly IGraphicsDevice _device;
     private readonly object _lock = new();
     private readonly Dictionary<int, List<Block>> _groups = new();   // key = GroupKey(memoryTypeIndex, deviceAddress)
     private readonly ulong[] _heapSizeByType;   // heap byte size behind each memory-type index (block-size cap)
+    private readonly uint[] _heapIndexByType;
+    private readonly MemoryPropertyFlags[] _flagsByType;
+    private readonly ulong[] _blockBytesByHeap;
+    private readonly bool[] _fellBackFromType;
 
     public DeviceMemoryAllocator(IGraphicsDevice device)
     {
         _device = device;
         var memProps = device.Adapter.Adapter.GetPhysicalDeviceMemoryProperties();
         _heapSizeByType = new ulong[memProps.MemoryTypeCount];
+        _heapIndexByType = new uint[memProps.MemoryTypeCount];
+        _flagsByType = new MemoryPropertyFlags[memProps.MemoryTypeCount];
+        _fellBackFromType = new bool[memProps.MemoryTypeCount];
+        _blockBytesByHeap = new ulong[memProps.MemoryHeapCount];
         for (var t = 0; t < memProps.MemoryTypeCount; t++)
         {
-            var heapIndex = memProps.MemoryTypes.Span[t].HeapIndex;
-            _heapSizeByType[t] = memProps.MemoryHeaps.Span[(int)heapIndex].Size;
+            var type = memProps.MemoryTypes.Span[t];
+            _heapIndexByType[t] = type.HeapIndex;
+            _flagsByType[t] = (MemoryPropertyFlags)type.PropertyFlags;
+            _heapSizeByType[t] = memProps.MemoryHeaps.Span[(int)type.HeapIndex].Size;
         }
     }
 
     /// <summary>Reserves <paramref name="size"/> bytes (aligned to <paramref name="alignment"/>) inside a shared block of
     /// the given memory type, allocating a new block only when no existing one has room. <paramref name="hostVisible"/>
-    /// blocks are persistently mapped; <paramref name="deviceAddress"/> selects a block allocated with the BDA flag.</summary>
-    public MemoryAllocation Allocate(ulong size, ulong alignment, uint memoryTypeIndex, bool hostVisible, bool deviceAddress)
+    /// blocks are persistently mapped; <paramref name="deviceAddress"/> selects a block allocated with the BDA flag.
+    /// When the device-local host-visible window is full - it is shared by every process on the GPU - the block comes
+    /// from a host-visible type in system memory that <paramref name="memoryTypeBits"/> allows.</summary>
+    public MemoryAllocation Allocate(ulong size, ulong alignment, uint memoryTypeIndex, uint memoryTypeBits, bool hostVisible, bool deviceAddress)
     {
         if (size == 0) size = 1;
         if (alignment == 0) alignment = 1;
@@ -42,26 +57,98 @@ public sealed class DeviceMemoryAllocator : IDeviceMemoryAllocator
 
         lock (_lock)
         {
-            var key = GroupKey(memoryTypeIndex, deviceAddress);
-            if (!_groups.TryGetValue(key, out var blocks))
+            var allocation = TryAllocate(size, alignment, memoryTypeIndex, hostVisible, deviceAddress);
+            if (allocation != null)
             {
-                blocks = [];
-                _groups[key] = blocks;
+                return allocation;
             }
 
-            foreach (var block in blocks)
-                if (TryCarve(block, size, alignment, out var offset))
-                    return MakeAllocation(block, offset, size);
+            var fallback = FallbackType(memoryTypeIndex, memoryTypeBits);
+            if (fallback != NoType)
+            {
+                allocation = TryAllocate(size, alignment, fallback, hostVisible, deviceAddress);
+                if (allocation != null)
+                {
+                    WarnFallback(memoryTypeIndex, fallback);
+                    return allocation;
+                }
+            }
 
-            // No block in this group has room -> allocate a new one (at least big enough for this request).
-            var heapCap = Math.Max(MinBlockSize, _heapSizeByType[memoryTypeIndex] / 8);
-            var blockSize = Math.Max(Math.Min(DefaultBlockSize, heapCap), size);
-            var fresh = CreateBlock(blockSize, memoryTypeIndex, hostVisible, deviceAddress);
-            blocks.Add(fresh);
-            if (!TryCarve(fresh, size, alignment, out var freshOffset))
-                throw new GraphicsEngineException("Fresh GPU memory block could not satisfy its own allocation");
-            return MakeAllocation(fresh, freshOffset, size);
+            var heap = _heapIndexByType[memoryTypeIndex];
+            throw new GraphicsEngineException(
+                $"Out of GPU memory: {size} bytes in memory type {memoryTypeIndex} (heap {heap}, " +
+                $"{_blockBytesByHeap[heap] / 1048576.0:F1} of {_heapSizeByType[memoryTypeIndex] / 1048576} MB in this process's blocks), " +
+                "and no other memory type the buffer allows can take it");
         }
+    }
+
+    private MemoryAllocation TryAllocate(ulong size, ulong alignment, uint memoryTypeIndex, bool hostVisible, bool deviceAddress)
+    {
+        var key = GroupKey(memoryTypeIndex, deviceAddress);
+        if (!_groups.TryGetValue(key, out var blocks))
+        {
+            blocks = [];
+            _groups[key] = blocks;
+        }
+
+        foreach (var block in blocks)
+        {
+            if (TryCarve(block, size, alignment, out var offset))
+            {
+                return MakeAllocation(block, offset, size);
+            }
+        }
+
+        var heapCap = Math.Max(MinBlockSize, _heapSizeByType[memoryTypeIndex] / HeapShareOfBlock);
+        var blockSize = Math.Max(Math.Min(DefaultBlockSize, heapCap), size);
+        var fresh = TryCreateBlock(blockSize, memoryTypeIndex, hostVisible, deviceAddress);
+        if (fresh == null)
+        {
+            return null;
+        }
+
+        blocks.Add(fresh);
+        if (!TryCarve(fresh, size, alignment, out var freshOffset))
+        {
+            throw new GraphicsEngineException("Fresh GPU memory block could not satisfy its own allocation");
+        }
+
+        return MakeAllocation(fresh, freshOffset, size);
+    }
+
+    private uint FallbackType(uint failedType, uint memoryTypeBits)
+    {
+        var failed = _flagsByType[failedType];
+        if (!failed.HasFlag(MemoryPropertyFlags.DeviceLocal) || !failed.HasFlag(MemoryPropertyFlags.HostVisible))
+        {
+            return NoType;
+        }
+
+        var wanted = failed & (MemoryPropertyFlags.HostVisible | MemoryPropertyFlags.HostCoherent);
+        for (uint t = 0; t < _flagsByType.Length; t++)
+        {
+            var allowed = ((memoryTypeBits >> (int)t) & 1) == 1;
+            var flags = _flagsByType[t];
+            if (t != failedType && allowed && !flags.HasFlag(MemoryPropertyFlags.DeviceLocal) && flags.HasFlag(wanted))
+            {
+                return t;
+            }
+        }
+
+        return NoType;
+    }
+
+    private void WarnFallback(uint wanted, uint taken)
+    {
+        if (_fellBackFromType[wanted])
+        {
+            return;
+        }
+
+        _fellBackFromType[wanted] = true;
+        Log.Logger.Warning(
+            "[MEM] memory type {Wanted} (heap {Heap}) is full: its buffers now take type {Taken} (heap {TakenHeap}), which the GPU reads more slowly",
+            wanted, _heapIndexByType[wanted], taken, _heapIndexByType[taken]);
     }
 
     /// <summary>Returns a sub-allocation's range to its block's free list (coalescing neighbors). The block itself is
@@ -99,17 +186,29 @@ public sealed class DeviceMemoryAllocator : IDeviceMemoryAllocator
         MappedBase = block.MappedBase == 0 ? 0 : block.MappedBase + (nuint)offset,
     };
 
-    private Block CreateBlock(ulong size, uint memoryTypeIndex, bool hostVisible, bool deviceAddress)
+    private Block TryCreateBlock(ulong size, uint memoryTypeIndex, bool hostVisible, bool deviceAddress)
     {
         var allocInfo = new MemoryAllocateInfo { AllocationSize = size, MemoryTypeIndex = memoryTypeIndex };
         if (deviceAddress)
             allocInfo.PNext = new MemoryAllocateFlagsInfo { Flags = MemoryAllocateFlagBits.DeviceAddressBit };
 
-        var memory = _device.LogicalDevice.AllocateMemory(allocInfo);
-        // Host-visible blocks are mapped once, for life: sub-allocations write via MappedBase + offset (a VkDeviceMemory
-        // can only be mapped once at a time, and the used host-visible types are HOST_COHERENT - the write path assumes
-        // coherence, matching the pre-existing Buffer upload code, so no flush is needed).
+        var result = _device.LogicalDevice.AllocateMemory(allocInfo, null, out var memory);
+        if (result == Result.ErrorOutOfDeviceMemory)
+        {
+            return null;
+        }
+
+        if (result != Result.Success)
+        {
+            throw new GraphicsEngineException($"vkAllocateMemory returned {result} for {size} bytes in memory type {memoryTypeIndex}");
+        }
+
         nuint mappedBase = hostVisible ? _device.MapMemory(memory, 0, size, 0) : 0;
+
+        var heap = _heapIndexByType[memoryTypeIndex];
+        _blockBytesByHeap[heap] += size;
+        Log.Logger.Debug("[MEM] block {Size:F1} MB in type {Type} (heap {Heap}): {Total:F1} of {HeapSize} MB in blocks",
+            size / 1048576.0, memoryTypeIndex, heap, _blockBytesByHeap[heap] / 1048576.0, _heapSizeByType[memoryTypeIndex] / 1048576);
 
         return new Block { Memory = memory, Size = size, MappedBase = mappedBase, Free = [new FreeRange(0, size)] };
     }
