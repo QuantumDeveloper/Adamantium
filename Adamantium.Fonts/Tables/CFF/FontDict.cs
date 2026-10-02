@@ -9,7 +9,9 @@ namespace Adamantium.Fonts.Tables.CFF
         public int PrivateDictOffset { get; set; }
             
         public List<byte[]> LocalSubr { get; set; }
-            
+
+        public int VariationStoreIndex { get; set; }
+
         public FontDict(int dictSize, int dictOffset)
         {
             PrivateDictSize = dictSize;

@@ -376,6 +376,7 @@ namespace Adamantium.Fonts.Parsers.CFF
         {
             var byteArray = new List<byte>(rawData);
             var rawOperands = new List<GenericOperandResult>();
+            var variationStoreIndex = 0;
 
             while (byteArray.Count > 0)
             {
@@ -398,7 +399,8 @@ namespace Adamantium.Fonts.Parsers.CFF
                     {
 
                         var blendedOperandsCount = rawOperands.Last().AsInt();
-                        var regionCount = font.VariationStore.VariationRegionList.RegionCount;
+                        var variationData = font.VariationStore.ItemVariationData[variationStoreIndex];
+                        var regionCount = variationData.RegionIndexCount;
                         var overallBlendOperandsCount = blendedOperandsCount * (regionCount + 1) + 1;
 
                         var startIndexOfBlendOperands = rawOperands.Count - overallBlendOperandsCount;
@@ -413,7 +415,7 @@ namespace Adamantium.Fonts.Parsers.CFF
 
                         for (var op = 0; op < blendedOperands.Count; ++op)
                         {
-                            var blendData = new RegionData();
+                            var blendData = new RegionData { RegionIndices = variationData.RegionIndices };
 
                             for (var region = 0; region < regionCount; ++region)
                             {
@@ -430,6 +432,11 @@ namespace Adamantium.Fonts.Parsers.CFF
                     }
                     else
                     {
+                        if ((DictOperatorsType)token == DictOperatorsType.vsindex)
+                        {
+                            variationStoreIndex = rawOperands.Last().AsInt();
+                        }
+
                         OperatorsRawValues[(DictOperatorsType)token] = rawOperands;
                         rawOperands = new List<GenericOperandResult>();
                     }

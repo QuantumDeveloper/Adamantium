@@ -6,6 +6,8 @@ namespace Adamantium.Fonts.Common
     {
         public List<double> Data;
 
+        public ushort[] RegionIndices;
+
         public RegionData()
         {
             Data = new List<double>();

@@ -123,6 +123,9 @@ namespace Adamantium.Fonts.Extensions
                             var offsets = otfTtfReader.ReadCffIndex(font.CffVersion);
                             fontDict.LocalSubr = offsets.DataByOffset;
                             break;
+                        case DictOperatorsType.vsindex:
+                            fontDict.VariationStoreIndex = operandResult.Value.AsInt();
+                            break;
                     }
                 }
             }
@@ -137,7 +140,7 @@ namespace Adamantium.Fonts.Extensions
             switch (format)
             {
                 case 0:
-                    font.CIDFontInfo.FdRanges0 = reader.ReadBytes(charStringCount);
+                    font.CIDFontInfo.FdRanges0 = reader.ReadBytes(charStringCount, true);
                     break;
                 case 3:
                 case 4:
@@ -146,7 +149,9 @@ namespace Adamantium.Fonts.Extensions
                     font.CIDFontInfo.FdRanges = new FDRange[rangesCount+1];
                     for (int i = 0; i < rangesCount; i++)
                     {
-                        var range = new FDRange(reader.ReadUInt16(), reader.ReadByte());
+                        var range = format == 3
+                            ? new FDRange(reader.ReadUInt16(), reader.ReadByte())
+                            : new FDRange(reader.ReadUInt32(), reader.ReadUInt16());
                         font.CIDFontInfo.FdRanges[i] = range;
                     }
 

@@ -89,6 +89,8 @@ namespace Adamantium.Fonts.Parsers.CFF
                 fontDictBias = cffParser.CalculateSubrBias((uint)fontDict.LocalSubr.Count);
             }
 
+            var variationStoreIndex = fontDict?.VariationStoreIndex ?? 0;
+
             while (mainStack.Count > 0)
             {
                 token = mainStack.Pop();
@@ -197,7 +199,8 @@ namespace Adamantium.Fonts.Parsers.CFF
                             isBlendPresent = true;
 
                             var blendedOperandsCount =  operands.Last().Value;
-                            var regionCount = font.VariationStore.VariationRegionList.RegionCount;
+                            var variationData = font.VariationStore.ItemVariationData[variationStoreIndex];
+                            var regionCount = variationData.RegionIndexCount;
                             var overallBlendOperandsCount = blendedOperandsCount * (regionCount + 1) + 1;
 
                             var startIndexOfBlendOperands = operands.Count - overallBlendOperandsCount;
@@ -211,7 +214,7 @@ namespace Adamantium.Fonts.Parsers.CFF
 
                             for (var op = 0; op < blendedOperands.Count; ++op)
                             {
-                                var blendData = new RegionData();
+                                var blendData = new RegionData { RegionIndices = variationData.RegionIndices };
 
                                 for (var region = 0; region < regionCount; ++region)
                                 {
@@ -273,6 +276,9 @@ namespace Adamantium.Fonts.Parsers.CFF
                             break;
                         case OperatorsType.@return:
                             clearOperands = false;
+                            break;
+                        case OperatorsType.vsindex:
+                            variationStoreIndex = (int)operands.Last().Value;
                             break;
                         default:
                             switch ((OperatorsType)token)

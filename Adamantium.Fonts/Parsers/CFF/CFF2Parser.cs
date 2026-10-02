@@ -192,60 +192,36 @@ namespace Adamantium.Fonts.Parsers.CFF
             var charstringIndex = otfTtfReader.ReadCffIndex(CFFVersion.CFF2);
             cffFont.CharStringsIndex = charstringIndex;
             
-            var mainStack = new Stack<byte>();
-            int exceptions = 0;
-            var glyphs = new List<Glyph>();
-
+            var count = cffFont.CharStringsIndex.DataByOffset.Count;
+            var glyphs = new Glyph[count];
+            var fontDicts = new FontDict[count];
+            var source = new CFFGlyphOutlineSource(this, cffFont, fontDicts);
             var fdArraySelector = new FontDictArraySelector(cffFont.CIDFontInfo);
 
-            // STEP 0. After filling the Index struct traverse the raw data array (ALL characters are here currently)
-
-            for (var i = 0; i < cffFont.CharStringsIndex.DataByOffset.Count; ++i)
+            for (var i = 0; i < count; ++i)
             {
-                // STEP 1. Take offsets one by one and fill another byte array - this time it is only bytes relative to the current character
-
-                var data = cffFont.CharStringsIndex.DataByOffset[i];
-                for (int j = data.Length; j >= 1; --j)
-                {
-                    mainStack.Push(data[j - 1]);
-                }
-
-                // STEP 3. Use fluent approach
-                // Byte Array --> Command List --> Outlines --> Bezier descretion
-                // Glyph g = CommandList(mainStack).OutlineList().BezierSampling(int sampleRate);
-                // g.charcode = 0;
-                // g.encoding = encode;
-                // VertexBuf vb = g.Triangulate();
-
-                //List<Glyph> ...
+                var glyph = Glyph.Create((uint)i, OutlineType.CompactFontFormat);
+                glyphs[i] = glyph;
                 try
                 {
-                    FontDict fontDict = null;
                     if (cffFont.IsCIDFont)
                     {
-                        var fdArrayIndex = fdArraySelector.SelectFontDictArray((uint) i);
-                        fontDict = cffFont.CIDFontDicts[fdArrayIndex];
+                        fontDicts[i] = cffFont.CIDFontDicts[fdArraySelector.SelectFontDictArray((uint)i)];
                     }
                     else if (cffFont.CIDFontDicts.Count == 1)
                     {
-                        fontDict = cffFont.CIDFontDicts[0];
+                        fontDicts[i] = cffFont.CIDFontDicts[0];
                     }
 
-                    var commandList = new CommandParser(this).Parse(cffFont, mainStack, fontDict, index: i);
-
-                    var glyph = Glyph.Create((uint) i, OutlineType.CompactFontFormat).SetCommands(commandList).FillOutlines().RecalculateBounds();
-
-                    glyphs.Add(glyph);
-                    
+                    glyph.SetOutlineSource(source);
                 }
                 catch (Exception)
                 {
-                    glyphs.Add(new Glyph((uint)i, OutlineType.CompactFontFormat){IsInvalid = true });
-                    exceptions++;
+                    glyph.IsInvalid = true;
                 }
             }
 
-            cffFont.SetGlyphs(glyphs.ToArray());
+            cffFont.SetGlyphs(glyphs);
         }
     }
 }

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Text;
 using System.Threading.Tasks;
 using Adamantium.Fonts.Common;
 using Adamantium.Fonts.Parsers;
@@ -87,7 +88,10 @@ namespace Adamantium.Fonts
 
         internal void AddErrorMessage(string message)
         {
-            errorMessages.Add(message);
+            lock (errorMessages)
+            {
+                errorMessages.Add(message);
+            }
         }
 
         public byte[] GetFontAsBytesArray()
@@ -128,10 +132,8 @@ namespace Adamantium.Fonts
             switch (fontType)
             {
                 case FontType.Ttf:
-                    parser = new TTFParser(path, 0);
-                    break;
                 case FontType.Otf:
-                    parser = new OTFParser(path, 0);
+                    parser = new OpenTypeParser(path, 0);
                     break;
                 case FontType.Woff:
                     parser = new WoffParser(path, 0);
@@ -161,10 +163,8 @@ namespace Adamantium.Fonts
             switch (fontType)
             {
                 case FontType.Ttf:
-                    parser = new TTFParser(path, sampleResolution);
-                    break;
                 case FontType.Otf:
-                    parser = new OTFParser(path, sampleResolution);
+                    parser = new OpenTypeParser(path, sampleResolution);
                     break;
                 case FontType.Woff:
                     parser = new WoffParser(path, sampleResolution);
@@ -199,7 +199,7 @@ namespace Adamantium.Fonts
 
         public static Typeface LoadFont(FontStreamReader fontStream, byte sampleResolution)
         {
-            var reader = new FontTypeReader(fontStream);
+            var reader = new FontTypeReader(fontStream, Encoding.UTF8, true);
             var fontType = reader.GetFontType();
             reader.Close();
             fontStream.Position = 0;
@@ -208,10 +208,8 @@ namespace Adamantium.Fonts
             switch (fontType)
             {
                 case FontType.Ttf:
-                    parser = new TTFParser(fontStream, sampleResolution);
-                    break;
                 case FontType.Otf:
-                    parser = new OTFParser(fontStream, sampleResolution);
+                    parser = new OpenTypeParser(fontStream, sampleResolution);
                     break;
                 case FontType.Woff:
                     parser = new WoffParser(fontStream, sampleResolution);

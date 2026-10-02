@@ -8,6 +8,7 @@ namespace Adamantium.Fonts.Common
         AdobeMicrosoftW3C,
         AdobeW3C,
         TiroTypeworks,
-        TiroTypeworksEmigre
+        TiroTypeworksEmigre,
+        Unregistered
     }
 }

@@ -6,12 +6,10 @@ namespace Adamantium.Fonts
 {
     public class FontTypeReader : BinaryReader
     {
-        private string fontPath;
         public FontTypeReader(String path) : this(File.Open(path, FileMode.Open, FileAccess.Read, FileShare.Read))
         {
-            fontPath = path;
         }
-    
+
         public FontTypeReader(Stream input) : base(input)
         {
         }
@@ -24,53 +22,30 @@ namespace Adamantium.Fonts
         {
         }
 
+        /// <summary>The format of the font, told by the signature it starts with.</summary>
         public FontType GetFontType()
         {
-            if (IsOTF() || Path.GetExtension(fontPath)?.ToLower() == ".ttc")
-            {
-                return FontType.Otf;
-            }
-            else if (IsWOFF())
-            {
-                return FontType.Woff;
-            }
-            else if (IsWOFF2())
-            {
-                return FontType.Woff2;
-            }
-            else if (Path.GetExtension(fontPath)?.ToLower() == ".ttf")
-            {
-                return FontType.Ttf;
-            }
-            
-            return FontType.Unknown;
-        }
-        
-        private bool IsOTF()
-        {
             BaseStream.Position = 0;
             var bytes = new byte[4];
-            BaseStream.Read(bytes, 0, 4);
-            var header = Encoding.UTF8.GetString(bytes);
-            return header == "ttcf" || header == "OTTO";
-        }
+            if (BaseStream.Read(bytes, 0, 4) < 4)
+            {
+                return FontType.Unknown;
+            }
 
-        private bool IsWOFF()
-        {
-            BaseStream.Position = 0;
-            var bytes = new byte[4];
-            BaseStream.Read(bytes, 0, 4);
-            var header = Encoding.UTF8.GetString(bytes);
-            return header == "wOFF";
-        }
+            switch (Encoding.ASCII.GetString(bytes))
+            {
+                case "OTTO":
+                case "ttcf":
+                    return FontType.Otf;
+                case "wOFF":
+                    return FontType.Woff;
+                case "wOF2":
+                    return FontType.Woff2;
+                case "true":
+                    return FontType.Ttf;
+            }
 
-        private bool IsWOFF2()
-        {
-            BaseStream.Position = 0;
-            var bytes = new byte[4];
-            BaseStream.Read(bytes, 0, 4);
-            var header = Encoding.UTF8.GetString(bytes);
-            return header == "wOF2";
+            return bytes[0] == 0 && bytes[1] == 1 && bytes[2] == 0 && bytes[3] == 0 ? FontType.Ttf : FontType.Unknown;
         }
     }
 }

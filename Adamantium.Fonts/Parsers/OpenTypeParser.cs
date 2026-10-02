@@ -15,7 +15,7 @@ using Adamantium.Fonts.Tables.Layout;
 
 namespace Adamantium.Fonts.Parsers
 {
-    internal class OTFParser : TTFParser
+    internal class OpenTypeParser : SfntParser
     {
         private TTCHeader ttcHeader;
 
@@ -35,7 +35,7 @@ namespace Adamantium.Fonts.Parsers
 
         private CFFFont cffFont;
 
-        static OTFParser()
+        static OpenTypeParser()
         {
             commonMandatoryTables = new ReadOnlyCollection<string>(new List<string>
             {
@@ -62,16 +62,16 @@ namespace Adamantium.Fonts.Parsers
             };
         }
 
-        protected internal OTFParser()
+        protected internal OpenTypeParser()
         {
 
         }
 
-        protected internal OTFParser(string filePath, byte resolution = 1) : base(filePath, resolution)
+        protected internal OpenTypeParser(string filePath, byte resolution = 1) : base(filePath, resolution)
         {
         }
 
-        protected internal OTFParser(FontStreamReader fontStreamReader, byte resolution = 0, params TableDirectory[] tableDirectories)
+        protected internal OpenTypeParser(FontStreamReader fontStreamReader, byte resolution = 0, params TableDirectory[] tableDirectories)
             : base(fontStreamReader, resolution, tableDirectories)
         {
         }
@@ -405,9 +405,9 @@ namespace Adamantium.Fonts.Parsers
         {
             var featureManager = CurrentFont.FeatureService;
 
-            foreach (var scriptTable in layout.ScriptList)
+            foreach (var scriptTable in layout.ScriptList.OrderBy(ScriptPriority))
             {
-                foreach (var langSysTable in scriptTable.LangSysTables)
+                foreach (var langSysTable in LanguageSystemsOf(scriptTable))
                 {
                     var langInfo = LanguageTags.GetMsdnLanguage(langSysTable.Name);
                     if (!featureManager.TryGetLanguage(langInfo, out var fontLang))
@@ -428,17 +428,40 @@ namespace Adamantium.Fonts.Parsers
                         }
 
                         fontLang.AddFeature(feature, featureKind);
-                        var lookups = new List<ILookupTable>();
-                        for (int k = 0; k < featureTable.LookupListIndices.Length; ++k)
+                        if (feature.Lookups == null)
                         {
-                            var index = featureTable.LookupListIndices[k];
-                            lookups.Add(layout.LookupList[index]);
-                        }
+                            var lookups = new List<ILookupTable>();
+                            for (int k = 0; k < featureTable.LookupListIndices.Length; ++k)
+                            {
+                                var index = featureTable.LookupListIndices[k];
+                                lookups.Add(layout.LookupList[index]);
+                            }
 
-                        feature.Lookups = lookups.ToArray();
+                            feature.Lookups = lookups.ToArray();
+                        }
                     }
                 }
             }
+        }
+
+        private static int ScriptPriority(ScriptTable scriptTable)
+        {
+            switch (scriptTable.Name)
+            {
+                case "latn":
+                    return 0;
+                case "DFLT":
+                    return 1;
+                default:
+                    return 2;
+            }
+        }
+
+        private static IEnumerable<LangSysTable> LanguageSystemsOf(ScriptTable scriptTable)
+        {
+            return scriptTable.DefaultLang == null
+                ? scriptTable.LangSysTables
+                : scriptTable.LangSysTables.Prepend(scriptTable.DefaultLang);
         }
     }
 }

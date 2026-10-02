@@ -140,6 +140,18 @@
       <Content Include="TTFFonts\SourceSans3-Semibold.ttf">
         <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       </Content>
+      <None Remove="source-sans-3v028R\WOFF2\TTF\SourceSans3-Regular.ttf.woff2" />
+      <Content Include="source-sans-3v028R\WOFF2\TTF\SourceSans3-Regular.ttf.woff2">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </Content>
+      <None Remove="source-sans-3v028R\VAR\SourceSans3VF-Roman.otf" />
+      <Content Include="source-sans-3v028R\VAR\SourceSans3VF-Roman.otf">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </Content>
+      <None Remove="OTFFonts\Quicksand-Bold.otf" />
+      <Content Include="OTFFonts\Quicksand-Bold.otf">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </Content>
       <None Remove="TTFFonts\SourceSans3-SemiboldIt.ttf" />
       <Content Include="TTFFonts\SourceSans3-SemiboldIt.ttf">
         <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>

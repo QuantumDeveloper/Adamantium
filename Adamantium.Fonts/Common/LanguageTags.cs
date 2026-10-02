@@ -7,9 +7,19 @@ namespace Adamantium.Fonts.Common
         private static Dictionary<string, LanguageTag> msdnTags;
         private static Dictionary<string, LanguageTag> systemTags;
 
+        /// <summary>The registered language with this tag; a tag that is not registered gets an entry named after itself.</summary>
         public static LanguageTag GetMsdnLanguage(string tag)
         {
-            return msdnTags[tag];
+            lock (msdnTags)
+            {
+                if (!msdnTags.TryGetValue(tag, out var language))
+                {
+                    language = new LanguageTag(tag, tag.TrimEnd());
+                    msdnTags[tag] = language;
+                }
+
+                return language;
+            }
         }
 
         public static LanguageTag GetIsoLanguage(string tag)

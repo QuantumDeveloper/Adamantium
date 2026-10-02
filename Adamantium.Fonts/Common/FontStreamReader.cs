@@ -1,7 +1,5 @@
 ﻿using System;
 using System.IO;
-using System.Linq;
-using System.Runtime.InteropServices;
 using System.Text;
 
 namespace Adamantium.Fonts.Common
@@ -63,52 +61,51 @@ namespace Adamantium.Fonts.Common
 
         public UInt16 ReadUInt16()
         {
-            var bytes = ReadBytes(Marshal.SizeOf<UInt16>());
-            return BitConverter.ToUInt16(bytes, 0);
+            var high = ReadByte();
+            var low = ReadByte();
+            return (UInt16)((high << 8) | low);
         }
 
         public UInt32 ReadUInt24()
         {
-            var bytes = new byte[4];
-            bytes[2] = ReadByte();
-            bytes[1] = ReadByte();
-            bytes[0] = ReadByte();
-            return BitConverter.ToUInt32(bytes.ToArray(), 0);
+            var high = ReadByte();
+            var middle = ReadByte();
+            var low = ReadByte();
+            return (UInt32)((high << 16) | (middle << 8) | low);
         }
 
         public UInt32 ReadUInt32()
         {
-            var bytes = ReadBytes(Marshal.SizeOf<UInt32>());
-            return BitConverter.ToUInt32(bytes, 0);
+            var high = ReadUInt16();
+            var low = ReadUInt16();
+            return ((UInt32)high << 16) | low;
         }
 
         public UInt64 ReadUInt64()
         {
-            var bytes = ReadBytes(Marshal.SizeOf<UInt64>());
-            return BitConverter.ToUInt64(bytes, 0);
+            var high = ReadUInt32();
+            var low = ReadUInt32();
+            return ((UInt64)high << 32) | low;
         }
 
         public Int16 ReadInt16()
         {
-            var bytes = ReadBytes(Marshal.SizeOf<Int16>());
-            return BitConverter.ToInt16(bytes, 0);
+            return (Int16)ReadUInt16();
         }
 
         public Int32 ReadInt32()
         {
-            var bytes = ReadBytes(Marshal.SizeOf<Int32>());
-            return BitConverter.ToInt32(bytes, 0);
+            return (Int32)ReadUInt32();
         }
 
         public Int64 ReadInt64()
         {
-            var bytes = ReadBytes(Marshal.SizeOf<Int64>());
-            return BitConverter.ToInt64(bytes, 0);
+            return (Int64)ReadUInt64();
         }
 
         public Single ReadFloat()
         {
-            var bytes = ReadBytes(Marshal.SizeOf<Single>());
+            var bytes = ReadBytes(sizeof(Single));
             return BitConverter.ToSingle(bytes, 0);
         }
 

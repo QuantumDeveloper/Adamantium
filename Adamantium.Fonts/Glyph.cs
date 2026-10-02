@@ -22,9 +22,23 @@ namespace Adamantium.Fonts
         private List<Outline> outlines;
         private bool isSplitOnSegments;
         private List<LineSegment2D> mergedOutlinesSegments;
-        internal IReadOnlyCollection<Outline> Outlines => outlines.AsReadOnly();
         private readonly Dictionary<uint, SampledOutline[]> sampledOutlinesCache;
-        private List<Command> commandList;
+        private IGlyphOutlineSource outlineSource;
+        private bool isLoadingOutlines;
+        private bool isInvalid;
+        private bool isComposite;
+        private Rectangle boundingRectangle;
+        private byte[] instructions;
+
+        internal IReadOnlyCollection<Outline> Outlines
+        {
+            get
+            {
+                EnsureOutlines();
+                return outlines.AsReadOnly();
+            }
+        }
+
         public uint Index { get; }
         public OutlineType OutlineType { get; internal set; }
         public double LeftSideBearingMultiplier { get; private set; }
@@ -37,18 +51,64 @@ namespace Adamantium.Fonts
         public IReadOnlyCollection<UInt32> Unicodes => unicodes.AsReadOnly();
         public string Name { get; internal set; }
         internal UInt32 SID { get; set; }
-        public bool IsInvalid { get; set; } // set this flag if glyph was not properly loaded
+        /// <summary>True when the glyph's data could not be read; it then has no outlines.</summary>
+        public bool IsInvalid
+        {
+            get
+            {
+                EnsureOutlines();
+                return isInvalid;
+            }
+            set => isInvalid = value;
+        }
+
         public ushort AdvanceWidth { get; internal set; }
         public ushort AdvanceHeight { get; internal set; }
         public short LeftSideBearing { get; internal set; }
         public short TopSideBearing { get; internal set; }
-        public bool IsComposite { get; internal set; } // For TTF
-        public Rectangle BoundingRectangle { get; internal set; }
+
+        /// <summary>True for a TrueType glyph built from other glyphs.</summary>
+        public bool IsComposite
+        {
+            get
+            {
+                EnsureOutlines();
+                return isComposite;
+            }
+            internal set => isComposite = value;
+        }
+
+        public Rectangle BoundingRectangle
+        {
+            get
+            {
+                EnsureOutlines();
+                return boundingRectangle;
+            }
+            internal set => boundingRectangle = value;
+        }
+
         public GlyphClassDefinition ClassDefinition { get; internal set; }
         internal List<CompositeGlyphComponent> CompositeGlyphComponents;
         public GlyphLayoutData Layout { get; internal set; }
-        public bool HasOutlines => outlines.Count > 0;
-        internal byte[] Instructions { get; private set; }
+
+        public bool HasOutlines
+        {
+            get
+            {
+                EnsureOutlines();
+                return outlines.Count > 0;
+            }
+        }
+
+        internal byte[] Instructions
+        {
+            get
+            {
+                EnsureOutlines();
+                return instructions;
+            }
+        }
         
         public List<char> RelatedCharacters { get; }
         
@@ -100,9 +160,8 @@ namespace Adamantium.Fonts
             
             if (rate == 0) rate = 1;
 
-            try
+            lock (lockObject)
             {
-                Monitor.TryEnter(lockObject);
                 if (!isSplitOnSegments)
                 {
                     SplitOnSegments();
@@ -118,10 +177,6 @@ namespace Adamantium.Fonts
                 //AutoHint();
 
                 return points;
-            }
-            finally
-            {
-                Monitor.Exit(lockObject);
             }
         }
 
@@ -254,6 +309,15 @@ namespace Adamantium.Fonts
             outlines.Add(outline);
         }
 
+        internal void AddComponentOutlines(Glyph[] fontGlyphs)
+        {
+            foreach (var component in CompositeGlyphComponents)
+            {
+                var componentGlyph = fontGlyphs[component.SimpleGlyphIndex];
+                outlines.AddRange(componentGlyph.TransformBasicOutlines(component.TransformMatrix));
+            }
+        }
+
         public SampledOutline[] TransformOutlines(Matrix3x2 matrix, byte rate)
         {
             var transformedOutlines = new List<SampledOutline>();
@@ -274,7 +338,7 @@ namespace Adamantium.Fonts
         public List<Outline> TransformBasicOutlines(Matrix3x2 matrix)
         {
             List<Outline> transformedOutlines = new List<Outline>();
-            foreach (var outline in outlines)
+            foreach (var outline in Outlines)
             {
                 var transformOutline = TransformOutline(outline.Points, matrix);
                 transformedOutlines.Add(transformOutline);
@@ -290,11 +354,6 @@ namespace Adamantium.Fonts
             sampledOutlinesCache[rate] = outlines;
         }
         
-        internal void SetOutlines(IEnumerable<Outline> transformed)
-        {
-            outlines = new List<Outline>(transformed);
-        }
-
         private Vector2[] TransformPoints(IEnumerable<Vector2> points, Matrix3x2 matrix)
         {
             var transformedPoints = new List<Vector2>();
@@ -330,13 +389,11 @@ namespace Adamantium.Fonts
             }
         }
 
-        internal Glyph RecalculateBounds()
+        internal Glyph RecalculateBounds(bool includeControlPoints = false)
         {
             if (IsEmpty) return this;
 
-            var allPoints = Outlines.SelectMany(x => x.Points).Where(x => !x.IsControl).ToArray();
-            // A non-empty glyph can still have a contour with no on-curve points (all control points, or a degenerate
-            // contour) - Min/Max would then throw. Fall back to every point, and if there are truly none, empty bounds.
+            var allPoints = Outlines.SelectMany(x => x.Points).Where(x => includeControlPoints || !x.IsControl).ToArray();
             if (allPoints.Length == 0)
                 allPoints = Outlines.SelectMany(x => x.Points).ToArray();
             if (allPoints.Length == 0)
@@ -353,9 +410,9 @@ namespace Adamantium.Fonts
             return this;
         }
 
-        internal void SetInstructions(byte[] instructions)
+        internal void SetInstructions(byte[] glyphInstructions)
         {
-            Instructions = instructions;
+            instructions = glyphInstructions;
         }
         
         public override string ToString()
@@ -368,18 +425,51 @@ namespace Adamantium.Fonts
             return new Glyph(index, outlineType);
         }
 
-        internal Glyph SetCommands(List<Command> commands)
+        internal void SetOutlineSource(IGlyphOutlineSource source)
         {
-            commandList = commands;
-            return this;
+            outlineSource = source;
         }
-        
-        internal Glyph FillOutlines(VariationRegionList regionList = null, float[] variationPoint = null)
+
+        private void EnsureOutlines()
+        {
+            var source = Volatile.Read(ref outlineSource);
+            if (source == null)
+            {
+                return;
+            }
+
+            lock (source)
+            {
+                if (outlineSource == null || isLoadingOutlines)
+                {
+                    return;
+                }
+
+                isLoadingOutlines = true;
+                try
+                {
+                    source.LoadOutlines(this);
+                }
+                catch (Exception)
+                {
+                    outlines.Clear();
+                    boundingRectangle = default;
+                    isInvalid = true;
+                }
+                finally
+                {
+                    isLoadingOutlines = false;
+                    Volatile.Write(ref outlineSource, null);
+                }
+            }
+        }
+
+        internal Glyph FillOutlines(List<Command> commands, VariationRegionList regionList = null, float[] variationPoint = null)
         {
             var interpreter = new CommandInterpreter();
             Outline outline = null;
 
-            foreach (var command in commandList)
+            foreach (var command in commands)
             {
                 if (command.IsNewOutline())
                 {

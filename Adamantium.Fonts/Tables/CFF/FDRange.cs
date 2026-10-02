@@ -5,9 +5,9 @@ namespace Adamantium.Fonts.Tables.CFF
     internal readonly struct FDRange
     {
         public readonly UInt32 First;
-        public readonly byte FontDictIndex;
+        public readonly ushort FontDictIndex;
 
-        public FDRange(UInt32 first, byte fd)
+        public FDRange(UInt32 first, ushort fd)
         {
             First = first;
             FontDictIndex = fd;

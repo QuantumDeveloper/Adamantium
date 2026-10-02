@@ -63,43 +63,40 @@ namespace Adamantium.Fonts.TextureGeneration
             return CalculateFontAtlasData(textureData, pixelsPerRow);
         }
 
-        private void CalculateTextureDataForAtlas(GlyphTextureData[] textureData)
+        internal void CalculateTextureDataForAtlas(GlyphTextureData[] textureData)
         {
-            // Next-fit shelf packing; a shelf is as tall as its tallest glyph. The cursor lives on atlasData, so packing
-            // continues as the dynamic atlas grows.
             var atlasWidth = (int)atlasData.AtlasSize.Width;
             var atlasHeight = (int)atlasData.AtlasSize.Height;
 
-            foreach (var glyphData in textureData)
+            lock (packGate)
             {
-                var w = (int)glyphData.FullGlyphSize.Width;
-                var h = (int)glyphData.FullGlyphSize.Height;
-
-                if (atlasData.PackX + w > atlasWidth)
+                foreach (var glyphData in textureData)
                 {
-                    atlasData.PackX = 0;
-                    atlasData.PackY += atlasData.ShelfHeight;
-                    atlasData.ShelfHeight = 0;
+                    var w = (int)glyphData.FullGlyphSize.Width;
+                    var h = (int)glyphData.FullGlyphSize.Height;
+
+                    if (atlasData.PackX + w > atlasWidth)
+                    {
+                        atlasData.PackX = 0;
+                        atlasData.PackY += atlasData.ShelfHeight;
+                        atlasData.ShelfHeight = 0;
+                    }
+
+                    if (atlasData.PackY + h > atlasHeight)
+                    {
+                        atlasData.AdvanceToNextLayer();
+                    }
+
+                    glyphData.BoundingRect.Left = atlasData.PackX;
+                    glyphData.BoundingRect.Top = atlasData.PackY;
+                    glyphData.DepthLayer = atlasData.CurrentDepthLayer;
+
+                    atlasData.PackX += w;
+                    if (h > atlasData.ShelfHeight)
+                        atlasData.ShelfHeight = h;
+
+                    glyphData.CalculateUV(atlasData.AtlasSize);
                 }
-
-                // The shelf overflows this LAYER's height -> move to the next array layer (reset cursor + layer++). This
-                // is what lets the atlas hold more than one 1024x1024 slice's worth of glyphs. The old code let PackY grow
-                // past the texture (off-atlas UVs) and separately drove the upload Depth from the layer, which crashed the
-                // GPU once a second layer appeared (>~256 glyphs).
-                if (atlasData.PackY + h > atlasHeight)
-                {
-                    atlasData.AdvanceToNextLayer();
-                }
-
-                glyphData.BoundingRect.Left = atlasData.PackX;
-                glyphData.BoundingRect.Top = atlasData.PackY;
-                glyphData.DepthLayer = atlasData.CurrentDepthLayer;
-
-                atlasData.PackX += w;
-                if (h > atlasData.ShelfHeight)
-                    atlasData.ShelfHeight = h;
-
-                glyphData.CalculateUV(atlasData.AtlasSize);
             }
         }
 
@@ -217,12 +214,7 @@ namespace Adamantium.Fonts.TextureGeneration
                 new ParallelOptions() { MaxDegreeOfParallelism = Environment.ProcessorCount }, GenerateTextureForGlyph);
 
             var data = atlasData.GetGlyphData(glyphs.Select(x=>x.Index).ToArray());
-            // Shelf-packs each glyph and assigns its BoundingRect, DepthLayer (which array slice) and UV. The layer now
-            // comes from the packer overflowing a slice, not a fixed 256 counter.
-            lock (packGate)
-            {
-                CalculateTextureDataForAtlas(data);
-            }
+            CalculateTextureDataForAtlas(data);
 
             return data;
         }
