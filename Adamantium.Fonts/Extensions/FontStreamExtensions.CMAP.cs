@@ -14,7 +14,7 @@ namespace Adamantium.Fonts.Extensions
                     {
                         Length = reader.ReadUInt16(),
                         Language = reader.ReadUInt16(),
-                        GlyphIdArray = reader.ReadBytes(256)
+                        GlyphIdArray = reader.ReadBytes(256, true)
                     };
                     return format0;
                 }

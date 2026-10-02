@@ -8,7 +8,7 @@ using ICSharpCode.SharpZipLib.Zip.Compression;
 
 namespace Adamantium.Fonts.Parsers
 {
-    internal class WoffParser : OTFParser
+    internal class WoffParser : OpenTypeParser
     {
         private readonly FontStreamReader reader;
 

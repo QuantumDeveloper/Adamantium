@@ -18,11 +18,11 @@ namespace Adamantium.Fonts.Tables.Layout
             {
                 case 1:
                     if (glyphIndex >= StartGlyphId &&
-                        glyphIndex < ClassValueArray.Length)
+                        glyphIndex - StartGlyphId < ClassValueArray.Length)
                     {
                         return ClassValueArray[glyphIndex - StartGlyphId];
                     }
-                    return -1;
+                    return 0;
                 case 2:
                     foreach (var rangeRecord in ClassRangeRecords)
                     {
@@ -39,7 +39,7 @@ namespace Adamantium.Fonts.Tables.Layout
                         }
                     }
 
-                    return -1;
+                    return 0;
                 default:
                     throw new NotSupportedException($"Format {Format} is not supported for ClassDef Table");
             }

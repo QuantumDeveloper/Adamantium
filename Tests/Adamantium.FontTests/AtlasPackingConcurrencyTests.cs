@@ -1,6 +1,5 @@
 using System.Linq;
-using System.Threading.Tasks;
-using Adamantium.Fonts;
+using System.Threading;
 using Adamantium.Fonts.TextureGeneration;
 using Adamantium.Mathematics;
 using NUnit.Framework;
@@ -12,39 +11,45 @@ namespace Adamantium.FontTests;
 // another letter's pixels.
 public class AtlasPackingConcurrencyTests
 {
-    private const string Letters =
-        "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789.,;:!?()[]{}+-*/=<>&%$#@";
+    private const int Threads = 8;
+    private const int CellsPerThread = 400;
 
     [Test]
     public void BatchesPackedAtOnce_NeverShareACell()
     {
-        var typeface = Typeface.LoadFont(@"OTFFonts/Crimson-Italic.otf", 3);
-        var font = typeface.GetFont(0);
+        var atlasData = new FontAtlasData(16, new Size(1024, 1024), 8);
+        var generator = new TextureAtlasGenerator(null, null, atlasData, FontParameters.Default(16));
+        var cells = Enumerable.Range(0, Threads)
+            .Select(t => Enumerable.Range(0, CellsPerThread)
+                .Select(i => new GlyphTextureData(16, 16, (uint)(t * CellsPerThread + i), 0, ' '))
+                .ToArray())
+            .ToArray();
 
-        for (var run = 0; run < 20; run++)
+        using var start = new Barrier(Threads);
+        var workers = Enumerable.Range(0, Threads).Select(t => new Thread(() =>
         {
-            var atlasData = new FontAtlasData(32, new Size(1024, 1024), 8);
-            var generator = new TextureAtlasGenerator(typeface, font, atlasData, FontParameters.Default());
-            var glyphs = font.TranslateIntoGlyphs(Letters).DistinctBy(x => x.Index).Where(x => !x.IsEmpty).ToArray();
-
-            // One glyph a batch: packing is short next to rasterizing, and small batches give it the most chances to overlap.
-            Parallel.ForEach(glyphs, new ParallelOptions { MaxDegreeOfParallelism = 8 },
-                glyph => generator.GenerateTextureForGlyphs([glyph]));
-
-            var cells = glyphs
-                .Select(x => atlasData.GetGlyphData(x.Index))
-                .Where(x => x != null && !x.IsEmpty)
-                .ToArray();
-
-            for (var i = 0; i < cells.Length; i++)
+            start.SignalAndWait();
+            foreach (var cell in cells[t])
             {
-                for (var j = i + 1; j < cells.Length; j++)
+                generator.CalculateTextureDataForAtlas([cell]);
+            }
+        })).ToList();
+        workers.ForEach(x => x.Start());
+        workers.ForEach(x => x.Join());
+
+        var all = cells.SelectMany(x => x).ToArray();
+        for (var i = 0; i < all.Length; i++)
+        {
+            for (var j = i + 1; j < all.Length; j++)
+            {
+                if (!Overlap(all[i], all[j]))
                 {
-                    Assert.That(Overlap(cells[i], cells[j]), Is.False,
-                        $"run {run}: glyphs {cells[i].GlyphIndex} and {cells[j].GlyphIndex} were packed into one cell " +
-                        $"on layer {cells[i].DepthLayer}, at {cells[i].BoundingRect.Left},{cells[i].BoundingRect.Top} and " +
-                        $"{cells[j].BoundingRect.Left},{cells[j].BoundingRect.Top}");
+                    continue;
                 }
+
+                Assert.Fail($"glyphs {all[i].GlyphIndex} and {all[j].GlyphIndex} were packed into one cell on layer " +
+                            $"{all[i].DepthLayer}, at {all[i].BoundingRect.Left},{all[i].BoundingRect.Top} and " +
+                            $"{all[j].BoundingRect.Left},{all[j].BoundingRect.Top}");
             }
         }
     }

@@ -14,7 +14,7 @@ using BrotliSharpLib;
 
 namespace Adamantium.Fonts.Parsers
 {
-    internal class Woff2Parser : OTFParser
+    internal class Woff2Parser : OpenTypeParser
     {
         private readonly FontStreamReader reader;
         
@@ -400,7 +400,7 @@ namespace Adamantium.Fonts.Parsers
             foreach (var compositeGlyph in compositeGlyphs)
             {
                 var glyph = new Glyph(compositeGlyph.Index, OutlineType.TrueType);
-                compositeGlyph.HasInstructions = ReadTTFCompositeGlyphComponentData(glyph, false);
+                compositeGlyph.HasInstructions = ReadTTFCompositeGlyphComponentData(FontReader, glyph, false);
                 glyphs[compositeGlyph.Index] = glyph;
             }
 
@@ -419,7 +419,7 @@ namespace Adamantium.Fonts.Parsers
             }
 
             FontReader.Position = bboxStreamStartAt;
-            int bitmapCount = (numGlyphs + 7) / 8;
+            int bitmapCount = 4 * ((numGlyphs + 31) / 32);
             byte[] bboxBitmap = FontReader.ReadBytes((long) bitmapCount, true).ExpandBitmap();
             for (int i = 0; i < numGlyphs; ++i)
             {
@@ -441,7 +441,7 @@ namespace Adamantium.Fonts.Parsers
                         throw new NotSupportedException($"There is no bounding box for composite glyph: {glyph.Index}");
                     }
 
-                    glyph.RecalculateBounds();
+                    glyph.RecalculateBounds(true);
                 }
             }
 
@@ -452,7 +452,13 @@ namespace Adamantium.Fonts.Parsers
                 var tempGlyph = tempGlyphs[i];
                 glyphs[i].SetInstructions(FontReader.ReadBytes(tempGlyph.InstructionsLength, true));
             }
-            
+
+            var compositeSource = new CompositeGlyphOutlineSource(glyphs);
+            foreach (var compositeGlyph in compositeGlyphs)
+            {
+                glyphs[compositeGlyph.Index].SetOutlineSource(compositeSource);
+            }
+
             Typeface.SetGlyphs(glyphs);
         }
 

@@ -22,7 +22,8 @@ namespace Adamantium.Fonts.Tables.CMAP
 
         public void CollectUnicodeToGlyphMappings()
         {
-            foreach (var characterMap in CharacterMaps)
+            var unicodeMaps = Array.FindAll(CharacterMaps, IsUnicodeMap);
+            foreach (var characterMap in unicodeMaps.Length > 0 ? unicodeMaps : CharacterMaps)
             {
                 characterMap.GetUnicodeToGlyphMappings(unicodeToGlyph);
             }
@@ -39,6 +40,24 @@ namespace Adamantium.Fonts.Tables.CMAP
             }
         }
 
+        private static bool IsUnicodeMap(CharacterMap map)
+        {
+            const ushort unicodePlatform = 0;
+            const ushort variationSequences = 5;
+            const ushort windowsPlatform = 3;
+            const ushort windowsSymbol = 0;
+            const ushort windowsUnicodeBmp = 1;
+            const ushort windowsUnicodeFull = 10;
+
+            if (map.PlatformId == unicodePlatform)
+            {
+                return map.EncodingId != variationSequences;
+            }
+
+            return map.PlatformId == windowsPlatform &&
+                   (map.EncodingId == windowsSymbol || map.EncodingId == windowsUnicodeBmp || map.EncodingId == windowsUnicodeFull);
+        }
+
         public UInt32 GetGlyphByCharacter(UInt32 character)
         {
             if (!characterToGlyph.TryGetValue(character, out var glyphIndex))
@@ -49,6 +68,7 @@ namespace Adamantium.Fonts.Tables.CMAP
                     if (index != 0)
                     {
                         characterToGlyph[character] = index;
+                        glyphIndex = index;
                         break;
                     }
                 }

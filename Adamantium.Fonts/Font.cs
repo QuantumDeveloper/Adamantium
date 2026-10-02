@@ -236,7 +236,7 @@ namespace Adamantium.Fonts
 
             Int16 kerningValue = 0;
 
-            UInt32 key = TTFParser.GenerateKerningKey(leftGlyphIndex, rightGlyphIndex);
+            UInt32 key = SfntParser.GenerateKerningKey(leftGlyphIndex, rightGlyphIndex);
 
             foreach (var data in KerningData)
             {

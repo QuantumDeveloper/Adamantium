@@ -1,3 +1,6 @@
+using System;
+using System.Linq;
+using Adamantium.Fonts.Tables.GPOS;
 using Adamantium.Fonts.Tables.Layout;
 
 namespace Adamantium.Fonts.Common
@@ -28,11 +31,16 @@ namespace Adamantium.Fonts.Common
             
             container.FeatureApplied(Info.Tag);
 
-            // optimization, reset unprocessed glyphs counter
             container.NewProcessingStart();
-            
+
             foreach (var lookup in Lookups)
             {
+                if (IsPairPositioning(lookup))
+                {
+                    PositionPairs(lookup, container, index, length);
+                    continue;
+                }
+
                 foreach (var subTable in lookup.SubTables)
                 {
                     switch (subTable.OwnerType)
@@ -45,8 +53,28 @@ namespace Adamantium.Fonts.Common
                             break;
                     }
 
-                    // when all glyphs are processed - we stop cycling through lookup tables
                     if (container.IsProcessingDone) return;
+                }
+            }
+        }
+
+        private static bool IsPairPositioning(ILookupTable lookup)
+        {
+            return lookup.SubTables.Length > 0 &&
+                   lookup.SubTables.All(x => x is GPOSLookupSubTable { Type: GPOSLookupType.PairAdjustment });
+        }
+
+        private void PositionPairs(ILookupTable lookup, GlyphLayoutContainer container, uint index, uint length)
+        {
+            var endIndex = Math.Min(index + length, container.Count);
+            for (var position = index; position < endIndex; position++)
+            {
+                foreach (GPOSLookupSubTable subTable in lookup.SubTables)
+                {
+                    if (subTable.PositionGlyphAt(container, Info, position))
+                    {
+                        break;
+                    }
                 }
             }
         }

@@ -33,7 +33,7 @@ namespace Adamantium.Fonts.Tables.CMAP
         {
             for (uint i = 0; i < GlyphIdArray.Length; ++i)
             {
-                unicodeToGlyph[i] = i;
+                unicodeToGlyph[i] = GlyphIdArray[i];
             }
         }
     }

@@ -101,6 +101,7 @@ namespace Adamantium.Fonts.Extensions
             {
                 var record = records[i];
                 var feature = new FeatureTable(record.Tag);
+                reader.Position = record.Offset;
                 long offset = reader.ReadUInt16();
                 if (offset != 0)
                 {
@@ -115,13 +116,32 @@ namespace Adamantium.Fonts.Extensions
 
             for (int i = 0; i < paramsOffsets.Length; ++i)
             {
-                if (paramsOffsets[i] <= 0) continue;
+                if (paramsOffsets[i] <= 0)
+                {
+                    continue;
+                }
 
-                var paramsTable = reader.ReadFeatureParametersTable(paramsOffsets[i]);
-                features[i].FeatureParameters = paramsTable;
+                if (IsNumberedFeature(features[i].Name, "cv"))
+                {
+                    features[i].FeatureParameters = reader.ReadFeatureParametersTable(paramsOffsets[i]);
+                }
+                else if (IsNumberedFeature(features[i].Name, "ss"))
+                {
+                    reader.Position = paramsOffsets[i];
+                    features[i].FeatureParameters = new FeatureParametersTable
+                    {
+                        Format = reader.ReadUInt16(),
+                        FeatUiLabelNameId = reader.ReadUInt16()
+                    };
+                }
             }
 
             return features.ToArray();
+        }
+
+        private static bool IsNumberedFeature(string name, string prefix)
+        {
+            return name.Length == 4 && name.StartsWith(prefix) && char.IsDigit(name[2]) && char.IsDigit(name[3]);
         }
 
         public static ScriptTable[] ReadScriptList(this FontStreamReader reader, long scriptListOffset)
@@ -142,7 +162,8 @@ namespace Adamantium.Fonts.Extensions
             foreach (var recordMap in scriptRecordMap)
             {
                 reader.Position = recordMap.Value;
-                var defaultLangSysOffset = reader.ReadUInt16() + recordMap.Value;
+                var defaultLangSysRawOffset = reader.ReadUInt16();
+                var defaultLangSysOffset = defaultLangSysRawOffset == 0 ? 0 : defaultLangSysRawOffset + recordMap.Value;
                 var scriptTable = new ScriptTable(recordMap.Key);
                 scriptTables.Add(scriptTable);
                 var langSysCount = reader.ReadUInt16();

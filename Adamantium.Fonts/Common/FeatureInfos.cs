@@ -264,9 +264,19 @@ namespace Adamantium.Fonts.Common
             
         }
 
+        /// <summary>The registered feature with this tag; a tag that is not registered gets an entry named after itself.</summary>
         public static FeatureInfo GetFeature(string tag)
         {
-            return features[tag];
+            lock (features)
+            {
+                if (!features.TryGetValue(tag, out var feature))
+                {
+                    feature = FeatureInfo.Create(tag, tag, FeatureRegistration.Unregistered, string.Empty);
+                    features[tag] = feature;
+                }
+
+                return feature;
+            }
         }
     }
 }
