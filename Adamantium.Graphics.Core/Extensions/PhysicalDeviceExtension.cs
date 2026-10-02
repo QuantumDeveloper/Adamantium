@@ -3,111 +3,110 @@ using System.Collections.Generic;
 using System.Linq;
 using Adamantium.Vulkan.Core;
 
-namespace Adamantium.Graphics.Core.Extensions
+namespace Adamantium.Graphics.Core.Extensions;
+
+public static class PhysicalDeviceExtension
 {
-    public static class PhysicalDeviceExtension
+    public static QueueFamilyContainer FindQueueFamilies(this GraphicsAdapter adapter)
     {
-        public static QueueFamilyContainer FindQueueFamilies(this GraphicsAdapter adapter)
+        var container = new QueueFamilyContainer(adapter);
+
+        var queueFamilies = adapter.Adapter.GetQueueFamilyProperties();
+
+        for (uint index = 0; index < queueFamilies.Length; index++)
         {
-            var container = new QueueFamilyContainer(adapter);
-
-            var queueFamilies = adapter.Adapter.GetQueueFamilyProperties();
-
-            for (uint index = 0; index < queueFamilies.Length; index++)
-            {
-                var info = new QueueFamilyInfo();
-                var queueFamily = queueFamilies[index];
-                info.Type = queueFamily.QueueFlags;
-                info.FamilyIndex = index;
-                info.Count = queueFamily.QueueCount;
+            var info = new QueueFamilyInfo();
+            var queueFamily = queueFamilies[index];
+            info.Type = queueFamily.QueueFlags;
+            info.FamilyIndex = index;
+            info.Count = queueFamily.QueueCount;
                 
-                container.AddQueueFamily(info);
-            }
-
-            return container;
+            container.AddQueueFamily(info);
         }
 
-        public static bool CanPresent(this GraphicsAdapter device, uint queueFamilyIndex, SurfaceKHR surface)
-        {
-            device.Adapter.GetPhysicalDeviceSurfaceSupport(queueFamilyIndex, surface, out var presentSupport);
-            return presentSupport;
-        }
-
-        public static UInt32 FindMemoryIndex(this GraphicsAdapter physicalDevice, UInt32 memoryTypeBits, MemoryPropertyFlags propertyFlags)
-        {
-            var memProperties = physicalDevice.Adapter.GetPhysicalDeviceMemoryProperties();
-            for (uint i = 0; i < memProperties.MemoryTypeCount; i++)
-            {
-                if (((memoryTypeBits >> (int)i) & 1) == 1 &&
-                    ((MemoryPropertyFlags)memProperties.MemoryTypes.Span[(int)i].PropertyFlags).HasFlag(propertyFlags))
-                {
-                    return i;
-                }
-            }
-
-            return 0;
-        }
+        return container;
     }
 
-    public class QueueFamilyContainer
+    public static bool CanPresent(this GraphicsAdapter device, uint queueFamilyIndex, SurfaceKHR surface)
     {
-        private readonly List<QueueFamilyInfo> _familyInfos;
-        
-        public PhysicalDevice PhysicalDevice { get; }
+        device.Adapter.GetPhysicalDeviceSurfaceSupport(queueFamilyIndex, surface, out var presentSupport);
+        return presentSupport;
+    }
 
-        public QueueFamilyContainer(PhysicalDevice physicalDevice)
+    public static UInt32 FindMemoryIndex(this GraphicsAdapter physicalDevice, UInt32 memoryTypeBits, MemoryPropertyFlags propertyFlags)
+    {
+        var memProperties = physicalDevice.Adapter.GetPhysicalDeviceMemoryProperties();
+        for (uint i = 0; i < memProperties.MemoryTypeCount; i++)
         {
-            PhysicalDevice = physicalDevice;
-            _familyInfos = new List<QueueFamilyInfo>();
+            if (((memoryTypeBits >> (int)i) & 1) == 1 &&
+                ((MemoryPropertyFlags)memProperties.MemoryTypes.Span[(int)i].PropertyFlags).HasFlag(propertyFlags))
+            {
+                return i;
+            }
         }
 
-        public IReadOnlyList<QueueFamilyInfo> FamilyInfos => _familyInfos;
+        return 0;
+    }
+}
 
-        public void AddQueueFamily(QueueFamilyInfo info)
-        {
-            _familyInfos.Add(info);
-        }
+public class QueueFamilyContainer
+{
+    private readonly List<QueueFamilyInfo> _familyInfos;
         
-        public bool CanPresent(QueueFamilyInfo info, SurfaceKHR surface)
-        {
-            if (surface == null) return true;
+    public PhysicalDevice PhysicalDevice { get; }
+
+    public QueueFamilyContainer(PhysicalDevice physicalDevice)
+    {
+        PhysicalDevice = physicalDevice;
+        _familyInfos = new List<QueueFamilyInfo>();
+    }
+
+    public IReadOnlyList<QueueFamilyInfo> FamilyInfos => _familyInfos;
+
+    public void AddQueueFamily(QueueFamilyInfo info)
+    {
+        _familyInfos.Add(info);
+    }
+        
+    public bool CanPresent(QueueFamilyInfo info, SurfaceKHR surface)
+    {
+        if (surface == null) return true;
             
-            PhysicalDevice.GetPhysicalDeviceSurfaceSupport(info.FamilyIndex, surface, out var presentSupport);
-            return presentSupport;
-        }
-
-        public uint GetPresentFamilyIndex(SurfaceKHR surface)
-        {
-            foreach (var familyInfo in _familyInfos)
-            {
-                PhysicalDevice.GetPhysicalDeviceSurfaceSupport(familyInfo.FamilyIndex, surface, out var presentSupport);
-                if (presentSupport) break;
-                return familyInfo.FamilyIndex;
-            }
-
-            return 0;
-        }
-
-        public QueueFamilyInfo GetFamilyInfo(QueueFlagBits flags)
-        {
-            return _familyInfos.FirstOrDefault(x => x.Type.HasFlag(flags));
-        }
-
-        public bool IsGraphicsQueueEqualsTransferQueue()
-        {
-            var graphicsQueue = _familyInfos.FirstOrDefault(x => x.Type.HasFlag(QueueFlagBits.GraphicsBit));
-            var transferQueue = _familyInfos.FirstOrDefault(x => x.Type.HasFlag(QueueFlagBits.TransferBit) && !x.Type.HasFlag(QueueFlagBits.GraphicsBit));
-
-            return graphicsQueue == transferQueue;
-        }
+        PhysicalDevice.GetPhysicalDeviceSurfaceSupport(info.FamilyIndex, surface, out var presentSupport);
+        return presentSupport;
     }
 
-    public class QueueFamilyInfo
+    public uint GetPresentFamilyIndex(SurfaceKHR surface)
     {
-        public uint FamilyIndex { get; set; }
-        
-        public uint Count { get; set; }
-        
-        public QueueFlagBits Type { get; set; }
+        foreach (var familyInfo in _familyInfos)
+        {
+            PhysicalDevice.GetPhysicalDeviceSurfaceSupport(familyInfo.FamilyIndex, surface, out var presentSupport);
+            if (presentSupport) break;
+            return familyInfo.FamilyIndex;
+        }
+
+        return 0;
     }
+
+    public QueueFamilyInfo GetFamilyInfo(QueueFlagBits flags)
+    {
+        return _familyInfos.FirstOrDefault(x => x.Type.HasFlag(flags));
+    }
+
+    public bool IsGraphicsQueueEqualsTransferQueue()
+    {
+        var graphicsQueue = _familyInfos.FirstOrDefault(x => x.Type.HasFlag(QueueFlagBits.GraphicsBit));
+        var transferQueue = _familyInfos.FirstOrDefault(x => x.Type.HasFlag(QueueFlagBits.TransferBit) && !x.Type.HasFlag(QueueFlagBits.GraphicsBit));
+
+        return graphicsQueue == transferQueue;
+    }
+}
+
+public class QueueFamilyInfo
+{
+    public uint FamilyIndex { get; set; }
+        
+    public uint Count { get; set; }
+        
+    public QueueFlagBits Type { get; set; }
 }

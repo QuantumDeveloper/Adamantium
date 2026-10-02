@@ -1,20 +1,19 @@
 ﻿using System;
 
-namespace Adamantium.Graphics.Core
+namespace Adamantium.Graphics.Core;
+
+[Flags]
+public enum MemoryPropertyFlags
 {
-    [Flags]
-    public enum MemoryPropertyFlags
-    {
-        DeviceLocal = 1,
+    DeviceLocal = 1,
 
-        HostVisible = 2,
+    HostVisible = 2,
 
-        HostCoherent = 4,
+    HostCoherent = 4,
 
-        HostCached = 8,
+    HostCached = 8,
 
-        LazilyAllocated = 16,
+    LazilyAllocated = 16,
 
-        Protected = 32,
-    }
+    Protected = 32,
 }

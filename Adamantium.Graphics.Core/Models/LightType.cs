@@ -1,10 +1,9 @@
-﻿namespace Adamantium.Graphics.Core.Models
+﻿namespace Adamantium.Graphics.Core.Models;
+
+public enum LightType
 {
-   public enum LightType
-   {
-      Ambient,
-      Directional,
-      Point,
-      Spot
-   }
+   Ambient,
+   Directional,
+   Point,
+   Spot
 }

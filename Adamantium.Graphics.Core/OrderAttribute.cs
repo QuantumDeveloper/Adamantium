@@ -1,14 +1,13 @@
 ﻿using System;
 
-namespace Adamantium.Graphics.Core
-{
-   public class OrderAttribute:Attribute
-   {
-      public readonly int Order;
+namespace Adamantium.Graphics.Core;
 
-      public OrderAttribute(int order)
-      {
-         Order = order;
-      }
+public class OrderAttribute:Attribute
+{
+   public readonly int Order;
+
+   public OrderAttribute(int order)
+   {
+      Order = order;
    }
 }

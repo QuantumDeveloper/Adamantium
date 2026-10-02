@@ -1,18 +1,17 @@
 ﻿using System;
 using System.Collections.Generic;
 
-namespace Adamantium.Graphics.Core.Models
-{
-   public partial class SceneData
-   {
-      public class ImageCollection : Dictionary<String, Image>
-      {
-         public ImageCollection()
-         {
-         }
+namespace Adamantium.Graphics.Core.Models;
 
-         public ImageCollection(ImageCollection images):base(images)
-         { }
+public partial class SceneData
+{
+   public class ImageCollection : Dictionary<String, Image>
+   {
+      public ImageCollection()
+      {
       }
+
+      public ImageCollection(ImageCollection images):base(images)
+      { }
    }
 }

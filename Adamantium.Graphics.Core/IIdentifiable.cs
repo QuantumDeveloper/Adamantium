@@ -1,9 +1,8 @@
 ﻿using System;
 
-namespace Adamantium.Graphics.Core
+namespace Adamantium.Graphics.Core;
+
+public interface IIdentifiable
 {
-   public interface IIdentifiable
-   {
-      UInt128 Uid { get; }
-   }
+   UInt128 Uid { get; }
 }

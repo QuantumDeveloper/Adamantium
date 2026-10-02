@@ -1,18 +1,17 @@
-﻿namespace Adamantium.Graphics.Core
+﻿namespace Adamantium.Graphics.Core;
+
+/// <summary>
+/// An interface to load and unload content.
+/// </summary>
+public interface IContentable
 {
    /// <summary>
-   /// An interface to load and unload content.
+   /// Loads the content.
    /// </summary>
-   public interface IContentable
-   {
-      /// <summary>
-      /// Loads the content.
-      /// </summary>
-      void LoadContent();
+   void LoadContent();
 
-      /// <summary>
-      /// Called when graphics resources need to be unloaded. Override this method to unload any application-specific graphics resources.
-      /// </summary>
-      void UnloadContent();
-   }
+   /// <summary>
+   /// Called when graphics resources need to be unloaded. Override this method to unload any application-specific graphics resources.
+   /// </summary>
+   void UnloadContent();
 }

@@ -1,11 +1,10 @@
-﻿namespace Adamantium.Graphics.Core
-{
-    public interface IInitializable
-    {
-        void Initialize();
+﻿namespace Adamantium.Graphics.Core;
 
-        bool Initialized { get; }
+public interface IInitializable
+{
+    void Initialize();
+
+    bool Initialized { get; }
         
-        bool Initializing { get; }
-    }
+    bool Initializing { get; }
 }

@@ -1,9 +1,8 @@
-﻿namespace Adamantium.Graphics.Core.Models
+﻿namespace Adamantium.Graphics.Core.Models;
+
+//Тип угла обзора камеры
+public enum FovType
 {
-   //Тип угла обзора камеры
-   public enum FovType
-   {
-      XFov,
-      YFov
-   }
+   XFov,
+   YFov
 }

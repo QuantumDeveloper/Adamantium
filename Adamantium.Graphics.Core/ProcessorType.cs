@@ -1,9 +1,8 @@
-﻿namespace Adamantium.Graphics.Core
-{
-    public enum ProcessorType
-    {
-        Update = 1,
+﻿namespace Adamantium.Graphics.Core;
 
-        Draw = 2
-    }
+public enum ProcessorType
+{
+    Update = 1,
+
+    Draw = 2
 }

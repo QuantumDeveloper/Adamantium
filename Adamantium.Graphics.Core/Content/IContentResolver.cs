@@ -1,12 +1,11 @@
 ﻿using System;
 
-namespace Adamantium.Graphics.Core.Content
+namespace Adamantium.Graphics.Core.Content;
+
+public interface IContentResolver
 {
-   public interface IContentResolver
-   {
-      bool Exists(String assetPath);
+   bool Exists(String assetPath);
 
-      String Resolve(String assetPath);
+   String Resolve(String assetPath);
 
-   }
 }

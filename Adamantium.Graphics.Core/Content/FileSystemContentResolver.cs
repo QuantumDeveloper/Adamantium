@@ -1,30 +1,29 @@
 ﻿using System;
 using System.IO;
 
-namespace Adamantium.Graphics.Core.Content
+namespace Adamantium.Graphics.Core.Content;
+
+public class FileSystemContentResolver: IContentResolver
 {
-   public class FileSystemContentResolver: IContentResolver
+   public bool Exists(string assetPath)
    {
-      public bool Exists(string assetPath)
-      {
-         return File.Exists(NormalizeAssetPath(assetPath));
-      }
+      return File.Exists(NormalizeAssetPath(assetPath));
+   }
 
-      public String Resolve(string assetPath)
+   public String Resolve(string assetPath)
+   {
+      if (Exists(assetPath))
       {
-         if (Exists(assetPath))
-         {
-            return NormalizeAssetPath(assetPath);
-         }
-         else
-         {
-            return null;
-         }
+         return NormalizeAssetPath(assetPath);
       }
+      else
+      {
+         return null;
+      }
+   }
 
-      private String NormalizeAssetPath(String path)
-      {
-         return path.Replace("/", "\\");
-      }
+   private String NormalizeAssetPath(String path)
+   {
+      return path.Replace("/", "\\");
    }
 }

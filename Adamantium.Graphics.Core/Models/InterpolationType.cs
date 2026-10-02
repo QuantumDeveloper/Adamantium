@@ -1,10 +1,9 @@
-﻿namespace Adamantium.Graphics.Core.Models
+﻿namespace Adamantium.Graphics.Core.Models;
+
+public enum InterpolationType
 {
-   public enum InterpolationType
-   {
-      Linear,
-      Cubic,
-      Bezier,
-      Step
-   }
+   Linear,
+   Cubic,
+   Bezier,
+   Step
 }

@@ -1,43 +1,42 @@
 ﻿using System;
 using System.IO;
 
-namespace Adamantium.Graphics.Core.Content
+namespace Adamantium.Graphics.Core.Content;
+
+public class EffectContentResolver : IContentResolver
 {
-   public class EffectContentResolver : IContentResolver
+   public static readonly string DefaultExtension = "fx";
+   //public static readonly string DefaultExtension = "."+EffectData.CompiledExtension;
+
+   public bool Exists(string assetPath)
    {
-        public static readonly string DefaultExtension = "fx";
-      //public static readonly string DefaultExtension = "."+EffectData.CompiledExtension;
+      return File.Exists(GetAssetPath(assetPath));
+   }
 
-      public bool Exists(string assetPath)
+   public String Resolve(string assetPath)
+   {
+      if (Exists(assetPath))
       {
-         return File.Exists(GetAssetPath(assetPath));
+         return GetAssetPath(assetPath);
+      }
+      else
+      {
+         return null;
+      }
+   }
+
+   private String NormalizeAssetPath(String path)
+   {
+      return path.Replace("/", "\\");
+   }
+
+   protected string GetAssetPath(string assetName)
+   {
+      if (string.IsNullOrEmpty(Path.GetExtension(assetName)))
+      {
+         assetName += DefaultExtension;
       }
 
-      public String Resolve(string assetPath)
-      {
-         if (Exists(assetPath))
-         {
-            return GetAssetPath(assetPath);
-         }
-         else
-         {
-            return null;
-         }
-      }
-
-      private String NormalizeAssetPath(String path)
-      {
-         return path.Replace("/", "\\");
-      }
-
-      protected string GetAssetPath(string assetName)
-      {
-         if (string.IsNullOrEmpty(Path.GetExtension(assetName)))
-         {
-            assetName += DefaultExtension;
-         }
-
-         return NormalizeAssetPath(assetName);
-      }
+      return NormalizeAssetPath(assetName);
    }
 }
