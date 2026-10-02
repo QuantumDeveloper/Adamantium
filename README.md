@@ -37,11 +37,18 @@ All packages share one version and are released together.
 ## Requirements
 
 - **.NET 10.**
-- **Windows 10 or 11, x64.** The macOS code exists but has not been built and run recently, so it is not claimed.
+- **Windows 10 or 11, x64.** macOS and Linux are planned; the macOS code exists but has not been built and run
+  recently, so it is not claimed.
 - **A GPU and driver with Vulkan 1.4**, `VK_EXT_shader_object` and `VK_EXT_descriptor_heap`, and the `shaderInt64`,
-  `shaderDrawParameters` and `geometryShader` features.
-  `VK_EXT_descriptor_heap` is recent and not every driver has it yet. The engine is developed and tested on an NVIDIA
-  Quadro RTX 4000 with NVIDIA's
+  `shaderDrawParameters` and `geometryShader` features. The descriptor heap is recent, and it sets the floor. By the
+  reports on [vulkan.gpuinfo.org](https://vulkan.gpuinfo.org):
+  - **NVIDIA:** Turing or newer - GeForce GTX 16 and RTX 20 series and later, Quadro RTX and T series, RTX A, Ada and
+    Blackwell. Ampere and newer report it from driver 582, Turing from driver 595.
+  - **AMD:** RDNA 3 or newer - Radeon RX 7000 and RX 9000 series, Radeon PRO W7000, and Radeon 740M, 760M, 780M and
+    newer integrated graphics, with a current driver.
+  - **Intel:** no Windows driver reports the descriptor heap yet.
+
+  The engine is developed and tested on an NVIDIA Quadro RTX 4000 with NVIDIA's
   [Vulkan developer driver](https://developer.nvidia.com/vulkan-driver); other GPUs have not been tested.
 - **No Vulkan SDK.** The Slang shader compiler ships in the
   [`Adamantium.Vulkan.Slang`](https://www.nuget.org/packages/Adamantium.Vulkan.Slang) package.
