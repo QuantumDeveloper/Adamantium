@@ -234,7 +234,7 @@ public class ForwardPlusRenderingProcessor : RenderingProcessor
             effect.World.SetValue(transformation.WorldMatrixF);
             if (material?.Texture != null)
             {
-                effect.SampleType.SetResource(GraphicsDevice.SamplerStates.LinearRepeat);
+                effect.SampleType.SetResource(SamplerStates.LinearRepeat);
                 effect.ShaderTexture.SetResource(material.Texture);
                 effect.ForwardPlusTexturedPass.Apply();
             }

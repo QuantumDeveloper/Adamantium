@@ -3,60 +3,59 @@ using System.Collections.Generic;
 using Adamantium.Mathematics;
 using MessagePack;
 
-namespace Adamantium.Graphics.Core.Models
+namespace Adamantium.Graphics.Core.Models;
+
+public partial class SceneData
 {
-   public partial class SceneData
+   //Класс для хранения меша, собранного из текстурных координат, вершин и нормалей.
+   //Содержит в себе всю информацию о геометрии, положении меша в пространстве и его видимости, а так же анимацию, если она присутствует.
+   public class Model
    {
-      //Класс для хранения меша, собранного из текстурных координат, вершин и нормалей.
-      //Содержит в себе всю информацию о геометрии, положении меша в пространстве и его видимости, а так же анимацию, если она присутствует.
-      public class Model
+      [SerializationConstructor]
+      public Model()
       {
-         [SerializationConstructor]
-         public Model()
+         Dependencies = new List<Model>();
+         Meshes = new List<Mesh>();
+         Rotation = QuaternionF.Identity;
+         Scale = Vector3F.One;
+      }
+
+      public Model(Model parent = null, String id = "", String name = "") : this()
+      {
+         ID = id;
+         Name = name;
+         Parent = parent;
+      }
+
+      internal void AddDependency(Model data)
+      {
+         if (!Dependencies.Contains(data))
          {
-            Dependencies = new List<Model>();
-            Meshes = new List<Mesh>();
-            Rotation = QuaternionF.Identity;
-            Scale = Vector3F.One;
+            Dependencies.Add(data);
          }
+      }
 
-         public Model(Model parent = null, String id = "", String name = "") : this()
-         {
-            ID = id;
-            Name = name;
-            Parent = parent;
-         }
+      public override string ToString()
+      {
+         return Name + ID;
+      }
 
-         internal void AddDependency(Model data)
-         {
-            if (!Dependencies.Contains(data))
-            {
-               Dependencies.Add(data);
-            }
-         }
+      [IgnoreMember]
+      public Model Parent { get; set; }
 
-         public override string ToString()
-         {
-            return Name + ID;
-         }
+      public List<Model> Dependencies { get; set; }
 
-         [IgnoreMember]
-         public Model Parent { get; set; }
+      public String Name { get; set; }
 
-         public List<Model> Dependencies { get; set; }
+      public String ID { get; set; }
 
-         public String Name { get; set; }
+      public Vector3F Scale { get; set; }
 
-         public String ID { get; set; }
+      public Vector3F Position { get; set; }
 
-         public Vector3F Scale { get; set; }
+      public QuaternionF Rotation { get; set; }
 
-         public Vector3F Position { get; set; }
+      public List<Mesh> Meshes { get; set; }
 
-         public QuaternionF Rotation { get; set; }
-
-         public List<Mesh> Meshes { get; set; }
-
-        }
    }
 }

@@ -1,7 +1,6 @@
-﻿namespace Adamantium.Graphics.Core
+﻿namespace Adamantium.Graphics.Core;
+
+public interface IEnable
 {
-    public interface IEnable
-    {
-        bool IsEnabled { get; set; }
-    }
+    bool IsEnabled { get; set; }
 }

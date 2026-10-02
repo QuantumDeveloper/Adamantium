@@ -1,8 +1,7 @@
-﻿namespace Adamantium.Graphics.Core.Content
+﻿namespace Adamantium.Graphics.Core.Content;
+
+public class ContentLoadOptions
 {
-   public class ContentLoadOptions
-   {
-      public bool AllowDuplication { get; set; }
-      public bool IgnoreRootDirectory { get; set; }
-   }
+   public bool AllowDuplication { get; set; }
+   public bool IgnoreRootDirectory { get; set; }
 }

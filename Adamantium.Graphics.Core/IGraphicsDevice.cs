@@ -44,9 +44,6 @@ public interface IDrawableDevice
 
 public interface IDestroyableDevice
 {
-    void Destroy(DescriptorSetLayout layout);
-    void Destroy(PipelineLayout layout);
-    void Destroy(Sampler sampler);
     void Destroy(Buffer buffer);
     void Destroy(DeviceMemory deviceMemory);
     void Destroy(Image image);
@@ -123,8 +120,6 @@ public interface IDynamicStateDevice
 
     void SetVertexBuffers(params IBuffer[] vertexBuffers);
     
-    public SamplerStateCollection SamplerStates { get; }
-    
     Queue GraphicsQueue { get; }
     
     IRenderTarget CurrentRenderTarget { get; }
@@ -168,12 +163,10 @@ public unsafe interface IGraphicsDevice : IDrawableDevice, IDynamicStateDevice, 
     /// <summary>Remember that this pass.s shaders are now bound to the current command buffer.</summary>
     void ShadersBound(object pass);
 
-    DescriptorSetLayout CreateDescriptorSetLayout(DescriptorSetLayoutCreateInfo layoutCreateInfo);
-    
     CommandBuffer CurrentCommandBuffer { get; }
 
     /// <summary>Register a semaphore the next <see cref="Submit"/> must wait on (timelineValue=0 for binary).</summary>
-    void AddWaitSemaphore(Semaphore semaphore, PipelineStageFlagBits stage, ulong timelineValue = 0);
+    void AddWaitSemaphore(Semaphore semaphore, PipelineStageFlagBits2 stage, ulong timelineValue = 0);
 
     /// <summary>Register a semaphore the next <see cref="Submit"/> must signal (timelineValue=0 for binary).</summary>
     void AddSignalSemaphore(Semaphore semaphore, ulong timelineValue = 0);
@@ -185,10 +178,6 @@ public unsafe interface IGraphicsDevice : IDrawableDevice, IDynamicStateDevice, 
     public void UnmapMemory(DeviceMemory memory);
     
     public IEffectPass CurrentEffectPass { get; set; }
-
-    PipelineLayout CreatePipelineLayout(PipelineLayoutCreateInfo createInfo);
-
-    uint GetDescriptorSetLayoutOffset(DescriptorSetLayout layout, uint bindingSlot);
 
     /// <param name="name">Readable identity of the shader (effect.technique.pass.stage) - names its binary-cache file.</param>
     ShaderEXT CreateShader(ShaderCreateInfoEXT shaderCreateInfo, string name = null);
@@ -202,23 +191,7 @@ public unsafe interface IGraphicsDevice : IDrawableDevice, IDynamicStateDevice, 
     void AddEffectPool(EffectPool pool);
     
     void RemoveEffectPool(EffectPool pool);
-    
-    void BindDescriptorBuffers(CommandBuffer commandBuffer, params DescriptorBufferBindingInfoEXT[] bindings);
-    
-    // void SetDescriptorBufferOffsets(CommandBuffer commandBuffer, PipelineBindPoint pipelineBindPoint, PipelineLayout layout, uint dataSet, uint setCount, uint[] bufferIndices, ulong[] offsets);
-    
-    uint GetDescriptorSetLayoutSize(DescriptorSetLayout layout);
-    
-    ulong UniformBufferDescriptorSize { get; }
-    
-    ulong SamplerDescriptorSize { get; }
-    
-    ulong SampledImageDescriptorSize { get; }
-    
-    uint DescriptorBufferOffsetAlignment { get; }
 
-    void GetDescriptor(DescriptorGetInfoEXT descriptorGetInfoExt, uint descriptorSize, nuint descriptorPtr);
-    
     Color ClearColor { get; set; }
     
     Device LogicalDevice { get; }
@@ -284,12 +257,12 @@ public unsafe interface IGraphicsDevice : IDrawableDevice, IDynamicStateDevice, 
 
     void InsertImageMemoryBarrier(CommandBuffer commandBuffer,
         ITexture texture,
-        AccessFlagBits sourceAccessMask,
-        AccessFlagBits destinationAccessMask,
+        AccessFlagBits2 sourceAccessMask,
+        AccessFlagBits2 destinationAccessMask,
         ImageLayout oldLayout,
         ImageLayout newLayout,
-        PipelineStageFlagBits sourceStageMask,
-        PipelineStageFlagBits destinationStageMask);
+        PipelineStageFlagBits2 sourceStageMask,
+        PipelineStageFlagBits2 destinationStageMask);
 
     void SetObjectDebugName(ulong objectHandle, ObjectType objectType, string name);
 }

@@ -38,8 +38,8 @@ All packages share one version and are released together.
 
 - **.NET 10.**
 - **Windows 10 or 11, x64.** The macOS code exists but has not been built and run recently, so it is not claimed.
-- **A GPU and driver with Vulkan 1.4** and `VK_EXT_shader_object`, `VK_EXT_descriptor_buffer`,
-  `VK_EXT_descriptor_heap`, `VK_KHR_dynamic_rendering`, `VK_KHR_synchronization2`, `VK_KHR_buffer_device_address`.
+- **A GPU and driver with Vulkan 1.4**, `VK_EXT_shader_object` and `VK_EXT_descriptor_heap`, and the `shaderInt64`,
+  `shaderDrawParameters` and `geometryShader` features.
   `VK_EXT_descriptor_heap` is recent and not every driver has it yet. The engine is developed and tested on an NVIDIA
   Quadro RTX 4000 with NVIDIA's
   [Vulkan developer driver](https://developer.nvidia.com/vulkan-driver); other GPUs have not been tested.

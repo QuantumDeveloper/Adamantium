@@ -1,28 +1,27 @@
 ﻿using System;
 using System.Collections.Generic;
 
-namespace Adamantium.Graphics.Core.Models
+namespace Adamantium.Graphics.Core.Models;
+
+public partial class SceneData
 {
-   public partial class SceneData
+   /// <summary>
+   /// Class containing all needed information for animation
+   /// <remarks>Inherits frame information for each joint</remarks>
+   /// </summary>
+   public class AnimationCollection:Dictionary<String, FrameCollection>
    {
       /// <summary>
-      /// Class containing all needed information for animation
-      /// <remarks>Inherits frame information for each joint</remarks>
+      /// Default AnimationData constructor
       /// </summary>
-      public class AnimationCollection:Dictionary<String, FrameCollection>
-      {
-         /// <summary>
-         /// Default AnimationData constructor
-         /// </summary>
-         public AnimationCollection()
-         {}
+      public AnimationCollection()
+      {}
 
-         /// <summary>
-         /// Copy constructor for AnimationData class
-         /// </summary>
-         /// <param name="copy"></param>
-         public AnimationCollection(AnimationCollection copy):base(copy)
-         {}
-      }
+      /// <summary>
+      /// Copy constructor for AnimationData class
+      /// </summary>
+      /// <param name="copy"></param>
+      public AnimationCollection(AnimationCollection copy):base(copy)
+      {}
    }
 }

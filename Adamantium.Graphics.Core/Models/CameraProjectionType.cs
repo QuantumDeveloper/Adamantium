@@ -1,9 +1,8 @@
-﻿namespace Adamantium.Graphics.Core.Models
+﻿namespace Adamantium.Graphics.Core.Models;
+
+//Тип проекции камеры
+public enum CameraProjectionType
 {
-   //Тип проекции камеры
-   public enum CameraProjectionType
-   {
-      Pespective,
-      Orthogonal
-   }
+   Pespective,
+   Orthogonal
 }

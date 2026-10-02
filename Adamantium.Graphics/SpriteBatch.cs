@@ -132,7 +132,7 @@ namespace Adamantium.Graphics
             spriteSortMode = sortMode;
             transformMatrix = transformationMatrix;
 
-            assignedSamplerState = samplerState ?? graphicsDevice.SamplerStates.AnisotropicRepeat;
+            assignedSamplerState = samplerState ?? SamplerStates.AnisotropicRepeat;
             
             customEffect = effect;
 

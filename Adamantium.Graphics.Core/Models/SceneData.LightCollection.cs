@@ -1,18 +1,17 @@
 ﻿using System;
 using System.Collections.Generic;
 
-namespace Adamantium.Graphics.Core.Models
+namespace Adamantium.Graphics.Core.Models;
+
+public partial class SceneData
 {
-   public partial class SceneData
+   public class LightCollection : Dictionary<String, SceneData.Light>
    {
-      public class LightCollection : Dictionary<String, SceneData.Light>
-      {
-         public LightCollection()
-         { }
+      public LightCollection()
+      { }
 
-         public LightCollection(LightCollection collection):base(collection)
-         { }
+      public LightCollection(LightCollection collection):base(collection)
+      { }
 
-      }
    }
 }

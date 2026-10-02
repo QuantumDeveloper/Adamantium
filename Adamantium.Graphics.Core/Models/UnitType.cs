@@ -1,8 +1,7 @@
-﻿namespace Adamantium.Graphics.Core.Models
+﻿namespace Adamantium.Graphics.Core.Models;
+
+public enum UnitType
 {
-   public enum UnitType
-   {
-      Centimeter,
-      Meter
-   }
+   Centimeter,
+   Meter
 }
