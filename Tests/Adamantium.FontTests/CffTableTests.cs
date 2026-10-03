@@ -46,6 +46,17 @@ public class CffTableTests
     }
 
     [Test]
+    public void DeltaArrayIsDecodedAsARunningSum()
+    {
+        byte[] blueValues = [127, 151, 248, 122, 151, 6];
+        double[] decoded = [-12, 0, 486, 498];
+
+        var dict = new PrivateDictParser(blueValues, new CFFFont(new CFFFontSet(), CFFVersion.CFF));
+
+        Assert.That(dict[DictOperatorsType.BlueValues].AsList(), Is.EqualTo(decoded));
+    }
+
+    [Test]
     public void BlendAppliesEachDeltaToItsOwnRegion()
     {
         var regions = new VariationRegionList

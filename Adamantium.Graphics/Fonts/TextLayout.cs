@@ -768,18 +768,11 @@ public class TextLayout : DisposableObject
 
         var glyphWidth = glyph.BoundingRectangle.Width * scale;
         var glyphHeight = glyph.BoundingRectangle.Height * scale;
-        var glyphTop = (glyphBase - glyphHeight) + verticalShift;
+        var glyphTop = (Math.Round(glyphBase) - glyphHeight) + verticalShift;
         glyphLeft += horizontalShift;
 
-        // Y snaps to shared baseline/ascender rows, rounded once, so round and flat letters sit on the same pixel row.
-        var baseR = (int)System.Math.Round(glyphBase);
-        var ascLine = glyphBase - Font.Ascender * scale;
-        var ascR = (int)System.Math.Round(ascLine);
-        var top = ascR + (int)System.Math.Round(glyphTop - ascLine);
-        var bottom = baseR - (int)System.Math.Round(glyphBase - (glyphTop + glyphHeight));
-
         // X stays sub-pixel: snapping fractional advances made equal gaps render a pixel apart.
-        return new RectangleF((float)glyphLeft, top, (float)glyphWidth, bottom - top);
+        return new RectangleF((float)glyphLeft, (float)glyphTop, (float)glyphWidth, (float)glyphHeight);
     }
 }
 
