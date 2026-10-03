@@ -288,18 +288,18 @@ namespace Adamantium.Fonts.Parsers.CFF
         }
         protected GenericOperandResult Delta(List<GenericOperandResult> rawOperands)
         {
-            List<double> deltas = new List<double>();
+            List<double> values = new List<double>();
 
             List<double> numbers = NumberArray(rawOperands).AsList();
 
-            deltas.Add(numbers[0]); // add first one, because there is at least one element in deltas 
-
-            for (var i = 1; i < numbers.Count; ++i)
+            double value = 0;
+            foreach (var number in numbers)
             {
-                deltas.Add(numbers[i] - numbers[i - 1]);
+                value += number;
+                values.Add(value);
             }
 
-            return deltas;
+            return values;
         }
 
         protected (byte HiNibble, byte LoNibble) ParseNibbles(byte raw)

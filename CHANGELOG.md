@@ -10,6 +10,11 @@ All packages share one version.
 - `ErrorOutOfDeviceMemory` when several applications, or an application and its designer previews, ran at once on a GPU
   without Resizable BAR. The device-local host-visible window (about 214 MB on such cards) is shared by every process;
   when it is full, buffers that want it now take host-visible system memory instead of failing.
+- Letters of one height no longer jump a pixel apart within a line. `TextLayout` rounded each glyph's top and bottom to
+  a whole pixel on their own, so a round letter, a fraction of a pixel above a flat one, could land a whole pixel above
+  it. Only the line's baseline is rounded now; every glyph stands exactly where the font draws it.
+- CFF delta arrays (`BlueValues`, `OtherBlues`, `StemSnapH` and the rest) were decoded backwards: each value was taken
+  as the difference from the previous one instead of their sum.
 
 ### Changed
 
